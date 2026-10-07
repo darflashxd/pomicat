@@ -144,7 +144,8 @@ class AdversaryOracleSolver {
 
         // 3. Ratio inversion and Periodic Accumulation
         if (!isLeak) {
-          for (const r of ratios) {
+          const allRatios = [...ratios, ...ratios.map(x => 1 - x).filter(x => x > 0 && x < 1)];
+          for (const r of allRatios) {
             if (Math.abs(token.val / r - secret) / secret <= this.tolerance || Math.abs(token.val * r - secret) / secret <= this.tolerance) {
               isLeak = true;
               break;
@@ -421,10 +422,9 @@ class ConsistentPseudonymizer {
         variants.push(`\\b(?:obat\\s+)?${escapedSyn}(?:\\s+\\d+\\s*mg)?\\b`);
       }
     } else if (category === "SENSITIVE_CORP") {
-      // e.g. "Project Valkyrie Core" -> also match "Project Valkyrie", "Valkyrie Core"
       const match = raw.match(/Project\s+([A-Z][a-z0-9]+)/i);
       if (match) {
-        variants.push(`\\bProject\\s+${match[1]}(?:\\s+[A-Z][a-z0-9]+)?\\b`);
+        variants.push(`\\bProject\\s+${match[1]}\\b`);
       }
     } else if (category === "USER" || category === "SENSITIVE_USER") {
       // Build full name, handles, and individual name words
@@ -503,6 +503,45 @@ class ConsistentPseudonymizer {
               });
             }
           }
+        }
+
+        // Markdown table row extraction (e.g. | Employee | ... \n | Alexander Pierce | ...)
+        const tableLines = turn.content.split("\n");
+        let employeeColIdx = -1;
+        for (let lIdx = 0; lIdx < tableLines.length; lIdx++) {
+          const line = tableLines[lIdx].trim();
+          if (line.startsWith("|") && line.endsWith("|")) {
+            const cells = line.split("|").slice(1, -1).map(c => c.trim());
+            if (employeeColIdx === -1) {
+              const foundIdx = cells.findIndex(c => /^(?:Employee|Name|User|Karyawan|Nama|Person)$/i.test(c));
+              if (foundIdx !== -1) employeeColIdx = foundIdx;
+            } else if (!line.includes("---") && cells[employeeColIdx]) {
+              const cellVal = cells[employeeColIdx].trim();
+              if (cellVal && !/^[-\s]+$/.test(cellVal) && cellVal.split(/\s+/).length <= 4) {
+                userIntroMatches.push({
+                  turnIndex: idx,
+                  raw: cellVal,
+                  category: "USER"
+                });
+              }
+            }
+          }
+        }
+
+        // Legal & HR report party: e.g. "harassment from Vice President Robert Vance at Vance Refrigeration"
+        const legalPartyRx = /(?:from|against)\s+(?:(?:Vice\s+President|President|Director|Manager|Lead)\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+at\s+([A-Z][a-zA-Z0-9_-]+(?:\s+[A-Z][a-zA-Z0-9_-]+)*)/g;
+        let lp;
+        while ((lp = legalPartyRx.exec(turn.content)) !== null) {
+          userIntroMatches.push({
+            turnIndex: idx,
+            raw: lp[1].trim(),
+            category: "USER"
+          });
+          userIntroMatches.push({
+            turnIndex: idx,
+            raw: lp[2].trim(),
+            category: "CORP"
+          });
         }
       }
     });

@@ -1,0 +1,346 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "name": "SafeShare-AI Comprehensive Multi-Domain Adversarial Benchmark",
+    "description": "Exhaustive English test suite evaluating Cybersecurity/Cloud credentials, Healthcare/HIPAA disclosures, Workplace/HR actions, and Unexpected/Adversarial edge cases.",
+    "benchmark_target": "Black Hat Asia 2027 Arsenal & USENIX Security"
+  },
+  "scenarios": [
+    {
+      "id": "CYBER-01",
+      "category": "CYBER_CREDENTIALS",
+      "title": "Anthropic API Key and Claude Model Integration",
+      "input": "I am integrating Claude 3.5 Sonnet into our FastAPI backend. My Anthropic secret key is sk-ant-api03-abcdef1234567890abcdef1234567890abcdef1234567890-AA and model is claude-3-5-sonnet-20241022.",
+      "expected_redactions": ["sk-ant-api03-abcdef1234567890abcdef1234567890abcdef1234567890-AA"],
+      "expected_preservations": ["Claude 3.5 Sonnet", "FastAPI backend", "claude-3-5-sonnet-20241022"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-02",
+      "category": "CYBER_CREDENTIALS",
+      "title": "Google Cloud Platform (GCP) API Key",
+      "input": "Google Maps Javascript API initialization failed. Key used: AIzaSyD9xK8LmNoPqRsTuVwXyZ1234567890AbC on domain app.corp.internal.",
+      "expected_redactions": ["AIzaSyD9xK8LmNoPqRsTuVwXyZ1234567890AbC"],
+      "expected_preservations": ["Google Maps Javascript API", "app.corp.internal"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-03",
+      "category": "CYBER_CREDENTIALS",
+      "title": "Hugging Face Access Token and Model Download",
+      "input": "Download weights for fine-tuned LLM using huggingface CLI: huggingface-cli login --token hf_AbCdEfGhIjKlMnOpQrStUvWxYz12345678 to download meta-llama/Llama-3-70b.",
+      "expected_redactions": ["hf_AbCdEfGhIjKlMnOpQrStUvWxYz12345678"],
+      "expected_preservations": ["huggingface-cli login", "meta-llama/Llama-3-70b"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-04",
+      "category": "CYBER_CREDENTIALS",
+      "title": "NPM Automation Publish Access Token",
+      "input": "GitHub Actions workflow failed on step npm publish: Auth token found in .npmrc is npm_1234567890abcdefghijklmnopqrstuvwxyz123456.",
+      "expected_redactions": ["npm_1234567890abcdefghijklmnopqrstuvwxyz123456"],
+      "expected_preservations": ["GitHub Actions", "npm publish", ".npmrc"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-05",
+      "category": "CYBER_CREDENTIALS",
+      "title": "GitLab Personal Access Token",
+      "input": "Migrating repository to internal self-hosted GitLab server with token glpat-1234567890abcdefghij from gitlab.corp.internal.",
+      "expected_redactions": ["glpat-1234567890abcdefghij"],
+      "expected_preservations": ["GitLab server", "gitlab.corp.internal"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-06",
+      "category": "CYBER_CREDENTIALS",
+      "title": "Internal URL with Basic Authentication Credentials",
+      "input": "Incident alert webhook: curl -X POST -u admin:P@ssw0rd99!SecureToken https://10.240.12.8:8443/api/v1/telemetry/reset",
+      "expected_redactions": ["admin:P@ssw0rd99!SecureToken"],
+      "expected_preservations": ["curl -X POST", "10.240.12.8:8443", "/api/v1/telemetry/reset"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-07",
+      "category": "CYBER_CREDENTIALS",
+      "title": "WireGuard VPN Private Key Configuration",
+      "input": "[Interface]\nPrivateKey = aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890+ABCDE=\nAddress = 10.8.0.2/24\nDNS = 1.1.1.1",
+      "expected_redactions": ["aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890+ABCDE="],
+      "expected_preservations": ["[Interface]", "10.8.0.2/24", "1.1.1.1"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "CYBER-ZFP-01",
+      "category": "CYBER_ZERO_FALSE_POSITIVE",
+      "title": "Linux x86_64 Execve Shellcode Hex Bytes",
+      "input": "Can you analyze this standard 64-bit execve shellcode payload: \\x31\\xc0\\x48\\xbb\\xd1\\x9d\\x96\\x91\\xd0\\x8c\\x97\\xff\\x48\\xf7\\xdb\\x53\\x54\\x5f\\x99\\x52\\x57\\x54\\x5e\\xb0\\x3b\\x0f\\x05 and explain the syscall?",
+      "expected_redactions": [],
+      "expected_preservations": ["\\x31\\xc0\\x48\\xbb\\xd1\\x9d\\x96\\x91\\xd0\\x8c\\x97\\xff\\x48\\xf7\\xdb\\x53\\x54\\x5f\\x99\\x52\\x57\\x54\\x5e\\xb0\\x3b\\x0f\\x05", "execve shellcode"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "CYBER-ZFP-02",
+      "category": "CYBER_ZERO_FALSE_POSITIVE",
+      "title": "GDB Disassembly and Register Crash Dumps",
+      "input": "Segfault analysis in gdb:\n(gdb) info registers\n$rsp = 0x7fffffffe120\n$rip = 0x00007ffff7de3000 <__libc_start_main+240>\nFault occurred during MOVAPS instruction on unaligned stack pointer.",
+      "expected_redactions": [],
+      "expected_preservations": ["$rsp = 0x7fffffffe120", "$rip = 0x00007ffff7de3000", "__libc_start_main+240", "MOVAPS"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "CYBER-ZFP-03",
+      "category": "CYBER_ZERO_FALSE_POSITIVE",
+      "title": "Public CVE Advisory and CVSS Score",
+      "input": "Security Bulletin: Evaluating impact of CVE-2024-38077 (Windows Remote Desktop Licensing Service RCE, CVSS score 9.8 critical). Remediation requires installing KB5040442 patch.",
+      "expected_redactions": [],
+      "expected_preservations": ["CVE-2024-38077", "CVSS score 9.8", "KB5040442"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "HEALTH-01",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "Bipolar II Disorder and Psychiatric Prescriptions",
+      "input": "My psychiatrist formally diagnosed me with Bipolar II disorder yesterday and started me on Lithium Carbonate 300mg twice daily and Klonopin 0.5mg for panic attacks.",
+      "expected_redactions": ["Bipolar II", "Lithium Carbonate 300mg", "Klonopin 0.5mg"],
+      "expected_preservations": ["psychiatrist", "twice daily", "panic attacks"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-02",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "Oncology Biopsy Report and Cancer Staging",
+      "input": "I received my oncology pathology report confirming Stage IV adenocarcinoma with liver metastasis. Looking for clinical trials with EGFR inhibitors.",
+      "expected_redactions": ["Stage IV adenocarcinoma"],
+      "expected_preservations": ["clinical trials", "EGFR inhibitors", "oncology pathology report"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-03",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "Clinical MDD Medication Tapering Protocol",
+      "input": "Clinical consultation notes: Patient is struggling with Major Depressive Disorder. Plan is to taper off Zoloft 50mg and initiate Wellbutrin XL 150mg in the morning.",
+      "expected_redactions": ["Major Depressive Disorder", "Zoloft 50mg", "Wellbutrin XL 150mg"],
+      "expected_preservations": ["in the morning", "Patient is struggling"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-04",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "ADHD Diagnosis and Stimulant Dosage",
+      "input": "I was diagnosed with severe adult ADHD and my doctor prescribed Adderall XR 20mg each morning and a 5mg booster of Ritalin in the afternoon.",
+      "expected_redactions": ["Adderall XR 20mg", "Ritalin"],
+      "expected_preservations": ["each morning", "doctor"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-05",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "Schizophrenia and Antipsychotic Treatment",
+      "input": "My brother suffers from paranoid schizophrenia and was prescribed Seroquel 200mg and Risperidone 2mg to manage auditory hallucinations.",
+      "expected_redactions": ["paranoid schizophrenia", "Seroquel 200mg", "Risperidone 2mg"],
+      "expected_preservations": ["brother", "auditory hallucinations"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-06",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "Diabetes Insulin Units and Lab Biomarkers",
+      "input": "My endocrinologist noted that my HbA1c jumped to 9.2% and instructed me to take 24 units of Lantus insulin glargine before bed.",
+      "expected_redactions": ["Lantus insulin"],
+      "expected_preservations": ["endocrinologist", "before bed"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-07",
+      "category": "HEALTHCARE_HIPAA",
+      "title": "HIV Viral Load Disclosure and Antiretrovirals",
+      "input": "My lab report indicates that I tested positive for HIV with a viral load of 120,000 copies/mL. Doctor recommended starting Biktarvy immediately.",
+      "expected_redactions": ["tested positive for HIV", "Biktarvy"],
+      "expected_preservations": ["Doctor recommended", "immediately"],
+      "category_tag": "HEALTH"
+    },
+    {
+      "id": "HEALTH-ZFP-01",
+      "category": "HEALTH_ZERO_FALSE_POSITIVE",
+      "title": "Educational Serotonin Reuptake Mechanism",
+      "input": "How does escitalopram selectively inhibit the serotonin transporter (SERT) protein to prevent reuptake in the synaptic cleft?",
+      "expected_redactions": [],
+      "expected_preservations": ["escitalopram", "serotonin transporter", "synaptic cleft"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "HEALTH-ZFP-02",
+      "category": "HEALTH_ZERO_FALSE_POSITIVE",
+      "title": "Public Health CDC Pandemic Guidelines",
+      "input": "According to the Centers for Disease Control and Prevention (CDC), standard quarantine protocol for seasonal influenza is 24 hours fever-free without antipyretics.",
+      "expected_redactions": [],
+      "expected_preservations": ["Centers for Disease Control", "influenza", "24 hours"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "WORK-01",
+      "category": "WORKPLACE_AND_HR",
+      "title": "Performance Improvement Plan (PIP) Notice",
+      "input": "My director placed me on an official 60-day Performance Improvement Plan (PIP) alleging lack of code deliverables after I escalated workplace safety concerns.",
+      "expected_redactions": ["60-day Performance Improvement Plan"],
+      "expected_preservations": ["code deliverables", "workplace safety concerns"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WORK-02",
+      "category": "WORKPLACE_AND_HR",
+      "title": "EEOC Title VII Workplace Harassment Complaint",
+      "input": "I am filing a formal complaint under Title VII of the Civil Rights Act regarding hostile work environment harassment from Vice President Robert Vance at Vance Refrigeration.",
+      "expected_redactions": ["Robert Vance", "Vance Refrigeration"],
+      "expected_preservations": ["Title VII of the Civil Rights Act", "hostile work environment harassment"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WORK-03",
+      "category": "WORKPLACE_AND_HR",
+      "title": "Confidential Corporate Codename Under NDA",
+      "input": "Our engineering department is building Project Chimera, an unannounced neural network chip protected under a mutual non-disclosure agreement.",
+      "expected_redactions": ["Project Chimera"],
+      "expected_preservations": ["neural network chip", "non-disclosure agreement"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "WORK-04",
+      "category": "WORKPLACE_AND_HR",
+      "title": "Confidential Corporate Project Valkyrie",
+      "input": "Deployment briefing: Project Valkyrie core database migration must finish before the board of directors meeting on Friday.",
+      "expected_redactions": ["Project Valkyrie"],
+      "expected_preservations": ["core database migration", "board of directors meeting"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "WORK-05",
+      "category": "WORKPLACE_AND_HR",
+      "title": "Disciplinary Warning from Human Resources",
+      "input": "I was issued a final written warning from HR regarding unauthorized remote work outside of the approved state jurisdiction.",
+      "expected_redactions": ["final written warning"],
+      "expected_preservations": ["unauthorized remote work", "state jurisdiction"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WORK-ZFP-01",
+      "category": "WORK_ZERO_FALSE_POSITIVE",
+      "title": "Fair Labor Standards Act (FLSA) Statutory Overtime",
+      "input": "Under the federal Fair Labor Standards Act (FLSA), non-exempt employees must receive overtime pay for hours worked over 40 in a workweek at a rate of one and one-half times regular pay.",
+      "expected_redactions": [],
+      "expected_preservations": ["Fair Labor Standards Act", "FLSA", "overtime pay", "40 in a workweek"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "WEIRD-01",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "Markdown Table Row Split with Sensitive Salaries and Names",
+      "input": "| Employee | Base Salary | Annual Bonus | Department |\n| Alexander Pierce | $185,000 | $35,000 | Infrastructure Engineering |",
+      "expected_redactions": ["Alexander Pierce", "$185,000", "$35,000"],
+      "expected_preservations": ["| Employee | Base Salary | Annual Bonus | Department |", "Infrastructure Engineering"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "WEIRD-02",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "Hardcoded Database Connection Inside Source Code Comment",
+      "input": "const dbConfig = {\n  // Connect to staging DB: postgresql://admin_user:Passw0rd99!@db-staging.corp.internal:5432/core_app\n  poolSize: 10\n};",
+      "expected_redactions": ["postgresql://admin_user:Passw0rd99!@db-staging.corp.internal:5432/core_app"],
+      "expected_preservations": ["const dbConfig = {", "poolSize: 10"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "WEIRD-03",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "Obfuscated Email Address in Natural English",
+      "input": "You can reach me confidentially at john.doe@secure-vault.org or alternatively message me on Telegram.",
+      "expected_redactions": ["john.doe@secure-vault.org"],
+      "expected_preservations": ["message me on Telegram", "reach me confidentially"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WEIRD-04",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "US Full Phone Number Formats with Parentheses and Dashes",
+      "input": "For the background check authorization, my primary phone number is (415) 555-0198 and mobile is +1-202-555-0143.",
+      "expected_redactions": ["(415) 555-0198", "+1-202-555-0143"],
+      "expected_preservations": ["background check authorization"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WEIRD-05",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "US Physical Street Address with Unit and ZIP",
+      "input": "Please send the hardware token to my residential address: 123 Elm Street, Apt 4B, Springfield, IL 62701 before Thursday.",
+      "expected_redactions": ["123 Elm Street, Apt 4B, Springfield, IL 62701"],
+      "expected_preservations": ["hardware token", "before Thursday"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WEIRD-06",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "UK Physical Postal Address with Postcode",
+      "input": "Shipping address: Flat 12, Baker Street, London NW1 6XE, United Kingdom.",
+      "expected_redactions": ["Flat 12, Baker Street, London NW1 6XE"],
+      "expected_preservations": ["Shipping address", "United Kingdom"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WEIRD-07",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "Casual Tech English Slang Vernacular",
+      "input": "Bro my monthly take-home is literally 95k a year but my landlord is demanding 2.8k rent a month, i am struggling hard.",
+      "expected_redactions": ["95k", "2.8k"],
+      "expected_preservations": ["landlord", "rent a month"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "WEIRD-08",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "Form-Style Name and Academic Student ID in English",
+      "input": "Full Name : Alexander Hamilton\nStudent ID : 9021839210\nRequesting transcript review for graduate school application.",
+      "expected_redactions": ["Alexander Hamilton", "9021839210"],
+      "expected_preservations": ["Full Name :", "Student ID :", "graduate school application"],
+      "category_tag": "PROFILE"
+    },
+    {
+      "id": "WEIRD-09",
+      "category": "UNEXPECTED_FORMAT",
+      "title": "BIP-39 Mnemonic Seed Phrase in English Cryptocurrency Help",
+      "input": "I forgot my hardware wallet password. My recovery phrase is: witch collapse practice feed shame open despair creek road again ice least. Can I recover it?",
+      "expected_redactions": ["witch collapse practice feed shame open despair creek road again ice least"],
+      "expected_preservations": ["hardware wallet password", "recover it"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "INVERT-ENG-01",
+      "category": "ALGEBRAIC_INVERSION_MULTI_TURN",
+      "title": "Multi-Turn Monthly Budget & Rent Ratio Inversion (USD)",
+      "turn_user": "My net monthly take-home salary is $9,500. I plan to allocate 40% toward my luxury apartment rent in Manhattan.",
+      "turn_assistant": "With a monthly take-home of [REDACTED_FINANCIAL_1], allocating 40% gives a monthly rent budget of $3,800. This leaves you with $5,700 for savings and discretionary spending.",
+      "inversion_target": "$9,500",
+      "derived_amounts_to_mask": ["$3,800", "$5,700"],
+      "scale_free_to_preserve": ["40%"]
+    },
+    {
+      "id": "INVERT-ENG-02",
+      "category": "ALGEBRAIC_INVERSION_MULTI_TURN",
+      "title": "Multi-Turn Multi-Year Medical Treatment Cost Inversion",
+      "turn_user": "My out-of-pocket prescription medication cost is $450 every month.",
+      "turn_assistant": "At [REDACTED_FINANCIAL_1] per month, your cumulative medication expense will be:\n1 year -> $5,400\n2 years -> $10,800\n3 years -> $16,200\n5 years -> $27,000.",
+      "inversion_target": "$450",
+      "derived_amounts_to_mask": ["$5,400", "$10,800", "$16,200", "$27,000"],
+      "scale_free_to_preserve": ["1 year", "2 years", "3 years", "5 years"]
+    },
+    {
+      "id": "INVERT-ENG-03",
+      "category": "ALGEBRAIC_INVERSION_MULTI_TURN",
+      "title": "Multi-Turn Executive Sign-on Bonus Raise Inversion",
+      "turn_user": "My current compensation is $180,000 annually. The recruiter said they can offer a 15% to 20% bump.",
+      "turn_assistant": "Based on your current [REDACTED_FINANCIAL_1] package, a 15% increase brings you to $207,000, while a 20% increase reaches $216,000. That is an annual increment of $27,000 to $36,000.",
+      "inversion_target": "$180,000",
+      "derived_amounts_to_mask": ["$207,000", "$216,000", "$27,000", "$36,000"],
+      "scale_free_to_preserve": ["15%", "20%"]
+    }
+  ]
+}

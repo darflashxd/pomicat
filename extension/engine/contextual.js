@@ -57,7 +57,13 @@ class ContextualClassifier {
       /\b(?:mortgage(?:\s+loan)?|down\s+payment|conforming\s+loan|dti|debt-to-income|ltv|loan-to-value|student\s+loans?|revolving\s+(?:debt|balance)|credit\s+limit|apr)\b/i,
       /\b(?:401\(?k\)?|roth\s+ira|capital\s+gains|family\s+trust|net\s+worth|portfolio\s+balance|deposito|wire|transfer)\b/i,
       /\b(?:racks|bands|half\s+a\s+mil|ember)\b/i,
-      /\b(?:operating\s+income|financing\s+cash\s+flow|ending\s+cash|disbursement|payroll|balances?|amount_captured)\b/i
+      /\b(?:operating\s+income|financing\s+cash\s+flow|ending\s+cash|disbursement|payroll|balances?|amount_captured)\b/i,
+      /\b(?:psychiatrist|psychologist|oncologist|endocrinologist|therapist|physician|doctor|dr\.)\b/i,
+      /\b(?:prescribed|diagnosed|diagnosis|medication|pathology\s+report|biopsy\s+results?|hba1c|viral\s+load|tested\s+positive)\b/i,
+      /\b(?:clinical\s+consultation|consultation\s+notes|patient|struggling\s+with|taper\s+off|titrate|initiate)\b/i,
+      /\b(?:pip|performance\s+improvement\s+plan|written\s+warning|harassment|hostile\s+work\s+environment|wrongful\s+termination|eeoc|title\s+vii)\b/i,
+      /\b(?:project\s+[a-z][a-z0-9_-]+|non-disclosure|nda|trade\s+secret)\b/i,
+      /\b(?:rent|renting|landlord|struggling\s+hard|cooked|paycheck)\b/i
     ];
 
     this.publicAnchors = [
@@ -85,7 +91,7 @@ class ContextualClassifier {
     for (const sent of sentences) {
       const isPersonal = this.personalAnchors.some(rx => rx.test(sent));
       const isPublic = this.publicAnchors.some(rx => rx.test(sent));
-      const hasExplicitPerson = /\b(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku|my|your|our|i|we|i\s*['`]?(?:m|ve|ll|d)?)\b/i.test(sent);
+      const hasExplicitPerson = /\b(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku|my|your|our|i|we|patient|i\s*['`]?(?:m|ve|ll|d)?)\b/i.test(sent);
 
       // Rule of Contextual Integrity:
       // If a sentence is marked with public/statistical/hypothetical anchors, PRESERVE IT (Safe O)
@@ -130,7 +136,7 @@ class ContextualClassifier {
         }
 
         // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics)
-        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?cancer|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+\d+[a-c]?)?|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|leukimia|leukemia|hiv(?:\s*positif)?|positif\s*hiv|skizofrenia|schizophrenia|bipolar(?:\s+(?:affective\s+disorder|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:lexapro|escitalopram|sertraline|zoloft|alprazolam|xanax|adderall|ritalin|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|clonazepam|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine)(?:\s*\d+\s*mg)?)/gi;
+        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy)(?:\s*[\d.]+\s*mg)?)/gi;
         const healthMatches = sent.matchAll(healthRegex);
         for (const m of healthMatches) {
           detected.push({
@@ -184,7 +190,7 @@ class ContextualClassifier {
         }
 
         // HR action check
-        const hrMatch = sent.match(/(?:Surat Peringatan (?:Pertama|Kedua|Ketiga|\d|\(SP-[1-3]\))|PHK sepihak|PIP \d+ hari|final written warning|Performance Improvement Plan)/i);
+        const hrMatch = sent.match(/(?:Surat Peringatan (?:Pertama|Kedua|Ketiga|\d|\(SP-[1-3]\))|PHK sepihak|PIP \d+ hari|(?:\d+[- ]day\s+)?Performance Improvement Plan(?:\s+\(PIP\))?|final written warning|written warning(?:\s+from\s+hr)?|disciplinary warning)/i);
         if (hrMatch) {
           detected.push({
             turnIndex,

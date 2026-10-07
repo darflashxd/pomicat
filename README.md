@@ -119,6 +119,7 @@ npm run test:all
 ```
 
 ### Specific Benchmark Suites:
+* **`npm run test:comprehensive`** — Evaluates 37 extensive multi-domain adversarial English scenarios across Cybersecurity/DevOps (Anthropic Claude keys, GCP API keys, HuggingFace, NPM, WireGuard, curl basic auth), Healthcare/HIPAA (psychotropics, oncology staging, clinical MDD transcripts), Workplace/HR (PIPs, Title VII harassment, unannounced NDA codenames), and unexpected edge cases (Markdown tables, code comments, obfuscated PII).
 * **`npm run test:financial`** — Evaluates international financial PII, Silicon Valley executive tech compensation (TC, base, RSUs, ISO strike price), direct banking (US SSN, EIN, ABA routing number, IBAN, SWIFT/BIC), GAAP parentheses negative numbers, corporate burn rates, and macroeconomic zero-false-positive controls.
 * **`npm run test:jembras`** — Tests the real-world **De Jembras** case study: verifies multi-year algebraic accumulation suppression (Rp 10.8M, 21.6M, 54M) while preserving scale-free percentages (30%, 40%) and key-value form delimiters (`name :`, `NIM :`).
 * **`npm run test:stress`** — Runs 16 out-of-the-box V3 extreme stress vectors (Indonesian NPWP, Passport, SIM, BPJS, EVM wallet, BIP-39 mnemonic, Stripe secret keys, Linux shadow hashes, Kubernetes YAML preservation).

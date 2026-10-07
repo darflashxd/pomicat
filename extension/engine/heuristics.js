@@ -84,7 +84,7 @@ class HeuristicsRedactor {
         id: "PHONE",
         name: "Phone Number",
         category: "PROFILE",
-        regex: /(?:\+?62|0)8[1-9][0-9]{7,10}\b|\b\+?1[-.\s]?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+        regex: /(?:\+?62|0)8[1-9][0-9]{7,10}\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
         replacement: "[REDACTED_PHONE]"
       },
       // 5. OpenAI API Keys (Legacy & Project keys)
@@ -94,6 +94,54 @@ class HeuristicsRedactor {
         category: "CREDENTIALS",
         regex: /\bsk-(?:proj-)?[A-Za-z0-9_-]{32,80}\b/g,
         replacement: "sk-dummy-test-key-placeholder"
+      },
+      // 5a-1. Anthropic API Key (Claude)
+      {
+        id: "ANTHROPIC_KEY",
+        name: "Anthropic Claude API Key",
+        category: "CREDENTIALS",
+        regex: /\bsk-ant-api03-[A-Za-z0-9_-]{80,110}\b/g,
+        replacement: "sk-ant-api03-dummyPlaceholderKeyForTesting00000"
+      },
+      // 5a-2. Google Cloud / Maps API Key
+      {
+        id: "GOOGLE_API_KEY",
+        name: "Google Cloud / Maps API Key",
+        category: "CREDENTIALS",
+        regex: /\bAIzaSy[A-Za-z0-9_-]{33}\b/g,
+        replacement: "AIzaSyDummyPlaceholderGoogleApiKey0000"
+      },
+      // 5a-3. Hugging Face Access Token
+      {
+        id: "HUGGINGFACE_TOKEN",
+        name: "Hugging Face Access Token",
+        category: "CREDENTIALS",
+        regex: /\bhf_[A-Za-z0-9]{34,40}\b/g,
+        replacement: "hf_dummyPlaceholderHuggingFaceToken000"
+      },
+      // 5a-4. NPM Automation / Publish Access Token
+      {
+        id: "NPM_TOKEN",
+        name: "NPM Access Token",
+        category: "CREDENTIALS",
+        regex: /\bnpm_[A-Za-z0-9]{36,50}\b/g,
+        replacement: "npm_dummyPlaceholderNpmTokenForTesting0000"
+      },
+      // 5a-5. GitLab Personal Access Token
+      {
+        id: "GITLAB_TOKEN",
+        name: "GitLab Personal Access Token",
+        category: "CREDENTIALS",
+        regex: /\bglpat-[A-Za-z0-9_-]{20,30}\b/g,
+        replacement: "glpat-dummyPlaceholderGitLabToken00000"
+      },
+      // 5a-6. WireGuard VPN Private Key
+      {
+        id: "WIREGUARD_PRIVATE_KEY",
+        name: "WireGuard VPN Private Key",
+        category: "CREDENTIALS",
+        regex: /(\bPrivateKey\s*=\s*)([A-Za-z0-9+/]{42,45}=)/g,
+        replacement: "$1[REDACTED_WIREGUARD_PRIVATE_KEY]"
       },
       // 5b. Stripe Production & Restricted Keys (sk_live_, rk_live_, etc.)
       {
@@ -175,6 +223,14 @@ class HeuristicsRedactor {
         regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^:\s]+:[^@\s]+@[^\s/:]+(?::\d+)?\/[^\s]*/gi,
         replacement: "postgresql://postgres:placeholder_password@localhost:5432/sandbox_db"
       },
+      // 10b. CLI Curl / Basic Auth Credentials (-u user:password)
+      {
+        id: "CLI_BASIC_AUTH",
+        name: "CLI Basic Auth Credentials",
+        category: "CREDENTIALS",
+        regex: /(\b(?:curl[^\n]*?-u\s+|-u\s+))([A-Za-z0-9._-]+:[^\s]+)/gi,
+        replacement: "$1[user]:[password]"
+      },
       // 11. Physical Home / Street Address (Expanded for KTP/Domisili and structured forms)
       {
         id: "ADDRESS_ID",
@@ -187,6 +243,14 @@ class HeuristicsRedactor {
           return physicalMarkers.test(raw) && !computingExclusions.test(raw);
         },
         replacement: "alamat di [REDACTED_ADDRESS] "
+      },
+      // 11b. English Residential / Shipping Address (US / UK Street & Postal Formats)
+      {
+        id: "ENGLISH_PHYSICAL_ADDRESS",
+        name: "US/UK Physical Street Address",
+        category: "PROFILE",
+        regex: /\b((?:(?:residential|shipping|mailing|home|street)?\s*address\s*[:=\-]?\s*)(?:to\s+my\s+residential\s+address\s*:\s*)?)((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*)?(?:[0-9]{1,5}\s+)?[A-Za-z0-9\s.,\/-]+?(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct)[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))\b/gi,
+        replacement: "$1[REDACTED_ADDRESS]"
       },
       // 12. Indonesian Tax ID (NPWP - 15/16 digits formatted or raw)
       {
