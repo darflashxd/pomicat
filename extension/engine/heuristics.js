@@ -15,6 +15,53 @@ class HeuristicsRedactor {
         regex: /\b([1-9][0-9]{15})\b/g,
         replacement: "[REDACTED_NIK]"
       },
+      // 1b. US Social Security Number (SSN - 9 digits formatted)
+      {
+        id: "US_SSN",
+        name: "US Social Security Number (SSN)",
+        category: "GOV_ID",
+        regex: /\b([0-9]{3}-[0-9]{2}-[0-9]{4})\b/g,
+        validator: (raw) => this.validateSSN(raw),
+        replacement: "[REDACTED_SSN]"
+      },
+      // 1c. US Employer Identification Number (EIN)
+      {
+        id: "US_EIN",
+        name: "US Employer Identification Number (EIN)",
+        category: "GOV_ID",
+        regex: /\b((?:ein|fein|tax\s+id)\s*[:=\-]?\s*)(\d{2}-\d{7})\b/gi,
+        replacement: "$1[REDACTED_EIN]"
+      },
+      // 1d. ABA Bank Routing Transit Number (9 digits with checksum)
+      {
+        id: "ABA_ROUTING",
+        name: "ABA Bank Routing Transit Number",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:routing(?:\s+transit|\s+number)?|aba(?:\s+routing)?)\s*[:=\-]?\s*))(\d{9})\b/gi,
+        validator: (raw) => {
+          const digits = raw.replace(/\D/g, "");
+          const last9 = digits.slice(-9);
+          return this.validateRouting(last9);
+        },
+        replacement: "$1[REDACTED_ROUTING_NUMBER]"
+      },
+      // 1e. International Bank Account Number (IBAN - ISO 13616)
+      {
+        id: "IBAN_ACCOUNT",
+        name: "International Bank Account Number (IBAN)",
+        category: "FINANCIAL",
+        regex: /\b([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/gi,
+        validator: (raw) => this.validateIBAN(raw),
+        replacement: "[REDACTED_IBAN]"
+      },
+      // 1f. SWIFT / BIC Code
+      {
+        id: "SWIFT_BIC",
+        name: "SWIFT / BIC Banking Code",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:swift(?:\s+code|\s+bic)?|bic)\s*[:=\-]?\s*))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/gi,
+        replacement: "$1[REDACTED_SWIFT_BIC]"
+      },
       // 2. Credit Card Numbers (13-19 digits with Luhn verification)
       {
         id: "CREDIT_CARD",
@@ -288,6 +335,63 @@ class HeuristicsRedactor {
       entropy -= p * Math.log2(p);
     }
     return entropy;
+  }
+
+  validateSSN(val) {
+    if (!val) return false;
+    const parts = val.split("-");
+    if (parts.length !== 3) return false;
+    const area = parseInt(parts[0], 10);
+    const group = parseInt(parts[1], 10);
+    const serial = parseInt(parts[2], 10);
+    if (isNaN(area) || isNaN(group) || isNaN(serial)) return false;
+    if (area === 0 || area === 666) return false;
+    if (group === 0) return false;
+    if (serial === 0) return false;
+    return true;
+  }
+
+  validateRouting(val) {
+    if (!val) return false;
+    const digits = val.replace(/\D/g, "");
+    if (digits.length !== 9) return false;
+    const d = digits.split("").map(Number);
+    const checksum = (3 * (d[0] + d[3] + d[6]) + 7 * (d[1] + d[4] + d[7]) + 1 * (d[2] + d[5] + d[8])) % 10;
+    return checksum === 0;
+  }
+
+  validateIBAN(val) {
+    if (!val) return false;
+    const clean = val.replace(/[\s-]/g, "").toUpperCase();
+    if (clean.length < 15 || clean.length > 34) return false;
+    const validCountries = new Set([
+      "AL", "AD", "AT", "AZ", "BH", "BY", "BE", "BA", "BR", "BG", "CR", "HR", "CY", "CZ", "DK", "DO",
+      "EG", "EE", "FO", "FI", "FR", "GE", "DE", "GI", "GR", "GL", "GT", "HU", "IS", "IQ", "IE", "IL",
+      "IT", "JO", "KZ", "XK", "KW", "LV", "LB", "LI", "LT", "LU", "MT", "MR", "MU", "MD", "MC", "ME",
+      "NL", "MK", "NO", "PK", "PS", "PL", "PT", "QA", "RO", "LC", "SM", "ST", "SA", "RS", "SC", "SK",
+      "SI", "ES", "SD", "SE", "CH", "TL", "TN", "TR", "UA", "AE", "GB", "VA", "VG"
+    ]);
+    const country = clean.substring(0, 2);
+    if (!validCountries.has(country)) return false;
+
+    const rearranged = clean.substring(4) + clean.substring(0, 4);
+    let numStr = "";
+    for (let i = 0; i < rearranged.length; i++) {
+      const code = rearranged.charCodeAt(i);
+      if (code >= 65 && code <= 90) {
+        numStr += (code - 55).toString();
+      } else if (code >= 48 && code <= 57) {
+        numStr += rearranged[i];
+      } else {
+        return false;
+      }
+    }
+    let remainder = 0;
+    for (let i = 0; i < numStr.length; i += 7) {
+      const chunk = remainder.toString() + numStr.substring(i, i + 7);
+      remainder = parseInt(chunk, 10) % 97;
+    }
+    return remainder === 1;
   }
 
   /**

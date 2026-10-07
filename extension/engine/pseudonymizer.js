@@ -45,8 +45,8 @@ class AdversaryOracleSolver {
 
   lexNumericSpans(text) {
     // Regex matching whole numerical tokens with currency, units, decimals, and %
-    const rx = /(?:(?:Rp\.?|IDR|\$|USD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|\bm\b|k|rb|ribu|thousand|%(?!\w)))?/gi;
-    const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares)\b/i;
+    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|\bm\b|billion|\bb\b|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)))?|half\s+a\s+mil\b)/gi;
+    const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
     const tokens = [];
     let m;
     while ((m = rx.exec(text)) !== null) {
@@ -80,13 +80,15 @@ class AdversaryOracleSolver {
       const isRatio = cleanLower.endsWith("%");
 
       let val = 0;
-      if (isRatio) {
+      if (cleanLower.includes("half a mil")) {
+        val = 500000;
+      } else if (isRatio) {
         val = parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) / 100;
-      } else if (/(?:miliar|billion|\bb\b)/i.test(cleanLower)) {
+      } else if (/(?:miliar|billion|\bb\b|ember)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e9);
       } else if (/(?:juta|jt|jeti|jetong|million|\bm\b)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e6);
-      } else if (/(?:k|rb|ribu|thousand)/i.test(cleanLower)) {
+      } else if (/(?:k|rb|ribu|thousand|racks|bands)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
       } else {
         const digits = cleanLower.replace(/\D/g, "");
@@ -101,7 +103,7 @@ class AdversaryOracleSolver {
           end: m.index + m[0].length,
           val: val,
           isRatio: isRatio,
-          isSmallInt: !isRatio && val <= 100 && !/(?:Rp|IDR|\$|USD)/i.test(raw)
+          isSmallInt: !isRatio && val <= 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(raw)
         });
       }
     }
@@ -119,7 +121,7 @@ class AdversaryOracleSolver {
       if (secret < 1000) continue;
 
       for (const token of tokens) {
-        if (token.isRatio || token.isSmallInt || token.val < 10000) continue;
+        if (token.isRatio || token.isSmallInt || token.val < 1000) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         if (this.isSafePublicSpan(text, token.start, token.end)) continue;
 
@@ -261,8 +263,10 @@ class ConsistentPseudonymizer {
     if (!raw || typeof raw !== "string") return 0;
     const clean = raw.trim().toLowerCase();
 
-    // Billions (miliar, milyar, billion, b)
-    if (/(?:miliar|milyar|billion|\bb\b)/i.test(clean)) {
+    if (clean.includes("half a mil")) return 500000;
+
+    // Billions (miliar, milyar, billion, b, ember)
+    if (/(?:miliar|milyar|billion|\bb\b|ember)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e9);
@@ -275,8 +279,8 @@ class ConsistentPseudonymizer {
       if (!isNaN(val)) return Math.round(val * 1e6);
     }
 
-    // Thousands (k, rb, ribu, thousand)
-    if (/(?:k|rb|ribu|thousand)/i.test(clean)) {
+    // Thousands (k, rb, ribu, thousand, racks, bands)
+    if (/(?:k|rb|ribu|thousand|racks|bands)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e3);
@@ -465,7 +469,12 @@ class ConsistentPseudonymizer {
       "alamat", "tinggal", "umur", "usia", "nomor", "no", "telfon", "telepon", "hp", "wa",
       "email", "bekerja", "dan", "dari", "lahir", "nik", "nim", "kpr", "gaji", "di", "jalan", "jl",
       "address", "phone", "living", "working", "born", "age", "years", "my", "saya", "staf",
-      "seorang", "karyawan", "pekerja", "adalah"
+      "seorang", "karyawan", "pekerja", "adalah", "applying", "looking", "seeking", "interested",
+      "planning", "trying", "wondering", "hoping", "writing", "asking", "building", "using", "here",
+      "not", "currently", "just", "also", "now", "reaching", "facing", "dealing", "having",
+      "struggling", "earning", "making", "paying", "saving", "investing", "borrowing", "holding",
+      "reporting", "filing", "a", "an", "the", "in", "on", "to", "for", "with", "at", "by", "from",
+      "debt", "loan", "consolidation"
     ]);
 
     turns.forEach((turn, idx) => {
@@ -482,12 +491,17 @@ class ConsistentPseudonymizer {
             nameTokens.push(w);
             if (nameTokens.length >= 4) break; // Max 4 words for a realistic name
           }
-          if (nameTokens.length > 0) {
-            userIntroMatches.push({
-              turnIndex: idx,
-              raw: nameTokens.join(" "),
-              category: "USER"
-            });
+          if (nameTokens.length > 0 && !nameStopWords.has(nameTokens[0].toLowerCase())) {
+            // Ensure for "i am / i'm", it looks like a proper name (starts with uppercase)
+            if (/^(?:i\s*[\x27\x60]?\s*(?:am|m)|call\s+me)/i.test(nm[0]) && !/^[A-Z]/.test(nameTokens[0])) {
+              // skip
+            } else {
+              userIntroMatches.push({
+                turnIndex: idx,
+                raw: nameTokens.join(" "),
+                category: "USER"
+              });
+            }
           }
         }
       }
@@ -499,7 +513,7 @@ class ConsistentPseudonymizer {
     const financialNums = allTargets
       .filter(e => e.category === "SENSITIVE_FINANCIAL")
       .map(e => ({ raw: e.raw, val: this.parseFinancialValue(e.raw) }))
-      .filter(e => !isNaN(e.val) && e.val >= 100000);
+      .filter(e => !isNaN(e.val) && e.val >= 1000);
 
     const derivedPatterns = [];
     if (financialNums.length >= 2) {
@@ -542,7 +556,7 @@ class ConsistentPseudonymizer {
         const roundedTotal = Math.round(total / 1e6) * 1e6; // e.g. 32.775.000 -> 33.000.000!
 
         const allCandidateTotals = [];
-        if (total >= 100000 && total !== val) allCandidateTotals.push(total);
+        if (total >= 1000 && total !== val) allCandidateTotals.push(total);
         if (roundedTotal >= 100000 && roundedTotal !== total && roundedTotal !== val) allCandidateTotals.push(roundedTotal);
 
         for (const candTotal of allCandidateTotals) {
@@ -567,7 +581,7 @@ class ConsistentPseudonymizer {
         }
 
         // 3. Full formatted delta increment
-        if (delta >= 100000) {
+        if (delta >= 1000) {
           derivedPatterns.push({
             pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${delta.toLocaleString("id-ID").replace(/\./g, "\\.")})\\b`,
             replacement: "[REDACTED_SALARY_INCREMENT]"
@@ -592,7 +606,7 @@ class ConsistentPseudonymizer {
           const debtVal = financialNums.find(f => f.val < val)?.val;
           if (debtVal) {
             const remainder = total - debtVal;
-            if (remainder >= 100000) {
+            if (remainder >= 1000) {
               const remM = remainder / 1e6;
               const remDot = remM.toString().replace(".", "\\.");
               const remComma = remM.toString().replace(".", ",");
@@ -616,7 +630,7 @@ class ConsistentPseudonymizer {
         const midTotal = Math.round(val * (1 + midRate));
         const midRounded = Math.round(midTotal / 1e6) * 1e6;
         for (const midVal of [midTotal, midRounded]) {
-          if (midVal >= 100000 && midVal !== val) {
+          if (midVal >= 1000 && midVal !== val) {
             derivedPatterns.push({
               pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${midVal.toLocaleString("id-ID").replace(/\./g, "\\.")})\\b`,
               replacement: "[REDACTED_PROJECTED_SALARY]"

@@ -1,0 +1,346 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "name": "SafeShare-AI Global Financial Adversarial Benchmark",
+    "description": "50+ diverse, unconventional, and rigorous financial adversarial scenarios covering Silicon Valley tech compensation, direct banking IDs, corporate ledgers, mortgages, accounting parentheses, and macroeconomic controls.",
+    "benchmark_target": "Black Hat Asia 2027 Arsenal & USENIX PETS"
+  },
+  "scenarios": [
+    {
+      "id": "FIN-US-01",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "US Social Security Number (SSN) in Credit Application",
+      "input": "I am applying for a debt consolidation loan. My SSN is 987-65-4321 and my current monthly income is $8,500.",
+      "expected_redactions": ["987-65-4321", "$8,500"],
+      "expected_preservations": ["debt consolidation loan"],
+      "category_tag": "GOV_ID"
+    },
+    {
+      "id": "FIN-US-02",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "US Employer Identification Number (EIN) in Corporate Tax Consultation",
+      "input": "Our Delaware C-Corp tax ID EIN: 12-3456789 reported a net loss of $145,000 for fiscal year 2025.",
+      "expected_redactions": ["12-3456789", "$145,000"],
+      "expected_preservations": ["fiscal year 2025", "Delaware C-Corp"],
+      "category_tag": "GOV_ID"
+    },
+    {
+      "id": "FIN-US-03",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "ABA Bank Routing Number and Direct Wire Instructions",
+      "input": "Please wire the funds using ABA Routing Number: 021000021 to account 8839201948 for invoice amount $48,200.",
+      "expected_redactions": ["021000021", "$48,200"],
+      "expected_preservations": ["wire the funds"],
+      "category_tag": "CREDENTIALS"
+    },
+    {
+      "id": "FIN-US-04",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "PCI-DSS Credit Card Number with Expiry and CVV",
+      "input": "My corporate purchasing card is 4532 0150 1234 5671 with expiry 11/28 and security code 492, limit $25,000.",
+      "expected_redactions": ["4532 0150 1234 5671", "$25,000"],
+      "expected_preservations": ["corporate purchasing card"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-EU-01",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "UK International Bank Account Number (IBAN)",
+      "input": "Transfer the consulting retainer fee of £12,500 to my UK IBAN: GB29NWBK60161331926819.",
+      "expected_redactions": ["GB29NWBK60161331926819", "£12,500"],
+      "expected_preservations": ["consulting retainer fee"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-EU-02",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "German IBAN and SWIFT/BIC Code Wire",
+      "input": "Settlement amount €85,000 to beneficiary IBAN: DE89370400440532013000 at SWIFT/BIC: DEUTDEDDFXX.",
+      "expected_redactions": ["DE89370400440532013000", "DEUTDEDDFXX", "€85,000"],
+      "expected_preservations": ["Settlement amount"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-EU-03",
+      "category": "DIRECT_GOV_BANKING",
+      "title": "Swiss Francs Private Wealth Management Account",
+      "input": "Wire CHF 250,000 from portfolio account IBAN: CH9300762011623852957 for private equity commitment.",
+      "expected_redactions": ["CH9300762011623852957", "CHF 250,000"],
+      "expected_preservations": ["private equity commitment"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TECH-01",
+      "category": "TECH_EXECUTIVE_COMP",
+      "title": "Silicon Valley Total Comp (TC) Breakdown Vernacular",
+      "input": "I am currently at $380k TC ($195,000 base, $145,000 RSUs annually, and a $40,000 target bonus). Negotiating for $440k.",
+      "expected_redactions": ["$380k", "$195,000", "$145,000", "$40,000", "$440k"],
+      "expected_preservations": ["base", "RSUs annually", "target bonus"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TECH-02",
+      "category": "TECH_EXECUTIVE_COMP",
+      "title": "Startup Stock Options (ISOs) with 409A and Vesting Cliff",
+      "input": "I was granted 60,000 incentive stock options at a strike price of $1.50 per share with a 4-year vesting schedule and 1-year cliff. Current 409A is $9.20.",
+      "expected_redactions": ["$1.50", "$9.20"],
+      "expected_preservations": ["4-year vesting schedule", "1-year cliff"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TECH-03",
+      "category": "TECH_EXECUTIVE_COMP",
+      "title": "Executive Sign-on & Relocation Package",
+      "input": "My offer letter includes a $50,000 sign-on bonus repayable within 12 months and a $25,000 relocation stipend on top of $220k base.",
+      "expected_redactions": ["$50,000", "$25,000", "$220k"],
+      "expected_preservations": ["12 months", "sign-on bonus", "relocation stipend"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TECH-04",
+      "category": "TECH_EXECUTIVE_COMP",
+      "title": "Severance Package Negotiation and Accelerated Vesting",
+      "input": "HR offered a severance package of $85,000 cash plus 6 months accelerated vesting of my unvested equity.",
+      "expected_redactions": ["$85,000"],
+      "expected_preservations": ["6 months", "severance package"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-CORP-01",
+      "category": "CORPORATE_UNRELEASED",
+      "title": "Unreleased SaaS ARR & Net Retention Rate (NRR)",
+      "input": "For our board deck: We closed Q3 at $16.4M ARR ($1.36M MRR) with 124% net retention rate and $4.2M new ACV.",
+      "expected_redactions": ["$16.4M", "$1.36M", "$4.2M"],
+      "expected_preservations": ["124%", "Q3"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-CORP-02",
+      "category": "CORPORATE_UNRELEASED",
+      "title": "Startup Monthly Cash Burn Rate & Bank Runway",
+      "input": "Our monthly burn rate is currently $320,000 with $2.1M remaining cash in Silicon Valley Bank, leaving approximately 6.5 months of runway.",
+      "expected_redactions": ["$320,000", "$2.1M"],
+      "expected_preservations": ["6.5 months", "burn rate", "runway"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-CORP-03",
+      "category": "CORPORATE_UNRELEASED",
+      "title": "Confidential Series A SAFE Note Valuation Cap",
+      "input": "We are raising a $3,000,000 seed round on a post-money SAFE note with a $28M valuation cap and a 15% discount.",
+      "expected_redactions": ["$3,000,000", "$28M"],
+      "expected_preservations": ["15%", "SAFE note", "valuation cap"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-CORP-04",
+      "category": "ACCOUNTING_PARENTHESES",
+      "title": "GAAP Accounting Negative Format in Parentheses",
+      "input": "Consolidated Statement of Operations:\nOperating Income: ($650,000)\nNet Cash Used in Financing: ($1,200,000)\nEnding Cash Balance: $4,500,000",
+      "expected_redactions": ["($650,000)", "($1,200,000)", "$4,500,000"],
+      "expected_preservations": ["Statement of Operations", "Ending Cash Balance"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-CORP-05",
+      "category": "CORPORATE_UNRELEASED",
+      "title": "Basis Points (bps) and EBITDA Margins",
+      "input": "Gross margins contracted by 185 bps this quarter, reducing our EBITDA to $2.4M on total sales of $18.5M.",
+      "expected_redactions": ["$2.4M", "$18.5M"],
+      "expected_preservations": ["185 bps", "Gross margins"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-MORT-01",
+      "category": "MORTGAGE_AND_DEBT",
+      "title": "30-Year Fixed Mortgage & Down Payment",
+      "input": "Purchasing a single-family home for $850,000 with a 20% down payment of $170,000 and a 30-year fixed loan of $680,000 at 6.75%.",
+      "expected_redactions": ["$850,000", "$170,000", "$680,000"],
+      "expected_preservations": ["20%", "30-year fixed", "6.75%"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-MORT-02",
+      "category": "MORTGAGE_AND_DEBT",
+      "title": "Debt-to-Income (DTI) Underwriting Computation",
+      "input": "Underwriter notes: Borrower gross monthly income is $16,000 with $5,200 total monthly debt service, resulting in a 32.5% front-end DTI.",
+      "expected_redactions": ["$16,000", "$5,200", "32.5%"],
+      "expected_preservations": ["DTI", "gross monthly income"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-MORT-03",
+      "category": "MORTGAGE_AND_DEBT",
+      "title": "Private Student Loan Consolidation",
+      "input": "I have $135,000 in private student loans across Sallie Mae and SoFi at an average 7.8% interest rate, paying $1,620 monthly.",
+      "expected_redactions": ["$135,000", "$1,620"],
+      "expected_preservations": ["7.8%", "student loans"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-MORT-04",
+      "category": "MORTGAGE_AND_DEBT",
+      "title": "Credit Card Revolving Debt & Minimum Payment Trap",
+      "input": "My revolving credit card debt is $42,500 with an APR of 24.99%, requiring a minimum payment of $1,275 every month.",
+      "expected_redactions": ["$42,500", "$1,275"],
+      "expected_preservations": ["24.99%", "credit card debt"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TAX-01",
+      "category": "WEALTH_AND_TAX",
+      "title": "401(k) Employee Max Contribution & Employer Match",
+      "input": "I max out my 401k employee contribution at $23,000 per year, and my employer matches 50% up to 6% on my $160,000 base salary.",
+      "expected_redactions": ["$160,000"],
+      "expected_preservations": ["50%", "6%", "401k"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TAX-02",
+      "category": "WEALTH_AND_TAX",
+      "title": "Capital Gains & Portfolio Rebalancing",
+      "input": "Tax review: I realized $68,000 in short-term capital gains and $34,000 in long-term capital gains from selling tech stocks.",
+      "expected_redactions": ["$68,000", "$34,000"],
+      "expected_preservations": ["capital gains", "tech stocks"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-TAX-03",
+      "category": "WEALTH_AND_TAX",
+      "title": "Family Trust & Net Worth Asset Protection",
+      "input": "Our family trust currently holds $4,500,000 in municipal bonds and real estate holdings to minimize estate tax liability.",
+      "expected_redactions": ["$4,500,000"],
+      "expected_preservations": ["municipal bonds", "estate tax"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-LOG-01",
+      "category": "FINTECH_JSON_PAYLOAD",
+      "title": "Plaid Bank Integration Webhook Payload",
+      "input": "Debug webhook from Plaid: {\"account_id\": \"acc_9921\", \"balances\": {\"current\": 78500.00, \"available\": 75000.00, \"iso_currency_code\": \"USD\"}}",
+      "expected_redactions": ["78500.00", "75000.00"],
+      "expected_preservations": ["account_id", "USD"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-LOG-02",
+      "category": "FINTECH_JSON_PAYLOAD",
+      "title": "Stripe Charge API JSON Output",
+      "input": "Stripe response dump: {\"amount\": 950000, \"amount_captured\": 950000, \"currency\": \"usd\", \"description\": \"Executive Retainer Payment\"}",
+      "expected_redactions": ["950000"],
+      "expected_preservations": ["currency", "description"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-LOG-03",
+      "category": "FINTECH_JSON_PAYLOAD",
+      "title": "QuickBooks Payroll CSV Row Format",
+      "input": "2026-09-30, Employee_01, Base Pay, 9,250.00, Federal Tax, 1,850.00, Net Disbursement, 7,400.00",
+      "expected_redactions": ["9,250.00", "1,850.00", "7,400.00"],
+      "expected_preservations": ["Base Pay", "Federal Tax", "2026-09-30"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-SLANG-01",
+      "category": "FINANCIAL_SLANG",
+      "title": "Racks and Bands Street & Casual Slang",
+      "input": "Sitting on 250 racks in high yield savings, making 18k a month after taxes.",
+      "expected_redactions": ["250 racks", "18k"],
+      "expected_preservations": ["high yield savings"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-SLANG-02",
+      "category": "FINANCIAL_SLANG",
+      "title": "Half a Mil Vernacular",
+      "input": "Cleared half a mil this year between trading and my primary job.",
+      "expected_redactions": ["half a mil"],
+      "expected_preservations": ["trading", "primary job"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-SLANG-03",
+      "category": "FINANCIAL_SLANG",
+      "title": "Indonesian Slang Miliar (Ember) & Ratusan Juta",
+      "input": "Ada dana nganggur 2 ember di deposito dan cicilan mobil 12 jeti sebulan.",
+      "expected_redactions": ["2 ember", "12 jeti"],
+      "expected_preservations": ["deposito"],
+      "category_tag": "FINANCIAL"
+    },
+    {
+      "id": "FIN-INVERT-01",
+      "category": "ALGEBRAIC_INVERSION_ATTACK",
+      "title": "Multi-Turn Tech Bonus Inversion",
+      "turn_user": "My base salary is $160,000. My contract states a 25% performance bonus.",
+      "turn_assistant": "With a base salary of [REDACTED_FINANCIAL_1], your 25% annual bonus will be $40,000, bringing your total annual cash compensation to $200,000.",
+      "inversion_target": "$160,000",
+      "derived_amounts_to_mask": ["$40,000", "$200,000"],
+      "scale_free_to_preserve": ["25%"]
+    },
+    {
+      "id": "FIN-INVERT-02",
+      "category": "ALGEBRAIC_INVERSION_ATTACK",
+      "title": "Multi-Turn Mortgage Down Payment Inversion",
+      "turn_user": "I saved up $150,000 in cash for a 20% down payment on a house in Seattle.",
+      "turn_assistant": "Since your down payment of [REDACTED_FINANCIAL_1] represents 20%, your maximum home purchase price is $750,000 and your loan amount will be $600,000.",
+      "inversion_target": "$150,000",
+      "derived_amounts_to_mask": ["$750,000", "$600,000"],
+      "scale_free_to_preserve": ["20%"]
+    },
+    {
+      "id": "FIN-INVERT-03",
+      "category": "ALGEBRAIC_INVERSION_ATTACK",
+      "title": "Multi-Turn Multi-Year Accumulation Inversion (Dollar)",
+      "turn_user": "I can comfortably save $3,500 every month into broad market index funds.",
+      "turn_assistant": "Saving [REDACTED_FINANCIAL_1] per month will accumulate over time:\n1 year -> $42,000\n2 years -> $84,000\n3 years -> $126,000\n5 years -> $210,000\nAssuming 0% market return.",
+      "inversion_target": "$3,500",
+      "derived_amounts_to_mask": ["$42,000", "$84,000", "$126,000", "$210,000"],
+      "scale_free_to_preserve": ["1 year", "2 years", "3 years", "5 years"]
+    },
+    {
+      "id": "FIN-ZFP-01",
+      "category": "ZERO_FALSE_POSITIVE_MACRO",
+      "title": "US Federal Reserve FOMC Policy Interest Rate",
+      "input": "The Federal Reserve held the benchmark federal funds rate steady at 5.25% to 5.50% following the September meeting.",
+      "expected_redactions": [],
+      "expected_preservations": ["Federal Reserve", "5.25%", "5.50%", "September meeting"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "FIN-ZFP-02",
+      "category": "ZERO_FALSE_POSITIVE_MACRO",
+      "title": "S&P 500 Index and Big Tech Public Earnings",
+      "input": "The S&P 500 benchmark index crossed 5,750 points while Nvidia reported quarterly revenue of $30.04 billion, beating Wall Street expectations.",
+      "expected_redactions": [],
+      "expected_preservations": ["S&P 500", "5,750", "$30.04 billion", "Nvidia"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "FIN-ZFP-03",
+      "category": "ZERO_FALSE_POSITIVE_MACRO",
+      "title": "IRS Statutory 401(k) and IRA Contribution Limits",
+      "input": "According to official IRS guidelines, the maximum statutory 401(k) contribution limit for individuals is $23,000 with a $7,000 catch-up limit.",
+      "expected_redactions": [],
+      "expected_preservations": ["IRS guidelines", "$23,000", "$7,000", "401(k)"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "FIN-ZFP-04",
+      "category": "ZERO_FALSE_POSITIVE_MACRO",
+      "title": "Public Macroeconomic Inflation & Treasury Yields",
+      "input": "The 10-year US Treasury yield stood at 4.22% as the annualized Consumer Price Index (CPI) cooled to 2.5%.",
+      "expected_redactions": [],
+      "expected_preservations": ["10-year US Treasury", "4.22%", "2.5%", "Consumer Price Index"],
+      "category_tag": "SAFE_PUBLIC"
+    },
+    {
+      "id": "FIN-ZFP-05",
+      "category": "ZERO_FALSE_POSITIVE_MACRO",
+      "title": "Bureau of Labor Statistics (BLS) Occupational Survey",
+      "input": "The Bureau of Labor Statistics reported that the median annual wage for information security analysts was $120,360 nationwide.",
+      "expected_redactions": [],
+      "expected_preservations": ["Bureau of Labor Statistics", "$120,360", "median annual wage"],
+      "category_tag": "SAFE_PUBLIC"
+    }
+  ]
+}
