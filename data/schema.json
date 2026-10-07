@@ -1,0 +1,42 @@
+{
+  "labels": [
+    "O",
+    "B-SENSITIVE_FINANCIAL",
+    "I-SENSITIVE_FINANCIAL",
+    "B-SENSITIVE_HEALTH",
+    "I-SENSITIVE_HEALTH",
+    "B-SENSITIVE_CORP",
+    "I-SENSITIVE_CORP",
+    "B-SENSITIVE_LEGAL_HR",
+    "I-SENSITIVE_LEGAL_HR",
+    "B-SENSITIVE_USER",
+    "I-SENSITIVE_USER"
+  ],
+  "label2id": {
+    "O": 0,
+    "B-SENSITIVE_FINANCIAL": 1,
+    "I-SENSITIVE_FINANCIAL": 2,
+    "B-SENSITIVE_HEALTH": 3,
+    "I-SENSITIVE_HEALTH": 4,
+    "B-SENSITIVE_CORP": 5,
+    "I-SENSITIVE_CORP": 6,
+    "B-SENSITIVE_LEGAL_HR": 7,
+    "I-SENSITIVE_LEGAL_HR": 8,
+    "B-SENSITIVE_USER": 9,
+    "I-SENSITIVE_USER": 10
+  },
+  "id2label": {
+    "0": "O",
+    "1": "B-SENSITIVE_FINANCIAL",
+    "2": "I-SENSITIVE_FINANCIAL",
+    "3": "B-SENSITIVE_HEALTH",
+    "4": "I-SENSITIVE_HEALTH",
+    "5": "B-SENSITIVE_CORP",
+    "6": "I-SENSITIVE_CORP",
+    "7": "B-SENSITIVE_LEGAL_HR",
+    "8": "I-SENSITIVE_LEGAL_HR",
+    "9": "B-SENSITIVE_USER",
+    "10": "I-SENSITIVE_USER"
+  },
+  "num_labels": 11
+}

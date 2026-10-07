@@ -1,0 +1,34 @@
+{
+  "name": "safeshare-ai",
+  "version": "2.1.0",
+  "description": "Client-Side Zero-Knowledge Privacy Guard & Algebraic Reconstruction Defense for Generative AI Chats",
+  "main": "extension/content_script.js",
+  "scripts": {
+    "test": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js",
+    "test:all": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_real_chatgpt_output.js && node test_extreme_stress_cases.js && node test_casual_chat_stress.js && node autonomous_deep_audit.js",
+    "test:jembras": "node test_de_jembras_benchmark.js",
+    "test:stress": "node test_v3_extreme_stress.js",
+    "test:enclave": "node test_uncopyable_audit.js",
+    "test:edge": "node test_edge_cases.js",
+    "test:audit": "node autonomous_deep_audit.js",
+    "relay:local": "python3 relay/server_local.py"
+  },
+  "keywords": [
+    "privacy",
+    "zero-knowledge",
+    "aes-gcm",
+    "llm-security",
+    "blackhat-arsenal",
+    "contextual-integrity",
+    "data-redaction",
+    "algebraic-reconstruction",
+    "chrome-extension",
+    "firefox-addon"
+  ],
+  "author": "SafeShare-AI Research Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darflashxd/safeshare-ai.git"
+  }
+}

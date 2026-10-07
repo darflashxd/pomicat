@@ -1,0 +1,62 @@
+# ==============================================================================
+# SafeShare-AI — Production .gitignore
+# ==============================================================================
+
+# 1. Knowledge Graphs & Graphify (STRICT: Never commit to git)
+graphify-out/
+**/graphify-out/
+.graphify*
+**/.graphify*
+
+# 2. Python Environments & Caches
+venv/
+.venv/
+env/
+**/venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# 3. Model Weights & Large Checkpoints (>100MB violates GitHub limits)
+# Note: Model weights are distributed via Google Drive (see MODELS_SETUP.md)
+*.onnx
+*.safetensors
+*.pt
+*.pth
+*.bin
+**/checkpoint-*/
+**/model_output/checkpoint-*/
+**/model.safetensors
+**/optimizer.pt
+**/safeshare_model.zip
+
+# 4. External Precompiled Binaries
+cloudflared
+**/cloudflared
+
+# 5. Local Databases, State & Cloudflare Wrangler Cache
+.wrangler/
+**/.wrangler/
+storage.json
+**/storage.json
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-*
+
+# 6. Test Reports & Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# 7. OS & Editor Metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.opencode/
+*.swp
+*.swo

@@ -1,0 +1,12 @@
+name = "safeshare-relay"
+main = "worker.js"
+compatibility_date = "2026-09-18"
+
+[assets]
+directory = "../viewer"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "safeshare-db"
+database_id = "b16c35b1-8428-4ccd-b4bb-e4bdc4f51954"

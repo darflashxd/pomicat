@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "SafeShare-AI Privacy Guard",
+  "version": "2.1.0",
+  "description": "AST-aware contextual PII redactor and Zero-Knowledge ephemeral sharing extension for ChatGPT, Claude, and DeepSeek.",
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://*.workers.dev/*",
+    "https://*.pages.dev/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*"
+      ],
+      "css": [
+        "ui/modal.css"
+      ],
+      "js": [
+        "engine/heuristics.js",
+        "engine/contextual.js",
+        "engine/pseudonymizer.js",
+        "engine/crypto.js",
+        "ui/modal.js",
+        "content_script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "safeshare@research.local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "action": {
+    "default_title": "SafeShare-AI Privacy Guard"
+  }
+}
