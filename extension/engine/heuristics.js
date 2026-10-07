@@ -11,6 +11,7 @@ class HeuristicsRedactor {
       {
         id: "ID_NIK",
         name: "Indonesian NIK / KTP",
+        category: "GOV_ID",
         regex: /\b([1-9][0-9]{15})\b/g,
         replacement: "[REDACTED_NIK]"
       },
@@ -18,6 +19,7 @@ class HeuristicsRedactor {
       {
         id: "CREDIT_CARD",
         name: "Credit Card",
+        category: "FINANCIAL",
         regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b\d{15,16}\b/g,
         validator: this.luhnCheck,
         replacement: "[REDACTED_CARD_NUMBER]"
@@ -26,6 +28,7 @@ class HeuristicsRedactor {
       {
         id: "EMAIL",
         name: "Email Address",
+        category: "PROFILE",
         regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
@@ -33,6 +36,7 @@ class HeuristicsRedactor {
       {
         id: "PHONE",
         name: "Phone Number",
+        category: "PROFILE",
         regex: /(?:\+?62|0)8[1-9][0-9]{7,10}\b|\b\+?1[-.\s]?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
         replacement: "[REDACTED_PHONE]"
       },
@@ -40,6 +44,7 @@ class HeuristicsRedactor {
       {
         id: "OPENAI_KEY",
         name: "OpenAI Secret Key",
+        category: "CREDENTIALS",
         regex: /\bsk-(?:proj-)?[A-Za-z0-9_-]{32,80}\b/g,
         replacement: "sk-dummy-test-key-placeholder"
       },
@@ -47,6 +52,7 @@ class HeuristicsRedactor {
       {
         id: "STRIPE_KEY",
         name: "Stripe Secret Key",
+        category: "CREDENTIALS",
         regex: /\b(?:sk|rk)_(?:live|test)_[a-zA-Z0-9]{20,99}\b/g,
         replacement: "[REDACTED_STRIPE_KEY]"
       },
@@ -54,6 +60,7 @@ class HeuristicsRedactor {
       {
         id: "SLACK_WEBHOOK",
         name: "Slack Incoming Webhook",
+        category: "CREDENTIALS",
         regex: /\bhttps:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]+\/B[a-zA-Z0-9_]+\/[a-zA-Z0-9_]+\b/g,
         replacement: "[REDACTED_SLACK_WEBHOOK]"
       },
@@ -61,6 +68,7 @@ class HeuristicsRedactor {
       {
         id: "EVM_CRYPTO_WALLET",
         name: "Ethereum EVM Wallet Address",
+        category: "CREDENTIALS",
         regex: /\b(0x[a-fA-F0-9]{40})\b/g,
         replacement: "[REDACTED_CRYPTO_WALLET]"
       },
@@ -68,6 +76,7 @@ class HeuristicsRedactor {
       {
         id: "BIP39_SEED_PHRASE",
         name: "BIP-39 Mnemonic Recovery Seed Phrase",
+        category: "CREDENTIALS",
         regex: /(\b(?:seed|mnemonic|recovery(?:\s+phrase)?|bip-?39)[^:\n\r]*[:=\-]?\s*)([a-z]{3,12}(?:[ \t]+[a-z]{3,12}){11,23})\b/gi,
         replacement: "$1[REDACTED_MNEMONIC_SEED_PHRASE]"
       },
@@ -75,6 +84,7 @@ class HeuristicsRedactor {
       {
         id: "LINUX_SHADOW_HASH",
         name: "Linux Shadow Password Hash",
+        category: "CREDENTIALS",
         regex: /\$(?:1|2[aby]?|5|6)\$[a-zA-Z0-9_$./=-]+\$[a-zA-Z0-9./]{16,86}/g,
         replacement: "$6$rounds=4096$[REDACTED_PASSWORD_HASH]"
       },
@@ -82,6 +92,7 @@ class HeuristicsRedactor {
       {
         id: "GITHUB_TOKEN",
         name: "GitHub Access Token",
+        category: "CREDENTIALS",
         regex: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,255}\b/g,
         replacement: "ghp_dummyPlaceholderTokenForTesting00000"
       },
@@ -89,6 +100,7 @@ class HeuristicsRedactor {
       {
         id: "AWS_KEY",
         name: "AWS Access Key",
+        category: "CREDENTIALS",
         regex: /\b(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b/g,
         replacement: "AKIAIOSFODNN7EXAMPLE"
       },
@@ -96,6 +108,7 @@ class HeuristicsRedactor {
       {
         id: "JWT",
         name: "JSON Web Token",
+        category: "CREDENTIALS",
         regex: /\beyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*\b/g,
         replacement: "[REDACTED_JWT_TOKEN]"
       },
@@ -103,6 +116,7 @@ class HeuristicsRedactor {
       {
         id: "PEM_PRIVATE_KEY",
         name: "Private Key Block",
+        category: "CREDENTIALS",
         regex: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
         replacement: "-----BEGIN PRIVATE KEY-----\n[REDACTED_PRIVATE_KEY_BLOCK]\n-----END PRIVATE KEY-----"
       },
@@ -110,6 +124,7 @@ class HeuristicsRedactor {
       {
         id: "DATABASE_URI",
         name: "Database Credentials URI",
+        category: "CREDENTIALS",
         regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^:\s]+:[^@\s]+@[^\s/:]+(?::\d+)?\/[^\s]*/gi,
         replacement: "postgresql://postgres:placeholder_password@localhost:5432/sandbox_db"
       },
@@ -117,6 +132,7 @@ class HeuristicsRedactor {
       {
         id: "ADDRESS_ID",
         name: "Physical Home/Street Address",
+        category: "PROFILE",
         regex: /\b(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?(?:\s+di|\s+adalah|\s*:)?\s*)([A-Za-z0-9\s.,\/-]+?)(?=\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|[\r\n]|$))/gi,
         validator: (raw) => {
           const physicalMarkers = /\b(?:jalan|jl\.?|gang|gg\.?|kampung|kp\.?|komplek|perumahan|dusun|desa|kelurahan|kecamatan|rt\s*\d+|rw\s*\d+|no(?:mor)?\s*\d+|blok\s*[a-z0-9]+)\b/i;
@@ -129,6 +145,7 @@ class HeuristicsRedactor {
       {
         id: "ID_NPWP",
         name: "Indonesian Tax ID (NPWP)",
+        category: "GOV_ID",
         regex: /\b((?:npwp(?:\s+pribadi|\s+badan)?\s*[:=\-]?\s*)?)(\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3})\b/gi,
         replacement: "$1[REDACTED_NPWP]"
       },
@@ -136,6 +153,7 @@ class HeuristicsRedactor {
       {
         id: "PASSPORT_RI",
         name: "Passport Number",
+        category: "GOV_ID",
         regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|passport)\s*[:=\-]?\s*)([A-Z]\d{7})\b/gi,
         replacement: "$1[REDACTED_PASSPORT]"
       },
@@ -143,6 +161,7 @@ class HeuristicsRedactor {
       {
         id: "ID_BPJS",
         name: "BPJS Health & Employment ID",
+        category: "GOV_ID",
         regex: /\b((?:(?:nomor\s+)?bpjs(?:\s+kesehatan|\s+ketenagakerjaan|\s+tk)?)\s*[:=\-]?\s*)(\d{11,13})\b/gi,
         replacement: "$1[REDACTED_BPJS]"
       },
@@ -150,6 +169,7 @@ class HeuristicsRedactor {
       {
         id: "ID_SIM",
         name: "Indonesian Driver License (SIM)",
+        category: "GOV_ID",
         regex: /\b((?:(?:nomor\s+)?sim(?:\s+[a-c])?)\s*[:=\-]?\s*)(\d{12})\b/gi,
         replacement: "$1[REDACTED_SIM]"
       },
@@ -157,6 +177,7 @@ class HeuristicsRedactor {
       {
         id: "STUDENT_ID",
         name: "Student ID / Academic NIM",
+        category: "GOV_ID",
         regex: /\b((?:nim|npm|nrp|no\.?\s*mahasiswa|student\s*id|nomor\s*induk\s*mahasiswa)\s*[:=\-]?\s*)([0-9]{8,14})\b/gi,
         replacement: "$1[REDACTED_NIM]"
       },
@@ -164,6 +185,7 @@ class HeuristicsRedactor {
       {
         id: "TERMINAL_PROMPT",
         name: "Terminal Shell Prompt",
+        category: "SYSTEM",
         regex: /((?:\([a-zA-Z0-9._-]+\)\s*)?)\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9._-]+):([~/\w\s\p{L}.-]+)([\$#])/gu,
         replacement: "$1[user]@[host]:~/[sandbox_path]$5"
       },
@@ -171,6 +193,7 @@ class HeuristicsRedactor {
       {
         id: "KALI_TERMINAL_PROMPT",
         name: "Kali Linux Shell Prompt",
+        category: "SYSTEM",
         regex: /┌──\(([a-zA-Z0-9._-]+)㉿([a-zA-Z0-9._-]+)\)-\[([~/\w\s\p{L}.-]*)\](?:\s*[\r\n]+\s*└─[\$#])?/gu,
         replacement: "┌──([user]㉿[host])-[~/[sandbox_path]]\n└─$"
       },
@@ -178,6 +201,7 @@ class HeuristicsRedactor {
       {
         id: "POWERLINE_ZSH_PROMPT",
         name: "Powerline & Modern Zsh Prompt",
+        category: "SYSTEM",
         regex: /(?:[A-Za-z]{3}\s+\d{1,2}\s+[A-Za-z]{3}\s+-\s+\d{1,2}:\d{2}\s*[\uE0B0-\uE0B3\s]*)?(?:~[\uE0B0-\uE0B3\s]*)?@([a-zA-Z0-9._-]+)(\s*[\uE0B0-\uE0B3])/gu,
         replacement: "@[user]$2"
       },
@@ -185,6 +209,7 @@ class HeuristicsRedactor {
       {
         id: "MACOS_TERMINAL_PROMPT",
         name: "macOS Shell Prompt",
+        category: "SYSTEM",
         regex: /\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9._-]+)\s+([~/\w\s\p{L}.-]+)\s*%/gu,
         replacement: "[user]@[host] ~/[sandbox_path] %"
       },
@@ -192,6 +217,7 @@ class HeuristicsRedactor {
       {
         id: "WINDOWS_PROMPT",
         name: "Windows Shell Prompt",
+        category: "SYSTEM",
         regex: /\b((?:PS\s+)?[A-Z]:\\Users\\)([a-zA-Z0-9._-]+)(\\[^>\n\r]*)?>/gi,
         replacement: "$1[user]$3>"
       },
@@ -199,6 +225,7 @@ class HeuristicsRedactor {
       {
         id: "GIT_AUTHOR_TRACE",
         name: "Git Author Identity",
+        category: "SYSTEM",
         regex: /\b(Author:\s*)([a-zA-Z0-9._\s-]+?)\s*<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,})>/gi,
         replacement: "$1[User_A] <[user@protected.local]>"
       },
@@ -206,6 +233,7 @@ class HeuristicsRedactor {
       {
         id: "SSH_KEY_COMMENT",
         name: "SSH Key Identity Comment",
+        category: "SYSTEM",
         regex: /\b(ssh-(?:ed25519|rsa|ecdsa|dss)\s+[A-Za-z0-9+/=]{32,}\s+)([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+)\b/g,
         replacement: "$1[user]@[host]"
       },
@@ -213,6 +241,7 @@ class HeuristicsRedactor {
       {
         id: "POSIX_ID_OUTPUT",
         name: "POSIX Identity Command Output",
+        category: "SYSTEM",
         regex: /\b(uid=\d+\()([a-zA-Z0-9._-]+)(\)\s+gid=\d+\()([a-zA-Z0-9._-]+)(\)(?:\s+groups=[\d(),a-zA-Z0-9._-]+)?)/g,
         replacement: "$1[user]$3[group]) groups=1000([group])"
       },
@@ -220,6 +249,7 @@ class HeuristicsRedactor {
       {
         id: "WHOAMI_USER_OUTPUT",
         name: "Whoami or USER Command Output",
+        category: "SYSTEM",
         regex: /((?:\bwhoami|\$USER)(?:\s*[:=>\->]+\s*|\s+))([a-zA-Z0-9._-]+)\b/gi,
         replacement: "$1[user]"
       },
@@ -227,6 +257,7 @@ class HeuristicsRedactor {
       {
         id: "UNIX_USER_HOST",
         name: "Internal User & Hostname",
+        category: "SYSTEM",
         regex: /\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9_-]+)(?!\.[a-zA-Z]{2,})\b/g,
         replacement: "[user]@[host]"
       },
@@ -234,6 +265,7 @@ class HeuristicsRedactor {
       {
         id: "USER_HOME_PATH",
         name: "User Home Directory Path",
+        category: "SYSTEM",
         regex: /(?:\/home\/|~\/|\/Users\/|[A-Z]:\\Users\\)[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9_\-.\s\p{L}]+)*/gu,
         replacement: "~/[sandbox_path]"
       }
@@ -317,6 +349,7 @@ class HeuristicsRedactor {
         detections.push({
           type: pattern.id,
           name: pattern.name,
+          category: pattern.category || "GENERAL",
           raw: raw,
           replacement: repl,
           index: match.index,

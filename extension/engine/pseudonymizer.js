@@ -217,15 +217,18 @@ class AdversaryOracleSolver {
     // Sort leaks in reverse position order and deduplicate
     leaks.sort((a, b) => b.start - a.start);
     const seen = new Set();
+    const dedupedLeaks = [];
     let out = text;
     for (const l of leaks) {
       const key = `${l.start}:${l.end}`;
       if (!seen.has(key)) {
         seen.add(key);
+        dedupedLeaks.push(l);
         out = out.substring(0, l.start) + l.replacement + out.substring(l.end);
       }
     }
 
+    this.lastLeaks = dedupedLeaks;
     return out;
   }
 }
@@ -706,11 +709,15 @@ class ConsistentPseudonymizer {
     // Phase 3: Adversary-Oracle Reconstruction Solver
     // Evaluates all visible numbers against known secret values and suppresses derived leaks
     const financialSecrets = financialNums.map(f => f.val);
+    const allSolverLeaks = [];
     if (financialSecrets.length > 0) {
       const solver = new AdversaryOracleSolver();
       for (let turn of updatedTurns) {
         if (turn.content && turn.role === "assistant") {
           turn.content = solver.solveAndRedact(turn.content, financialSecrets);
+          if (solver.lastLeaks && solver.lastLeaks.length > 0) {
+            allSolverLeaks.push(...solver.lastLeaks);
+          }
         }
       }
     }
@@ -720,7 +727,8 @@ class ConsistentPseudonymizer {
       mappings: Array.from(this.entityMap.entries()).map(([k, v]) => {
         const [cat, raw] = k.split("::");
         return { category: cat, original: raw, pseudonym: v };
-      })
+      }),
+      solverLeaks: allSolverLeaks
     };
   }
 }
