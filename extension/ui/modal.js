@@ -414,29 +414,27 @@ class SafeShareModal {
 
       let htmlContent = this.escapeHtml(turn.content);
 
-      // Wrap replacement tags into interactive badges
+      // A. Wrap unmasked items (if user toggled protection off)
       for (const cand of this.candidates) {
         const isCatActive = this.activeCategories.has(cand.category);
         const isProtected = isCatActive && cand.enabled;
-
-        const replEscaped = this.escapeHtml(cand.replacement);
-        const rawEscaped = this.escapeHtml(cand.raw);
-
-        if (isProtected && replEscaped) {
-          const regRepl = new RegExp(this.escapeRegExp(replEscaped), "g");
-          const badgeHtml = `<span class="ss-badge ss-badge-redacted" data-cand-id="${cand.id}" title="Click to unmask (Original: ${rawEscaped})">${replEscaped}<span class="ss-badge-icon">✕</span></span>`;
-          htmlContent = htmlContent.replace(regRepl, badgeHtml);
-        } else if (!isProtected && rawEscaped) {
-          const regRaw = new RegExp(this.escapeRegExp(rawEscaped), "gi");
-          const badgeHtml = `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`;
-          htmlContent = htmlContent.replace(regRaw, badgeHtml);
+        if (!isProtected && cand.raw) {
+          const rawEscaped = this.escapeHtml(cand.raw);
+          const regRaw = new RegExp(`\\b${this.escapeRegExp(rawEscaped)}\\b`, "gi");
+          htmlContent = htmlContent.replace(regRaw, `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`);
         }
       }
 
+      // B. Single-pass regex replacing all redacted tags (avoids nesting span inside span!)
+      htmlContent = htmlContent.replace(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
+        const cand = this.candidates.find(c => c.replacement === tag);
+        const candId = cand ? cand.id : "c_tag";
+        const rawText = cand ? this.escapeHtml(cand.raw) : tag;
+        return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
+      });
+
       sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${turn.role.toUpperCase()}]:</div><div class="turn-body">${htmlContent}</div></div>`;
     }
-
-    this.sanitizedTurns = finalTurns;
 
     // 1. Update Diff Boxes
     const diffOrigEl = document.getElementById("diff-box-orig");

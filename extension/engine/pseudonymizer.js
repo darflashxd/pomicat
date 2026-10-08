@@ -45,7 +45,7 @@ class AdversaryOracleSolver {
 
   lexNumericSpans(text) {
     // Regex matching whole numerical tokens with currency, units, decimals, and %
-    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|\bm\b|billion|\bb\b|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)))?|half\s+a\s+mil\b)/gi;
+    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
     const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
     const tokens = [];
     let m;
@@ -84,15 +84,15 @@ class AdversaryOracleSolver {
         val = 500000;
       } else if (isRatio) {
         val = parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) / 100;
-      } else if (/(?:miliar|billion|\bb\b|ember)/i.test(cleanLower)) {
+      } else if (/(?:miliar|billion|\bb\b|ember|b$)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e9);
       } else if (/(?:crores?)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e7);
-      } else if (/(?:juta|jt|jeti|jetong|million|\bm\b)/i.test(cleanLower)) {
+      } else if (/(?:juta|jt|jeti|jetong|million|\bm\b|m$)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e6);
       } else if (/(?:lakhs?|lpa)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e5);
-      } else if (/(?:k|rb|ribu|thousand|racks|bands)/i.test(cleanLower)) {
+      } else if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
       } else {
         const digits = cleanLower.replace(/\D/g, "");
@@ -319,7 +319,7 @@ class ConsistentPseudonymizer {
     if (clean.includes("half a mil")) return 500000;
 
     // Billions (miliar, milyar, billion, b, ember)
-    if (/(?:miliar|milyar|billion|\bb\b|ember)/i.test(clean)) {
+    if (/(?:miliar|milyar|billion|\bb\b|ember|b$)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e9);
@@ -333,7 +333,7 @@ class ConsistentPseudonymizer {
     }
 
     // Millions (juta, jt, jeti, jetong, million, m)
-    if (/(?:juta|jt|jeti|jetong|million|\bm\b)/i.test(clean)) {
+    if (/(?:juta|jt|jeti|jetong|million|\bm\b|m$)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e6);
@@ -347,7 +347,7 @@ class ConsistentPseudonymizer {
     }
 
     // Thousands (k, rb, ribu, thousand, racks, bands)
-    if (/(?:k|rb|ribu|thousand|racks|bands)/i.test(clean)) {
+    if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e3);
