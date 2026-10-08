@@ -27,7 +27,7 @@ class ContextualClassifier {
       /\b(?:gaji|penghasilan|upah|bonus|take home pay|thp|kompensasi|uang saku|pendapatan|tunjangan|remunerasi)(?:\s+\w+)?\s*(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku)?\b/i,
       /\b(?:gajiku|penghasilanku|upahku|gajimu|penghasilanmu)\b/i,
       /\b(?:gaji|penghasilan|kompensasi|upah|pendapatan)\s+(?:saya|Anda|kamu|gw|gue|ku|mu)\b/i,
-      /\b(?:my|your|our|i|we)\s+(?:\w+\s+){0,3}(?:salary|compensation|earnings|income|take-home|pay|debt|savings|loss|net\s+loss|net\s+income|revenue|deficit)\b/i,
+      /\b(?:my|your|our|i|we)\s+(?:\w+\s+){0,3}(?:salary|compensation|earnings|income|take-home|pay|debt|savings|checking|account|debit|card|policy|claim|insurance|bill|billing|loss|net\s+loss|net\s+income|revenue|deficit)\b/i,
       /\b(?:i owe|i make|you make|you earn|earning|making)\b/i,
       /\b(?:personal\s+debt|credit\s+card\s+debt|mortgage|student\s+loan|debt|loans)\b/i,
       /\b(?:my|your|saya|Anda)\s+(?:\w+\s+){0,2}(?:base\s+salary|annual\s+salary|monthly\s+salary|monthly\s+income|annual\s+income|gross\s+income|net\s+income|take-home\s+pay|hourly\s+rate)\b/i,
@@ -66,6 +66,8 @@ class ContextualClassifier {
       /\b(?:project\s+(?!(?:management|planning|manager|lead|update|timeline|report|review|charter|lifecycle|work|description)\b)[a-z][a-z0-9_-]+|non-disclosure|nda|trade\s+secret)\b/i,
       /\b(?:lpa|lakhs?|crores?|joining\s+bonus)\b/i,
       /\b(?:therapy\s+session|psychotherapy|counseling|childhood\s+trauma|trauma|panic\s+attacks?|suicidal\s+ideation|self-harm|ptsd)\b/i,
+      /\b(?:checking\s+account|savings\s+account|debit\s+card|credit\s+card|autopay|declined|insufficient\s+funds|overdraft|chargeback|card\s+transaction|available\s+balance|do\s+not\s+honor|card\s+ending\s+in|ends\s+in\s+\d{4})\b/i,
+      /\b(?:health\s+insurance|dental\s+insurance|vision\s+insurance|medical\s+bill(?:ing)?|insurance\s+claim|claim\s+number|member\s+id|group\s+number|in-network|out-of-network|deductible|coinsurance|copay(?:ment)?|out-of-pocket|explanation\s+of\s+benefits|eob)\b/i,
       /\b(?:rent|renting|landlord|struggling\s+hard|cooked|paycheck)\b/i
     ];
 
@@ -105,6 +107,14 @@ class ContextualClassifier {
 
       // If personal context is active, extract the corresponding values
       if (isPersonal) {
+        // Pre-compute phone number spans to prevent telephone numbers (e.g. 1-800-869-3557) from being parsed as financial amounts
+        const phoneSpans = [];
+        const phoneRx = /(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]\d{3}[-.\s]\d{4}\b|(?:\+?62|0)8[1-9][0-9]{7,10}\b/g;
+        let pm;
+        while ((pm = phoneRx.exec(sent)) !== null) {
+          phoneSpans.push([pm.index, pm.index + pm[0].length]);
+        }
+
         // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances)
         const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
@@ -112,6 +122,11 @@ class ContextualClassifier {
         for (const m of finMatches) {
           const matchIndex = m.index;
           const matchStr = m[0];
+
+          // Skip if inside a telephone number
+          if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
+            continue;
+          }
 
           // Skip IRC retirement plan references like 401k or 401(k)
           if (/^401\s*k$/i.test(matchStr.trim()) || /\b401\(?k\)?\b/i.test(matchStr)) continue;

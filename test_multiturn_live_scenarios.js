@@ -32,14 +32,16 @@ function runLiveMultiTurnAudit() {
 
     const intermediate = [];
     const allCtx = [];
+    const allHeuristics = [];
     for (let i = 0; i < turns.length; i++) {
       const hRes = heuristics.scan(turns[i].content);
+      allHeuristics.push(...hRes.detections);
       const cDets = contextual.classifyTurn(hRes.sanitizedText, i);
       allCtx.push(...cDets);
       intermediate.push({ role: turns[i].role, content: hRes.sanitizedText });
     }
 
-    return pseudonymizer.anonymizeConversation(intermediate, allCtx);
+    return pseudonymizer.anonymizeConversation(intermediate, allCtx, allHeuristics);
   }
 
   // --- SCENARIO 1: DEVSECOPS INCIDENT ---

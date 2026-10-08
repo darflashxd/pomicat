@@ -44,6 +44,14 @@ class AdversaryOracleSolver {
   }
 
   lexNumericSpans(text) {
+    // Identify telephone spans to avoid lexing phone digits (like 1-800-869-3557) as financial amounts
+    const phoneSpans = [];
+    const phoneRx = /(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
+    let pm;
+    while ((pm = phoneRx.exec(text)) !== null) {
+      phoneSpans.push([pm.index, pm.index + pm[0].length]);
+    }
+
     // Regex matching whole numerical tokens with currency, units, decimals, and %
     const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
     const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
@@ -52,6 +60,11 @@ class AdversaryOracleSolver {
     while ((m = rx.exec(text)) !== null) {
       const raw = m[0].trim();
       if (!raw) continue;
+
+      // Skip if inside a telephone number
+      if (phoneSpans.some(([s, e]) => m.index >= s && (m.index + m[0].length) <= e)) {
+        continue;
+      }
 
       // Ensure we don't start in the middle of a word or tag or dot or port (e.g. 10.244.0.15, :5432)
       if (m.index > 0 && /[\w.:]/.test(text[m.index - 1])) {
@@ -404,6 +417,37 @@ class ConsistentPseudonymizer {
 
     if (category === "SENSITIVE_FINANCIAL") {
       variants.push(`\\b${escapedRaw}\\b`);
+
+      // Card number formats with spaces, hyphens, or no separators
+      const cardDigits = raw.replace(/\D/g, "");
+      if (cardDigits.length >= 15 && cardDigits.length <= 19) {
+        variants.push(`\\b${cardDigits}\\b`);
+        variants.push(`\\b${cardDigits.replace(/(\d{4})/g, "$1 ").trim()}\\b`);
+        variants.push(`\\b${cardDigits.replace(/(\d{4})/g, "$1-").slice(0, -1)}\\b`);
+      }
+
+      // Bank account / loan prefix code variants (e.g. WF-990218374, SOFI-99821174)
+      const pfxMatch = raw.match(/^([A-Za-z]{2,6})[-_ ]?(\d{6,14})$/);
+      if (pfxMatch) {
+        const pfx = pfxMatch[1];
+        const numPart = pfxMatch[2];
+        variants.push(`\\b${pfx}[-_ ]?${numPart}\\b`);
+        variants.push(`\\b${numPart}\\b`);
+      }
+
+      // Card expiration date variants (e.g. "exp 08/27" -> also match raw "08/27")
+      const expDateMatch = raw.match(/\b((?:0[1-9]|1[0-2])[\/-](?:20)?\d{2})\b/);
+      if (expDateMatch) {
+        variants.push(`\\b${expDateMatch[1]}\\b`);
+      }
+
+      // Card last 4 digits variants (e.g. "ends in 4417" -> also match "ending in 4417", "ends in 4417")
+      const last4Match = raw.match(/\b(?:(?:card|debit|credit|account)\s+)?(?:ends|ending)\s+in\s+([0-9]{4})\b/i);
+      if (last4Match) {
+        variants.push(`\\bending\\s+in\\s+${last4Match[1]}\\b`);
+        variants.push(`\\bends\\s+in\\s+${last4Match[1]}\\b`);
+      }
+
       const num = this.parseFinancialValue(raw);
       if (num && !isNaN(num) && num >= 1000) {
         const idFormatted = num.toLocaleString("id-ID").replace(/\./g, "\\.");
@@ -542,8 +586,9 @@ class ConsistentPseudonymizer {
    * Sweeps and neutralizes entities and their equivalence classes across ALL turns (User & Assistant).
    * @param {Array<{role: string, content: string}>} turns
    * @param {Array<{turnIndex: number, raw: string, category: string}>} detectedEntities
+   * @param {Array<{type: string, raw: string, replacement: string}>} heuristicDetections
    */
-  anonymizeConversation(turns, detectedEntities) {
+  anonymizeConversation(turns, detectedEntities, heuristicDetections = []) {
     const updatedTurns = JSON.parse(JSON.stringify(turns));
 
     // Extract user name if introduced in user prompt, respecting stop-words and clause boundaries
@@ -805,6 +850,83 @@ class ConsistentPseudonymizer {
         replacement: dp.replacement,
         length: dp.pattern.length
       });
+    }
+
+    // Add cross-turn sweep rules from Tier 1 Heuristic Detections (Credit cards, CVV, Card expiry, Account IDs)
+    for (const hd of heuristicDetections) {
+      if (hd && hd.raw) {
+        const hEsc = hd.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        replacementRules.push({
+          regexStr: `\\b${hEsc}\\b`,
+          replacement: hd.replacement,
+          length: hd.raw.length
+        });
+
+        const token = hd.secretToken || hd.raw;
+
+        // Special handling for physical addresses (sweep pure street address string across assistant turns)
+        if (hd.type === "ENGLISH_PHYSICAL_ADDRESS" || hd.type === "ADDRESS_ID") {
+          if (token && token.length >= 6) {
+            const aEsc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            replacementRules.push({
+              regexStr: `\\b${aEsc}\\b`,
+              replacement: "[REDACTED_ADDRESS]",
+              length: token.length
+            });
+          }
+        }
+
+        // Special handling for card expiration dates (e.g. "exp 08/27" -> also sweep raw date "08/27")
+        if (hd.type === "CARD_EXPIRY_DATE") {
+          const m = token.match(/((?:0[1-9]|1[0-2])[\/-](?:20)?\d{2})/);
+          if (m) {
+            replacementRules.push({
+              regexStr: `\\b${m[1]}\\b`,
+              replacement: "[REDACTED_CARD_EXPIRY]",
+              length: m[1].length
+            });
+          }
+        }
+
+        // Special handling for card security codes (e.g. "CVV 339" -> also sweep raw code "339")
+        if (hd.type === "CARD_SECURITY_CODE") {
+          const m = token.match(/\b([0-9]{3,4})\b/);
+          if (m) {
+            replacementRules.push({
+              regexStr: `\\b${m[1]}\\b`,
+              replacement: "[REDACTED_CVV]",
+              length: m[1].length
+            });
+          }
+        }
+
+        // Special handling for credit/debit card numbers (sweep raw digits, spaced, and dashed)
+        if (hd.type === "CREDIT_CARD") {
+          const cardDigits = token.replace(/\D/g, "");
+          if (cardDigits.length >= 15 && cardDigits.length <= 19) {
+            const spaced = cardDigits.replace(/(\d{4})/g, "$1 ").trim();
+            const dashed = cardDigits.replace(/(\d{4})/g, "$1-").slice(0, -1);
+            replacementRules.push({ regexStr: `\\b${cardDigits}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: cardDigits.length });
+            replacementRules.push({ regexStr: `\\b${spaced.replace(/\s+/g, "\\s+")}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: spaced.length });
+            replacementRules.push({ regexStr: `\\b${dashed}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: dashed.length });
+          }
+        }
+
+        // Special handling for bank accounts, loan prefix IDs, and universal record identifiers
+        if (hd.type === "PREFIXED_BANK_LOAN_ID" || hd.type === "UNIVERSAL_RECORD_IDENTIFIER") {
+          const idVal = token;
+          if (idVal && idVal.length >= 4) {
+            const idEsc = idVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            replacementRules.push({ regexStr: `\\b${idEsc}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length });
+
+            const pfxMatch = idVal.match(/^([A-Za-z]{2,6})[-_ ]?(\d{6,14})$/);
+            if (pfxMatch) {
+              replacementRules.push({ regexStr: `\\b${pfxMatch[1]}[-_ ]?${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length });
+              replacementRules.push({ regexStr: `\\b${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: pfxMatch[2].length });
+            }
+          }
+        }
+      }
     }
 
     // Sort replacement rules by pattern specificity (longest pattern first)

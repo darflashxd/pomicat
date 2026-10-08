@@ -295,9 +295,11 @@ class SafeShareModal {
     }
 
     // 2. Scan Tier 3 (Pseudonymizer & Algebraic Solver)
+    const allHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections);
     const { mappings, solverLeaks } = this.pseudonymizer.anonymizeConversation(
       intermediateTurns,
-      this.rawContextualEntities
+      this.rawContextualEntities,
+      allHeuristics
     );
 
     // Contextual mappings into candidates
@@ -400,9 +402,14 @@ class SafeShareModal {
 
     // 3. Run the full multi-turn engine (sweeping all user and assistant turns)
     this.pseudonymizer.reset();
+    const activeHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections).filter(h => {
+      const cand = this.candidates.find(c => c.raw === h.raw);
+      return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
+    });
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
-      activeContextual
+      activeContextual,
+      activeHeuristics
     );
 
     this.sanitizedTurns = anonymizedTurns;

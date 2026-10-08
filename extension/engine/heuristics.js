@@ -74,14 +74,87 @@ class HeuristicsRedactor {
         regex: /\b((?:(?:swift(?:\s+code|\s+bic)?|bic)\s*[:=\-]?\s*))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/gi,
         replacement: "$1[REDACTED_SWIFT_BIC]"
       },
-      // 2. Credit Card Numbers (13-19 digits with Luhn verification)
+      // 2. Credit Card Numbers (13-19 digits with Luhn verification & Fail-Closed Context Fallback)
       {
         id: "CREDIT_CARD",
         name: "Credit Card",
         category: "FINANCIAL",
         regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b\d{15,16}\b/g,
-        validator: this.luhnCheck,
+        validator: (raw, index, text) => {
+          if (this.luhnCheck(raw)) return true;
+          // Fail-closed fallback: if Luhn fails, but surrounding context explicitly indicates a card number, redact it!
+          if (text) {
+            const start = Math.max(0, index - 80);
+            const end = Math.min(text.length, index + raw.length + 80);
+            const window = text.substring(start, end).toLowerCase();
+            return /\b(?:card(?:\s+number)?|debit|credit|visa|mastercard|amex|discover|ends\s+in|ending\s+in|pan|cvv|cvc|exp)\b/.test(window);
+          }
+          return false;
+        },
         replacement: "[REDACTED_CARD_NUMBER]"
+      },
+      // 2b. Card Security Verification Code (CVV, CVC, CID, Security Code - 3-4 digits)
+      {
+        id: "CARD_SECURITY_CODE",
+        name: "Card Security Code (CVV/CVC)",
+        category: "FINANCIAL",
+        regex: /\b((?:cvv2?|cvc2?|cid|security\s+code)\s*[:=\-]?\s*)([0-9]{3,4})\b/gi,
+        replacement: "$1[REDACTED_CVV]"
+      },
+      // 2c. Card Expiration Date (MM/YY or MM/YYYY with anchor)
+      {
+        id: "CARD_EXPIRY_DATE",
+        name: "Card Expiration Date",
+        category: "FINANCIAL",
+        regex: /\b((?:(?:card\s+)?(?:exp(?:iration)?|expiry)(?:\s+date)?)\s*[:=\-]?\s*)((?:0[1-9]|1[0-2])[\/-](?:20)?\d{2})\b/gi,
+        replacement: "$1[REDACTED_CARD_EXPIRY]"
+      },
+      // 2d. Universal Record, Account, Policy, Loan, & Booking Identifiers (Cross-Domain)
+      {
+        id: "UNIVERSAL_RECORD_IDENTIFIER",
+        name: "Account / Record Identifier",
+        category: "FINANCIAL",
+        regex: /\b((?:(?:checking|savings|bank|loan|credit|mortgage|deposit)\s+account(?:\s+number)?|(?:(?:account|acct|loan|policy|claim|member|group|booking|pnr|e-?ticket|record|case|docket|invoice|order|tracking)(?:\s+(?:#|id|number|no\.?|code|reference|\bref\b))?)|(?:sofi|wf|wells\s+fargo|chase|citi|bofa|aetna|cigna|united|metlife)\s+(?:account|loan|policy))\s*(?:[:=\-]|is)?\s*#?)([A-Za-z0-9]{1,8}[-_/][A-Za-z0-9_-]{4,24}|1Z[0-9A-Z]{16}|[0-9]{6,18}|(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,12})\b/gi,
+        validator: (raw, index, text) => {
+          const clean = raw.trim();
+          if (/^(?:active|pending|closed|open|true|false|none|null|undefined|ready)$/i.test(clean)) return false;
+          return true;
+        },
+        replacement: "$1[REDACTED_RECORD_ID]"
+      },
+      // 2e. Standalone Bank Account Prefix Identifiers (e.g. WF-990218374, SOFI-99821174, AETNA-8849201)
+      {
+        id: "PREFIXED_BANK_LOAN_ID",
+        name: "Bank / Loan / Policy ID",
+        category: "FINANCIAL",
+        regex: /\b((?:(?:from|to|via|on|in|#|account|acct|loan|policy|claim|ref|rekening)\s*(?:[:=\-]|is)?\s*)?)([A-Z]{2,6}-\d{6,14})\b/g,
+        validator: (raw, index, text) => {
+          const m = raw.match(/([A-Z]{2,6})-(\d{6,14})/);
+          if (!m) return false;
+          const prefix = m[1].toUpperCase();
+          const technicalExclusions = ["CVE", "RFC", "ISO", "IEEE", "HTTP", "HTTPS", "UTF", "UTC", "SHA", "MD", "SONNET", "OPUS", "HAIKU", "LLAMA", "GEMINI", "CLAUDE", "PORT"];
+          if (technicalExclusions.includes(prefix)) return false;
+
+          const knownInstitutions = ["WF", "SOFI", "CHASE", "CITI", "BOFA", "PNC", "ALLY", "AETNA", "CIGNA", "METLIFE", "USAA", "TD", "BCA", "BRI", "BNI", "MANDIRI", "AMEX", "DISCOVER"];
+          if (knownInstitutions.includes(prefix)) return true;
+
+          if (text) {
+            const start = Math.max(0, index - 80);
+            const end = Math.min(text.length, index + raw.length + 80);
+            const window = text.substring(start, end).toLowerCase();
+            return /\b(?:account|acct|loan|checking|savings|balance|bank|policy|claim|deposit|statement|bill|rekening|pinjaman|member)\b/.test(window);
+          }
+          return false;
+        },
+        replacement: "$1[REDACTED_ACCOUNT_ID]"
+      },
+      // 2f. Card Ending In Last 4 Digits
+      {
+        id: "CARD_LAST_FOUR",
+        name: "Card Last Four Digits",
+        category: "FINANCIAL",
+        regex: /\b((?:(?:card|debit|credit|account)\s+(?:ends|ending)\s+in)\s*)([0-9]{4})\b/gi,
+        replacement: "$1[REDACTED_CARD_LAST_4]"
       },
       // 3. Email Addresses (Standard and Defanged [at]/[dot]/(at)/(dot))
       {
@@ -91,12 +164,25 @@ class HeuristicsRedactor {
         regex: /\b[A-Za-z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*|\s*\(at\)\s*)[A-Za-z0-9.-]+(?:\s*\.\s*|\s*\[dot\]\s*|\s*\(dot\)\s*)[A-Za-z]{2,}\b/gi,
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
-      // 4. Phone Numbers (ID: +62/08..., US/International)
+      // 4. Phone Numbers (ID: +62/08..., US/International with Toll-Free Hotline Protection)
       {
         id: "PHONE",
         name: "Phone Number",
         category: "PROFILE",
         regex: /(?:\+?62|0)8[1-9][0-9]{7,10}\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+        validator: (raw, index, text) => {
+          // If it's a toll-free number (800, 888, 877, 866, 855, 844, 833) in corporate/support context, preserve it!
+          const digits = raw.replace(/\D/g, "");
+          const isTollFree = /^(?:1)?(?:800|888|877|866|855|844|833)/.test(digits);
+          if (isTollFree && text) {
+            const start = Math.max(0, index - 80);
+            const window = text.substring(start, Math.min(text.length, index + raw.length + 40)).toLowerCase();
+            if (/\b(?:call|support|service|official|hotline|helpdesk|contact|toll-?free|bank|wells\s+fargo|customer|help|amazon|sofi|aetna|cigna|number\s+on\s+the\s+back)\b/.test(window)) {
+              return false; // Preserve public business support hotline
+            }
+          }
+          return true; // Redact personal phone numbers
+        },
         replacement: "[REDACTED_PHONE]"
       },
       // 5. OpenAI API Keys (Legacy & Project keys)
@@ -308,7 +394,7 @@ class HeuristicsRedactor {
         id: "ENGLISH_PHYSICAL_ADDRESS",
         name: "US/UK Physical Street Address",
         category: "PROFILE",
-        regex: /\b((?:(?:residential|shipping|mailing|home|street)?\s*address\s*[:=\-]?\s*)(?:to\s+my\s+residential\s+address\s*:\s*)?)((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*)?(?:[0-9]{1,5}\s+)?[A-Za-z0-9\s.,\/-]+?(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct)[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))\b/gi,
+        regex: /\b((?:(?:residential|shipping|mailing|home|street)\s+)?address\s*[:=\-]?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy)\b(?:[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
         replacement: "$1[REDACTED_ADDRESS]"
       },
       // 12. Indonesian Tax ID (NPWP - 15/16 digits formatted or raw)
@@ -581,6 +667,7 @@ class HeuristicsRedactor {
           name: pattern.name,
           category: pattern.category || "GENERAL",
           raw: raw,
+          secretToken: (match.length > 2 && match[2]) ? match[2] : raw,
           replacement: repl,
           index: match.index,
           length: raw.length
