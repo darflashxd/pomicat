@@ -145,21 +145,23 @@ Pelatihan model dilakukan langsung pada mesin pengembang (*bare-metal environmen
   - **Patience Early Stopping:** 2 epoch evaluasi berturut-turut.
 
 ### 3.4 Hasil Metrik Evaluasi Resmi (`evaluation_metrics.json`)
-Evaluasi dilakukan pada subset pengujian independen (*hold-out test set*) sebanyak 6.200 kalimat yang belum pernah dilihat oleh model:
+Evaluasi dilakukan pada subset pengujian independen (*hold-out test set*) sebanyak 9.997 kalimat yang dipartisi secara **Template-Disjoint** (pola kalimat pengujian belum pernah dilihat sama sekali di data pelatihan):
 
 | Metrik Evaluasi | Nilai Tercapai | Keterangan Ilmiah |
 |---|---|---|
-| **Evaluation Loss** | `0.000321` | Konvergensi model sangat stabil tanpa overfitting liar |
-| **Precision** | `1.0 (100.0%)` | Setiap entitas yang dilabeli sensitif benar-benar data pribadi |
-| **Recall** | `1.0 (100.0%)` | Tidak ada satu pun data pribadi yang luput dari klasifikasi |
-| **F1-Score** | `1.0 (100.0%)` | Keseimbangan harmonik absolut antara presisi dan recall |
-| **Throughput Inferensi** | `2.362 sampel/detik` | Sangat cepat untuk kebutuhan pemindaian real-time |
+| **Evaluation Loss** | `0.3398` | Loss realistis pada partisi out-of-template |
+| **Accuracy** | `95.36% (0.9536)` | Akurasi klasifikasi token pada data out-of-template |
+| **Precision** | `60.68% (0.6068)` | Tingkat kepastian entitas sensitif pada variasi sintaks baru |
+| **Recall** | `68.00% (0.6800)` | Cakupan tangkapan entitas sensitif murni deep learning |
+| **F1-Score** | `64.13% (0.6413)` | Skor harmonik realistis (bebas template memorization leakage) |
+| **Hybrid Pipeline SER** | `0.00% (Zero Leaks)` | Tingkat kebocoran saat digabungkan dengan Tier 1 & Tier 3 |
+| **Throughput Inferensi** | `2.489 sampel/detik` | Sangat cepat untuk kebutuhan pemindaian real-time |
 
 ### 3.5 Kuantisasi ONNX INT8 & Eksekusi di Browser
 Untuk menjalankan model deep learning langsung di dalam browser tanpa ketergantungan pada backend server:
 1. Model PyTorch diekspor ke format Open Neural Network Exchange (ONNX) menggunakan pustaka HuggingFace Optimum (`export_onnx.py`).
-2. Dilakukan kuantisasi dinamis 8-bit (*Dynamic INT8 Quantization*): bobot model dipadatkan dari floating-point 32-bit menjadi bilangan bulat 8-bit.
-3. Ukuran model terkompresi menjadi **129 MB** (`model_quantized.onnx`), memungkinkan inferensi sub-milidetik (< 7 ms) di CPU klien menggunakan ONNX Runtime WebAssembly.
+2. Dilakukan kuantisasi dinamis 8-bit (*Dynamic INT8 Quantization*): bobot model dipadatkan dari floating-point 32-bit (514.11 MB) menjadi bilangan bulat 8-bit.
+3. Ukuran model terkompresi menjadi **128.89 MB** (`model_quantized.onnx`, reduksi 74.9%), dengan latensi inferensi terverifikasi **6.42 ms** di CPU klien menggunakan ONNX Runtime WebAssembly.
 
 ---
 

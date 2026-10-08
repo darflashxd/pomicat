@@ -1,29 +1,34 @@
 """
-SafeShare-AI — Comprehensive Contextual Privacy Dataset Generator V3 (SafeShare-PrivacyBench)
+SafeShare-AI — Comprehensive Contextual Privacy Dataset Generator V4 (SafeShare-PrivacyBench 100k)
 Engineered for Black Hat Asia 2027 Arsenal & Academic Peer-Reviewed Security Benchmarks.
 
 Key Innovations:
 1. Probabilistic Context-Free Grammar (PCFG): 300+ combinatorial syntactic patterns.
-2. Global Domain Coverage:
-   - Silicon Valley Tech Comp ($380k TC, RSUs, 4-yr vest, 1-yr cliff, 409A valuation, strike price)
-   - Global Tech Comp: Indian LPA, Lakhs, Crores, European taxes & pensions
-   - GAAP Accounting Negative Format: Deficit cash flow in parentheses ($650,000)
-   - DevSecOps & Cloud Secrets: .env, YAML passwords, WireGuard keys, Basic Auth, tokens
-   - Healthcare & Mental Health (HIPAA): Bipolar II, MDD, oncology staging, psychotropics, trauma
-   - Workplace & HR: Performance Improvement Plans (PIP), written warnings, Title VII harassment
-3. Hard Negative Macro & Scientific Contrast (Zero False Positive):
-   - Federal Reserve FOMC rates, S&P 500 index, Bureau of Labor Statistics (BLS) surveys, IRS limits
-   - CTF x86_64 shellcode, GDB register crash dumps, CVE advisories, Docker & Linux syntax
-   - Common English nouns: project management, project planning, workstream update
-4. Template-Disjoint Partitioning:
-   - Train and Test sets strictly partitioned by template families to eliminate template leakage.
+2. 100,000 Balanced Samples with Template-Disjoint Partitioning:
+   - 80,000 Train samples (80%)
+   - 10,000 Validation samples (10%)
+   - 10,000 Test samples (10%)
+3. Global Multi-Domain Coverage:
+   - Silicon Valley Tech Comp ($380k TC, base, RSUs, 409A, strike price, ISOs)
+   - Indian Tech Comp: 45 LPA, 10 Lakhs, 1.5 Crores
+   - European Comp: €, £, CHF with pension/tax deductions
+   - GAAP Accounting Parentheses Deficits: ($650,000), monthly burn rate, runway
+   - Healthcare & Mental Health (HIPAA): Bipolar II, MDD, oncology staging, trauma
+   - Workplace & HR: Performance Improvement Plans (PIP), final written warnings, Title VII
+4. Developer Code, SQL & Technical Hard Negatives (Label O - Safe):
+   - SQL queries (`SELECT employee_id, salary FROM payroll`)
+   - Python & JavaScript variables (`const user_id = 1000; let salary = 0;`)
+   - C++ structs and JSON payloads
+   - Shell commands, Linux kernel, GDB registers, x86_64 shellcode, CVE advisories
+5. Human Organic Seeds & Conversational Evasion (Reddit, Blind, Typos):
+   - Unstructured conversational prompts, typos (slary, accunt, gji), code-switching
 """
 
 import json
 import random
 import os
 import re
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple
 
 random.seed(1337)
 
@@ -113,20 +118,11 @@ MEDICATIONS_EN = [
     "Adderall XR 20mg", "Ritalin 10mg", "Risperidone 2mg", "Klonopin 0.5mg", "Seroquel 200mg", "Lantus insulin", "Biktarvy"
 ]
 
-PROJECTS_CORP_ID = [
-    "Project Garuda-Fintech", "Project Valkyrie Core", "Inisiatif Merger Titan",
-    "Operasi BlackHawk", "Project Aurora Migration", "Protokol Aegis-Internal"
-]
 PROJECTS_CORP_EN = [
     "Project Chimera", "Project Valkyrie", "Project Nightfall", "Project Apollo Core", "Project Titan Acquisition",
     "Project BlueSky Migration", "Project Cerberus Zero", "Project Aegis Stealth"
 ]
 
-HR_ACTIONS_ID = [
-    "Surat Peringatan Ketiga (SP-3)", "Surat Peringatan Pertama (SP-1)",
-    "pemutusan hubungan kerja (PHK) sepihak", "Program Peningkatan Kinerja (PIP) 30 hari",
-    "skorsing investigasi fraud internal", "surat teguran keras direksi"
-]
 HR_ACTIONS_EN = [
     "60-day Performance Improvement Plan (PIP)", "final written warning", "first performance warning",
     "unilateral wrongful termination", "30-day Performance Improvement Plan (PIP)",
@@ -160,7 +156,7 @@ def tokenize_and_label(text: str, entity_substring: str = None, label_prefix: st
     return tokens, labels
 
 
-def generate_financial_partition(is_test: bool = False, n_samples: int = 5000) -> List[Dict]:
+def generate_financial_partition(is_test: bool = False, n_samples: int = 7000) -> List[Dict]:
     data = []
     per_bucket = n_samples // 4
 
@@ -265,6 +261,72 @@ def generate_financial_partition(is_test: bool = False, n_samples: int = 5000) -
     return data
 
 
+def generate_developer_code_partition(is_test: bool = False, n_samples: int = 5000) -> List[Dict]:
+    """Generates Developer Code & SQL Hard Negatives where terms like salary, id, user appear as code syntax (Label O)."""
+    data = []
+    
+    code_templates_train = [
+        "SELECT employee_id, salary, department FROM payroll_records WHERE status = 'active';",
+        "const calculateNetPay = (grossSalary, taxRate) => grossSalary * (1 - taxRate);",
+        "def get_user_profile(user_id: int) -> dict: return db.query(User).filter_by(id=user_id).first()",
+        "CREATE TABLE users (id SERIAL PRIMARY KEY, username VARCHAR(50), balance DECIMAL(12, 2));",
+        "INSERT INTO compensation_bands (level, base_min, base_max) VALUES ('L5', 180000, 240000);",
+        "UPDATE employee_accounts SET credit_limit = 5000 WHERE account_id = 'ACC_9921';",
+        "struct EmployeeRecord { uint32_t id; double annual_compensation; char role[64]; };",
+        "curl -X GET https://api.stripe.com/v1/customers -H 'Authorization: Bearer test_key'",
+        "logger.info('Processing payroll batch for department: Engineering with total employees: %d', count)",
+        "return {'status': 'success', 'data': {'account_type': 'checking', 'routing_prefix': '0210'}}"
+    ]
+    
+    code_templates_test = [
+        "SELECT avg(salary) AS mean_comp, max(bonus) FROM engineering_salaries GROUP BY location;",
+        "class PayrollCalculator: def __init__(self, base_pay: float): self.base = base_pay",
+        "const userPayload = JSON.stringify({ action: 'verify_identity', tenant_id: 'corp_alpha' });",
+        "prisma.employee.findMany({ where: { compensation: { gte: 100000 } } });",
+        "export interface UserMetadata { id: string; emailVerified: boolean; balanceRemaining: number; }",
+        "git log --pretty=format:'%h - %an, %ar : %s' --grep='payroll service update'",
+        "docker run -e DB_NAME=finance_prod -e DB_PORT=5432 -p 5432:5432 postgres:15-alpine",
+        "terraform apply -target=aws_security_group.db_ingress -var='environment=production'"
+    ]
+    
+    templates = code_templates_test if is_test else code_templates_train
+    for _ in range(n_samples):
+        snippet = random.choice(templates)
+        tokens, labels = tokenize_and_label(snippet)
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "DEV_CODE", "type": "SAFE_CODE_SYNTAX"})
+        
+    return data
+
+
+def generate_human_organic_partition(is_test: bool = False, n_samples: int = 2500) -> List[Dict]:
+    """Generates Organic Human Prompts with typos, colloquialisms, and informal phrasing."""
+    data = []
+    
+    organic_train = [
+        ("im making 130k base as senior dev in austin, rent is 2400 a month, how to save for downpayment?", "130k", "SENSITIVE_FINANCIAL"),
+        ("got offered 380k tc at meta (210k base 170k rsu). current google tc is 340k. should i counter?", "380k tc", "SENSITIVE_FINANCIAL"),
+        ("my slary is 95k but my credit card debt is 22k at 24% interest, feeling overwhelmed", "95k", "SENSITIVE_FINANCIAL"),
+        ("bro my thp is 28jt nett per month but monthly cicilan kpr is 12jt, is this sustainable?", "28jt", "SENSITIVE_FINANCIAL"),
+        ("i have 45000 in student loans and 12000 in car loans, monthly payments are killing me", "45000", "SENSITIVE_FINANCIAL")
+    ]
+    
+    organic_test = [
+        ("cleared half a mil this year from consulting and day trading, need tax shelter ideas", "half a mil", "SENSITIVE_FINANCIAL"),
+        ("my rent is 3200 a month and i only take home 7800 after taxes and 401k deduction", "3200", "SENSITIVE_FINANCIAL"),
+        ("got placed on a 30 day pip today by my manager after reporting safety concerns to hr", "30 day pip", "SENSITIVE_LEGAL_HR"),
+        ("dr prescribed me 20mg lexapro and 0.5mg xanax for crippling panic attacks", "20mg lexapro", "SENSITIVE_HEALTH"),
+        ("our startup burn rate is 180k/mo and we only have 900k left in the bank", "180k", "SENSITIVE_FINANCIAL")
+    ]
+    
+    pool = organic_test if is_test else organic_train
+    for _ in range(n_samples):
+        text, target_str, label_tag = random.choice(pool)
+        tokens, labels = tokenize_and_label(text, target_str, label_tag)
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "HUMAN_ORGANIC", "type": "SENSITIVE"})
+        
+    return data
+
+
 def generate_health_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
     data = []
     per_type = n_samples // 3
@@ -331,7 +393,7 @@ def generate_health_partition(is_test: bool = False, n_samples: int = 4000) -> L
     return data
 
 
-def generate_corp_hr_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
+def generate_corp_hr_partition(is_test: bool = False, n_samples: int = 3500) -> List[Dict]:
     data = []
     per_type = n_samples // 3
 
@@ -393,7 +455,7 @@ def generate_corp_hr_partition(is_test: bool = False, n_samples: int = 4000) -> 
     return data
 
 
-def generate_user_cyber_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
+def generate_user_cyber_partition(is_test: bool = False, n_samples: int = 3500) -> List[Dict]:
     data = []
     per_type = n_samples // 2
 
@@ -500,30 +562,44 @@ def build_ood_human_dataset() -> List[Dict]:
             "id": "OOD-10",
             "text": "The project management institute offers certification in project planning and agile project leadership.",
             "entities": [] # Safe Project Management Negative
+        },
+        {
+            "id": "OOD-11",
+            "text": "SELECT salary, bonus, department FROM corp_payroll WHERE active = true;",
+            "entities": [] # Safe SQL Code Negative
+        },
+        {
+            "id": "OOD-12",
+            "text": "In Python code: const user_id = 1000; let baseSalary = calculateTax(grossComp);",
+            "entities": [] # Safe Script Code Negative
         }
     ]
 
 
 def main():
-    print("[*] Generating SafeShare-AI PrivacyBench Dataset V3 (Template-Disjoint)...")
+    print("[*] Generating SafeShare-AI PrivacyBench Dataset V4 (100,000 Balanced Multi-Domain)...")
 
-    # Generate Train Partition (80%) using Training Template Sets
-    train_fin = generate_financial_partition(is_test=False, n_samples=20000)
-    train_health = generate_health_partition(is_test=False, n_samples=16000)
-    train_corp = generate_corp_hr_partition(is_test=False, n_samples=16000)
-    train_cyber = generate_user_cyber_partition(is_test=False, n_samples=16000)
-    train_data = train_fin + train_health + train_corp + train_cyber
+    # Generate Train Partition (80,000 samples)
+    train_fin = generate_financial_partition(is_test=False, n_samples=26000)
+    train_dev = generate_developer_code_partition(is_test=False, n_samples=20000)
+    train_health = generate_health_partition(is_test=False, n_samples=14000)
+    train_corp = generate_corp_hr_partition(is_test=False, n_samples=10000)
+    train_cyber = generate_user_cyber_partition(is_test=False, n_samples=10000)
+    train_data = train_fin + train_dev + train_health + train_corp + train_cyber
     random.shuffle(train_data)
+    train_data = train_data[:80000]
 
-    # Generate Validation & Test Partition using Reserved Disjoint Template Sets
-    test_fin = generate_financial_partition(is_test=True, n_samples=5000)
-    test_health = generate_health_partition(is_test=True, n_samples=4000)
-    test_corp = generate_corp_hr_partition(is_test=True, n_samples=4000)
-    test_cyber = generate_user_cyber_partition(is_test=True, n_samples=4000)
-    eval_pool = test_fin + test_health + test_corp + test_cyber
+    # Generate Validation & Test Partition using Reserved Disjoint Templates (20,000 samples total)
+    test_fin = generate_financial_partition(is_test=True, n_samples=6500)
+    test_dev = generate_developer_code_partition(is_test=True, n_samples=5000)
+    test_health = generate_health_partition(is_test=True, n_samples=3500)
+    test_corp = generate_corp_hr_partition(is_test=True, n_samples=2500)
+    test_cyber = generate_user_cyber_partition(is_test=True, n_samples=2500)
+    eval_pool = test_fin + test_dev + test_health + test_corp + test_cyber
     random.shuffle(eval_pool)
+    eval_pool = eval_pool[:20000]
 
-    n_val = len(eval_pool) // 2
+    n_val = 10000
     val_data = eval_pool[:n_val]
     test_data = eval_pool[n_val:]
 

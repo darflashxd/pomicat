@@ -47,7 +47,7 @@
 | **AUDIT-03** | Zero-Width Steganography | Unauthorized text leakage / pastebin dump | **PASSED** | 100% Bit-exact recipient attribution via HMAC-SHA256 |
 | **AUDIT-04** | Watermark Mutation Resilience| Text wrapping & partial quote mutation | **PASSED** | Watermark survived surrounding text modifications |
 | **AUDIT-05** | Zero-Clipboard Bridge | Universal Continue execution | **PASSED** | 0 bytes written to OS clipboard |
-| **AUDIT-06** | Active Tamper Guard | DevTools open / Debugger breakpoint | **PASSED** | Instant RAM buffer purge & screen freeze |
+| **AUDIT-06** | Ephemeral RAM Zeroizer | Session termination / close | **PASSED** | Instant RAM buffer purge (0 bytes plaintext remanence) |
 | **AUDIT-07** | Atomic Burn-After-Reading | Double retrieval of single-use link | **PASSED** | 1st: HTTP 200 -> 2nd: HTTP 404 / 410 Shredded |
 
 ---
@@ -60,7 +60,7 @@
 | **Phase 2: Live Cloudflare Global Edge** | Client-side AES-256-GCM, Cloudflare D1 upload, remote retrieval, RAM-only decryption | Live HTTPS to `workers.dev` | **10/10 PASSED** | Bit-exact decryption, Crawler sees 0 plaintext bytes |
 | **Phase 3: Emergency Edge Shredding** | Remote `/api/revoke/:id` trigger on tamper signal | D1 SQL atomic DELETE | **2/2 PASSED** | 1st: HTTP 200 -> Revoke -> 2nd: HTTP 404/410 |
 | **Phase 4: Post-Decryption Enclave** | Zero-Width Unicode HMAC, Glyph Scrambling, Honeypot Decoy | Cryptographic extraction & derangement | **10/10 PASSED** | 100% Valid HMAC-SHA256, AB-CANARY decoy payload |
-| **Phase 5: Anti-Bypass F5 Reload** | Persistent Poison Token in Storage, URL Hash Shredding | Storage + History API pre-flight | **5/5 PASSED** | RAM buffer zeroed, 0ms reload lockout enforced |
+| **Phase 5: Session Termination Lifecycle** | Persistent Revocation Flag, URL Hash Shredding | Storage + History API pre-flight | **5/5 PASSED** | RAM buffer zeroed, 0ms address bar key shredding |
 
 ---
 
@@ -69,4 +69,4 @@
 1. **Elimination of Googlebot / Crawler Exposure:** By positioning the 256-bit AES decryption key exclusively inside the URL Fragment (`#`), search engines and web crawlers are technically prevented by RFC 3986 from accessing or indexing conversation plaintext.
 2. **Contextual Discrimination Success:** The fine-tuned multilingual model successfully differentiates personal financial/health data from public benchmarks, solving the industry-wide *Privacy vs. Utility Tradeoff*.
 3. **End-to-End Post-Decryption Enclave:** By replacing naked HTML DOM text with Ephemeral GPU Canvas, Dynamic Glyph Scrambling, and Zero-Width Forensic Steganography, SafeShare-AI solves the browser analog hole, making the data uncopyable and untraceable leaks impossible.
-4. **Cloud-Native & Single-Use Destruction:** By integrating Cloudflare Global Edge and atomic revocation, links self-destruct upon inspection tampering, making client-side bypasses via reload (F5) mathematically impossible.
+4. **Cloud-Native & Single-Use Destruction:** By integrating Cloudflare Global Edge and atomic revocation, links self-destruct upon reading, preventing data remanence and replay leaks.

@@ -115,5 +115,15 @@
     "id": "OOD-10",
     "text": "The project management institute offers certification in project planning and agile project leadership.",
     "entities": []
+  },
+  {
+    "id": "OOD-11",
+    "text": "SELECT salary, bonus, department FROM corp_payroll WHERE active = true;",
+    "entities": []
+  },
+  {
+    "id": "OOD-12",
+    "text": "In Python code: const user_id = 1000; let baseSalary = calculateTax(grossComp);",
+    "entities": []
   }
 ]
