@@ -143,8 +143,54 @@ function runUniversalDomainInvarianceSuite() {
   assert(r6.anonymizedTurns[1].content.includes("1-888-280-4331"), "Toll-free AWS support hotline in Assistant turn must be 100% PRESERVED!");
   console.log("  [✓] Domain 6 Passed: Model versions, RFC standards, CVE numbers, and toll-free hotlines 100% preserved (0% FP)!");
 
+  // --- DOMAIN 7: MULTI-TURN BANKING CHECKLIST & PROFILE TOGGLE ---
+  console.log("\n[Domain 7] Testing Multi-Turn Banking Checklist & Contact Profile Toggle...");
+  const d7User = "Wait, you mentioned the expiration might be the issue. Can you check that again? Also, can you look at whether the billing address 742 Evergreen Terrace matches what Wells Fargo has? And my phone (503) 882-4471 — is that the number they'd have on file?\n\nAlso I want to make sure — my SoFi loan SOFI-99821174 is on autopay from WF-990218374. Is that the right setup?";
+  const d7Asst = "Wells Fargo Call Checklist\nDebit card: ending in 2276\nCard expiration: 08/27\nBilling address: 742 Evergreen Terrace\nPhone number on account: (503) 882-4471\nScheduled autopay amount: $450\nChecking account balance is approximately $4,200.";
+
+  // A. With Profile ON (Default Protected)
+  const r7On = processDialogue(d7User, d7Asst);
+  assert(!r7On.anonymizedTurns[0].content.includes("(503) 882-4471"), "Phone number must be redacted when Profile is ON!");
+  assert(!r7On.anonymizedTurns[0].content.includes("742 Evergreen Terrace"), "Address must be redacted when Profile is ON!");
+  assert(!r7On.anonymizedTurns[1].content.includes("(503) 882-4471"), "Phone in checklist must be redacted when Profile is ON!");
+  assert(!r7On.anonymizedTurns[1].content.includes("742 Evergreen Terrace"), "Address in checklist must be redacted when Profile is ON!");
+  assert(r7On.anonymizedTurns[1].content.includes("[REDACTED_CARD_LAST_4]"), "Debit card ending in 2276 must use [REDACTED_CARD_LAST_4]!");
+
+  // B. With Profile OFF (User Toggled Unmasked)
+  pseudonymizer.reset();
+  const turns7 = [
+    { role: "user", content: d7User },
+    { role: "assistant", content: d7Asst }
+  ];
+  const inter7 = [];
+  const ctx7 = [];
+  const h7 = [];
+  for (let i = 0; i < turns7.length; i++) {
+    const hRes = heuristics.scan(turns7[i].content);
+    // Filter out PROFILE from heuristics to simulate toggle OFF
+    const nonProfileDets = hRes.detections.filter(d => d.category !== "PROFILE");
+    h7.push(...nonProfileDets);
+    let sText = turns7[i].content;
+    for (const d of nonProfileDets) {
+      sText = sText.replace(new RegExp(d.raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), d.replacement);
+    }
+    const cDets = contextual.classifyTurn(sText, i);
+    ctx7.push(...cDets);
+    inter7.push({ role: turns7[i].role, content: sText });
+  }
+  const r7Off = pseudonymizer.anonymizeConversation(inter7, ctx7, h7);
+  assert(r7Off.anonymizedTurns[0].content.includes("(503) 882-4471"), "Phone must remain raw when Profile is OFF!");
+  assert(r7Off.anonymizedTurns[0].content.includes("742 Evergreen Terrace"), "Address must remain raw when Profile is OFF!");
+  assert(r7Off.anonymizedTurns[1].content.includes("(503) 882-4471"), "Phone in checklist must remain raw when Profile is OFF!");
+  assert(r7Off.anonymizedTurns[1].content.includes("742 Evergreen Terrace"), "Address in checklist must remain raw without budget/financial mangling when Profile is OFF!");
+  assert(!r7Off.anonymizedTurns[1].content.includes("[REDACTED_BUDGET_ALLOCATION] Evergreen Terrace"), "House number 742 must NEVER be mangled as budget allocation!");
+  assert(!r7Off.anonymizedTurns[0].content.includes("[REDACTED_FINANCIAL_"), "Address and phone must NEVER be mistagged as redacted financial!");
+  assert(r7Off.anonymizedTurns[0].content.includes("[REDACTED_RECORD_ID]"), "Loan ID must remain protected as financial record!");
+  assert(r7Off.anonymizedTurns[0].content.includes("[REDACTED_ACCOUNT_ID]"), "Account ID must remain protected as financial account!");
+  console.log("  [✓] Domain 7 Passed: Multi-turn checklist & Profile toggle ON/OFF verified with zero false financial tags!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 6 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
+  console.log("   ALL 7 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
   console.log("================================================================================\n");
 }
 

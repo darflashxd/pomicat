@@ -422,14 +422,17 @@ class SafeShareModal {
       let htmlContent = this.escapeHtml(turn.content);
 
       // A. Wrap unmasked items (if user toggled protection off)
-      for (const cand of this.candidates) {
-        const isCatActive = this.activeCategories.has(cand.category);
-        const isProtected = isCatActive && cand.enabled;
-        if (!isProtected && cand.raw) {
-          const rawEscaped = this.escapeHtml(cand.raw);
-          const regRaw = new RegExp(`\\b${this.escapeRegExp(rawEscaped)}\\b`, "gi");
-          htmlContent = htmlContent.replace(regRaw, `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`);
-        }
+      const unmaskedCandidates = this.candidates
+        .filter(cand => {
+          const isCatActive = this.activeCategories.has(cand.category);
+          return !(isCatActive && cand.enabled) && cand.raw;
+        })
+        .sort((a, b) => b.raw.length - a.raw.length);
+
+      for (const cand of unmaskedCandidates) {
+        const rawEscaped = this.escapeHtml(cand.raw);
+        const regRaw = new RegExp(`(?<![\\w])${this.escapeRegExp(rawEscaped)}(?![\\w])`, "gi");
+        htmlContent = htmlContent.replace(regRaw, `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`);
       }
 
       // B. Single-pass regex replacing all redacted tags (avoids nesting span inside span!)

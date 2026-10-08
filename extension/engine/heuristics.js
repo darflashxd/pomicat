@@ -153,7 +153,17 @@ class HeuristicsRedactor {
         id: "CARD_LAST_FOUR",
         name: "Card Last Four Digits",
         category: "FINANCIAL",
-        regex: /\b((?:(?:card|debit|credit|account)\s+(?:ends|ending)\s+in)\s*)([0-9]{4})\b/gi,
+        regex: /\b((?:(?:(?:(?:debit|credit)\s+)?(?:card|account))\s*[:=\-]?\s*)?(?:ends|ending)\s+in\s*)([0-9]{4})\b/gi,
+        validator: (raw, index, text) => {
+          if (text) {
+            const start = Math.max(0, index - 40);
+            const before = text.substring(start, index).toLowerCase();
+            if (/\b(?:year|quarter|month|period|semester|fiscal|week|day)\s*$/i.test(before)) {
+              return false;
+            }
+          }
+          return true;
+        },
         replacement: "$1[REDACTED_CARD_LAST_4]"
       },
       // 3. Email Addresses (Standard and Defanged [at]/[dot]/(at)/(dot))
@@ -394,7 +404,7 @@ class HeuristicsRedactor {
         id: "ENGLISH_PHYSICAL_ADDRESS",
         name: "US/UK Physical Street Address",
         category: "PROFILE",
-        regex: /\b((?:(?:residential|shipping|mailing|home|street)\s+)?address\s*[:=\-]?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy)\b(?:[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
+        regex: /\b((?:(?:residential|shipping|mailing|home|street|billing)\s+)?address\s*[:=\-]?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy)\b(?:[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
         replacement: "$1[REDACTED_ADDRESS]"
       },
       // 12. Indonesian Tax ID (NPWP - 15/16 digits formatted or raw)

@@ -115,6 +115,21 @@ class ContextualClassifier {
           phoneSpans.push([pm.index, pm.index + pm[0].length]);
         }
 
+        // Pre-compute address spans to prevent house numbers (e.g. 742 Evergreen Terrace) and postal zip codes from being parsed as financial amounts
+        const addressSpans = [];
+        const addrRx = /\b(?:(?:(?:residential|shipping|mailing|home|street|billing)\s+)?address\s*[:=\-]?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+))?((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy)\b(?:[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi;
+        let am;
+        while ((am = addrRx.exec(sent)) !== null) {
+          addressSpans.push([am.index, am.index + am[0].length]);
+        }
+        const idAddrRx = /\b(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?(?:\s+di|\s+adalah|\s*:)?\s*)([A-Za-z0-9\s.,\/-]+?)(?=\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|[\r\n]|$))/gi;
+        let iam;
+        while ((iam = idAddrRx.exec(sent)) !== null) {
+          if (/\b(?:jalan|jl\.?|gang|gg\.?|kampung|kp\.?|komplek|perumahan|dusun|desa|kelurahan|kecamatan|rt\s*\d+|rw\s*\d+|no(?:mor)?\s*\d+|blok\s*[a-z0-9]+)\b/i.test(iam[0])) {
+            addressSpans.push([iam.index, iam.index + iam[0].length]);
+          }
+        }
+
         // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances)
         const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
@@ -123,8 +138,11 @@ class ContextualClassifier {
           const matchIndex = m.index;
           const matchStr = m[0];
 
-          // Skip if inside a telephone number
+          // Skip if inside a telephone number or physical address
           if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
+            continue;
+          }
+          if (addressSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
             continue;
           }
 
