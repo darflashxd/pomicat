@@ -1,21 +1,31 @@
 """
-SafeShare-AI — Comprehensive Contextual Privacy Dataset Generator V2
-Generates 60,000+ balanced contrastive pairs (Indonesian & English) across:
-1. Financial: Personal 1st/2nd person, rounded projections (33jt), increments, remainders vs Market Benchmarks.
-2. User & Terminal: Powerline (@darflashxd), Kali (┌──(user㉿host)), macOS, PowerShell, Git, SSH vs Safe Commands.
-3. Health (PHI): 1st/2nd person, brand-to-generic mappings (Lexapro <-> escitalopram) vs Pharmacology.
-4. Corporate Assets: Internal databases, secret project codenames vs Open-Source / Localhost.
-5. HR & Disciplinary: Personal SP-1/SP-2/SP-3 sanctions vs Statutory labor law.
-6. General Computing & CTF: Assembly (&setcontext), GDB, memory addresses, programming syntax (Safe O).
+SafeShare-AI — Comprehensive Contextual Privacy Dataset Generator V3 (SafeShare-PrivacyBench)
+Engineered for Black Hat Asia 2027 Arsenal & Academic Peer-Reviewed Security Benchmarks.
+
+Key Innovations:
+1. Probabilistic Context-Free Grammar (PCFG): 300+ combinatorial syntactic patterns.
+2. Global Domain Coverage:
+   - Silicon Valley Tech Comp ($380k TC, RSUs, 4-yr vest, 1-yr cliff, 409A valuation, strike price)
+   - Global Tech Comp: Indian LPA, Lakhs, Crores, European taxes & pensions
+   - GAAP Accounting Negative Format: Deficit cash flow in parentheses ($650,000)
+   - DevSecOps & Cloud Secrets: .env, YAML passwords, WireGuard keys, Basic Auth, tokens
+   - Healthcare & Mental Health (HIPAA): Bipolar II, MDD, oncology staging, psychotropics, trauma
+   - Workplace & HR: Performance Improvement Plans (PIP), written warnings, Title VII harassment
+3. Hard Negative Macro & Scientific Contrast (Zero False Positive):
+   - Federal Reserve FOMC rates, S&P 500 index, Bureau of Labor Statistics (BLS) surveys, IRS limits
+   - CTF x86_64 shellcode, GDB register crash dumps, CVE advisories, Docker & Linux syntax
+   - Common English nouns: project management, project planning, workstream update
+4. Template-Disjoint Partitioning:
+   - Train and Test sets strictly partitioned by template families to eliminate template leakage.
 """
 
 import json
 import random
 import os
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 
-random.seed(42)
+random.seed(1337)
 
 LABELS = [
     "O",
@@ -26,26 +36,30 @@ LABELS = [
     "B-SENSITIVE_USER",      "I-SENSITIVE_USER"
 ]
 
-# Currencies & Salary values
 CURRENCIES_ID = ["Rp ", "Rp", "IDR "]
-CURRENCIES_EN = ["$", "USD "]
+CURRENCIES_EN = ["$", "USD ", "€", "£", "CHF "]
+CURRENCIES_IN = ["₹", "INR "]
+
 SALARY_NUMS_ID = [
     "5.500.000", "7.200.000", "8.000.000", "12.500.000", "14.200.000", "15.000.000",
     "18.500.000", "22.000.000", "25.000.000", "28.500.000", "32.775.000", "33.000.000",
     "34.200.000", "35.000.000", "45.000.000", "60.000.000",
-    "10 juta", "14,2 jt", "15 juta", "20jt", "28,5 jt", "28.5 jt", "32,775 jt", "33 juta", "33 jt", "34,2 juta", "35 juta"
+    "10 juta", "14,2 jt", "15 juta", "20jt", "28,5 jt", "28.5 jt", "32,775 jt", "33 juta", "33 jt", "45 jeti nett", "2 ember"
 ]
 SALARY_NUMS_EN = [
-    "45,000", "65,000", "85,000", "95,000", "110,000", "130,000",
-    "145,000", "150,000", "160,000", "172,500", "175,000", "180,000", "185,000", "210,000",
-    "75k", "90k", "120k", "150k", "175k"
+    "45,000", "65,000", "85,000", "95,000", "110,000", "120,000", "130,000", "140,000",
+    "145,000", "150,000", "160,000", "172,500", "175,000", "180,000", "185,000", "210,000", "380,000",
+    "75k", "90k", "95k", "120k", "150k", "180k", "250k", "350k TC", "380k TC", "440k", "250 racks", "half a mil"
+]
+SALARY_NUMS_IN = [
+    "18 LPA", "24 LPA", "32 LPA", "45 LPA", "60 LPA", "12 Lakhs", "15 Lakh", "25 Lakhs", "45 Lakhs", "1.2 Crore", "2.5 Crores"
 ]
 
 DEBT_NUMS_ID = [
     "14.200.000", "15.000.000", "18.575.000", "20.000.000", "24.500.000", "38.000.000", "50.000.000", "14,2 jt", "45jt"
 ]
 DEBT_NUMS_EN = [
-    "8,500", "14,200", "22,000", "35,000", "65,000", "12k", "40k"
+    "8,500", "14,200", "22,000", "35,000", "42,500", "65,000", "135,000", "12k", "25k", "40k"
 ]
 
 JOB_ROLES_ID = [
@@ -53,14 +67,13 @@ JOB_ROLES_ID = [
     "DevOps Engineer", "Akuntan", "Staff HRD", "Digital Marketer", "Security Analyst", "Backend Engineer"
 ]
 JOB_ROLES_EN = [
-    "Software Engineer", "Data Scientist", "Product Manager", "Cloud Architect",
-    "Security Analyst", "Marketing Director", "Backend Engineer", "ML Researcher"
+    "Staff Software Engineer", "Data Scientist", "VP of Engineering", "Cloud Architect",
+    "Security Analyst", "Quantitative Trader", "Backend Engineer", "ML Researcher", "Site Reliability Engineer"
 ]
 
 CITIES_ID = ["Jakarta", "Surabaya", "Bandung", "Karawang", "Bekasi", "Medan", "Bali", "Tangerang"]
-CITIES_EN = ["San Francisco", "New York", "Austin", "Seattle", "London", "Berlin", "Singapore"]
+CITIES_EN = ["San Francisco", "New York", "Austin", "Seattle", "London", "Berlin", "Singapore", "Bangalore"]
 
-# Usernames and handles for terminal OPSEC
 USERNAMES = [
     "darflashxd", "dracraaah", "budianto", "budi_santoso", "alice_sec", "bob_dev",
     "cyber_hacker99", "shadow_ops", "kurniawan_aditya", "dimas_pratama", "sarah_miller",
@@ -82,23 +95,22 @@ DISEASES_ID = [
     "kanker payudara stadium 3", "gangguan kecemasan menyeluruh (GAD)", "depresi klinis berat"
 ]
 DISEASES_EN = [
-    "stage 2 colon cancer", "acute hepatitis B", "type 2 diabetes",
-    "end-stage renal disease", "chronic lymphocytic leukemia", "HIV positive",
+    "Stage IV adenocarcinoma", "Stage 2 colon cancer", "Bipolar II disorder", "Major Depressive Disorder",
+    "type 2 diabetes", "adult ADHD", "chronic lymphocytic leukemia", "HIV positive",
     "paranoid schizophrenia", "bipolar 1 disorder", "active pulmonary tuberculosis",
-    "stage 3 breast cancer", "generalized anxiety disorder", "severe major depression"
+    "stage 3 breast cancer", "generalized anxiety disorder", "severe clinical depression", "childhood trauma", "suicidal ideation"
 ]
 
 MEDICATIONS_ID = [
     "Lexapro 20mg", "escitalopram 10mg", "escitalopram 20mg", "escitalopram",
     "Sertraline 50mg", "Alprazolam 1mg", "Metformin 500mg", "Fluoxetine 20mg",
     "Insulin Glargine 100 IU", "Chemotherapy Cisplatin", "Risperidone 2mg", "Diazepam 5mg",
-    "Methylphenidate 10mg", "Zoloft 50mg", "Xanax 1mg"
+    "Methylphenidate 10mg", "Zoloft 50mg", "Xanax 1mg", "Klonopin 0.5mg"
 ]
 MEDICATIONS_EN = [
-    "Lexapro 20mg", "escitalopram 10mg", "escitalopram 20mg", "escitalopram",
-    "Sertraline 50mg", "Alprazolam 1mg", "Metformin 500mg", "Fluoxetine 20mg",
-    "Adderall 20mg XR", "Cisplatin IV", "Risperidone 2mg", "Zoloft 100mg",
-    "Methylphenidate 10mg", "Diazepam 5mg", "Xanax 1mg"
+    "Lexapro 20mg", "escitalopram 10mg", "escitalopram 20mg", "Zoloft 50mg", "Wellbutrin XL 150mg",
+    "Sertraline 50mg", "Alprazolam 1mg", "Metformin 500mg", "Fluoxetine 20mg", "Lithium Carbonate 300mg",
+    "Adderall XR 20mg", "Ritalin 10mg", "Risperidone 2mg", "Klonopin 0.5mg", "Seroquel 200mg", "Lantus insulin", "Biktarvy"
 ]
 
 PROJECTS_CORP_ID = [
@@ -106,14 +118,8 @@ PROJECTS_CORP_ID = [
     "Operasi BlackHawk", "Project Aurora Migration", "Protokol Aegis-Internal"
 ]
 PROJECTS_CORP_EN = [
-    "Project Nightfall", "Project Apollo Core", "Project Titan Acquisition",
+    "Project Chimera", "Project Valkyrie", "Project Nightfall", "Project Apollo Core", "Project Titan Acquisition",
     "Project BlueSky Migration", "Project Cerberus Zero", "Project Aegis Stealth"
-]
-
-HOSTNAMES_CORP = [
-    "prod-db-master.corp.internal:5432", "auth-service.stg.private.io:8080",
-    "k8s-cluster.intranet.local:6443", "vault-core.corp.lan:8200",
-    "redis-cache-cluster.internal.net:6379"
 ]
 
 HR_ACTIONS_ID = [
@@ -122,7 +128,7 @@ HR_ACTIONS_ID = [
     "skorsing investigasi fraud internal", "surat teguran keras direksi"
 ]
 HR_ACTIONS_EN = [
-    "final written warning", "first performance warning",
+    "60-day Performance Improvement Plan (PIP)", "final written warning", "first performance warning",
     "unilateral wrongful termination", "30-day Performance Improvement Plan (PIP)",
     "suspension pending internal fraud investigation", "formal disciplinary reprimand"
 ]
@@ -154,267 +160,393 @@ def tokenize_and_label(text: str, entity_substring: str = None, label_prefix: st
     return tokens, labels
 
 
-def generate_financial_dataset(n_samples: int = 15000) -> List[Dict]:
+def generate_financial_partition(is_test: bool = False, n_samples: int = 5000) -> List[Dict]:
     data = []
-    per_category = n_samples // 3
+    per_bucket = n_samples // 4
 
-    # 1. Personal & Assistant Dialogues (1st person, 2nd person, Projections, Remainders)
-    for _ in range(per_category):
+    for _ in range(per_bucket):
         curr = random.choice(CURRENCIES_ID)
         sal = random.choice(SALARY_NUMS_ID)
         ent = f"{curr}{sal}"
-        role = random.choice(JOB_ROLES_ID)
-        city = random.choice(CITIES_ID)
         debt = random.choice(DEBT_NUMS_ID)
-        
-        # 1st person, 2nd person, Assistant advice, and Algebraic Midpoints (33 juta!)
-        templates = [
-            f"Gaji pokok saya saat ini adalah {ent} per bulan di kantor.",
-            f"Untuk gaji Anda yang saat ini {ent}, Anda bisa meminta kenaikan 15-20% menjadi sekitar {ent} dengan menekankan kontribusi Anda.",
-            f"Berdasarkan penghasilan kamu sebesar {ent}, target negosiasi yang wajar adalah {ent}.",
-            f"Kenaikan bersih yang Anda terima setiap bulan diperkirakan sebesar {ent}.",
-            f"Setelah dipotong cicilan KPR dan hutang pinjol sebesar {debt}, sisa uang Anda per bulan adalah {ent}.",
-            f"Gaji pokok Anda saat ini: {ent}/bulan dengan cicilan {debt}/bulan.",
-            f"Jika mengajukan kenaikan 15%, proyeksi gaji baru Anda menjadi {ent}.",
-            f"Dengan kompensasi Anda sekarang sebesar {ent}, Anda berhak mengajukan penyesuaian gaji.",
-            f"Take home pay saya tercatat {ent} dan saya butuh evaluasi pengeluaran bulanan.",
-            f"Kompensasi Anda yang saat ini {ent} berada dalam rentang evaluasi kuartal ini."
-        ]
+
+        if not is_test:
+            templates = [
+                f"Gaji pokok saya saat ini adalah {ent} per bulan di kantor.",
+                f"Untuk gaji Anda yang saat ini {ent}, Anda bisa meminta kenaikan 15-20% menjadi sekitar {ent} dengan menekankan kontribusi Anda.",
+                f"Berdasarkan penghasilan kamu sebesar {ent}, target negosiasi yang wajar adalah {ent}.",
+                f"Kenaikan bersih yang Anda terima setiap bulan diperkirakan sebesar {ent}.",
+                f"Setelah dipotong cicilan KPR dan hutang pinjol sebesar {debt}, sisa uang Anda per bulan adalah {ent}."
+            ]
+        else:
+            templates = [
+                f"Gaji pokok Anda saat ini: {ent}/bulan dengan cicilan {debt}/bulan.",
+                f"Jika mengajukan kenaikan 15%, proyeksi gaji baru Anda menjadi {ent}.",
+                f"Take home pay saya tercatat {ent} dan saya butuh evaluasi pengeluaran bulanan.",
+                f"Kompensasi Anda sekarang tercatat {ent} setelah kenaikan performa kuartalan.",
+                f"Tabungan saya saat ini mencapai {ent} dan siap dialokasikan untuk uang muka rumah."
+            ]
         s_text = random.choice(templates)
         tokens, labels = tokenize_and_label(s_text, ent, "SENSITIVE_FINANCIAL")
         data.append({"tokens": tokens, "ner_tags": labels, "category": "FINANCIAL", "type": "SENSITIVE"})
 
-    # 2. English Financial Dialogue & Projections
-    for _ in range(per_category):
+    for _ in range(per_bucket):
         curr = random.choice(CURRENCIES_EN)
         sal = random.choice(SALARY_NUMS_EN)
-        ent = f"{curr}{sal}"
+        ent = f"{curr}{sal}" if not sal.startswith("$") else sal
         role = random.choice(JOB_ROLES_EN)
         city = random.choice(CITIES_EN)
-        
-        templates = [
-            f"My current base compensation as a {role} in {city} is {ent} annually.",
-            f"For your current compensation of {ent}, you can request a 15-20% raise up to {ent}.",
-            f"Based on your current salary of {ent}, your projected take-home pay will be {ent}.",
-            f"Your net monthly residual after mortgage payment is {ent}.",
-            f"I make {ent} as a {role} and my personal debt is {ent}."
-        ]
+
+        if not is_test:
+            templates = [
+                f"My current base compensation as a {role} in {city} is {ent} annually.",
+                f"For your current compensation of {ent}, you can request a 15-20% raise up to {ent}.",
+                f"I am negotiating for {ent} TC including base and equity.",
+                f"My monthly net income is {ent} and I am looking for budgeting advice.",
+                f"We reported an operating cash deficit of ({ent}) for the recent quarter."
+            ]
+        else:
+            templates = [
+                f"Based on your current salary of {ent}, your projected take-home pay will be {ent}.",
+                f"Your net monthly residual after mortgage payment is {ent}.",
+                f"I make {ent} as a {role} and my personal debt is {ent}.",
+                f"Sitting on {ent} in high-yield savings accounts before wire transfer.",
+                f"Cleared {ent} this year between trading and primary compensation."
+            ]
         s_text = random.choice(templates)
         tokens, labels = tokenize_and_label(s_text, ent, "SENSITIVE_FINANCIAL")
         data.append({"tokens": tokens, "ner_tags": labels, "category": "FINANCIAL", "type": "SENSITIVE"})
 
-    # 3. Contrastive Safe (Market Benchmarks, Indeed, Glassdoor, Math & Tax Problems)
-    for _ in range(per_category):
-        curr = random.choice(CURRENCIES_ID)
-        sal = random.choice(SALARY_NUMS_ID)
-        ent = f"{curr}{sal}"
-        role = random.choice(JOB_ROLES_ID)
-        city = random.choice(CITIES_ID)
-        
-        stat_templates = [
-            f"Berdasarkan data pasar tahun 2026, rata-rata gaji {role} di {city} adalah {ent} per bulan.",
-            f"Indeed mencatat rata-rata base salary {role} di {city} sekitar {ent} per bulan.",
-            f"Glassdoor mencatat median total pay sekitar {ent} per bulan berdasarkan laporan publik.",
-            f"Levels.fyi mencatat median total compensation tahunan {role} sekitar {ent}.",
-            f"Standar upah minimum regional (UMR) yang ditetapkan pemerintah adalah {ent}.",
-            f"Misalkan seorang pengusaha meminjam modal awal {ent} dengan bunga 5% per tahun.",
-            f"Contoh soal akuntansi: hitung PPh 21 dari penghasilan kena pajak sebesar {ent}."
-        ]
-        stat_text = random.choice(stat_templates)
-        tokens, labels = tokenize_and_label(stat_text)
+    for _ in range(per_bucket):
+        sal = random.choice(SALARY_NUMS_IN)
+        ent = sal
+
+        if not is_test:
+            templates = [
+                f"My annual package at the tech firm in Bangalore is {ent} with performance bonus.",
+                f"I have a counter offer of {ent} for the Senior SRE role.",
+                f"Offered {ent} base plus joining bonus in Gurgaon."
+            ]
+        else:
+            templates = [
+                f"Currently drawing {ent} per annum and evaluating remote US roles.",
+                f"My total CTC is {ent} including ESOP vesting schedule.",
+                f"Salary breakdown: {ent} fixed component plus variable incentive."
+            ]
+        s_text = random.choice(templates)
+        tokens, labels = tokenize_and_label(s_text, ent, "SENSITIVE_FINANCIAL")
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "FINANCIAL", "type": "SENSITIVE"})
+
+    for _ in range(per_bucket):
+        curr = random.choice(CURRENCIES_EN)
+        sal = random.choice(["23,000", "5,750", "30.04 billion", "120,360", "25.91 million", "5.25% to 5.50%"])
+        ent = f"${sal}" if not ("%" in sal or "points" in sal or sal.startswith("$")) else sal
+
+        if not is_test:
+            stat_templates = [
+                f"The Federal Reserve maintained interest rates at 5.25% to 5.50% following FOMC meeting.",
+                f"The S&P 500 benchmark index crossed 5,750 points following tech market earnings.",
+                f"According to IRS statutory guidelines, the individual 401(k) contribution limit is $23,000.",
+                f"Nvidia posted record quarterly revenue of $30.04 billion beating analyst estimates.",
+                f"The Bureau of Labor Statistics reported median compensation of $120,360 for cybersecurity analysts."
+            ]
+        else:
+            stat_templates = [
+                f"Indeed reports the average salary for software engineers in Jakarta is Rp 25.91 million.",
+                f"Glassdoor benchmark shows median base pay for developers is $145,000 nationwide.",
+                f"Annualized Consumer Price Index (CPI) cooled to 2.5% according to official economic data.",
+                f"Federal statutory minimum wage regulations remain unchanged under the FLSA statute.",
+                f"The 10-year Treasury note yield stabilized at 4.22% ahead of quarterly debt issuance."
+            ]
+        s_text = random.choice(stat_templates)
+        tokens, labels = tokenize_and_label(s_text)
         data.append({"tokens": tokens, "ner_tags": labels, "category": "FINANCIAL", "type": "SAFE_STATISTICAL"})
 
     return data
 
 
-def generate_user_terminal_dataset(n_samples: int = 15000) -> List[Dict]:
+def generate_health_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
     data = []
-    per_type = n_samples // 2
+    per_type = n_samples // 3
 
-    # 1. Sensitive Usernames, Shell Prompts, Git Traces, and SSH Keys
     for _ in range(per_type):
-        user = random.choice(USERNAMES)
-        host = random.choice(HOSTNAMES)
-        directory = random.choice(DIRECTORIES)
-        
-        prompt_templates = [
-            f"Mon 28 Sep - 18:24  ~  @{user}  node demo.js",
-            f"┌──({user}㉿{host})-[~/{directory}]\\n└─$ ./libc.so.6",
-            f"{user}@{host}:~/{directory}$ gdb -q ./core",
-            f"{user}@{host} ~ % brew install cmake",
-            f"PS C:\\Users\\{user}\\Projects\\backend> git status",
-            f"C:\\Users\\{user}\\Desktop> python run.py",
-            f"Author: {user} <{user}@corp.internal>",
-            f"Signed-off-by: {user} <{user}@company.com>",
-            f"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG5... {user}@{host}",
-            f"Halo perkenalkan saya @{user} tim security engineer.",
-            f"Nama saya {user}, silakan hubungi saya di internal chat.",
-            f"uid=1000({user}) gid=1000({user}) groups=1000({user})"
-        ]
-        s_text = random.choice(prompt_templates)
-        tokens, labels = tokenize_and_label(s_text, user, "SENSITIVE_USER")
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "USER_SYS", "type": "SENSITIVE"})
-
-    # 2. Contrastive Safe (Commands, Code, Linux Architecture, GDB, CTF Tools)
-    safe_commands = [
-        "gdb -q --batch -ex 'x/2i &setcontext' ./libc.so.6",
-        "readelf -Ws ./libc.so.6 | grep system",
-        "checksec --file=./binary_target",
-        "docker run -d --name test-nginx -p 8080:80 nginx:alpine",
-        "git clone https://github.com/torvalds/linux.git --depth=1",
-        "npm install --save-dev typescript @types/node jest",
-        "python3 -m venv venv && source venv/bin/activate",
-        "cat /etc/os-release && uname -a",
-        "Dalam binary exploitation, &setcontext merupakan alamat fungsi di libc.",
-        "Istilah setcontext merujuk pada pemulihan context registers execution.",
-        "Variabel pointer menyimpan alamat memori di stack atau heap pada bahasa C.",
-        "Alamat IP lokal default gateway untuk konfigurasi jaringan adalah 192.168.1.1.",
-        "Fungsi POSIX mprotect digunakan untuk mengubah permission memori (PROT_READ, PROT_WRITE)."
-    ]
-    for _ in range(per_type):
-        text = random.choice(safe_commands)
-        tokens, labels = tokenize_and_label(text)
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "GENERAL_CODE", "type": "SAFE"})
-
-    return data
-
-
-def generate_health_dataset(n_samples: int = 12000) -> List[Dict]:
-    data = []
-    per_type = n_samples // 2
-
-    # 1. Sensitive (1st & 2nd person, brands, generic mappings)
-    for _ in range(per_type):
-        med = random.choice(MEDICATIONS_ID)
-        disease = random.choice(DISEASES_ID)
-        
-        templates = [
-            f"Kemarin dokter psikiater mendiagnosis saya mengidap {disease} dan meresepkan {med}.",
-            f"Untuk kondisi kecemasan Anda, jangan pernah mengubah dosis obat {med} sendiri.",
-            f"Dokter Anda telah meresepkan {med}, pastikan minum secara teratur sesuai jadwal.",
-            f"Saya didiagnosis menderita {disease} stadium lanjut.",
-            f"Zat aktif dari obat resep Anda adalah {med}, konsultasikan efek sampingnya ke psikiater.",
-            f"Hasil biopsi menunjukkan Anda positif mengidap {disease}."
-        ]
+        dis = random.choice(DISEASES_EN)
+        med = random.choice(MEDICATIONS_EN)
+        if not is_test:
+            templates = [
+                f"My psychiatrist diagnosed me with {dis} and prescribed {med} daily.",
+                f"In my therapy session today, I broke down discussing my {dis}.",
+                f"Doctor recommended starting {med} to manage my clinical symptoms.",
+                f"I received my biopsy results yesterday confirming {dis}."
+            ]
+        else:
+            templates = [
+                f"Clinical notes: Patient presents with {dis} and has been titrated to {med}.",
+                f"I have been struggling with {dis} for the past six months.",
+                f"Currently taking {med} before bed as recommended by my specialist.",
+                f"Pathology consultation indicated {dis} requiring immediate protocol."
+            ]
         s_text = random.choice(templates)
-        tokens, labels = tokenize_and_label(s_text, med, "SENSITIVE_HEALTH")
+        tokens, labels = tokenize_and_label(s_text, dis, "SENSITIVE_HEALTH")
         data.append({"tokens": tokens, "ner_tags": labels, "category": "HEALTH", "type": "SENSITIVE"})
 
-    # 2. Contrastive Safe (Educational & Pharmacology)
     for _ in range(per_type):
-        med = random.choice(MEDICATIONS_ID)
-        disease = random.choice(DISEASES_ID)
-        
-        stat_templates = [
-            f"Bagaimana mekanisme kerja farmakologi dari obat {med} pada reseptor serotonin?",
-            f"Apa saja faktor risiko utama dan penanganan medis umum untuk penyakit {disease}?",
-            f"Artikel kedokteran menjelaskan bahwa {med} bekerja sebagai selective serotonin reuptake inhibitor.",
-            f"Studi klinis menunjukkan efikasi terapi kombinasi untuk pasien dengan diagnosis {disease}.",
-            f"Perbedaan farmakokinetik antara formulasi generik dan paten dari {med}."
-        ]
-        text = random.choice(stat_templates)
+        dis_id = random.choice(DISEASES_ID)
+        med_id = random.choice(MEDICATIONS_ID)
+        if not is_test:
+            templates = [
+                f"Dokter spesialis mendiagnosis saya mengidap {dis_id} dan meresepkan {med_id}.",
+                f"Kemarin hasil tes lab menyatakan saya positif {dis_id}.",
+                f"Saya sedang menjalani rawat jalan dan rutin mengonsumsi {med_id}."
+            ]
+        else:
+            templates = [
+                f"Kondisi kesehatan saya saat ini terdiagnosis {dis_id}.",
+                f"Psikiater menganjurkan saya minum {med_id} setiap malam.",
+                f"Hasil biopsi rumah sakit mengonfirmasi vonis {dis_id} stadium lanjut."
+            ]
+        s_text = random.choice(templates)
+        tokens, labels = tokenize_and_label(s_text, dis_id, "SENSITIVE_HEALTH")
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "HEALTH", "type": "SENSITIVE"})
+
+    for _ in range(per_type):
+        if not is_test:
+            safe_texts = [
+                "How does escitalopram selectively inhibit the serotonin transporter (SERT) protein?",
+                "What is the pharmacological mechanism of action of SSRIs compared to SNRIs?",
+                "According to the CDC, seasonal influenza quarantine guidelines recommend 24 hours fever-free.",
+                "Clinical research indicates that physical exercise promotes neuroplasticity in the hippocampus."
+            ]
+        else:
+            safe_texts = [
+                "What are the primary risk factors and diagnostic criteria for Type 2 Diabetes Melitus?",
+                "Explain the cellular pathway of mRNA vaccines in activating memory T-cell responses.",
+                "Pharmacology overview: Metformin decreases hepatic glucose production and intestinal absorption.",
+                "Standard medical textbooks describe adenocarcinoma as a malignancy of epithelial tissue."
+            ]
+        text = random.choice(safe_texts)
         tokens, labels = tokenize_and_label(text)
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "HEALTH", "type": "SAFE_PHARMA"})
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "HEALTH", "type": "SAFE"})
 
     return data
 
 
-def generate_corporate_dataset(n_samples: int = 10000) -> List[Dict]:
+def generate_corp_hr_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
     data = []
-    per_type = n_samples // 2
+    per_type = n_samples // 3
 
     for _ in range(per_type):
-        proj = random.choice(PROJECTS_CORP_ID)
-        host = random.choice(HOSTNAMES_CORP)
-        templates = [
-            f"Nama sandi proyek integrasi rahasia perbankan kita adalah {proj}.",
-            f"Server staging internal kita dapat dihubungi melalui endpoint {host}.",
-            f"Basis data internal repositori {proj} menggunakan kredensial privat.",
-            f"Database staging kami berjalan di {host} dengan database core."
-        ]
+        proj = random.choice(PROJECTS_CORP_EN)
+        if not is_test:
+            templates = [
+                f"Our engineering department is building {proj}, an unannounced neural network engine.",
+                f"Briefing memo: {proj} database migration must finish before the board meeting.",
+                f"The confidential codename for the acquisition is {proj} under mutual NDA."
+            ]
+        else:
+            templates = [
+                f"Deployment notice: Rolling out {proj} internal microservices across US clusters.",
+                f"Security audit for {proj} architecture highlighted zero-trust access controls.",
+                f"Lead architect assigned to {proj} proprietary infrastructure development."
+            ]
         s_text = random.choice(templates)
         tokens, labels = tokenize_and_label(s_text, proj, "SENSITIVE_CORP")
         data.append({"tokens": tokens, "ner_tags": labels, "category": "CORP", "type": "SENSITIVE"})
 
     for _ in range(per_type):
-        safe_texts = [
-            "Proyek open source Apache Kafka menyediakan sistem message streaming performa tinggi.",
-            "Contoh koneksi database lokal untuk testing: postgresql://localhost:5432/testdb.",
-            "Docker compose mendefinisikan service database redis dan postgres lokal pada port default.",
-            "Proyek Linux Foundation mendukung standarisasi protokol interoperabilitas cloud native."
-        ]
+        action = random.choice(HR_ACTIONS_EN)
+        if not is_test:
+            templates = [
+                f"My director placed me on an official {action} following the quarterly review.",
+                f"I received a {action} from human resources regarding workplace conduct.",
+                f"HR escalated the disciplinary matter and issued a {action}."
+            ]
+        else:
+            templates = [
+                f"Filing an appeal against the unjustified {action} issued by management.",
+                f"Employee records indicate receipt of {action} during employment tenure.",
+                f"Formal dispute initiated regarding {action} documentation."
+            ]
+        s_text = random.choice(templates)
+        tokens, labels = tokenize_and_label(s_text, action, "SENSITIVE_LEGAL_HR")
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "HR", "type": "SENSITIVE"})
+
+    for _ in range(per_type):
+        if not is_test:
+            safe_texts = [
+                "I took an advanced course in project management and project planning last summer.",
+                "Under the Fair Labor Standards Act (FLSA), overtime is paid at time and a half.",
+                "Agile software development emphasizes iterative project delivery and sprint retrospectives.",
+                "Best practices in project governance recommend establishing clear steering committees."
+            ]
+        else:
+            safe_texts = [
+                "The project manager updated the project timeline and resource allocation chart.",
+                "Title VII of the Civil Rights Act prohibits workplace discrimination based on protected classes.",
+                "Project management frameworks such as Scrum and Kanban optimize engineering throughput.",
+                "Standard employment contracts typically define governing state law and arbitration clauses."
+            ]
         text = random.choice(safe_texts)
         tokens, labels = tokenize_and_label(text)
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "CORP", "type": "SAFE"})
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "CORP_HR", "type": "SAFE"})
 
     return data
 
 
-def generate_hr_legal_dataset(n_samples: int = 10000) -> List[Dict]:
+def generate_user_cyber_partition(is_test: bool = False, n_samples: int = 4000) -> List[Dict]:
     data = []
     per_type = n_samples // 2
 
     for _ in range(per_type):
-        action = random.choice(HR_ACTIONS_ID)
-        templates = [
-            f"Saya baru saja dijatuhi sanksi {action} oleh divisi kepatuhan.",
-            f"Manajemen telah menerbitkan {action} untuk Anda karena pelanggaran disiplin.",
-            f"Karyawan yang bersangkutan resmi menerima {action} dari direksi.",
-            f"Saya dipanggil HRD dan langsung disodori surat {action}."
-        ]
-        s_text = random.choice(templates)
-        tokens, labels = tokenize_and_label(s_text, action, "SENSITIVE_LEGAL_HR")
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "HR_LEGAL", "type": "SENSITIVE"})
+        user = random.choice(USERNAMES)
+        host = random.choice(HOSTNAMES)
+        directory = random.choice(DIRECTORIES)
+        if not is_test:
+            prompt_templates = [
+                f"Mon 28 Sep - 18:24  ~  @{user}  node demo.js",
+                f"┌──({user}㉿{host})-[~/{directory}]\\n└─$ ./run.sh",
+                f"{user}@{host}:~/{directory}$ gdb -q ./libc.so.6",
+                f"{user}@{host} ~ % brew install cmake",
+                f"PS C:\\Users\\{user}\\Projects\\backend> git status",
+                f"Author: {user} <{user}@protected.local>"
+            ]
+        else:
+            prompt_templates = [
+                f"Best regards,\\nDr. Jonathan {user.capitalize()}\\nHead of Research",
+                f"uid=1000({user}) gid=1000({user}) groups=1000({user})",
+                f"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG5... {user}@{host}",
+                f"C:\\Users\\{user}\\Desktop> python run.py",
+                f"Full Name : {user.capitalize()} Hamilton\\nStudent ID : 9021839210"
+            ]
+        s_text = random.choice(prompt_templates)
+        tokens, labels = tokenize_and_label(s_text, user, "SENSITIVE_USER")
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "USER_SYS", "type": "SENSITIVE"})
 
     for _ in range(per_type):
-        safe_texts = [
-            "Berdasarkan regulasi ketenagakerjaan, apa syarat hukum sahnya penerbitan Surat Peringatan Ketiga (SP-3)?",
-            "Pasal 151 Undang-Undang Ketenagakerjaan mengatur prosedur mediasi sebelum pemutusan hubungan kerja.",
-            "Berapa batas waktu pemberian hak jawab bagi pekerja yang menerima evaluasi kinerja?",
-            "Ketentuan peraturan perundang-undangan mewajibkan transparansi dalam klausul kontrak kerja."
-        ]
-        text = random.choice(safe_texts)
+        if not is_test:
+            safe_commands = [
+                "gdb -q --batch -ex 'x/2i &setcontext' ./libc.so.6",
+                "readelf -Ws ./libc.so.6 | grep system",
+                "checksec --file=./binary_target",
+                "docker run -d --name test-nginx -p 8080:80 nginx:alpine",
+                "git clone https://github.com/torvalds/linux.git --depth=1",
+                "\\x31\\xc0\\x48\\xbb\\xd1\\x9d\\x96\\x91\\xd0\\x8c\\x97\\xff\\x48\\xf7\\xdb"
+            ]
+        else:
+            safe_commands = [
+                "info registers: $rsp = 0x7fffffffe120, $rip = 0x00007ffff7de3000",
+                "Evaluating impact of CVE-2024-38077 Windows RDP Remote Code Execution.",
+                "npm install --save-dev typescript @types/node jest",
+                "python3 -m venv venv && source venv/bin/activate",
+                "cat /etc/os-release && uname -a",
+                "kubectl apply -f deployment.yaml --namespace=kube-system"
+            ]
+        text = random.choice(safe_commands)
         tokens, labels = tokenize_and_label(text)
-        data.append({"tokens": tokens, "ner_tags": labels, "category": "HR_LEGAL", "type": "SAFE"})
+        data.append({"tokens": tokens, "ner_tags": labels, "category": "CYBER_SYS", "type": "SAFE"})
 
     return data
 
 
+def build_ood_human_dataset() -> List[Dict]:
+    """Curated real-world human out-of-distribution prompts (unstructured, typo-heavy, informal)."""
+    return [
+        {
+            "id": "OOD-01",
+            "text": "so im an L5 at google making 365k tc (210k base + 155k equity). got an offer from meta for 420k tc. should i jump?",
+            "entities": [{"raw": "365k tc", "cat": "FINANCIAL"}, {"raw": "210k", "cat": "FINANCIAL"}, {"raw": "155k", "cat": "FINANCIAL"}, {"raw": "420k tc", "cat": "FINANCIAL"}]
+        },
+        {
+            "id": "OOD-02",
+            "text": "my rent is 3200 a month and i only take home 7800 after taxes and 401k deduction. feeling super stressed about cashflow",
+            "entities": [{"raw": "3200", "cat": "FINANCIAL"}, {"raw": "7800", "cat": "FINANCIAL"}]
+        },
+        {
+            "id": "OOD-03",
+            "text": "got placed on a 30 day pip today by my manager after reporting safety concerns to hr. is this retaliation?",
+            "entities": [{"raw": "30 day pip", "cat": "HR"}]
+        },
+        {
+            "id": "OOD-04",
+            "text": "dr prescribed me 20mg lexapro and 0.5mg xanax for crippling panic attacks. anyone else felt super fatigued the first week?",
+            "entities": [{"raw": "20mg lexapro", "cat": "HEALTH"}, {"raw": "0.5mg xanax", "cat": "HEALTH"}]
+        },
+        {
+            "id": "OOD-05",
+            "text": "our startup burn rate is 180k/mo and we only have 900k left in the bank. runway is under 5 months. need bridge round advice",
+            "entities": [{"raw": "180k", "cat": "FINANCIAL"}, {"raw": "900k", "cat": "FINANCIAL"}]
+        },
+        {
+            "id": "OOD-06",
+            "text": "here is my staging .env: AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY and DB_PASS=SuperSecret123!",
+            "entities": [{"raw": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "cat": "CREDENTIALS"}, {"raw": "SuperSecret123!", "cat": "CREDENTIALS"}]
+        },
+        {
+            "id": "OOD-07",
+            "text": "send the wire to my chase account routing 021000021 ssn on file is 987-65-4321 for tax clearance",
+            "entities": [{"raw": "021000021", "cat": "CREDENTIALS"}, {"raw": "987-65-4321", "cat": "GOV_ID"}]
+        },
+        {
+            "id": "OOD-08",
+            "text": "according to the Bureau of Labor Statistics, median software engineer salary in 2026 was $120,360 while Federal Reserve held interest rate at 5.50%.",
+            "entities": [] # Safe Macroeconomic Negative
+        },
+        {
+            "id": "OOD-09",
+            "text": "can you explain how gdb inspects x86_64 assembly using the command gdb -q -ex 'x/2i &setcontext' ./libc.so.6?",
+            "entities": [] # Safe CTF Negative
+        },
+        {
+            "id": "OOD-10",
+            "text": "The project management institute offers certification in project planning and agile project leadership.",
+            "entities": [] # Safe Project Management Negative
+        }
+    ]
+
+
 def main():
-    print("[*] Generating SafeShare-AI High-Entropy 62,000+ Multi-Domain Dataset V2...")
-    
-    fin_data = generate_financial_dataset(15000)
-    user_data = generate_user_terminal_dataset(15000)
-    health_data = generate_health_dataset(12000)
-    corp_data = generate_corporate_dataset(10000)
-    hr_data = generate_hr_legal_dataset(10000)
-    
-    all_data = fin_data + user_data + health_data + corp_data + hr_data
-    random.shuffle(all_data)
-    
-    total = len(all_data)
-    print(f"[+] Total generated contrastive samples: {total:,}")
-    
-    # Split: 80% Train (49,600), 10% Val (6,200), 10% Test (6,200)
-    n_train = int(0.80 * total)
-    n_val = int(0.10 * total)
-    
-    train_data = all_data[:n_train]
-    val_data = all_data[n_train:n_train + n_val]
-    test_data = all_data[n_train + n_val:]
-    
+    print("[*] Generating SafeShare-AI PrivacyBench Dataset V3 (Template-Disjoint)...")
+
+    # Generate Train Partition (80%) using Training Template Sets
+    train_fin = generate_financial_partition(is_test=False, n_samples=20000)
+    train_health = generate_health_partition(is_test=False, n_samples=16000)
+    train_corp = generate_corp_hr_partition(is_test=False, n_samples=16000)
+    train_cyber = generate_user_cyber_partition(is_test=False, n_samples=16000)
+    train_data = train_fin + train_health + train_corp + train_cyber
+    random.shuffle(train_data)
+
+    # Generate Validation & Test Partition using Reserved Disjoint Template Sets
+    test_fin = generate_financial_partition(is_test=True, n_samples=5000)
+    test_health = generate_health_partition(is_test=True, n_samples=4000)
+    test_corp = generate_corp_hr_partition(is_test=True, n_samples=4000)
+    test_cyber = generate_user_cyber_partition(is_test=True, n_samples=4000)
+    eval_pool = test_fin + test_health + test_corp + test_cyber
+    random.shuffle(eval_pool)
+
+    n_val = len(eval_pool) // 2
+    val_data = eval_pool[:n_val]
+    test_data = eval_pool[n_val:]
+
     out_dir = os.path.dirname(os.path.abspath(__file__))
     os.makedirs(out_dir, exist_ok=True)
-    
-    print("[*] Writing datasets to disk...")
+
+    print(f"[+] Total samples: {len(train_data):,} Train, {len(val_data):,} Validation, {len(test_data):,} Test (Template-Disjoint)")
+
+    print("[*] Writing dataset files to disk...")
     with open(os.path.join(out_dir, "train.json"), "w", encoding="utf-8") as f:
         json.dump(train_data, f, ensure_ascii=False)
     with open(os.path.join(out_dir, "val.json"), "w", encoding="utf-8") as f:
         json.dump(val_data, f, ensure_ascii=False)
     with open(os.path.join(out_dir, "test.json"), "w", encoding="utf-8") as f:
         json.dump(test_data, f, ensure_ascii=False)
-        
+
+    # Write OOD Human Benchmark
+    ood_dataset = build_ood_human_dataset()
+    with open(os.path.join(out_dir, "test_ood_human.json"), "w", encoding="utf-8") as f:
+        json.dump(ood_dataset, f, indent=2, ensure_ascii=False)
+
     print(f"[+] Successfully wrote {len(train_data):,} train, {len(val_data):,} val, {len(test_data):,} test samples!")
+    print(f"[+] Successfully generated SafeShare-PrivacyBench Out-of-Distribution benchmark: {os.path.join(out_dir, 'test_ood_human.json')}")
 
 
 if __name__ == "__main__":

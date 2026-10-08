@@ -119,9 +119,9 @@ async function runUncopyableEnclaveAudit() {
   console.log("  [✓] Audit 5 Passed: Zero-Clipboard Continuation Bridge verified (No OS clipboard dump)!");
 
   // ---------------------------------------------------------------------------
-  // AUDIT 6: Active Tamper Guard & RAM Memory Zeroizer
+  // AUDIT 6: Ephemeral RAM Memory Zeroizer & Session Lifecycle
   // ---------------------------------------------------------------------------
-  console.log("\n[Audit 6] Testing Active Tamper Guard & RAM Memory Zeroizer...");
+  console.log("\n[Audit 6] Testing Ephemeral RAM Memory Zeroizer & Session Lifecycle...");
   const guard = new SafeShareTamperGuard();
   let inMemoryDecryptedTurns = [
     { role: "user", content: "Secret salary Rp 50.000.000" },
@@ -133,10 +133,10 @@ async function runUncopyableEnclaveAudit() {
   });
 
   assert.notStrictEqual(inMemoryDecryptedTurns, null, "Buffer must exist before trigger");
-  guard.triggerViolation("Simulated DevTools Inspection Delta");
+  guard.terminateSession("Session Finished / Tab Closed");
   assert.strictEqual(inMemoryDecryptedTurns, null, "Buffer must be zeroed immediately upon violation");
   assert.strictEqual(guard.isTriggered, true, "Guard state must be triggered");
-  console.log("  [✓] Audit 6 Passed: RAM buffer purged cleanly on simulated DevTools breach!");
+  console.log("  [✓] Audit 6 Passed: RAM buffer purged cleanly on session termination!");
 
   // ---------------------------------------------------------------------------
   // AUDIT 7: Atomic Burn-After-Reading Lifecycle

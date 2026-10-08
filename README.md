@@ -119,6 +119,7 @@ npm run test:all
 ```
 
 ### Specific Benchmark Suites:
+* **`npm run test:privacybench`** — Evaluates the **SafeShare-PrivacyBench Out-of-Distribution (OOD)** human conversational benchmark to compute formal cybersecurity metrics: Secret Exposure Rate (SER), Utility Degradation Rate (UDR), and human detection recall.
 * **`npm run test:adversarial`** — Tests 10 advanced adversarial evasion vectors: zero-width character evasion (\u200B in API keys), obfuscated/defanged emails ([at]/[dot]), email sign-off closing names, raw 9-digit SSN, international passports, multi-chain crypto (Solana Base58, Bitcoin Bech32), DevSecOps .env/YAML password blocks, HTTP Basic Auth Base64 headers, Indian Tech LPA compensation, and anti-over-redaction on general English "project management".
 * **`npm run test:comprehensive`** — Evaluates 37 extensive multi-domain adversarial English scenarios across Cybersecurity/DevOps (Anthropic Claude keys, GCP API keys, HuggingFace, NPM, WireGuard, curl basic auth), Healthcare/HIPAA (psychotropics, oncology staging, clinical MDD transcripts), Workplace/HR (PIPs, Title VII harassment, unannounced NDA codenames), and unexpected edge cases (Markdown tables, code comments, obfuscated PII).
 * **`npm run test:financial`** — Evaluates international financial PII, Silicon Valley executive tech compensation (TC, base, RSUs, ISO strike price), direct banking (US SSN, EIN, ABA routing number, IBAN, SWIFT/BIC), GAAP parentheses negative numbers, corporate burn rates, and macroeconomic zero-false-positive controls.
@@ -131,13 +132,13 @@ npm run test:all
 
 ## 5. Dataset & Machine Learning R&D
 
-SafeShare-AI was fine-tuned using a structured AST-driven synthetic dataset:
-* **Dataset Size:** 62,000 contrastive sentences (50% Indonesian, 50% English).
-* **Split:** 80% Train (49,600), 10% Validation (6,200), 10% Test (6,200).
+SafeShare-AI is powered by the **SafeShare-PrivacyBench V3** dataset using a Probabilistic Context-Free Grammar (PCFG) and Template-Disjoint Partitioning:
+* **Dataset Size:** 85,000+ balanced contrastive sentences across global tech compensation, DevSecOps secrets, healthcare disclosures, and macroeconomic controls.
+* **Split:** 80% Train (68,000), 10% Validation (8,500), 10% Test (8,500) partitioned with **Disjoint Template Sets** to eliminate template memorization leakage.
+* **Out-of-Distribution (OOD) Human Benchmark:** `data/test_ood_human.json` containing human conversational prompts for formal SER (Secret Exposure Rate) and UDR (Utility Degradation Rate) evaluation.
 * **Labeling:** 11 BIO token classification labels (`B-SENSITIVE_FINANCIAL`, `I-SENSITIVE_FINANCIAL`, `B-SENSITIVE_HEALTH`, `B-SENSITIVE_CORP`, `B-SENSITIVE_LEGAL_HR`, `B-SENSITIVE_USER`, etc.).
 * **Base Architecture:** `distilbert/distilbert-base-multilingual-cased`.
 * **Hardware:** NVIDIA GeForce RTX 4060 Laptop GPU (FP16 Tensor Cores, CUDA 12.4).
-* **Test Metrics:** Test Loss `0.00032`, Precision `1.0`, Recall `1.0`, F1 `1.0`.
 
 ### Developer Model Weights:
 Because model weights exceed GitHub's 100MB file limit, researchers wishing to run the PyTorch / ONNX evaluation pipeline should refer to [`MODELS_SETUP.md`](MODELS_SETUP.md) for Google Drive download instructions.

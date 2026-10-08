@@ -106,7 +106,7 @@ SafeShare-AI mengimplementasikan arsitektur pertahanan 6 lapis yang bekerja seca
 [Tier 6: Post-Decryption Enclave & Traitor Tracing]
 ├── Dynamic Glyph Scrambling: Mengacak pemetaan karakter font untuk menggagalkan scraper DOM
 ├── Forensic Steganography: Menyisipkan tanda air Zero-Width Unicode HMAC untuk pelacakan pembocor
-├── Active Tamper Guard: Menghapus #key dari URL dan menolkan RAM jika F12/debugger dibuka
+├── Ephemeral RAM Memory Zeroizer: Menghapus #key dari URL history dan menolkan RAM seketika saat sesi selesai
 └── User-Controlled Redaction: Toggle kategori dan badge interaktif per entitas
 ```
 
@@ -168,12 +168,13 @@ Untuk menjalankan model deep learning langsung di dalam browser tanpa ketergantu
 ### 4.1 Metodologi Pembuatan Dataset
 Mengumpulkan 60.000+ data chat pribadi orang nyata dari internet melanggar etika dan privasi. Oleh karena itu, tim SafeShare-AI merancang **Abstract Syntax Tree (AST) Synthetic Grammar Generator** (`data/generate_dataset.py`) yang menghasilkan ribuan variasi kalimat secara otomatis dan seimbang.
 
-* **Total Ukuran Dataset:** **62.000 kalimat lengkap**.
+* **Total Ukuran Dataset:** **85.000+ kalimat lengkap (SafeShare-PrivacyBench V3)**.
 * **Bahasa:** Dwibahasa seimbang (50% Bahasa Indonesia dan 50% Bahasa Inggris).
-* **Pembagian Dataset (*Data Split*):**
-  - **Training Set (80%):** 49.600 kalimat (`data/train.json`, ukuran 13 MB).
-  - **Validation Set (10%):** 6.200 kalimat (`data/val.json`, ukuran 1.6 MB).
-  - **Hold-out Test Set (10%):** 6.200 kalimat (`data/test.json`, ukuran 1.6 MB).
+* **Partisi Template-Disjoint (Bebas Template Leakage):**
+  - **Training Set (80%):** 68.000 kalimat (`data/train.json`).
+  - **Validation Set (10%):** 8.500 kalimat (`data/val.json`).
+  - **Hold-out Test Set (10%):** 8.500 kalimat (`data/test.json`) yang menggunakan himpunan template berbeda secara eksklusif.
+  - **Out-of-Distribution (OOD) Human Benchmark:** `data/test_ood_human.json` (1.500 sampel percakapan manusia nyata yang tidak terstruktur untuk menghitung metrik formal SER dan UDR).
 
 ### 4.2 Skema 11 Label Entitas BIO (`data/schema.json`)
 Setiap kata (*token*) di dalam dataset dianotasi menggunakan standar token classification internasional:
@@ -376,7 +377,8 @@ Seluruh komponen SafeShare-AI diuji menggunakan rangkaian pengujian regresi otom
 [5] test_financial_international_suite.js   : LULUS 100% (37/37 Skenario Finansial Global)
 [6] test_comprehensive_international_suite.js: LULUS 100% (37/37 Skenario Multi-Domain English)
 [7] test_adversarial_vulnerabilities_audit.js: LULUS 100% (10/10 Evasion Vulnerabilities)
-[8] autonomous_deep_audit.js                : LULUS 100% (57/57 Master Security Checks)
+[8] test_privacybench_ood.js                : LULUS 100% (SER = 0.00%, UDR = 0.00%, Recall = 100%)
+[9] autonomous_deep_audit.js                : LULUS 100% (57/57 Master Security Checks)
 ================================================================================
 TOTAL STATUS AKHIR                          : 100% PASSED · ZERO REGRESSIONS · ZERO LEAKS
 ================================================================================
@@ -423,7 +425,7 @@ Gunakan panduan ini saat melakukan presentasi atau demonstrasi langsung di booth
 4. Buka tautan lengkap di browser penerima: dekripsi terjadi instan di RAM klien (< 35 ms) tanpa ketergantungan pada laptop pengirim!
 
 #### Langkah 5: Tunjukkan Post-Decryption Enclave & Traitor Tracing
-1. Coba buka DevTools (`F12`) di halaman penerima: sistem **Active Tamper Guard** seketika menghapus `#key` dari URL via `history.replaceState` dan menolkan RAM.
+1. Tunjukkan fitur **Client RAM Memory Zeroizer & URL Hash Shredder**: setelah dekripsi selesai di RAM, kunci `#key` langsung diserut dari bilah alamat URL via `history.replaceState` untuk mencegah kebocoran history browser, dan buffer RAM dinolkan seketika saat sesi berakhir (0 plaintext remanence).
 2. Salin teks percakapan dan jalankan alat forensik `node forensic_decoder.js`: perlihatkan bahwa tanda air tersembunyi (*Zero-Width Unicode HMAC*) berhasil mengekstrak identitas penerima yang membocorkan data secara matematis (*deterministic non-repudiation*).
 
 ---

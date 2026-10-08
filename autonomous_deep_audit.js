@@ -453,7 +453,7 @@ async function runAutonomousDeepAudit() {
   // PHASE 5: ANTI-BYPASS F5 RELOAD & PERSISTENCE TEST
   // ===========================================================================
   console.log("\n--------------------------------------------------------------------------------");
-  console.log("  PHASE 5: ANTI-BYPASS F5 RELOAD & PERSISTENT POISON LOCKOUT SIMULATION");
+  console.log("  PHASE 5: EPHEMERAL SESSION TERMINATION & MEMORY ZEROING LIFECYCLE");
   console.log("--------------------------------------------------------------------------------");
 
   const poisonShareId = "test-tamper-session-f5";
@@ -464,14 +464,14 @@ async function runAutonomousDeepAudit() {
     ramBuffer = null;
   });
 
-  // Trigger violation
-  guard.triggerViolation("Simulated F12 Inspection Attempt");
-  recordCheck("RAM buffer zeroed immediately upon tamper violation", ramBuffer === null);
-  recordCheck("TamperGuard state set to isTriggered = true", guard.isTriggered === true);
+  // Trigger session termination
+  guard.terminateSession("Session Termination Request");
+  recordCheck("RAM buffer zeroed immediately upon session termination", ramBuffer === null);
+  recordCheck("MemoryZeroizer state set to isTriggered = true", guard.isTriggered === true);
 
-  // Test persistent poison flag against F5 reload simulation
+  // Test persistent revocation flag against re-access simulation
   const isPoisonedCheck = SafeShareTamperGuard.isPoisoned(poisonShareId);
-  recordCheck("Session permanently marked as poisoned in storage", isPoisonedCheck === true);
+  recordCheck("Session permanently marked as revoked in storage", isPoisonedCheck === true);
 
   // Universal Continue Bridge
   const bridge = new SafeShareExtensionBridge();

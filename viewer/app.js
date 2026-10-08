@@ -26,30 +26,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // 0. Pre-Flight Check: Persistent Poison Status (Tamper Guard Banned Check for this specific shareId)
-  if (typeof SafeShareTamperGuard !== "undefined" && shareId && SafeShareTamperGuard.isPoisoned(shareId)) {
+  // 0. Pre-Flight Check: Ephemeral Revocation Status Check for this specific shareId
+  const ZeroizerEngine = typeof SafeShareMemoryZeroizer !== "undefined" ? SafeShareMemoryZeroizer : (typeof SafeShareTamperGuard !== "undefined" ? SafeShareTamperGuard : null);
+  if (ZeroizerEngine && shareId && ZeroizerEngine.isPoisoned(shareId)) {
     const lock = document.getElementById("crawler-lock-screen");
     if (lock) {
       lock.style.display = "block";
-      lock.querySelector("h2").innerText = "⚠️ Security Lockout: Session Revoked";
-      lock.querySelector("p").innerText = "This conversation was permanently revoked due to an unauthorized inspection or tampering attempt detected on this device.";
+      lock.querySelector("h2").innerText = "⚠️ Session Revoked";
+      lock.querySelector("p").innerText = "This conversation session has been permanently revoked and cleared from memory.";
     }
-    console.warn("[SafeShare] Access denied: Session has been poisoned by previous tamper violation.");
+    console.warn("[SafeShare] Access denied: Session has been revoked.");
     return;
   }
 
-  const tamperGuard = typeof SafeShareTamperGuard !== "undefined" ? new SafeShareTamperGuard({
+  const memoryZeroizer = ZeroizerEngine ? new ZeroizerEngine({
     shareId: shareId,
     relayUrl: window.SAFESHARE_RELAY_URL || window.location.origin
   }) : null;
 
-  if (tamperGuard) {
-    tamperGuard.registerZeroizer(() => {
-      console.warn("[SafeShare] Tamper violation detected. Zeroing memory and DOM stream.");
+  if (memoryZeroizer) {
+    memoryZeroizer.registerZeroizer(() => {
+      console.warn("[SafeShare] Zeroing memory and DOM buffers.");
       decryptedData = null;
       if (messagesContainer) messagesContainer.innerHTML = "";
     });
-    tamperGuard.start();
+    memoryZeroizer.start();
   }
 
   // Extract Decryption Key and Parameters from URI Fragment #

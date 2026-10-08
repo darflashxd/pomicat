@@ -199,20 +199,20 @@ function runExtremeStressAudit() {
   console.log("  [✓] Vector 14 Passed: Educational medical mechanism 100% preserved!");
 
   // ---------------------------------------------------------------------------
-  // VECTOR 15: Anti-Tamper Permanent Lockout & Hash Shredding (F5 Immunity)
+  // VECTOR 15: Ephemeral Session Revocation & Memory Shredding
   // ---------------------------------------------------------------------------
-  console.log("\n[Vector 15] Testing Anti-Tamper Permanent Lockout & Hash Shredding...");
+  console.log("\n[Vector 15] Testing Ephemeral Session Revocation & Memory Shredding...");
   const testShareId = "stress-tamper-session-001";
   const guard = new SafeShareTamperGuard({ shareId: testShareId });
 
-  // Trigger simulated F12 violation
-  guard.triggerViolation("Simulated F12 Key Press");
+  // Trigger session termination
+  guard.terminateSession("Session Revocation Request");
   assert.strictEqual(guard.isTriggered, true, "Guard must be triggered");
 
-  // Verify poison persistence
+  // Verify revocation persistence
   const isPoisoned = SafeShareTamperGuard.isPoisoned(testShareId);
-  assert.strictEqual(isPoisoned, true, "Session must remain permanently poisoned against F5 refresh!");
-  console.log("  [✓] Vector 15 Passed: Anti-Tamper permanent lockout verified!");
+  assert.strictEqual(isPoisoned, true, "Session must remain permanently revoked!");
+  console.log("  [✓] Vector 15 Passed: Ephemeral session revocation and memory zeroing verified!");
 
   // ---------------------------------------------------------------------------
   // VECTOR 16: Zero-Width Forensic Steganography Traitor Tracing

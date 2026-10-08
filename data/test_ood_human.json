@@ -1,0 +1,119 @@
+[
+  {
+    "id": "OOD-01",
+    "text": "so im an L5 at google making 365k tc (210k base + 155k equity). got an offer from meta for 420k tc. should i jump?",
+    "entities": [
+      {
+        "raw": "365k tc",
+        "cat": "FINANCIAL"
+      },
+      {
+        "raw": "210k",
+        "cat": "FINANCIAL"
+      },
+      {
+        "raw": "155k",
+        "cat": "FINANCIAL"
+      },
+      {
+        "raw": "420k tc",
+        "cat": "FINANCIAL"
+      }
+    ]
+  },
+  {
+    "id": "OOD-02",
+    "text": "my rent is 3200 a month and i only take home 7800 after taxes and 401k deduction. feeling super stressed about cashflow",
+    "entities": [
+      {
+        "raw": "3200",
+        "cat": "FINANCIAL"
+      },
+      {
+        "raw": "7800",
+        "cat": "FINANCIAL"
+      }
+    ]
+  },
+  {
+    "id": "OOD-03",
+    "text": "got placed on a 30 day pip today by my manager after reporting safety concerns to hr. is this retaliation?",
+    "entities": [
+      {
+        "raw": "30 day pip",
+        "cat": "HR"
+      }
+    ]
+  },
+  {
+    "id": "OOD-04",
+    "text": "dr prescribed me 20mg lexapro and 0.5mg xanax for crippling panic attacks. anyone else felt super fatigued the first week?",
+    "entities": [
+      {
+        "raw": "20mg lexapro",
+        "cat": "HEALTH"
+      },
+      {
+        "raw": "0.5mg xanax",
+        "cat": "HEALTH"
+      }
+    ]
+  },
+  {
+    "id": "OOD-05",
+    "text": "our startup burn rate is 180k/mo and we only have 900k left in the bank. runway is under 5 months. need bridge round advice",
+    "entities": [
+      {
+        "raw": "180k",
+        "cat": "FINANCIAL"
+      },
+      {
+        "raw": "900k",
+        "cat": "FINANCIAL"
+      }
+    ]
+  },
+  {
+    "id": "OOD-06",
+    "text": "here is my staging .env: AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY and DB_PASS=SuperSecret123!",
+    "entities": [
+      {
+        "raw": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        "cat": "CREDENTIALS"
+      },
+      {
+        "raw": "SuperSecret123!",
+        "cat": "CREDENTIALS"
+      }
+    ]
+  },
+  {
+    "id": "OOD-07",
+    "text": "send the wire to my chase account routing 021000021 ssn on file is 987-65-4321 for tax clearance",
+    "entities": [
+      {
+        "raw": "021000021",
+        "cat": "CREDENTIALS"
+      },
+      {
+        "raw": "987-65-4321",
+        "cat": "GOV_ID"
+      }
+    ]
+  },
+  {
+    "id": "OOD-08",
+    "text": "according to the Bureau of Labor Statistics, median software engineer salary in 2026 was $120,360 while Federal Reserve held interest rate at 5.50%.",
+    "entities": []
+  },
+  {
+    "id": "OOD-09",
+    "text": "can you explain how gdb inspects x86_64 assembly using the command gdb -q -ex 'x/2i &setcontext' ./libc.so.6?",
+    "entities": []
+  },
+  {
+    "id": "OOD-10",
+    "text": "The project management institute offers certification in project planning and agile project leadership.",
+    "entities": []
+  }
+]
