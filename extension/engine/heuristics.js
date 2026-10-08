@@ -24,6 +24,18 @@ class HeuristicsRedactor {
         validator: (raw) => this.validateSSN(raw),
         replacement: "[REDACTED_SSN]"
       },
+      // 1b-2. US Social Security Number (Raw 9 digits with context)
+      {
+        id: "US_SSN_RAW",
+        name: "US Social Security Number (Raw)",
+        category: "GOV_ID",
+        regex: /\b((?:(?:social\s+security(?:\s+number)?|ssn)(?:\s+is|\s*[:=\-])?\s*))([0-9]{9})\b/gi,
+        validator: (raw) => {
+          const digits = raw.replace(/\D/g, "");
+          return digits.length === 9 && digits !== "000000000" && !digits.startsWith("000") && !digits.startsWith("666");
+        },
+        replacement: "$1[REDACTED_SSN]"
+      },
       // 1c. US Employer Identification Number (EIN)
       {
         id: "US_EIN",
@@ -71,12 +83,12 @@ class HeuristicsRedactor {
         validator: this.luhnCheck,
         replacement: "[REDACTED_CARD_NUMBER]"
       },
-      // 3. Email Addresses
+      // 3. Email Addresses (Standard and Defanged [at]/[dot]/(at)/(dot))
       {
         id: "EMAIL",
         name: "Email Address",
         category: "PROFILE",
-        regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+        regex: /\b[A-Za-z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*|\s*\(at\)\s*)[A-Za-z0-9.-]+(?:\s*\.\s*|\s*\[dot\]\s*|\s*\(dot\)\s*)[A-Za-z]{2,}\b/gi,
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
       // 4. Phone Numbers (ID: +62/08..., US/International)
@@ -167,6 +179,29 @@ class HeuristicsRedactor {
         regex: /\b(0x[a-fA-F0-9]{40})\b/g,
         replacement: "[REDACTED_CRYPTO_WALLET]"
       },
+      // 5d-2. Bitcoin BTC Wallet Address (Bech32 bc1 & Base58 Legacy 1 or 3)
+      {
+        id: "BITCOIN_WALLET",
+        name: "Bitcoin BTC Wallet Address",
+        category: "CREDENTIALS",
+        regex: /\b(bc1[a-z0-9]{25,60}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+        replacement: "[REDACTED_CRYPTO_WALLET]"
+      },
+      // 5d-3. Solana SOL Wallet Address (Base58, 32-44 chars)
+      {
+        id: "SOLANA_WALLET",
+        name: "Solana SOL Wallet Address",
+        category: "CREDENTIALS",
+        regex: /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/g,
+        validator: (raw, index, text) => {
+          if (!text) return false;
+          const start = Math.max(0, index - 80);
+          const end = Math.min(text.length, index + raw.length + 80);
+          const window = text.substring(start, end).toLowerCase();
+          return /\b(?:sol|solana|phantom|wallet|address|dompet|transfer|crypto|token|pubkey)\b/.test(window);
+        },
+        replacement: "[REDACTED_CRYPTO_WALLET]"
+      },
       // 5e. BIP-39 12/24-Word Recovery Mnemonic Seed Phrase
       {
         id: "BIP39_SEED_PHRASE",
@@ -231,6 +266,30 @@ class HeuristicsRedactor {
         regex: /(\b(?:curl[^\n]*?-u\s+|-u\s+))([A-Za-z0-9._-]+:[^\s]+)/gi,
         replacement: "$1[user]:[password]"
       },
+      // 10c. HTTP Basic Authorization Header (Base64)
+      {
+        id: "HTTP_BASIC_AUTH_HEADER",
+        name: "HTTP Basic Authorization Header",
+        category: "CREDENTIALS",
+        regex: /(\bAuthorization:\s*Basic\s+)([A-Za-z0-9+/=]{16,})/gi,
+        replacement: "$1[REDACTED_BASE64_CREDENTIALS]"
+      },
+      // 10d. Environment Variables Secrets (AWS Secret Key, DB Passwords, etc.)
+      {
+        id: "ENV_CONFIG_SECRET",
+        name: "Environment Variable Secret",
+        category: "CREDENTIALS",
+        regex: /\b((?:AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
+        replacement: "$1[REDACTED_SECRET]"
+      },
+      // 10e. YAML Configuration Password & Secret Block
+      {
+        id: "YAML_CONFIG_SECRET",
+        name: "YAML Config Secret Key",
+        category: "CREDENTIALS",
+        regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
+        replacement: "$1[REDACTED_SECRET]"
+      },
       // 11. Physical Home / Street Address (Expanded for KTP/Domisili and structured forms)
       {
         id: "ADDRESS_ID",
@@ -260,12 +319,12 @@ class HeuristicsRedactor {
         regex: /\b((?:npwp(?:\s+pribadi|\s+badan)?\s*[:=\-]?\s*)?)(\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3})\b/gi,
         replacement: "$1[REDACTED_NPWP]"
       },
-      // 13. Indonesian & International Passport (Paspor RI)
+      // 13. Indonesian & International Passport (Paspor RI / US / UK)
       {
         id: "PASSPORT_RI",
         name: "Passport Number",
         category: "GOV_ID",
-        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|passport)\s*[:=\-]?\s*)([A-Z]\d{7})\b/gi,
+        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s+number)?)(?:\s+is|\s*[:=\-])?\s*)([A-Z]\d{7,8}|\d{9})\b/gi,
         replacement: "$1[REDACTED_PASSPORT]"
       },
       // 14. BPJS Kesehatan & Ketenagakerjaan (11-13 digits)
@@ -492,6 +551,9 @@ class HeuristicsRedactor {
    * Returns: { sanitizedText, detections: [{ type, matched, offset, length }] }
    */
   scan(text) {
+    if (!text) return { sanitizedText: "", detections: [] };
+    // Pre-processing: Strip invisible zero-width evasion characters
+    text = text.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "");
     let sanitizedText = text;
     const detections = [];
 
@@ -501,7 +563,7 @@ class HeuristicsRedactor {
       
       while ((match = regex.exec(text)) !== null) {
         const raw = match[0];
-        if (pattern.validator && !pattern.validator(raw)) {
+        if (pattern.validator && !pattern.validator(raw, match.index, text)) {
           continue;
         }
 

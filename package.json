@@ -4,8 +4,9 @@
   "description": "Client-Side Zero-Knowledge Privacy Guard & Algebraic Reconstruction Defense for Generative AI Chats",
   "main": "extension/content_script.js",
   "scripts": {
-    "test": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js",
-    "test:all": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js && node test_real_chatgpt_output.js && node test_extreme_stress_cases.js && node test_casual_chat_stress.js && node autonomous_deep_audit.js",
+    "test": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js && node test_adversarial_vulnerabilities_audit.js",
+    "test:all": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js && node test_adversarial_vulnerabilities_audit.js && node test_real_chatgpt_output.js && node test_extreme_stress_cases.js && node test_casual_chat_stress.js && node autonomous_deep_audit.js",
+    "test:adversarial": "node test_adversarial_vulnerabilities_audit.js",
     "test:comprehensive": "node test_comprehensive_international_suite.js",
     "test:financial": "node test_financial_international_suite.js",
     "test:jembras": "node test_de_jembras_benchmark.js",

@@ -119,6 +119,7 @@ npm run test:all
 ```
 
 ### Specific Benchmark Suites:
+* **`npm run test:adversarial`** — Tests 10 advanced adversarial evasion vectors: zero-width character evasion (\u200B in API keys), obfuscated/defanged emails ([at]/[dot]), email sign-off closing names, raw 9-digit SSN, international passports, multi-chain crypto (Solana Base58, Bitcoin Bech32), DevSecOps .env/YAML password blocks, HTTP Basic Auth Base64 headers, Indian Tech LPA compensation, and anti-over-redaction on general English "project management".
 * **`npm run test:comprehensive`** — Evaluates 37 extensive multi-domain adversarial English scenarios across Cybersecurity/DevOps (Anthropic Claude keys, GCP API keys, HuggingFace, NPM, WireGuard, curl basic auth), Healthcare/HIPAA (psychotropics, oncology staging, clinical MDD transcripts), Workplace/HR (PIPs, Title VII harassment, unannounced NDA codenames), and unexpected edge cases (Markdown tables, code comments, obfuscated PII).
 * **`npm run test:financial`** — Evaluates international financial PII, Silicon Valley executive tech compensation (TC, base, RSUs, ISO strike price), direct banking (US SSN, EIN, ABA routing number, IBAN, SWIFT/BIC), GAAP parentheses negative numbers, corporate burn rates, and macroeconomic zero-false-positive controls.
 * **`npm run test:jembras`** — Tests the real-world **De Jembras** case study: verifies multi-year algebraic accumulation suppression (Rp 10.8M, 21.6M, 54M) while preserving scale-free percentages (30%, 40%) and key-value form delimiters (`name :`, `NIM :`).

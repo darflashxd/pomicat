@@ -62,7 +62,9 @@ class ContextualClassifier {
       /\b(?:prescribed|diagnosed|diagnosis|medication|pathology\s+report|biopsy\s+results?|hba1c|viral\s+load|tested\s+positive)\b/i,
       /\b(?:clinical\s+consultation|consultation\s+notes|patient|struggling\s+with|taper\s+off|titrate|initiate)\b/i,
       /\b(?:pip|performance\s+improvement\s+plan|written\s+warning|harassment|hostile\s+work\s+environment|wrongful\s+termination|eeoc|title\s+vii)\b/i,
-      /\b(?:project\s+[a-z][a-z0-9_-]+|non-disclosure|nda|trade\s+secret)\b/i,
+      /\b(?:project\s+(?!(?:management|planning|manager|lead|update|timeline|report|review|charter|lifecycle|work|description)\b)[a-z][a-z0-9_-]+|non-disclosure|nda|trade\s+secret)\b/i,
+      /\b(?:lpa|lakhs?|crores?|joining\s+bonus)\b/i,
+      /\b(?:therapy\s+session|psychotherapy|counseling|childhood\s+trauma|trauma|panic\s+attacks?|suicidal\s+ideation|self-harm|ptsd)\b/i,
       /\b(?:rent|renting|landlord|struggling\s+hard|cooked|paycheck)\b/i
     ];
 
@@ -102,8 +104,8 @@ class ContextualClassifier {
 
       // If personal context is active, extract the corresponding values
       if (isPersonal) {
-        // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), 45 jeti, 15 juta, 20jt, $150k, 90k, half a mil, 250 racks, strike price, float balances)
-        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)?[\d.,]+\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|\bm\b|billion|\bb\b|k|rb|ribu|thousand|rupiah|racks|bands|ember)\b)|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{5,12}\b)/gi;
+        // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances)
+        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|\bm\b|billion|\bb\b|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b)|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{5,12}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
         const finMatches = sent.matchAll(finRegex);
         for (const m of finMatches) {
@@ -135,8 +137,8 @@ class ContextualClassifier {
           });
         }
 
-        // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics)
-        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy)(?:\s*[\d.]+\s*mg)?)/gi;
+        // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics, trauma)
+        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:childhood\s+trauma|suicidal\s+ideation|self-harm|ptsd)|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy)(?:\s*[\d.]+\s*mg)?)/gi;
         const healthMatches = sent.matchAll(healthRegex);
         for (const m of healthMatches) {
           detected.push({
@@ -148,8 +150,8 @@ class ContextualClassifier {
           });
         }
 
-        // Corporate confidential check (match all occurrences)
-        const corpMatches = sent.matchAll(/(?:Project\s[A-Z][a-zA-Z0-9_-]+|Inisiatif\s[A-Z][a-zA-Z0-9_-]+|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.corp(?:\.internal)?:\d{2,5})/gi);
+        // Corporate confidential check (match specific project names, excluding generic nouns like project management)
+        const corpMatches = sent.matchAll(/(?:Project\s+(?!(?:Management|Planning|Manager|Managers|Lead|Leads|Update|Updates|Timeline|Timelines|Report|Reports|Review|Reviews|Description|Work|Workstream|Overview|Summary|Charter|Lifecycle|Scope|that|this|the|a|an)\b)[A-Z][a-zA-Z0-9_-]+|Inisiatif\s+[A-Z][a-zA-Z0-9_-]+|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.corp(?:\.internal)?:\d{2,5})/g);
         for (const m of corpMatches) {
           detected.push({
             turnIndex,

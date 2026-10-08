@@ -86,8 +86,12 @@ class AdversaryOracleSolver {
         val = parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) / 100;
       } else if (/(?:miliar|billion|\bb\b|ember)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e9);
+      } else if (/(?:crores?)/i.test(cleanLower)) {
+        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e7);
       } else if (/(?:juta|jt|jeti|jetong|million|\bm\b)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e6);
+      } else if (/(?:lakhs?|lpa)/i.test(cleanLower)) {
+        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e5);
       } else if (/(?:k|rb|ribu|thousand|racks|bands)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
       } else {
@@ -273,11 +277,25 @@ class ConsistentPseudonymizer {
       if (!isNaN(val)) return Math.round(val * 1e9);
     }
 
+    // Crores (crore, crores)
+    if (/(?:crores?)/i.test(clean)) {
+      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+      const val = parseFloat(numPart);
+      if (!isNaN(val)) return Math.round(val * 1e7);
+    }
+
     // Millions (juta, jt, jeti, jetong, million, m)
     if (/(?:juta|jt|jeti|jetong|million|\bm\b)/i.test(clean)) {
       const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
       const val = parseFloat(numPart);
       if (!isNaN(val)) return Math.round(val * 1e6);
+    }
+
+    // Lakhs / LPA (lakh, lakhs, lpa)
+    if (/(?:lakhs?|lpa)/i.test(clean)) {
+      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+      const val = parseFloat(numPart);
+      if (!isNaN(val)) return Math.round(val * 1e5);
     }
 
     // Thousands (k, rb, ribu, thousand, racks, bands)
@@ -542,6 +560,21 @@ class ConsistentPseudonymizer {
             raw: lp[2].trim(),
             category: "CORP"
           });
+        }
+
+        // Email sign-off / closing signature detection:
+        // e.g. "Best regards,\nDr. Jonathan Vance\nHead of Research"
+        const signOffRx = /(?:(?:Best\s+regards|Warm\s+regards|Kind\s+regards|Sincerely|Regards|Thanks\s+(?:and\s+regards)?|Warmly|Cheers|Respectfully|Yours\s+truly|Salam),?\s*[\r\n]+)(?:(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)[ \t]+)?([A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)+)/gi;
+        let so;
+        while ((so = signOffRx.exec(turn.content)) !== null) {
+          const sigName = so[1].trim();
+          if (sigName && !nameStopWords.has(sigName.toLowerCase()) && sigName.split(/\s+/).length <= 4) {
+            userIntroMatches.push({
+              turnIndex: idx,
+              raw: sigName,
+              category: "USER"
+            });
+          }
         }
       }
     });
