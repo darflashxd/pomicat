@@ -245,9 +245,10 @@ class SafeShareModal {
   runPipeline() {
     this.pseudonymizer.reset();
     this.candidates = [];
+    this.cachedTurnDetections = [];
+    this.rawContextualEntities = [];
 
     const intermediateTurns = [];
-    const detectedContextualEntities = [];
     let candIdCounter = 0;
 
     // 1. Scan Tier 1 (Heuristics)
@@ -258,29 +259,34 @@ class SafeShareModal {
       for (const det of hResult.detections) {
         let cat = det.category || "CREDENTIALS";
         if (det.type === "CREDIT_CARD") cat = "FINANCIAL";
-        else if (["ID_NIK", "ID_NPWP", "PASSPORT_RI", "ID_BPJS", "ID_SIM", "STUDENT_ID"].includes(det.type)) cat = "GOV_ID";
-        else if (["EMAIL", "PHONE", "ADDRESS_ID"].includes(det.type)) cat = "PROFILE";
+        else if (["ID_NIK", "ID_NPWP", "PASSPORT_RI", "ID_BPJS", "ID_SIM", "STUDENT_ID", "US_SSN", "US_SSN_RAW", "US_EIN"].includes(det.type)) cat = "GOV_ID";
+        else if (["EMAIL", "PHONE", "ADDRESS_ID", "ENGLISH_PHYSICAL_ADDRESS"].includes(det.type)) cat = "PROFILE";
         else if (det.type.includes("PROMPT") || det.type.includes("OUTPUT") || det.type.includes("USER_") || det.type.includes("SSH_") || det.type.includes("GIT_")) cat = "SYSTEM";
 
-        this.candidates.push({
-          id: `c_${candIdCounter++}`,
-          turnIndex: turnIdx,
-          role: turn.role,
-          category: cat,
-          categoryLabel: SS_CATEGORIES[cat]?.label || "General",
-          ruleName: det.name,
-          raw: det.raw,
-          replacement: det.replacement,
-          start: det.index,
-          length: det.length,
-          enabled: true,
-          isAlgebraic: false
-        });
+        const exists = this.candidates.some(c => c.raw.toLowerCase() === det.raw.toLowerCase());
+        if (!exists) {
+          this.candidates.push({
+            id: `c_${candIdCounter++}`,
+            role: turn.role,
+            category: cat,
+            categoryLabel: SS_CATEGORIES[cat]?.label || "General",
+            ruleName: det.name,
+            raw: det.raw,
+            replacement: det.replacement,
+            enabled: true,
+            isAlgebraic: false
+          });
+        }
       }
 
       // Tier 2 (Contextual) pass
       const cDetections = this.contextual.classifyTurn(hResult.sanitizedText, turnIdx);
-      detectedContextualEntities.push(...cDetections);
+      this.rawContextualEntities.push(...cDetections);
+
+      this.cachedTurnDetections.push({
+        hDetections: hResult.detections,
+        cDetections: cDetections
+      });
 
       intermediateTurns.push({
         role: turn.role,
@@ -289,9 +295,9 @@ class SafeShareModal {
     }
 
     // 2. Scan Tier 3 (Pseudonymizer & Algebraic Solver)
-    const { anonymizedTurns, mappings, solverLeaks } = this.pseudonymizer.anonymizeConversation(
+    const { mappings, solverLeaks } = this.pseudonymizer.anonymizeConversation(
       intermediateTurns,
-      detectedContextualEntities
+      this.rawContextualEntities
     );
 
     // Contextual mappings into candidates
@@ -308,15 +314,12 @@ class SafeShareModal {
         if (!exists) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
-            turnIndex: 0,
             role: "user",
             category: cat,
             categoryLabel: SS_CATEGORIES[cat]?.label || "General",
             ruleName: `Contextual ${m.category.replace("SENSITIVE_", "")}`,
             raw: m.original,
             replacement: m.pseudonym,
-            start: -1,
-            length: m.original.length,
             enabled: true,
             isAlgebraic: false
           });
@@ -328,19 +331,16 @@ class SafeShareModal {
     if (solverLeaks && Array.isArray(solverLeaks)) {
       for (const leak of solverLeaks) {
         if (!leak.raw) continue;
-        const exists = this.candidates.some(c => c.raw === leak.raw && c.replacement === leak.replacement);
+        const exists = this.candidates.some(c => c.raw === leak.raw);
         if (!exists) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
-            turnIndex: 1,
             role: "assistant",
             category: "FINANCIAL",
             categoryLabel: SS_CATEGORIES.FINANCIAL.label,
             ruleName: "Algebraic Inversion Defense",
             raw: leak.raw,
             replacement: leak.replacement,
-            start: leak.start,
-            length: leak.raw.length,
             enabled: true,
             isAlgebraic: true
           });
@@ -360,8 +360,6 @@ class SafeShareModal {
     let sanitizedTextPlain = "";
     let sanitizedHtmlDisplay = "";
 
-    const finalTurns = [];
-
     // Tally candidate counts per category
     const catCounts = {};
     for (const catKey of Object.keys(SS_CATEGORIES)) {
@@ -373,49 +371,68 @@ class SafeShareModal {
       }
     }
 
-    // Process each turn
+    // 1. Prepare intermediate turns based on active heuristic candidate toggles
+    const activeIntermediateTurns = [];
     for (let tIdx = 0; tIdx < this.currentTurns.length; tIdx++) {
       const turn = this.currentTurns[tIdx];
       origTextDisplay += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
 
-      // Get all candidates relevant to this turn, sorted by length descending
-      const turnCands = this.candidates.filter(c => c.turnIndex === tIdx || c.turnIndex === -1);
-      turnCands.sort((a, b) => (b.raw ? b.raw.length : 0) - (a.raw ? a.raw.length : 0));
+      let turnText = turn.content;
+      const hDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
+      for (const det of hDets) {
+        const cand = this.candidates.find(c => c.raw.toLowerCase() === det.raw.toLowerCase());
+        const isProtected = !cand || (this.activeCategories.has(cand.category) && cand.enabled);
+        if (isProtected) {
+          turnText = turnText.replace(new RegExp(this.escapeRegExp(det.raw), "gi"), det.replacement);
+        }
+      }
+      activeIntermediateTurns.push({
+        role: turn.role,
+        content: turnText
+      });
+    }
 
-      let plainContent = turn.content;
+    // 2. Filter active contextual entities based on user toggles
+    const activeContextual = (this.rawContextualEntities || []).filter(e => {
+      const cand = this.candidates.find(c => c.raw.toLowerCase() === e.raw.toLowerCase());
+      return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
+    });
+
+    // 3. Run the full multi-turn engine (sweeping all user and assistant turns)
+    this.pseudonymizer.reset();
+    const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
+      activeIntermediateTurns,
+      activeContextual
+    );
+
+    this.sanitizedTurns = anonymizedTurns;
+
+    // 4. Build output displays and interactive badges
+    for (let tIdx = 0; tIdx < anonymizedTurns.length; tIdx++) {
+      const turn = anonymizedTurns[tIdx];
+      sanitizedTextPlain += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
+
       let htmlContent = this.escapeHtml(turn.content);
 
-      for (const cand of turnCands) {
-        if (!cand.raw) continue;
+      // Wrap replacement tags into interactive badges
+      for (const cand of this.candidates) {
         const isCatActive = this.activeCategories.has(cand.category);
         const isProtected = isCatActive && cand.enabled;
 
-        const rawEscaped = this.escapeHtml(cand.raw);
         const replEscaped = this.escapeHtml(cand.replacement);
+        const rawEscaped = this.escapeHtml(cand.raw);
 
-        // Plain text substitution for Crypto/Relay
-        if (isProtected) {
-          const regPlain = new RegExp(this.escapeRegExp(cand.raw), "gi");
-          plainContent = plainContent.replace(regPlain, cand.replacement);
-        }
-
-        // HTML rich substitution for interactive UI view
-        const regHtml = new RegExp(this.escapeRegExp(rawEscaped), "gi");
-        if (isProtected) {
+        if (isProtected && replEscaped) {
+          const regRepl = new RegExp(this.escapeRegExp(replEscaped), "g");
           const badgeHtml = `<span class="ss-badge ss-badge-redacted" data-cand-id="${cand.id}" title="Click to unmask (Original: ${rawEscaped})">${replEscaped}<span class="ss-badge-icon">✕</span></span>`;
-          htmlContent = htmlContent.replace(regHtml, badgeHtml);
-        } else {
+          htmlContent = htmlContent.replace(regRepl, badgeHtml);
+        } else if (!isProtected && rawEscaped) {
+          const regRaw = new RegExp(this.escapeRegExp(rawEscaped), "gi");
           const badgeHtml = `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`;
-          htmlContent = htmlContent.replace(regHtml, badgeHtml);
+          htmlContent = htmlContent.replace(regRaw, badgeHtml);
         }
       }
 
-      finalTurns.push({
-        role: turn.role,
-        content: plainContent
-      });
-
-      sanitizedTextPlain += `[${turn.role.toUpperCase()}]:\n${plainContent}\n\n`;
       sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${turn.role.toUpperCase()}]:</div><div class="turn-body">${htmlContent}</div></div>`;
     }
 

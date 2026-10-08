@@ -53,14 +53,14 @@ class AdversaryOracleSolver {
       const raw = m[0].trim();
       if (!raw) continue;
 
-      // Ensure we don't start in the middle of a word or tag or dot (e.g. 10.244.0.15)
-      if (m.index > 0 && /[\w.]/.test(text[m.index - 1])) {
+      // Ensure we don't start in the middle of a word or tag or dot or port (e.g. 10.244.0.15, :5432)
+      if (m.index > 0 && /[\w.:]/.test(text[m.index - 1])) {
         continue;
       }
 
       const afterText = text.substring(m.index + m[0].length);
-      // Skip if followed by dot and digits (IP address check)
-      if (/^\.\d+/.test(afterText)) {
+      // Skip if followed by dot and digits (IP address check) or URL path (:5432/db), but allow financial time periods (/month, /year, /bulan)
+      if (/^\.\d+/.test(afterText) || (/^\/[a-zA-Z0-9_]/.test(afterText) && !/^\/(?:month|mo|year|yr|bulan|thn|tahun|day|hari|hr|hour|jam|week|minggu)\b/i.test(afterText))) {
         continue;
       }
 
@@ -69,10 +69,10 @@ class AdversaryOracleSolver {
         continue;
       }
 
-      // Skip if inside technical container / OS user configs
+      // Skip if inside technical container / OS user / network port configs
       const lineStart = Math.max(0, text.lastIndexOf("\n", m.index));
       const beforeInLine = text.substring(lineStart, m.index);
-      if (/(?:runAsUser|runAsGroup|fsGroup|port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) {
+      if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) {
         continue;
       }
 
@@ -121,11 +121,57 @@ class AdversaryOracleSolver {
     const codeBlocks = this.findCodeBlockSpans(text);
     const leaks = [];
 
-    for (const secret of secretValues) {
-      if (secret < 1000) continue;
+    // 1. Extend secret values with pairwise arithmetic combinations (sums, differences, remainders)
+    const extendedSecrets = new Set(secretValues);
+    for (let i = 0; i < secretValues.length; i++) {
+      for (let j = i + 1; j < secretValues.length; j++) {
+        const sA = secretValues[i];
+        const sB = secretValues[j];
+        if (sA + sB >= 500) extendedSecrets.add(sA + sB);
+        if (Math.abs(sA - sB) >= 500) extendedSecrets.add(Math.abs(sA - sB));
+      }
+    }
+
+    // 2. Depth 2 differences & multi-item deductions (e.g. 6200 - 2400 - 580 = 3220)
+    const cur = Array.from(extendedSecrets);
+    for (let i = 0; i < cur.length; i++) {
+      for (let j = i + 1; j < cur.length; j++) {
+        const diff = Math.abs(cur[i] - cur[j]);
+        if (diff >= 500 && extendedSecrets.size < 600) {
+          extendedSecrets.add(diff);
+        }
+      }
+    }
+
+    // 3. Monthly debt amortization targets
+    for (const s of secretValues) {
+      if (s >= 5000) {
+        for (const r of [0.05, 0.08, 0.10, 0.15, 0.20, 0.249, 0.25, 0.30]) {
+          const rm = r / 12;
+          const pmt = Math.round(s * (rm / (1 - Math.pow(1 + rm, -12))));
+          if (pmt > 500) extendedSecrets.add(pmt);
+        }
+      }
+    }
+
+    // 4. Debt monthly remainder cashflows: e.g. 3220 - 1710 = 1510
+    const cur2 = Array.from(extendedSecrets);
+    for (let i = 0; i < cur2.length; i++) {
+      for (let j = i + 1; j < cur2.length; j++) {
+        const diff = Math.abs(cur2[i] - cur2[j]);
+        if (diff >= 500 && extendedSecrets.size < 1000) {
+          extendedSecrets.add(diff);
+        }
+      }
+    }
+
+    const secretsToTest = Array.from(extendedSecrets);
+
+    for (const secret of secretsToTest) {
+      if (secret < 100) continue;
 
       for (const token of tokens) {
-        if (token.isRatio || token.isSmallInt || token.val < 1000) continue;
+        if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         if (this.isSafePublicSpan(text, token.start, token.end)) continue;
 
@@ -200,21 +246,23 @@ class AdversaryOracleSolver {
           let tag = "[REDACTED_BUDGET_ALLOCATION]";
           if (line.includes("year") || line.includes("tahun") || line.includes("timeline") || line.includes("akumulasi")) {
             tag = "[REDACTED_SAVINGS_ACCUMULATION]";
-          } else if (line.includes("kenaikan") || line.includes("increment") || line.includes("delta") || line.includes("tambahan")) {
+          } else if (line.includes("kenaikan") || line.includes("increment") || line.includes("delta") || line.includes("tambahan") || line.includes("raise")) {
             tag = "[REDACTED_SALARY_INCREMENT]";
-          } else if (/\bnaik\b/i.test(line) || line.includes("proyeksi") || line.includes("projected") || line.includes("menjadi")) {
+          } else if (/\bnaik\b/i.test(line) || line.includes("proyeksi") || line.includes("projected") || line.includes("menjadi") || line.includes("target")) {
             tag = "[REDACTED_PROJECTED_SALARY]";
-          } else if (line.includes("sisa") || line.includes("remainder") || line.includes("cicilan") || line.includes("cashflow") || line.includes("kpr")) {
+          } else if (line.includes("sisa") || line.includes("remainder") || line.includes("cicilan") || line.includes("cashflow") || line.includes("kpr") || line.includes("debt") || line.includes("payoff") || line.includes("discretionary") || line.includes("available")) {
             tag = "[REDACTED_REMAINDER_CASHFLOW]";
-          } else if (line.includes("budget") || line.includes("anggaran") || line.includes("alokasi") || line.includes("car") || line.includes("food") || line.includes("transport") || line.includes("saving") || line.includes("tabungan")) {
+          } else if (line.includes("pro-forma") || line.includes("runway") || line.includes("pre-money") || line.includes("burn") || line.includes("budget") || line.includes("anggaran") || line.includes("alokasi") || line.includes("car") || line.includes("food") || line.includes("transport") || line.includes("saving") || line.includes("tabungan") || line.includes("rent") || line.includes("groceries")) {
             tag = "[REDACTED_BUDGET_ALLOCATION]";
-          } else if (Math.abs(token.val - secret) / secret <= this.tolerance) {
+          } else if (secretValues.some(sv => Math.abs(token.val - sv) / sv <= this.tolerance)) {
             tag = "[REDACTED_FINANCIAL_1]";
           }
 
           leaks.push({
             start: token.start,
             end: token.end,
+            raw: token.raw,
+            val: token.val,
             replacement: tag
           });
         }
@@ -366,15 +414,24 @@ class ConsistentPseudonymizer {
         variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${enFormatted}\\b`);
         variants.push(`\\b${num}\\b`);
 
-        // 2. Millions abbreviations (e.g. 28,5 juta, 28.5 jt, 28,5 jt)
+        // 1b. Thousands abbreviations (e.g. 145k, 340k, 18k, 25k, $340K)
+        if (num >= 1e3 && num < 1e9) {
+          const thousands = num / 1e3;
+          if (thousands === Math.floor(thousands) || thousands.toFixed(1).endsWith(".5")) {
+            const kth = thousands.toString().replace(".", "\\.");
+            variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${kth}\\s*(?:k|rb|ribu|thousand)(?![\\w])`);
+          }
+        }
+
+        // 2. Millions abbreviations (e.g. 28,5 juta, 28.5 jt, 28,5 jt, $1.5M, $18M)
         if (num >= 1e5) {
           const millions = num / 1e6;
           const milDot = millions.toString().replace(".", "\\.");
           const milComma = millions.toString().replace(".", ",");
-          variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?(?:${milDot}|${milComma})\\s*(?:juta|jt|million|m)\\b`);
+          variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?(?:${milDot}|${milComma})\\s*(?:juta|jt|jeti|million|m)(?![\\w])`);
           
           if (millions === Math.floor(millions)) {
-            variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${Math.floor(millions)}\\s*(?:juta|jt|million|m)\\b`);
+            variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${Math.floor(millions)}\\s*(?:juta|jt|jeti|million|m)(?![\\w])`);
           }
 
           // 3. Annualized derivations (LLM multiplying monthly salary by 12)
@@ -393,6 +450,8 @@ class ConsistentPseudonymizer {
         "cipralex": ["escitalopram", "lexapro"],
         "zoloft": ["sertraline"],
         "sertraline": ["zoloft"],
+        "wellbutrin": ["bupropion", "zyban"],
+        "bupropion": ["wellbutrin", "zyban"],
         "prozac": ["fluoxetine"],
         "fluoxetine": ["prozac"],
         "xanax": ["alprazolam"],
@@ -427,11 +486,17 @@ class ConsistentPseudonymizer {
         }
       }
 
-      // Add base drug brand/name variants if 2 tokens e.g. "Lexapro 20mg"
-      const parts = raw.split(/\s+/);
-      if (parts.length === 2 && /^\d+\s*mg$/i.test(parts[1])) {
-        const brandName = parts[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        variants.push(`\\b(?:obat\\s+)?${brandName}(?:\\s+\\d+\\s*mg)?\\b`);
+      // Add base drug brand/name variants without dosage (e.g. "150mg Wellbutrin XL" -> "Wellbutrin XL", "Wellbutrin")
+      const strippedDose = raw.replace(/\b\d+\s*(?:mg|iu|mcg|ml)\b/gi, "").trim();
+      if (strippedDose.length >= 3) {
+        variants.push(`\\b(?:obat\\s+)?${strippedDose.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s+\\d+\\s*(?:mg|iu|mcg|ml))?\\b`);
+        // If it's a multi-token brand with formulation suffix (XL, XR, SR, CR, IR), also match root brand
+        if (/(?:XL|XR|SR|CR|IR)\b/i.test(strippedDose)) {
+          const firstToken = strippedDose.split(/\s+/)[0];
+          if (firstToken.length >= 4 && !/^(?:tablet|capsule|liquid|oral|daily|twice)$/i.test(firstToken)) {
+            variants.push(`\\b(?:obat\\s+)?${firstToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s+(?:XL|XR|SR|CR|IR))?(?:\\s+\\d+\\s*(?:mg|iu|mcg|ml))?\\b`);
+          }
+        }
       }
 
       // Add all recognized generic/brand synonyms

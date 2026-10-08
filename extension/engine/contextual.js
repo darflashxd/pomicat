@@ -60,6 +60,7 @@ class ContextualClassifier {
       /\b(?:operating\s+income|financing\s+cash\s+flow|ending\s+cash|disbursement|payroll|balances?|amount_captured)\b/i,
       /\b(?:psychiatrist|psychologist|oncologist|endocrinologist|therapist|physician|doctor|dr\.)\b/i,
       /\b(?:prescribed|diagnosed|diagnosis|medication|pathology\s+report|biopsy\s+results?|hba1c|viral\s+load|tested\s+positive)\b/i,
+      /\b(?:switched\s+(?:me|my)|switch\s+(?:me|my)|put\s+me\s+on|started\s+me\s+on|taking|taking\s+daily|prescribing\s+me|prescribed\s+me)\b/i,
       /\b(?:clinical\s+consultation|consultation\s+notes|patient|struggling\s+with|taper\s+off|titrate|initiate)\b/i,
       /\b(?:pip|performance\s+improvement\s+plan|written\s+warning|harassment|hostile\s+work\s+environment|wrongful\s+termination|eeoc|title\s+vii)\b/i,
       /\b(?:project\s+(?!(?:management|planning|manager|lead|update|timeline|report|review|charter|lifecycle|work|description)\b)[a-z][a-z0-9_-]+|non-disclosure|nda|trade\s+secret)\b/i,
@@ -115,18 +116,20 @@ class ContextualClassifier {
           // Skip IRC retirement plan references like 401k or 401(k)
           if (/^401\s*k$/i.test(matchStr.trim()) || /\b401\(?k\)?\b/i.test(matchStr)) continue;
 
-          // Skip if part of an IP address (e.g. 10.244.0.15)
-          if (matchIndex > 0 && /[\w.]/.test(sent[matchIndex - 1])) continue;
+          // Skip if part of an IP address (e.g. 10.244.0.15) or network port (localhost:5432, 127.0.0.1:8080)
+          if (matchIndex > 0 && /[\w.:]/.test(sent[matchIndex - 1])) continue;
           const afterText = sent.substring(matchIndex + matchStr.length);
           if (/^\.\d+/.test(afterText)) continue;
+          // Skip if followed by URL path (e.g. :5432/sandbox_db), but allow financial time periods (/month, /year, /bulan)
+          if (/^\/[a-zA-Z0-9_]/.test(afterText) && !/^\/(?:month|mo|year|yr|bulan|thn|tahun|day|hari|hr|hour|jam|week|minggu)\b/i.test(afterText)) continue;
 
           // Skip if followed by non-financial clinical or blockchain units (e.g. 45.000 copies/mL)
           if (nonFinUnits.test(afterText)) continue;
 
-          // Skip if inside technical container / OS user configs
+          // Skip if inside technical container / OS user / network port configs
           const lineStart = Math.max(0, sent.lastIndexOf("\n", matchIndex));
           const beforeInLine = sent.substring(lineStart, matchIndex);
-          if (/(?:runAsUser|runAsGroup|fsGroup|port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) continue;
+          if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) continue;
 
           // If a 4-digit number looks like a calendar year (1950-2040), ensure explicit financial context
           if (/^\d{4}$/.test(matchStr)) {
