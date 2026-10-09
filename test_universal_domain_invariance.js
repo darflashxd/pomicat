@@ -217,8 +217,93 @@ function runUniversalDomainInvarianceSuite() {
   assert(!r8Off.anonymizedTurns[1].content.includes("[REDACTED_BUDGET_ALLOCATION]"), "Turn 1 must NEVER turn into [REDACTED_BUDGET_ALLOCATION]!");
   console.log("  [✓] Domain 8 Passed: Financial badge unmask verified with ZERO budget allocation corruption!");
 
+  // --- DOMAIN 9: DYNAMIC CATEGORY PILL COUNT DECREMENT ON UNMASK ---
+  console.log("\n[Domain 9] Testing Dynamic Category Pill Counts on Unmask & Re-redact...");
+  // Setup minimal DOM mocks to instantiate and test SafeShareModal
+  const pillsCreated = [];
+  const makeMock = (id = "") => ({
+    id,
+    innerHTML: "",
+    innerText: "",
+    style: {},
+    addEventListener(evt, fn) { this["on" + evt] = fn; },
+    querySelectorAll() { return []; },
+    querySelector() { return makeMock(); },
+    appendChild(child) {
+      if (id === "policy-pills-list") pillsCreated.push(child);
+    },
+    remove() {},
+    classList: { add(c) { this.className += " " + c; }, remove(c) { this.className = (this.className || "").replace(c, "").trim(); }, toggle() {} },
+    setAttribute(k, v) { this[k] = v; },
+    getAttribute(k) { return this[k] || null; }
+  });
+
+  global.localStorage = {
+    store: {},
+    getItem(k) { return this.store[k] || null; },
+    setItem(k, v) { this.store[k] = v; }
+  };
+  global.document = {
+    getElementById(id) { return makeMock(id); },
+    createElement(tag) { return makeMock(tag); },
+    body: makeMock("body")
+  };
+  global.HeuristicsRedactor = HeuristicsRedactor;
+  global.ContextualClassifier = ContextualClassifier;
+  global.ConsistentPseudonymizer = ConsistentPseudonymizer;
+  global.SafeShareCrypto = require("./extension/engine/crypto.js");
+
+  const SafeShareModal = require("./extension/ui/modal.js");
+  const modal = new SafeShareModal();
+
+  modal.open([
+    { role: "user", content: "My checking account WF-990218374 balance is $4,200. Debit card ends in 2276, exp 08/27, CVV 339." },
+    { role: "assistant", content: "Autopay of $450 is scheduled on account WF-990218374." }
+  ]);
+
+  const getCounts = () => {
+    pillsCreated.length = 0;
+    modal.rebuildViews();
+    const counts = {};
+    for (const p of pillsCreated) {
+      const cat = p.getAttribute("data-cat");
+      const countMatch = p.innerHTML.match(/class="cat-pill-count">(\d+)<\/span>/);
+      if (cat && countMatch) counts[cat] = parseInt(countMatch[1], 10);
+    }
+    return counts;
+  };
+
+  const initialCounts = getCounts();
+  const initialFinCount = initialCounts.FINANCIAL;
+  assert(initialFinCount > 0, "Financial category count must be > 0 initially!");
+
+  // Unmask $4,200 candidate
+  const cand4200 = modal.candidates.find(c => c.raw === "$4,200");
+  assert(cand4200, "Candidate $4,200 must exist!");
+  cand4200.enabled = false;
+  modal.candidates.forEach(other => {
+    if (other.raw.toLowerCase() === cand4200.raw.toLowerCase() || (other.category === "FINANCIAL" && cand4200.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand4200.raw.replace(/[^\d]/g, ""))) {
+      other.enabled = false;
+    }
+  });
+
+  const unmaskedCounts = getCounts();
+  assert.strictEqual(unmaskedCounts.FINANCIAL, initialFinCount - 1, `Financial count must decrement from ${initialFinCount} to ${initialFinCount - 1} when unmasked!`);
+
+  // Re-redact candidate
+  cand4200.enabled = true;
+  modal.candidates.forEach(other => {
+    if (other.raw.toLowerCase() === cand4200.raw.toLowerCase() || (other.category === "FINANCIAL" && cand4200.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand4200.raw.replace(/[^\d]/g, ""))) {
+      other.enabled = true;
+    }
+  });
+
+  const reRedactedCounts = getCounts();
+  assert.strictEqual(reRedactedCounts.FINANCIAL, initialFinCount, `Financial count must increment back to ${initialFinCount} when re-redacted!`);
+  console.log(`  [✓] Domain 9 Passed: Dynamic pill counts verified (Initial: ${initialFinCount} -> Unmasked: ${unmaskedCounts.FINANCIAL} -> Re-redacted: ${reRedactedCounts.FINANCIAL})!`);
+
   console.log("\n================================================================================");
-  console.log("   ALL 8 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
+  console.log("   ALL 9 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
   console.log("================================================================================\n");
 }
 

@@ -379,14 +379,17 @@ class SafeShareModal {
     let sanitizedTextPlain = "";
     let sanitizedHtmlDisplay = "";
 
-    // Tally candidate counts per category
-    const catCounts = {};
+    // Tally candidate counts and active protected counts per category
+    const catStats = {};
     for (const catKey of Object.keys(SS_CATEGORIES)) {
-      catCounts[catKey] = 0;
+      catStats[catKey] = { total: 0, active: 0 };
     }
     for (const c of this.candidates) {
-      if (catCounts[c.category] !== undefined) {
-        catCounts[c.category]++;
+      if (catStats[c.category]) {
+        catStats[c.category].total++;
+        if (this.activeCategories.has(c.category) && c.enabled) {
+          catStats[c.category].active++;
+        }
       }
     }
 
@@ -519,7 +522,7 @@ class SafeShareModal {
     }
 
     // 2. Update Category Filter Pills
-    this.renderCategoryPills(catCounts);
+    this.renderCategoryPills(catStats);
 
     // 3. Update Entity Inspector Drawer
     this.renderInspectorList();
@@ -578,30 +581,39 @@ class SafeShareModal {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  renderCategoryPills(catCounts) {
+  renderCategoryPills(catStats) {
     const listEl = document.getElementById("policy-pills-list");
     if (!listEl) return;
     listEl.innerHTML = "";
 
     for (const [key, meta] of Object.entries(SS_CATEGORIES)) {
-      const count = catCounts[key] || 0;
-      if (count === 0) continue; // Only show relevant categories
+      const stat = catStats[key] || { total: 0, active: 0 };
+      if (stat.total === 0) continue; // Only show relevant categories detected in conversation
 
-      const isActive = this.activeCategories.has(key);
+      const isActive = this.activeCategories.has(key) && stat.active > 0;
       const pill = document.createElement("button");
       pill.className = `cat-pill ${isActive ? "active" : "inactive"}`;
       pill.setAttribute("data-cat", key);
+      pill.setAttribute("title", `${stat.active} of ${stat.total} items protected. Click to toggle category.`);
       pill.innerHTML = `
         <span class="cat-pill-icon">${meta.icon}</span>
         <span class="cat-pill-label">${meta.label}</span>
-        <span class="cat-pill-count">${count}</span>
+        <span class="cat-pill-count">${stat.active}</span>
       `;
 
       pill.addEventListener("click", () => {
-        if (this.activeCategories.has(key)) {
+        if (isActive) {
+          // If category currently has active protections, turn it off completely
           this.activeCategories.delete(key);
+          this.candidates.forEach(c => {
+            if (c.category === key) c.enabled = false;
+          });
         } else {
+          // Turn category on and enable all items in it
           this.activeCategories.add(key);
+          this.candidates.forEach(c => {
+            if (c.category === key) c.enabled = true;
+          });
         }
         this.savePreferences();
         this.rebuildViews();
