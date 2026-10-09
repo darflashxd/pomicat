@@ -189,8 +189,36 @@ function runUniversalDomainInvarianceSuite() {
   assert(r7Off.anonymizedTurns[0].content.includes("[REDACTED_ACCOUNT_ID]"), "Account ID must remain protected as financial account!");
   console.log("  [✓] Domain 7 Passed: Multi-turn checklist & Profile toggle ON/OFF verified with zero false financial tags!");
 
+  // --- DOMAIN 8: FINANCIAL BADGE CLICK UNMASK WITHOUT BUDGET ALLOCATION CORRUPTION ---
+  console.log("\n[Domain 8] Testing Financial Badge Unmask (Anti-Budget Allocation Corruption)...");
+  const d8User = "My Wells Fargo checking account WF-990218374 keeps getting declined even though I have $4,200 in it.";
+  const d8Asst = "Yes. Having $4,200 in the checking account does not necessarily mean a debit card transaction will be approved.";
+
+  // Initial: Redacted
+  const r8On = processDialogue(d8User, d8Asst);
+  assert(r8On.anonymizedTurns[0].content.includes("[REDACTED_FINANCIAL_1]"), "Turn 0 must be redacted as [REDACTED_FINANCIAL_1] initially!");
+  assert(r8On.anonymizedTurns[1].content.includes("[REDACTED_FINANCIAL_1]"), "Turn 1 must be redacted as [REDACTED_FINANCIAL_1] initially!");
+
+  // Unmasked by user clicking the badge:
+  pseudonymizer.reset();
+  const r8Off = pseudonymizer.anonymizeConversation(
+    [
+      { role: "user", content: heuristics.scan(d8User).sanitizedText },
+      { role: "assistant", content: heuristics.scan(d8Asst).sanitizedText }
+    ],
+    [], // $4,200 is unmasked, so filtered out from activeContextual
+    [],
+    { disabledFinancialVals: [4200], disabledLeaks: ["4200", "$4,200"] }
+  );
+
+  assert(r8Off.anonymizedTurns[0].content.includes("$4,200"), "Turn 0 must reveal raw $4,200 when unmasked!");
+  assert(r8Off.anonymizedTurns[1].content.includes("$4,200"), "Turn 1 must reveal raw $4,200 when unmasked!");
+  assert(!r8Off.anonymizedTurns[0].content.includes("[REDACTED_BUDGET_ALLOCATION]"), "Turn 0 must NEVER turn into [REDACTED_BUDGET_ALLOCATION]!");
+  assert(!r8Off.anonymizedTurns[1].content.includes("[REDACTED_BUDGET_ALLOCATION]"), "Turn 1 must NEVER turn into [REDACTED_BUDGET_ALLOCATION]!");
+  console.log("  [✓] Domain 8 Passed: Financial badge unmask verified with ZERO budget allocation corruption!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 7 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
+  console.log("   ALL 8 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
   console.log("================================================================================\n");
 }
 

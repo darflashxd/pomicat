@@ -107,6 +107,17 @@ class AdversaryOracleSolver {
         continue;
       }
 
+      // Skip calendar years (1950-2040) when preceded by month names or year/tahun
+      if (/^\d{4}$/.test(raw)) {
+        const yNum = parseInt(raw, 10);
+        if (yNum >= 1950 && yNum <= 2040) {
+          const beforeSnippet = text.substring(Math.max(0, m.index - 30), m.index).toLowerCase();
+          if (/\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|year|tahun|in|since|until|by)\s*$/i.test(beforeSnippet)) {
+            continue;
+          }
+        }
+      }
+
       const cleanLower = raw.toLowerCase();
       const isRatio = cleanLower.endsWith("%");
 
@@ -205,7 +216,10 @@ class AdversaryOracleSolver {
         if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         if (this.isSafePublicSpan(text, token.start, token.end)) continue;
-        if (disabledLeaks && (disabledLeaks.includes(token.raw) || disabledLeaks.includes(String(token.val)))) continue;
+        if (disabledLeaks && (disabledLeaks.includes(token.raw) || disabledLeaks.includes(String(token.val)) || disabledLeaks.some(dl => {
+          const dlNum = parseFloat(String(dl).replace(/[^\d.]/g, ""));
+          return !isNaN(dlNum) && Math.abs(token.val - dlNum) <= 0.01;
+        }))) continue;
 
         let isLeak = false;
 
@@ -276,18 +290,19 @@ class AdversaryOracleSolver {
           const line = text.substring(lineStart, lineEnd).toLowerCase();
 
           let tag = "[REDACTED_BUDGET_ALLOCATION]";
-          if (line.includes("year") || line.includes("tahun") || line.includes("timeline") || line.includes("akumulasi")) {
-            tag = "[REDACTED_SAVINGS_ACCUMULATION]";
-          } else if (line.includes("kenaikan") || line.includes("increment") || line.includes("delta") || line.includes("tambahan") || line.includes("raise")) {
-            tag = "[REDACTED_SALARY_INCREMENT]";
-          } else if (/\bnaik\b/i.test(line) || line.includes("proyeksi") || line.includes("projected") || line.includes("menjadi") || line.includes("target")) {
-            tag = "[REDACTED_PROJECTED_SALARY]";
-          } else if (line.includes("sisa") || line.includes("remainder") || line.includes("cicilan") || line.includes("cashflow") || line.includes("kpr") || line.includes("debt") || line.includes("payoff") || line.includes("discretionary") || line.includes("available")) {
-            tag = "[REDACTED_REMAINDER_CASHFLOW]";
-          } else if (line.includes("pro-forma") || line.includes("runway") || line.includes("pre-money") || line.includes("burn") || line.includes("budget") || line.includes("anggaran") || line.includes("alokasi") || line.includes("car") || line.includes("food") || line.includes("transport") || line.includes("saving") || line.includes("tabungan") || line.includes("rent") || line.includes("groceries")) {
-            tag = "[REDACTED_BUDGET_ALLOCATION]";
-          } else if (secretValues.some(sv => Math.abs(token.val - sv) / sv <= this.tolerance)) {
+          // 1. Direct equality with user base secrets takes precedence over derived labels!
+          if (secretValues.some(sv => Math.abs(token.val - sv) / sv <= this.tolerance)) {
             tag = "[REDACTED_FINANCIAL_1]";
+          } else if (/\b(?:year|years|tahun|timeline|akumulasi)\b/i.test(line)) {
+            tag = "[REDACTED_SAVINGS_ACCUMULATION]";
+          } else if (/\b(?:kenaikan|increment|delta|tambahan|raise)\b/i.test(line)) {
+            tag = "[REDACTED_SALARY_INCREMENT]";
+          } else if (/\b(?:naik|proyeksi|projected|menjadi|target)\b/i.test(line)) {
+            tag = "[REDACTED_PROJECTED_SALARY]";
+          } else if (/\b(?:sisa|remainder|cicilan|cashflow|kpr|debt|payoff|discretionary|available)\b/i.test(line)) {
+            tag = "[REDACTED_REMAINDER_CASHFLOW]";
+          } else if (/\b(?:pro-forma|runway|pre-money|burn|budget|anggaran|alokasi|car|cars|food|transport|saving|savings|tabungan|rent|groceries)\b/i.test(line)) {
+            tag = "[REDACTED_BUDGET_ALLOCATION]";
           }
 
           leaks.push({
@@ -1000,7 +1015,10 @@ class ConsistentPseudonymizer {
 
     // Phase 3: Adversary-Oracle Reconstruction Solver
     // Evaluates all visible numbers against known secret values and suppresses derived leaks
-    const financialSecrets = financialNums.map(f => f.val);
+    const disabledFinancialVals = (options.disabledFinancialVals || []);
+    const financialSecrets = financialNums
+      .map(f => f.val)
+      .filter(v => !disabledFinancialVals.some(dv => Math.abs(v - dv) / v <= 0.01));
     const allSolverLeaks = [];
     if (financialSecrets.length > 0) {
       const solver = new AdversaryOracleSolver();

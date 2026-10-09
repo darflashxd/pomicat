@@ -136,7 +136,8 @@ class ContextualClassifier {
         const finMatches = sent.matchAll(finRegex);
         for (const m of finMatches) {
           const matchIndex = m.index;
-          const matchStr = m[0];
+          let matchStr = m[0].replace(/[.,;:]+$/, "");
+          if (!matchStr) continue;
 
           // Skip if inside a telephone number or physical address
           if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {

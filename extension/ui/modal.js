@@ -414,7 +414,8 @@ class SafeShareModal {
 
     // 2. Filter active contextual entities based on user toggles
     const activeContextual = (this.rawContextualEntities || []).filter(e => {
-      const cand = this.candidates.find(c => c.raw.toLowerCase() === e.raw.toLowerCase());
+      const cleanE = e.raw.replace(/[.,;:]+$/, "").trim();
+      const cand = this.candidates.find(c => c.raw.toLowerCase() === cleanE.toLowerCase() || c.raw.toLowerCase() === e.raw.toLowerCase());
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
 
@@ -426,15 +427,20 @@ class SafeShareModal {
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
 
+    const disabledFinancialVals = this.candidates
+      .filter(c => c.category === "FINANCIAL" && (!this.activeCategories.has(c.category) || !c.enabled))
+      .map(c => this.pseudonymizer.parseFinancialValue(c.raw))
+      .filter(v => !isNaN(v) && v > 0);
+
     const disabledLeaks = this.candidates
-      .filter(c => c.isAlgebraic && (!this.activeCategories.has(c.category) || !c.enabled))
+      .filter(c => !this.activeCategories.has(c.category) || !c.enabled)
       .map(c => c.raw);
 
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
       activeContextual,
       activeHeuristics,
-      { disabledLeaks }
+      { disabledLeaks, disabledFinancialVals }
     );
 
     this.sanitizedTurns = anonymizedTurns;
@@ -498,7 +504,14 @@ class SafeShareModal {
           const candId = badge.getAttribute("data-cand-id");
           const cand = this.candidates.find(c => c.id === candId);
           if (cand) {
-            cand.enabled = !cand.enabled;
+            const nextState = !cand.enabled;
+            cand.enabled = nextState;
+            // Also synchronize all other candidates sharing the exact same raw secret or numeric value
+            this.candidates.forEach(other => {
+              if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
+                other.enabled = nextState;
+              }
+            });
             this.rebuildViews();
           }
         });
@@ -641,8 +654,14 @@ class SafeShareModal {
 
       const inputEl = card.querySelector(".cand-toggle-input");
       inputEl.addEventListener("change", (e) => {
-        cand.enabled = e.target.checked;
-        if (e.target.checked && !this.activeCategories.has(cand.category)) {
+        const nextState = e.target.checked;
+        cand.enabled = nextState;
+        this.candidates.forEach(other => {
+          if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
+            other.enabled = nextState;
+          }
+        });
+        if (nextState && !this.activeCategories.has(cand.category)) {
           this.activeCategories.add(cand.category);
           this.savePreferences();
         }
