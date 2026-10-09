@@ -146,10 +146,21 @@
         updateShieldIndicator(inputEl);
       });
 
-      const parent = inputEl.parentElement;
-      if (parent) {
-        parent.style.position = parent.style.position || "relative";
-        parent.appendChild(indicator);
+      // Mount shield bar right above the prompt composer to avoid overflow:hidden clipping
+      const composerForm = inputEl.closest("form") || inputEl.closest("[class*='composer']") || inputEl.closest("div.relative") || inputEl.parentElement;
+      let bar = document.getElementById("safeshare-shield-bar");
+      if (!bar && composerForm && composerForm.parentElement) {
+        bar = document.createElement("div");
+        bar.id = "safeshare-shield-bar";
+        bar.style.cssText = "display: flex; justify-content: flex-end; width: 100%; margin-bottom: 6px; padding: 0 4px; pointer-events: none; z-index: 99999;";
+        composerForm.parentElement.insertBefore(bar, composerForm);
+      }
+      if (bar) {
+        indicator.style.pointerEvents = "auto";
+        bar.appendChild(indicator);
+      } else if (inputEl.parentElement) {
+        inputEl.parentElement.style.position = inputEl.parentElement.style.position || "relative";
+        inputEl.parentElement.appendChild(indicator);
       }
     }
 

@@ -7,19 +7,22 @@
  * Invariant: secret ∉ outbound_prompt
  */
 
-if (typeof require !== "undefined") {
-  var HeuristicsRedactor = require("./heuristics.js");
-  var ContextualClassifier = require("./contextual.js");
-  var ConsistentPseudonymizer = require("./pseudonymizer.js");
-  var SafeShareSymbolicVault = require("./symbolic_vault.js");
-}
+const _resolveHeuristics = () => (typeof HeuristicsRedactor !== "undefined" ? HeuristicsRedactor : (typeof require !== "undefined" ? require("./heuristics.js") : null));
+const _resolveContextual = () => (typeof ContextualClassifier !== "undefined" ? ContextualClassifier : (typeof require !== "undefined" ? require("./contextual.js") : null));
+const _resolvePseudonymizer = () => (typeof ConsistentPseudonymizer !== "undefined" ? ConsistentPseudonymizer : (typeof require !== "undefined" ? require("./pseudonymizer.js") : null));
+const _resolveVault = () => (typeof SafeShareSymbolicVault !== "undefined" ? SafeShareSymbolicVault : (typeof require !== "undefined" ? require("./symbolic_vault.js") : null));
 
 class SafeShareSymbolicRewriter {
   constructor(vault = null) {
-    this.vault = vault || new SafeShareSymbolicVault();
-    this.heuristics = new HeuristicsRedactor();
-    this.contextual = new ContextualClassifier();
-    this.pseudonymizer = new ConsistentPseudonymizer();
+    const VaultClass = _resolveVault();
+    const HeuristicsClass = _resolveHeuristics();
+    const ContextualClass = _resolveContextual();
+    const PseudonymizerClass = _resolvePseudonymizer();
+
+    this.vault = vault || (VaultClass ? new VaultClass() : null);
+    this.heuristics = HeuristicsClass ? new HeuristicsClass() : null;
+    this.contextual = ContextualClass ? new ContextualClass() : null;
+    this.pseudonymizer = PseudonymizerClass ? new PseudonymizerClass() : null;
   }
 
   /**

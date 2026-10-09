@@ -107,13 +107,15 @@ class AdversaryOracleSolver {
         continue;
       }
 
-      // Skip calendar years (1950-2040) when preceded by month names or year/tahun
+      // Skip calendar years (1950-2040) unless explicitly preceded by currency symbols
       if (/^\d{4}$/.test(raw)) {
         const yNum = parseInt(raw, 10);
-        if (yNum >= 1950 && yNum <= 2040) {
-          const beforeSnippet = text.substring(Math.max(0, m.index - 30), m.index).toLowerCase();
-          if (/\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|year|tahun|in|since|until|by)\s*$/i.test(beforeSnippet)) {
-            continue;
+        if (yNum >= 1950 && yNum <= 2040 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(raw)) {
+          const beforeSnippet = text.substring(Math.max(0, m.index - 40), m.index).toLowerCase();
+          const afterSnippet = text.substring(m.index + m[0].length, Math.min(text.length, m.index + m[0].length + 20)).toLowerCase();
+          const isExplicitFinancial = /(?:rent|salary|gaji|income|pay|bonus|debt|owe|making|earning|take-home|spending|spent|balance|cost|fee|bill|charge|saving|tabungan)\s+(?:is\s+|of\s+)?$/i.test(beforeSnippet) || /^\s*(?:\/month|\/mo|\/year|\/bulan|per\s+month|per\s+year)/i.test(afterSnippet);
+          if (!isExplicitFinancial) {
+            continue; // Treat as calendar year, not financial leak
           }
         }
       }
@@ -353,6 +355,10 @@ class ConsistentPseudonymizer {
     for (let k in this.counters) {
       this.counters[k] = 1;
     }
+  }
+
+  setEntityMap(map) {
+    this.entityMap = new Map(map || []);
   }
 
   /**
@@ -623,6 +629,9 @@ class ConsistentPseudonymizer {
    * @param {Array<{type: string, raw: string, replacement: string}>} heuristicDetections
    */
   anonymizeConversation(turns, detectedEntities, heuristicDetections = [], options = {}) {
+    if (options.masterEntityMap) {
+      this.entityMap = new Map(options.masterEntityMap);
+    }
     const updatedTurns = JSON.parse(JSON.stringify(turns));
 
     // Extract user name if introduced in user prompt, respecting stop-words and clause boundaries

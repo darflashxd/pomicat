@@ -326,7 +326,10 @@ class SafeShareModal {
       allHeuristics
     );
 
-    // Contextual mappings into candidates
+    // Save master entity map so tags and numbers remain 100% immutable throughout the session
+    this.masterEntityMap = new Map(this.pseudonymizer.entityMap);
+
+    // Contextual mappings into candidates with canonical deduplication
     if (mappings && Array.isArray(mappings)) {
       for (const m of mappings) {
         let cat = "PROFILE";
@@ -335,48 +338,85 @@ class SafeShareModal {
         else if (m.category === "SENSITIVE_CORP") cat = "CREDENTIALS";
         else if (m.category === "SENSITIVE_LEGAL_HR") cat = "PROFILE";
 
-        const exists = this.candidates.some(c => c.raw.toLowerCase() === m.original.toLowerCase());
-        if (!exists) {
+        const cleanRaw = (m.original || "").replace(/[.,;:]+$/, "").trim();
+        const existing = this.candidates.find(c =>
+          c.raw.toLowerCase() === cleanRaw.toLowerCase() ||
+          (c.category === cat && this.pseudonymizer.parseFinancialValue(c.raw) === this.pseudonymizer.parseFinancialValue(cleanRaw) && this.pseudonymizer.parseFinancialValue(cleanRaw) > 0)
+        );
+
+        if (!existing) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
             role: "user",
             turnIndex: 0,
             category: cat,
             categoryLabel: SS_CATEGORIES[cat]?.label || "General",
-            ruleName: `Contextual ${m.category.replace("SENSITIVE_", "")}`,
-            raw: m.original,
-            fullRaw: m.original,
+            ruleName: cat === "FINANCIAL" ? "Financial Amount" : `Contextual ${m.category.replace("SENSITIVE_", "")}`,
+            raw: cleanRaw,
+            fullRaw: cleanRaw,
             tag: m.pseudonym,
             replacement: m.pseudonym,
             enabled: true,
+            occurrences: 1,
             isAlgebraic: false
           });
+        } else {
+          existing.occurrences = (existing.occurrences || 1) + 1;
+          if (!existing.tag || existing.tag === "c_tag") {
+            existing.tag = m.pseudonym;
+          }
         }
       }
     }
 
-    // Solver algebraic leaks into candidates
+    // Solver algebraic leaks into candidates (filter out calendar years)
     if (solverLeaks && Array.isArray(solverLeaks)) {
       for (const leak of solverLeaks) {
         if (!leak.raw) continue;
-        const exists = this.candidates.some(c => c.raw === leak.raw);
-        if (!exists) {
+        const isYear = /^(?:19[5-9]\d|20[0-4]\d)$/.test(leak.raw.trim());
+        if (isYear) continue;
+
+        const cleanRaw = leak.raw.replace(/[.,;:]+$/, "").trim();
+        const existing = this.candidates.find(c => c.raw.toLowerCase() === cleanRaw.toLowerCase());
+        if (!existing) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
             role: "assistant",
             turnIndex: -1,
             category: "FINANCIAL",
             categoryLabel: SS_CATEGORIES.FINANCIAL.label,
-            ruleName: "Algebraic Inversion Defense",
-            raw: leak.raw,
-            fullRaw: leak.raw,
+            ruleName: "Derived Math Calculation",
+            raw: cleanRaw,
+            fullRaw: cleanRaw,
             tag: leak.replacement,
             replacement: leak.replacement,
             enabled: true,
+            occurrences: 1,
             isAlgebraic: true
           });
         }
       }
+    }
+
+    // Compute total occurrences across turns for each candidate
+    for (const cand of this.candidates) {
+      let count = 0;
+      const clean = cand.raw.toLowerCase().trim();
+      for (const ctx of this.rawContextualEntities) {
+        const ctxClean = ctx.raw.replace(/[.,;:]+$/, "").toLowerCase().trim();
+        if (ctxClean === clean || (cand.category === "FINANCIAL" && this.pseudonymizer.parseFinancialValue(ctx.raw) === this.pseudonymizer.parseFinancialValue(cand.raw) && this.pseudonymizer.parseFinancialValue(cand.raw) > 0)) {
+          count++;
+        }
+      }
+      for (const turnDet of this.cachedTurnDetections) {
+        for (const h of turnDet.hDetections) {
+          const hClean = (h.secretToken || h.raw).toLowerCase().trim();
+          if (hClean === clean || h.raw.toLowerCase().trim() === clean) {
+            count++;
+          }
+        }
+      }
+      cand.occurrences = Math.max(1, count);
     }
 
     // Rebuild UI views and assemble output
@@ -455,7 +495,11 @@ class SafeShareModal {
       activeIntermediateTurns,
       activeContextual,
       activeHeuristics,
-      { disabledLeaks, disabledFinancialVals }
+      {
+        masterEntityMap: this.masterEntityMap,
+        disabledLeaks,
+        disabledFinancialVals
+      }
     );
 
     this.sanitizedTurns = anonymizedTurns;
@@ -565,13 +609,13 @@ class SafeShareModal {
       chipsEl.innerHTML = "";
       const chipProtected = document.createElement("span");
       chipProtected.className = "summary-chip chip-secret";
-      chipProtected.innerText = `${activeProtectedCount} masked`;
+      chipProtected.innerText = `${activeProtectedCount} protected`;
       chipsEl.appendChild(chipProtected);
 
       if (totalDetectedCount - activeProtectedCount > 0) {
         const chipUnmasked = document.createElement("span");
         chipUnmasked.className = "summary-chip chip-entity";
-        chipUnmasked.innerText = `${totalDetectedCount - activeProtectedCount} kept raw`;
+        chipUnmasked.innerText = `${totalDetectedCount - activeProtectedCount} unmasked`;
         chipsEl.appendChild(chipUnmasked);
       }
     }
@@ -645,54 +689,72 @@ class SafeShareModal {
       return;
     }
 
+    // Group candidates by category for clean user-friendly presentation
+    const grouped = {};
     for (const cand of this.candidates) {
-      const meta = SS_CATEGORIES[cand.category] || { icon: "🛡️", label: "General" };
-      const isCatActive = this.activeCategories.has(cand.category);
-      const isItemActive = isCatActive && cand.enabled;
+      if (!grouped[cand.category]) grouped[cand.category] = [];
+      grouped[cand.category].push(cand);
+    }
 
-      const card = document.createElement("div");
-      card.className = `inspector-item-card ${isItemActive ? "item-active" : "item-inactive"}`;
-      card.innerHTML = `
-        <div class="item-card-left">
-          <div class="item-icon">${meta.icon}</div>
-          <div class="item-details">
-            <div class="item-name-row">
-              <span class="item-rule-name">${this.escapeHtml(cand.ruleName)}</span>
-              <span class="item-turn-tag">${cand.role === "assistant" ? "AI Reply" : "User Prompt"}</span>
-              ${cand.isAlgebraic ? `<span class="item-algebraic-tag" title="Inversion protection against mathematical reconstruction">🔗 Derived Math</span>` : ""}
-            </div>
-            <div class="item-values-row">
-              <code class="val-raw" title="${this.escapeHtml(cand.raw)}">${this.escapeHtml(cand.raw)}</code>
-              <span class="val-arrow">→</span>
-              <code class="val-masked">${this.escapeHtml(cand.tag || cand.replacement)}</code>
+    for (const [catKey, cands] of Object.entries(grouped)) {
+      const meta = SS_CATEGORIES[catKey] || { icon: "🛡️", label: "General" };
+      const groupHeader = document.createElement("div");
+      groupHeader.className = "inspector-group-header";
+      groupHeader.innerHTML = `
+        <span class="group-header-icon">${meta.icon}</span>
+        <span class="group-header-title">${meta.label}</span>
+        <span class="group-header-badge">${cands.length} ${cands.length === 1 ? 'item' : 'items'}</span>
+      `;
+      container.appendChild(groupHeader);
+
+      for (const cand of cands) {
+        const isCatActive = this.activeCategories.has(cand.category);
+        const isItemActive = isCatActive && cand.enabled;
+
+        const card = document.createElement("div");
+        card.className = `inspector-item-card ${isItemActive ? "item-active" : "item-inactive"}`;
+        card.innerHTML = `
+          <div class="item-card-left">
+            <div class="item-icon">${meta.icon}</div>
+            <div class="item-details">
+              <div class="item-name-row">
+                <span class="item-rule-name">${this.escapeHtml(cand.ruleName)}</span>
+                <span class="item-turn-tag">${cand.occurrences && cand.occurrences > 1 ? `${cand.occurrences}x in chat` : (cand.role === "assistant" ? "AI Reply" : "User Prompt")}</span>
+                ${cand.isAlgebraic ? `<span class="item-algebraic-tag" title="Inversion protection against mathematical reconstruction">🔗 Derived Math</span>` : ""}
+              </div>
+              <div class="item-values-row">
+                <code class="val-raw" title="${this.escapeHtml(cand.raw)}">${this.escapeHtml(cand.raw)}</code>
+                <span class="val-arrow">→</span>
+                <code class="val-masked">${this.escapeHtml(cand.tag || cand.replacement)}</code>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="item-card-right">
-          <label class="ss-switch" title="Toggle redaction for this item">
-            <input type="checkbox" class="cand-toggle-input" data-cand-id="${cand.id}" ${isItemActive ? "checked" : ""}>
-            <span class="ss-slider"></span>
-          </label>
-        </div>
-      `;
+          <div class="item-card-right">
+            <label class="ss-switch" title="Toggle redaction for this item">
+              <input type="checkbox" class="cand-toggle-input" data-cand-id="${cand.id}" ${isItemActive ? "checked" : ""}>
+              <span class="ss-slider"></span>
+            </label>
+          </div>
+        `;
 
-      const inputEl = card.querySelector(".cand-toggle-input");
-      inputEl.addEventListener("change", (e) => {
-        const nextState = e.target.checked;
-        cand.enabled = nextState;
-        this.candidates.forEach(other => {
-          if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
-            other.enabled = nextState;
+        const inputEl = card.querySelector(".cand-toggle-input");
+        inputEl.addEventListener("change", (e) => {
+          const nextState = e.target.checked;
+          cand.enabled = nextState;
+          this.candidates.forEach(other => {
+            if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
+              other.enabled = nextState;
+            }
+          });
+          if (nextState && !this.activeCategories.has(cand.category)) {
+            this.activeCategories.add(cand.category);
+            this.savePreferences();
           }
+          this.rebuildViews();
         });
-        if (nextState && !this.activeCategories.has(cand.category)) {
-          this.activeCategories.add(cand.category);
-          this.savePreferences();
-        }
-        this.rebuildViews();
-      });
 
-      container.appendChild(card);
+        container.appendChild(card);
+      }
     }
   }
 

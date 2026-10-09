@@ -302,8 +302,53 @@ function runUniversalDomainInvarianceSuite() {
   assert.strictEqual(reRedactedCounts.FINANCIAL, initialFinCount, `Financial count must increment back to ${initialFinCount} when re-redacted!`);
   console.log(`  [✓] Domain 9 Passed: Dynamic pill counts verified (Initial: ${initialFinCount} -> Unmasked: ${unmaskedCounts.FINANCIAL} -> Re-redacted: ${reRedactedCounts.FINANCIAL})!`);
 
+  // --- DOMAIN 10: IMMUTABLE STABLE TAGS & DIRECT CLICKABILITY OF FINANCIAL_3 ---
+  console.log("\n[Domain 10] Testing Immutable Stable Tags & Direct Clickability of FINANCIAL_3...");
+  const modal10 = new SafeShareModal();
+  modal10.open([
+    { role: "user", content: "Balance is $4,200, recurring payment is $450, total debt is $14,250." },
+    { role: "assistant", content: "For $4,200 balance, paying $450 towards $14,250 debt leaves adequate buffer. Another $4,200 will be deposited." }
+  ]);
+
+  // Verify canonical deduplication: $4,200 appeared twice but must only produce 1 candidate card!
+  const cands4200 = modal10.candidates.filter(c => c.raw === "$4,200");
+  assert.strictEqual(cands4200.length, 1, "Candidate $4,200 must be deduplicated into 1 canonical card!");
+  assert(cands4200[0].occurrences >= 2, "Candidate $4,200 must register 2+ occurrences in chat!");
+
+  // Verify 3 distinct stable tags:
+  const candF1 = modal10.candidates.find(c => c.raw === "$4,200");
+  const candF2 = modal10.candidates.find(c => c.raw === "$450");
+  const candF3 = modal10.candidates.find(c => c.raw === "$14,250");
+
+  assert(candF1 && candF1.tag === "[REDACTED_FINANCIAL_1]", "Entity 1 must have stable tag [REDACTED_FINANCIAL_1]");
+  assert(candF2 && candF2.tag === "[REDACTED_FINANCIAL_2]", "Entity 2 must have stable tag [REDACTED_FINANCIAL_2]");
+  assert(candF3 && candF3.tag === "[REDACTED_FINANCIAL_3]", "Entity 3 must have stable tag [REDACTED_FINANCIAL_3]");
+
+  // Simulate unmasking Entity 1 ($4,200):
+  candF1.enabled = false;
+  modal10.rebuildViews();
+
+  // In the updated text: Entity 2 and Entity 3 MUST maintain [REDACTED_FINANCIAL_2] and [REDACTED_FINANCIAL_3]!
+  // They MUST NOT shift to FINANCIAL_1!
+  assert(modal10.sanitizedTurns[0].content.includes("$4,200"), "Entity 1 must be unmasked as $4,200 in Turn 0!");
+  assert(modal10.sanitizedTurns[0].content.includes("[REDACTED_FINANCIAL_2]"), "Entity 2 MUST NOT shift numbers; must remain [REDACTED_FINANCIAL_2]!");
+  assert(modal10.sanitizedTurns[0].content.includes("[REDACTED_FINANCIAL_3]"), "Entity 3 MUST NOT shift numbers; must remain [REDACTED_FINANCIAL_3]!");
+
+  // Simulate clicking badge for [REDACTED_FINANCIAL_3] to unmask it:
+  candF3.enabled = false;
+  modal10.rebuildViews();
+
+  assert(modal10.sanitizedTurns[0].content.includes("$14,250"), "Entity 3 must be unmasked as $14,250!");
+  assert(modal10.sanitizedTurns[0].content.includes("[REDACTED_FINANCIAL_2]"), "Entity 2 must STILL remain [REDACTED_FINANCIAL_2]!");
+
+  // Simulate re-redacting Entity 1 ($4,200):
+  candF1.enabled = true;
+  modal10.rebuildViews();
+  assert(modal10.sanitizedTurns[0].content.includes("[REDACTED_FINANCIAL_1]"), "Entity 1 must return cleanly to [REDACTED_FINANCIAL_1]!");
+  console.log("  [✓] Domain 10 Passed: Immutable tag binding verified! FINANCIAL_1, 2, and 3 never shift numbers and toggle bidirectionally!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 9 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
+  console.log("   ALL 10 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
   console.log("================================================================================\n");
 }
 
