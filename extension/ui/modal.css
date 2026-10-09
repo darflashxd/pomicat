@@ -651,6 +651,80 @@
   opacity: 0.8;
 }
 
+/* Local Compute Hydrated Badge */
+.ss-local-compute {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: all;
+}
+
+.ss-local-compute:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.ss-compute-tag {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+  letter-spacing: 0.2px;
+}
+
+/* Privacy Shield Prompt Indicator */
+#safeshare-shield-indicator {
+  position: absolute;
+  top: -32px;
+  right: 12px;
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: rgba(24, 24, 27, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #a1a1aa;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+#safeshare-shield-indicator.shield-active {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(6, 78, 59, 0.35);
+}
+
+#safeshare-shield-indicator.shield-active:hover {
+  background: rgba(6, 78, 59, 0.55);
+  border-color: rgba(16, 185, 129, 0.7);
+}
+
+#safeshare-shield-indicator.shield-disabled {
+  color: #71717a;
+  border-color: rgba(255, 255, 255, 0.06);
+  opacity: 0.65;
+}
+
 .diff-box::-webkit-scrollbar {
   width: 6px;
   height: 6px;

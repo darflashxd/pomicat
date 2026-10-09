@@ -189,6 +189,18 @@ class SafeShareModal {
               <option value="burn">Burn after 1 view</option>
             </select>
           </div>
+
+          <!-- Pre-Inference Shield Setting -->
+          <div class="safeshare-options-row" style="margin-top: 10px;">
+            <div class="options-label">
+              <span style="font-size: 13px;">🛡️</span>
+              <span title="Rewrites raw secrets to symbolic variables before sending to AI, computing results locally in RAM">Pre-Inference Symbolic Shield:</span>
+            </div>
+            <label class="ss-switch" title="Toggle Pre-Inference Prompt Protection">
+              <input type="checkbox" id="safeshare-pre-inference-toggle">
+              <span class="ss-slider"></span>
+            </label>
+          </div>
         </div>
 
         <!-- Success Result View -->
@@ -720,6 +732,17 @@ class SafeShareModal {
       this.savePreferences();
       this.rebuildViews();
     });
+
+    // Pre-Inference Shield Toggle Event
+    const preInferToggle = backdrop.querySelector("#safeshare-pre-inference-toggle");
+    if (preInferToggle) {
+      preInferToggle.checked = localStorage.getItem("safeshare_pre_inference") !== "false";
+      preInferToggle.addEventListener("change", (e) => {
+        localStorage.setItem("safeshare_pre_inference", e.target.checked ? "true" : "false");
+        // Dispatch custom event for content_script to update shield state immediately
+        window.dispatchEvent(new CustomEvent("safeshare:shield_toggle", { detail: { active: e.target.checked } }));
+      });
+    }
 
     // Publish & Encrypt Event
     backdrop.querySelector("#btn-encrypt-publish").addEventListener("click", async () => {

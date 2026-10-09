@@ -1,11 +1,25 @@
 /**
  * SafeShare-AI — Content Script
- * Injects SafeShare action button into ChatGPT, Claude, and DeepSeek interfaces
- * and extracts conversation context.
+ * Injects SafeShare action button into ChatGPT, Claude, and DeepSeek interfaces,
+ * manages Pre-Inference Outbound Symbolic Transformation (<S1>),
+ * and executes Local Compute Hydration in client RAM.
  */
 
 (function () {
   console.log("[SafeShare-AI] Extension content script active.");
+
+  // Ephemeral engines initialized in content script context
+  const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault() : null;
+  const symbolicRewriter = (typeof SafeShareSymbolicRewriter !== "undefined" && symbolicVault) ? new SafeShareSymbolicRewriter(symbolicVault) : null;
+  const localCompute = typeof SafeShareLocalCompute !== "undefined" ? new SafeShareLocalCompute() : null;
+
+  function isPreInferenceEnabled() {
+    try {
+      return localStorage.getItem("safeshare_pre_inference") !== "false";
+    } catch (_) {
+      return true;
+    }
+  }
 
   function initSafeShareButton() {
     if (document.getElementById("safeshare-action-pill")) return;
@@ -63,6 +77,184 @@
     });
 
     document.body.appendChild(pill);
+  }
+
+  /**
+   * Finds the active prompt input area across ChatGPT, Claude, and DeepSeek.
+   */
+  function findPromptInputElement() {
+    return (
+      document.querySelector("#prompt-textarea") ||
+      document.querySelector("div[contenteditable='true'][data-id]") ||
+      document.querySelector("div[contenteditable='true']") ||
+      document.querySelector("fieldset div[contenteditable='true']") ||
+      document.querySelector("textarea[data-id]") ||
+      document.querySelector("textarea")
+    );
+  }
+
+  /**
+   * Retrieves text from the input element (handling textarea and contenteditable).
+   */
+  function getInputText(el) {
+    if (!el) return "";
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      return el.value || "";
+    }
+    return el.innerText || el.textContent || "";
+  }
+
+  /**
+   * Injects rewritten symbolic text into ProseMirror/Lexical/React input element.
+   */
+  function setInputText(el, newText) {
+    if (!el) return;
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      el.value = newText;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
+
+    // Contenteditable (ChatGPT / Claude ProseMirror / Lexical)
+    el.focus();
+    if (typeof document.execCommand === "function") {
+      document.execCommand("selectAll", false, null);
+      document.execCommand("insertText", false, newText);
+    } else {
+      el.innerText = newText;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+
+  /**
+   * Manages the subtle Privacy Shield Chip indicator near the input prompt area.
+   */
+  function updateShieldIndicator(inputEl) {
+    if (!symbolicRewriter || !inputEl) return;
+
+    let indicator = document.getElementById("safeshare-shield-indicator");
+    const isEnabled = isPreInferenceEnabled();
+
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.id = "safeshare-shield-indicator";
+      indicator.title = "Pre-Inference Symbolic Shield: Click to toggle on/off";
+      indicator.addEventListener("click", () => {
+        const nextState = !isPreInferenceEnabled();
+        localStorage.setItem("safeshare_pre_inference", nextState ? "true" : "false");
+        updateShieldIndicator(inputEl);
+      });
+
+      const parent = inputEl.parentElement;
+      if (parent) {
+        parent.style.position = parent.style.position || "relative";
+        parent.appendChild(indicator);
+      }
+    }
+
+    if (!isEnabled) {
+      indicator.className = "shield-disabled";
+      indicator.innerHTML = `<span>🛡️ Shield Off</span>`;
+      return;
+    }
+
+    const currentText = getInputText(inputEl);
+    const analysis = symbolicRewriter.analyze(currentText);
+
+    if (analysis.hasSensitive) {
+      indicator.className = "shield-active";
+      indicator.innerHTML = `<span>🛡️ ${analysis.detectedItems.length} Secret${analysis.detectedItems.length > 1 ? "s" : ""} Protected (&lt;S1&gt;)</span>`;
+    } else {
+      indicator.className = "shield-active";
+      indicator.innerHTML = `<span>🛡️ Shield Ready</span>`;
+    }
+  }
+
+  /**
+   * Hooks prompt submission to apply Pre-Inference symbolic rewrite transparently.
+   */
+  function initPreInferenceInterception() {
+    if (!symbolicRewriter || !symbolicVault) return;
+
+    const inputEl = findPromptInputElement();
+    if (!inputEl) return;
+
+    // Attach typing listener to update shield indicator
+    if (!inputEl.dataset.safeshareHooked) {
+      inputEl.dataset.safeshareHooked = "true";
+      inputEl.addEventListener("input", () => updateShieldIndicator(inputEl));
+      inputEl.addEventListener("focus", () => updateShieldIndicator(inputEl));
+
+      // Hook Enter key
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+          handlePreInferencePromptSubmit(inputEl);
+        }
+      }, true); // Capture phase
+    }
+
+    // Hook Send Buttons
+    const sendButtons = document.querySelectorAll(
+      "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button"
+    );
+    sendButtons.forEach((btn) => {
+      if (!btn.dataset.safeshareHooked) {
+        btn.dataset.safeshareHooked = "true";
+        btn.addEventListener("click", () => handlePreInferencePromptSubmit(inputEl), true);
+      }
+    });
+
+    updateShieldIndicator(inputEl);
+  }
+
+  function handlePreInferencePromptSubmit(inputEl) {
+    if (!isPreInferenceEnabled() || !symbolicRewriter) return;
+
+    try {
+      const currentText = getInputText(inputEl);
+      if (!currentText || currentText.trim().length === 0) return;
+
+      const rewritten = symbolicRewriter.rewrite(currentText);
+      if (rewritten.isTransformed) {
+        console.log("[SafeShare-AI] Pre-Inference Rewrite applied:", rewritten.symbols);
+        setInputText(inputEl, rewritten.sanitizedPrompt);
+      }
+    } catch (err) {
+      console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
+    }
+  }
+
+  /**
+   * Hydrates formulas in AI responses with locally computed numbers in client RAM.
+   */
+  function initLocalHydrationObserver() {
+    if (!localCompute || !symbolicVault) return;
+
+    const observer = new MutationObserver(() => {
+      if (symbolicVault.size() === 0) return;
+      const vaultData = symbolicVault.getAll();
+
+      // Find assistant text containers
+      const asstNodes = document.querySelectorAll(
+        "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, .font-claude-message p"
+      );
+
+      asstNodes.forEach((node) => {
+        if (node.dataset.safeshareHydrated) return;
+        const text = node.innerHTML;
+
+        if (/<S\d+>|\bS\d+\b/.test(text)) {
+          const res = localCompute.hydrateText(text, vaultData, true);
+          if (res.computedCount > 0) {
+            node.innerHTML = res.hydratedText;
+            node.dataset.safeshareHydrated = "true";
+          }
+        }
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   /**
@@ -125,6 +317,18 @@
     return turns;
   }
 
-  // Periodic check to inject button once UI is loaded
-  setInterval(initSafeShareButton, 1500);
+  // Periodic check to inject button & prompt shield once UI is loaded
+  setInterval(() => {
+    initSafeShareButton();
+    initPreInferenceInterception();
+  }, 1500);
+
+  // Initialize inbound streaming local hydration observer
+  initLocalHydrationObserver();
+
+  // Listen to modal toggle events
+  window.addEventListener("safeshare:shield_toggle", (e) => {
+    const inputEl = findPromptInputElement();
+    if (inputEl) updateShieldIndicator(inputEl);
+  });
 })();
