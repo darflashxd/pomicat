@@ -470,15 +470,25 @@ class SafeShareModal {
     // 2. Filter active contextual entities based on user toggles
     const activeContextual = (this.rawContextualEntities || []).filter(e => {
       const cleanE = e.raw.replace(/[.,;:]+$/, "").trim();
-      const cand = this.candidates.find(c => c.raw.toLowerCase() === cleanE.toLowerCase() || c.raw.toLowerCase() === e.raw.toLowerCase());
+      const eVal = this.pseudonymizer.parseFinancialValue(cleanE);
+      const cand = this.candidates.find(c =>
+        c.raw.toLowerCase() === cleanE.toLowerCase() ||
+        c.raw.toLowerCase() === e.raw.toLowerCase() ||
+        (c.category === "FINANCIAL" && eVal > 0 && this.pseudonymizer.parseFinancialValue(c.raw) === eVal)
+      );
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
 
     // 3. Filter active heuristics and collect disabled algebraic leaks
     this.pseudonymizer.reset();
     const activeHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections).filter(h => {
-      const secretVal = h.secretToken || h.raw;
-      const cand = this.candidates.find(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === h.raw.toLowerCase());
+      const secretVal = (h.secretToken || h.raw).replace(/[.,;:]+$/, "").trim();
+      const hVal = this.pseudonymizer.parseFinancialValue(secretVal);
+      const cand = this.candidates.find(c =>
+        c.raw.toLowerCase() === secretVal.toLowerCase() ||
+        c.fullRaw?.toLowerCase() === h.raw.toLowerCase() ||
+        (c.category === "FINANCIAL" && hVal > 0 && this.pseudonymizer.parseFinancialValue(c.raw) === hVal)
+      );
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
 

@@ -69,7 +69,7 @@ class AdversaryOracleSolver {
 
     // Regex matching whole numerical tokens with currency, units, decimals, and %
     const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
-    const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
+    const nonFinUnits = /^\s*(?:(?:additional|more|extra|fewer|less)\s+)?(?:months?|years?|days?|hours?|weeks?|quarters?|percentage\s+points?|basis\s+points?|bps|points?|pts?|shares?|tokens?|users?|employees?|engineers?|customers?|plates?|guests?|items?|copies|cells|copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar)\b/i;
     const tokens = [];
     let m;
     while ((m = rx.exec(text)) !== null) {
@@ -139,9 +139,20 @@ class AdversaryOracleSolver {
       } else if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
       } else {
-        const digits = cleanLower.replace(/\D/g, "");
-        if (digits.length >= 4) val = parseInt(digits, 10);
-        else val = parseInt(digits, 10) || 0;
+        if (cleanLower.includes(".") && !cleanLower.includes(",")) {
+          val = parseFloat(cleanLower);
+        } else if (cleanLower.includes(",") && !cleanLower.includes(".")) {
+          const parts = cleanLower.split(",");
+          if (parts[1] && parts[1].length === 3) {
+            val = parseInt(cleanLower.replace(/\D/g, ""), 10);
+          } else {
+            val = parseFloat(cleanLower.replace(",", "."));
+          }
+        } else {
+          const digits = cleanLower.replace(/\D/g, "");
+          if (digits.length >= 4) val = parseInt(digits, 10);
+          else val = parseInt(digits, 10) || 0;
+        }
       }
 
       if (val > 0) {
@@ -494,16 +505,16 @@ class ConsistentPseudonymizer {
         const enFormatted = num.toLocaleString("en-US").replace(/,/g, ",");
 
         // 1. Currency prefix + formatted number or plain number
-        variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${idFormatted}\\b`);
-        variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${enFormatted}\\b`);
-        variants.push(`\\b${num}\\b`);
+        variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${idFormatted}(?![\\w.,])`);
+        variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${enFormatted}(?![\\w.,])`);
+        variants.push(`(?<![\\w.,])${num}(?![\\w.,])`);
 
         // 1b. Thousands abbreviations (e.g. 145k, 340k, 18k, 25k, $340K)
         if (num >= 1e3 && num < 1e9) {
           const thousands = num / 1e3;
           if (thousands === Math.floor(thousands) || thousands.toFixed(1).endsWith(".5")) {
             const kth = thousands.toString().replace(".", "\\.");
-            variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${kth}\\s*(?:k|rb|ribu|thousand)(?![\\w])`);
+            variants.push(`(?<![\\w.,$€£¥])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${kth}\\s*(?:k|rb|ribu|thousand)(?![\\w.,])`);
           }
         }
 
@@ -512,19 +523,22 @@ class ConsistentPseudonymizer {
           const millions = num / 1e6;
           const milDot = millions.toString().replace(".", "\\.");
           const milComma = millions.toString().replace(".", ",");
-          variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?(?:${milDot}|${milComma})\\s*(?:juta|jt|jeti|million|m)(?![\\w])`);
+          variants.push(`(?<![\\w.,$€£¥])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?(?:${milDot}|${milComma})\\s*(?:juta|jt|jeti|million|m)(?![\\w.,])`);
           
           if (millions === Math.floor(millions)) {
-            variants.push(`(?<![\\w])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${Math.floor(millions)}\\s*(?:juta|jt|jeti|million|m)(?![\\w])`);
+            variants.push(`(?<![\\w.,$€£¥])(?:(?:Rp\\.?|IDR|\\$|USD|€|EUR|£|GBP|CHF|SGD)\\s*)?${Math.floor(millions)}\\s*(?:juta|jt|jeti|million|m)(?![\\w.,])`);
           }
 
-          // 3. Annualized derivations (LLM multiplying monthly salary by 12)
-          const annual = num * 12;
-          const annualM = annual / 1e6;
-          const annDot = annualM.toString().replace(".", "\\.");
-          const annComma = annualM.toString().replace(".", ",");
-          variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?(?:${annDot}|${annComma})\\s*(?:juta|jt|million|m)(?:\\s*\\/\\s*tahun|\\s*per\\s*tahun)?\\b`);
-          variants.push(`\\b(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${annual.toLocaleString("id-ID").replace(/\./g, "\\.")}\\b`);
+          // 3. Annualized derivations ONLY if raw explicitly indicated monthly frequency
+          const isMonthlyEntity = /(?:month|mo|bulan|per\s+month|\/mo|\/month|\/bulan|sebulan|monthly)/i.test(raw);
+          if (isMonthlyEntity) {
+            const annual = num * 12;
+            const annualM = annual / 1e6;
+            const annDot = annualM.toString().replace(".", "\\.");
+            const annComma = annualM.toString().replace(".", ",");
+            variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?(?:${annDot}|${annComma})\\s*(?:juta|jt|million|m)(?:\\s*\\/\\s*tahun|\\s*per\\s*tahun)?(?![\\w.,])`);
+            variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${annual.toLocaleString("id-ID").replace(/\./g, "\\.")}(?![\\w.,])`);
+          }
         }
       }
     } else if (category === "SENSITIVE_HEALTH") {
