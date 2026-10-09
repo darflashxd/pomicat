@@ -47,6 +47,12 @@ class SafeShareModal {
     } catch (_) {}
   }
 
+  extractTag(replacement) {
+    if (!replacement) return "";
+    const m = String(replacement).match(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/);
+    return m ? m[0] : replacement;
+  }
+
   escapeHtml(str) {
     if (!str) return "";
     return String(str)
@@ -263,15 +269,21 @@ class SafeShareModal {
         else if (["EMAIL", "PHONE", "ADDRESS_ID", "ENGLISH_PHYSICAL_ADDRESS"].includes(det.type)) cat = "PROFILE";
         else if (det.type.includes("PROMPT") || det.type.includes("OUTPUT") || det.type.includes("USER_") || det.type.includes("SSH_") || det.type.includes("GIT_")) cat = "SYSTEM";
 
-        const exists = this.candidates.some(c => c.raw.toLowerCase() === det.raw.toLowerCase());
+        const secretVal = det.secretToken || det.raw;
+        const tag = this.extractTag(det.replacement);
+
+        const exists = this.candidates.some(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === det.raw.toLowerCase());
         if (!exists) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
             role: turn.role,
+            turnIndex: turnIdx,
             category: cat,
             categoryLabel: SS_CATEGORIES[cat]?.label || "General",
             ruleName: det.name,
-            raw: det.raw,
+            raw: secretVal,
+            fullRaw: det.raw,
+            tag: tag,
             replacement: det.replacement,
             enabled: true,
             isAlgebraic: false
@@ -311,16 +323,18 @@ class SafeShareModal {
         else if (m.category === "SENSITIVE_CORP") cat = "CREDENTIALS";
         else if (m.category === "SENSITIVE_LEGAL_HR") cat = "PROFILE";
 
-        // Avoid exact duplicate candidates if already covered by Tier 1
         const exists = this.candidates.some(c => c.raw.toLowerCase() === m.original.toLowerCase());
         if (!exists) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
             role: "user",
+            turnIndex: 0,
             category: cat,
             categoryLabel: SS_CATEGORIES[cat]?.label || "General",
             ruleName: `Contextual ${m.category.replace("SENSITIVE_", "")}`,
             raw: m.original,
+            fullRaw: m.original,
+            tag: m.pseudonym,
             replacement: m.pseudonym,
             enabled: true,
             isAlgebraic: false
@@ -338,10 +352,13 @@ class SafeShareModal {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
             role: "assistant",
+            turnIndex: -1,
             category: "FINANCIAL",
             categoryLabel: SS_CATEGORIES.FINANCIAL.label,
             ruleName: "Algebraic Inversion Defense",
             raw: leak.raw,
+            fullRaw: leak.raw,
+            tag: leak.replacement,
             replacement: leak.replacement,
             enabled: true,
             isAlgebraic: true
@@ -373,7 +390,7 @@ class SafeShareModal {
       }
     }
 
-    // 1. Prepare intermediate turns based on active heuristic candidate toggles
+    // 1. Prepare intermediate turns based on active candidate toggles
     const activeIntermediateTurns = [];
     for (let tIdx = 0; tIdx < this.currentTurns.length; tIdx++) {
       const turn = this.currentTurns[tIdx];
@@ -382,7 +399,8 @@ class SafeShareModal {
       let turnText = turn.content;
       const hDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
       for (const det of hDets) {
-        const cand = this.candidates.find(c => c.raw.toLowerCase() === det.raw.toLowerCase());
+        const secretVal = det.secretToken || det.raw;
+        const cand = this.candidates.find(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === det.raw.toLowerCase());
         const isProtected = !cand || (this.activeCategories.has(cand.category) && cand.enabled);
         if (isProtected) {
           turnText = turnText.replace(new RegExp(this.escapeRegExp(det.raw), "gi"), det.replacement);
@@ -400,19 +418,34 @@ class SafeShareModal {
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
 
-    // 3. Run the full multi-turn engine (sweeping all user and assistant turns)
+    // 3. Filter active heuristics and collect disabled algebraic leaks
     this.pseudonymizer.reset();
     const activeHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections).filter(h => {
-      const cand = this.candidates.find(c => c.raw === h.raw);
+      const secretVal = h.secretToken || h.raw;
+      const cand = this.candidates.find(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === h.raw.toLowerCase());
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
+
+    const disabledLeaks = this.candidates
+      .filter(c => c.isAlgebraic && (!this.activeCategories.has(c.category) || !c.enabled))
+      .map(c => c.raw);
+
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
       activeContextual,
-      activeHeuristics
+      activeHeuristics,
+      { disabledLeaks }
     );
 
     this.sanitizedTurns = anonymizedTurns;
+
+    // Helper to replace text without penetrating existing <span ...>...</span> badges
+    const replaceOutsideSpans = (html, regex, replacer) => {
+      return html.replace(new RegExp(`(<span[^>]*>[\\s\\S]*?<\\/span>)|(${regex.source})`, regex.flags), (match, span, target, ...args) => {
+        if (span) return span;
+        return replacer(target, ...args);
+      });
+    };
 
     // 4. Build output displays and interactive badges
     for (let tIdx = 0; tIdx < anonymizedTurns.length; tIdx++) {
@@ -432,12 +465,17 @@ class SafeShareModal {
       for (const cand of unmaskedCandidates) {
         const rawEscaped = this.escapeHtml(cand.raw);
         const regRaw = new RegExp(`(?<![\\w])${this.escapeRegExp(rawEscaped)}(?![\\w])`, "gi");
-        htmlContent = htmlContent.replace(regRaw, `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${rawEscaped}<span class="ss-badge-icon">👁️</span></span>`);
+        htmlContent = replaceOutsideSpans(htmlContent, regRaw, (m) => `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${m}<span class="ss-badge-icon">👁️</span></span>`);
       }
 
-      // B. Single-pass regex replacing all redacted tags (avoids nesting span inside span!)
-      htmlContent = htmlContent.replace(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
-        const cand = this.candidates.find(c => c.replacement === tag);
+      // B. Single-pass regex replacing all redacted tags outside existing spans
+      const turnDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
+      htmlContent = replaceOutsideSpans(htmlContent, /\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
+        // Find matching candidate: prefer one belonging to this turn or detections
+        let cand = this.candidates.find(c => (c.tag === tag || c.replacement === tag) && turnDets.some(d => (d.secretToken || d.raw).toLowerCase() === c.raw.toLowerCase()));
+        if (!cand) {
+          cand = this.candidates.find(c => c.tag === tag || c.replacement === tag);
+        }
         const candId = cand ? cand.id : "c_tag";
         const rawText = cand ? this.escapeHtml(cand.raw) : tag;
         return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
@@ -589,7 +627,7 @@ class SafeShareModal {
             <div class="item-values-row">
               <code class="val-raw" title="${this.escapeHtml(cand.raw)}">${this.escapeHtml(cand.raw)}</code>
               <span class="val-arrow">→</span>
-              <code class="val-masked">${this.escapeHtml(cand.replacement)}</code>
+              <code class="val-masked">${this.escapeHtml(cand.tag || cand.replacement)}</code>
             </div>
           </div>
         </div>

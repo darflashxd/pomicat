@@ -145,7 +145,7 @@ class AdversaryOracleSolver {
     return tokens;
   }
 
-  solveAndRedact(text, secretValues) {
+  solveAndRedact(text, secretValues, disabledLeaks = []) {
     if (!secretValues || secretValues.length === 0) return text;
     const tokens = this.lexNumericSpans(text);
     const ratios = tokens.filter(t => t.isRatio && t.val > 0).map(t => t.val);
@@ -168,7 +168,7 @@ class AdversaryOracleSolver {
     for (let i = 0; i < cur.length; i++) {
       for (let j = i + 1; j < cur.length; j++) {
         const diff = Math.abs(cur[i] - cur[j]);
-        if (diff >= 500 && extendedSecrets.size < 600) {
+        if (diff >= 500 && extendedSecrets.size < 500) {
           extendedSecrets.add(diff);
         }
       }
@@ -205,6 +205,7 @@ class AdversaryOracleSolver {
         if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         if (this.isSafePublicSpan(text, token.start, token.end)) continue;
+        if (disabledLeaks && (disabledLeaks.includes(token.raw) || disabledLeaks.includes(String(token.val)))) continue;
 
         let isLeak = false;
 
@@ -606,7 +607,7 @@ class ConsistentPseudonymizer {
    * @param {Array<{turnIndex: number, raw: string, category: string}>} detectedEntities
    * @param {Array<{type: string, raw: string, replacement: string}>} heuristicDetections
    */
-  anonymizeConversation(turns, detectedEntities, heuristicDetections = []) {
+  anonymizeConversation(turns, detectedEntities, heuristicDetections = [], options = {}) {
     const updatedTurns = JSON.parse(JSON.stringify(turns));
 
     // Extract user name if introduced in user prompt, respecting stop-words and clause boundaries
@@ -1005,7 +1006,7 @@ class ConsistentPseudonymizer {
       const solver = new AdversaryOracleSolver();
       for (let turn of updatedTurns) {
         if (turn.content && turn.role === "assistant") {
-          turn.content = solver.solveAndRedact(turn.content, financialSecrets);
+          turn.content = solver.solveAndRedact(turn.content, financialSecrets, options.disabledLeaks || []);
           if (solver.lastLeaks && solver.lastLeaks.length > 0) {
             allSolverLeaks.push(...solver.lastLeaks);
           }
