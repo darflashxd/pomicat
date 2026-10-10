@@ -22,18 +22,35 @@ class SafeShareLocalCompute {
   }
 
   /**
+   * Pre-normalizes HTML/Markdown representations of symbols into standard <S...> tokens.
+   * Handles browser HTML tags (<s19></s19>, <s19/>), HTML entities (&lt;S19&gt;), and LaTeX brackets.
+   * @param {string} html
+   * @returns {string}
+   */
+  preNormalizeHtmlSymbols(html) {
+    if (!html || typeof html !== "string") return "";
+    let s = html;
+    // 1. Browser HTML element tags created by browser DOM parser: <s19></s19>, <s19>, <S19></S19>
+    s = s.replace(/<s(\d+)>(?:<\/s\1>)?/gi, "<S$1>");
+    s = s.replace(/<s(\d+)\s*\/>/gi, "<S$1>");
+    // 2. HTML entities: &lt;S19&gt;, &lt;s19&gt;
+    s = s.replace(/&lt;\s*s(\d+)\s*&gt;/gi, "<S$1>");
+    // 3. LaTeX angle brackets: \langle S19\rangle, \langle s19\rangle
+    s = s.replace(/\\langle\s*s(\d+)\s*\\rangle/gi, "<S$1>");
+    // 4. Unicode angle brackets: ⟨S19⟩, ⟨s19⟩
+    s = s.replace(/⟨\s*s(\d+)\s*⟩/gi, "<S$1>");
+    return s;
+  }
+
+  /**
    * Normalizes LaTeX notation, Unicode operators, and fractions into standard arithmetic.
    * @param {string} expr
    * @returns {string}
    */
   cleanMathString(expr) {
     if (!expr || typeof expr !== "string") return "";
-    let s = expr;
-    // Normalize LaTeX angle brackets \langle S1\rangle -> <S1>
-    s = s.replace(/\\langle\s*([A-Za-z0-9_]+)\s*\\rangle/gi, "<$1>");
-    s = s.replace(/⟨\s*([A-Za-z0-9_]+)\s*⟩/g, "<$1>");
-    s = s.replace(/&lt;\s*([A-Za-z0-9_]+)\s*&gt;/gi, "<$1>");
-    // Normalize LaTeX fractions \frac{a}{b} -> ((a)/(b))
+    let s = this.preNormalizeHtmlSymbols(expr);
+    // Normalize LaTeX fractions \frac{a}{b} -> ((a) / (b))
     s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gi, "(($1) / ($2))");
     // Normalize LaTeX parens & operators
     s = s.replace(/\\left\(/gi, "(").replace(/\\right\)/gi, ")");
@@ -321,10 +338,19 @@ class SafeShareLocalCompute {
     const evaluations = [];
     const escapeAttr = (str) => String(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-    let hydratedText = text;
+    let hydratedText = this.preNormalizeHtmlSymbols(text);
 
-    // Phase 1: Process LaTeX display math blocks \[ ... \] or $$ ... $$
-    const latexBlockRx = /(\\\[|\$\$)([\s\S]*?)(\\\]|\$\$)/g;
+    // Helper to prevent nesting inside already-generated ss-local-compute spans
+    const replaceOutsideSpans = (content, regex, replacer) => {
+      const outerRx = new RegExp(`(<span[^>]*class="[^"]*ss-local-compute[^"]*"[\\s\\S]*?<\\/span>)|(${regex.source})`, regex.flags);
+      return content.replace(outerRx, (match, span, target, ...args) => {
+        if (span) return span;
+        return replacer(target, ...args);
+      });
+    };
+
+    // Phase 1: Process LaTeX display and inline math blocks \[ ... \], $$ ... $$, \( ... \), $ ... $
+    const latexBlockRx = /(\\\[|\$\$|\\\(|\$)([\s\S]*?)(\\\]|\$\$|\\\)|\$)/g;
     hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, inner, closeTag) => {
       if (!/<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b/i.test(inner)) return fullMatch;
       const eq = inner.match(/^([\s\S]*?=\s*)([\s\S]+)$/);
@@ -339,6 +365,16 @@ class SafeShareLocalCompute {
         } catch (_) {
           return fullMatch;
         }
+      } else if (inner.includes("<S") || inner.includes("\\langle") || inner.includes("frac")) {
+        try {
+          const cleanExpr = this.cleanMathString(inner);
+          const val = this.compute(cleanExpr, symbolTable);
+          const formatted = this.formatValue(val, defaultCurrency, cleanExpr).replace("%", "\\%");
+          evaluations.push({ expr: inner.trim(), val, formatted });
+          return `${openTag}${formatted}${closeTag}`;
+        } catch (_) {
+          return fullMatch;
+        }
       }
       return fullMatch;
     });
@@ -346,10 +382,11 @@ class SafeShareLocalCompute {
     // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and parentheses)
     const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
-    hydratedText = hydratedText.replace(multiTermRx, (fullMatch, offset) => {
+    hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
+      const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
       const hasKnownSymbol = Object.keys(vault).some(k => {
         const bare = k.replace(/[<>]/g, "");
-        return fullMatch.includes(k) || fullMatch.includes(bare);
+        return fullMatch.toLowerCase().includes(k.toLowerCase()) || fullMatch.toLowerCase().includes(bare.toLowerCase());
       });
       if (!hasKnownSymbol) return fullMatch;
 
@@ -390,10 +427,11 @@ class SafeShareLocalCompute {
     // Phase 3: Process standalone variables
     const standaloneVarRx = /(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b)(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
-    hydratedText = hydratedText.replace(standaloneVarRx, (fullMatch, offset) => {
+    hydratedText = replaceOutsideSpans(hydratedText, standaloneVarRx, (fullMatch, ...args) => {
+      const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
       const symbolKey = Object.keys(vault).find(k => {
         const bare = k.replace(/[<>]/g, "");
-        return fullMatch.includes(k) || fullMatch.includes(bare);
+        return fullMatch.toLowerCase().includes(k.toLowerCase()) || fullMatch.toLowerCase().includes(bare.toLowerCase());
       });
       if (!symbolKey) return fullMatch;
 

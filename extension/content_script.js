@@ -182,6 +182,7 @@
         const nextState = !isPreInferenceEnabled();
         localStorage.setItem("safeshare_pre_inference", nextState ? "true" : "false");
         updateShieldIndicator(inputEl);
+        runHydrationPass();
       });
       indicator.style.pointerEvents = "auto";
       bar.appendChild(indicator);
@@ -291,32 +292,78 @@
   }
 
   /**
+   * Performs an active hydration pass over all visible assistant message nodes.
+   * If shield is disabled, reverts any existing local compute spans back to original expressions.
+   * Resolves KaTeX math annotations, tables, code, and text containers.
+   */
+  function runHydrationPass() {
+    if (!localCompute || !symbolicVault || typeof document === "undefined" || !document.body) return;
+    const isEnabled = isPreInferenceEnabled();
+
+    // If shield is disabled: un-hydrate all local compute spans so user sees raw symbols
+    if (!isEnabled) {
+      const hydratedSpans = document.querySelectorAll(".ss-local-compute, [data-expr]");
+      hydratedSpans.forEach(span => {
+        const origExpr = span.getAttribute("data-expr");
+        if (origExpr) {
+          const txtNode = document.createTextNode(decodeURIComponent(origExpr));
+          span.replaceWith(txtNode);
+        }
+      });
+      document.querySelectorAll("[data-safeshare-hydrated]").forEach(el => {
+        delete el.dataset.safeshareHydrated;
+      });
+      return;
+    }
+
+    if (symbolicVault.size() === 0) return;
+    const vaultData = symbolicVault.getAll();
+    if (!vaultData || Object.keys(vaultData).length === 0) return;
+
+    // Selector for all assistant message content containers
+    const asstNodes = document.querySelectorAll(
+      "[data-message-author-role='assistant'], [data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td"
+    );
+
+    asstNodes.forEach((node) => {
+      if (node.dataset.safeshareHydrated === "true") return;
+
+      // Check if node is KaTeX with annotation
+      const katexAnnotation = node.querySelector ? node.querySelector("annotation[encoding='application/x-tex']") : null;
+      if (katexAnnotation) {
+        const tex = katexAnnotation.textContent || "";
+        if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs?\d+\b/i.test(tex)) {
+          const res = localCompute.hydrateText(tex, vaultData, true);
+          if (res.computedCount > 0) {
+            sanitizeAndMountHydration(node, res.hydratedText);
+            node.dataset.safeshareHydrated = "true";
+            return;
+          }
+        }
+      }
+
+      const text = node.innerHTML;
+      if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs\d+\b/i.test(text)) {
+        const res = localCompute.hydrateText(text, vaultData, true);
+        if (res.computedCount > 0) {
+          sanitizeAndMountHydration(node, res.hydratedText);
+          node.dataset.safeshareHydrated = "true";
+        }
+      }
+    });
+  }
+
+  /**
    * Hydrates formulas in AI responses with locally computed numbers in client RAM.
    */
   function initLocalHydrationObserver() {
     if (!localCompute || !symbolicVault) return;
 
+    // Run hydration pass immediately on existing elements (e.g. after tab refresh or navigation)
+    runHydrationPass();
+
     const observer = new MutationObserver(() => {
-      if (symbolicVault.size() === 0) return;
-      const vaultData = symbolicVault.getAll();
-
-      // Find assistant text containers including paragraphs, list items, tables cells, headers, and math blocks
-      const asstNodes = document.querySelectorAll(
-        "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] div.math, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message div, .chat-message-assistant p, .chat-message-assistant td"
-      );
-
-      asstNodes.forEach((node) => {
-        if (node.dataset.safeshareHydrated) return;
-        const text = node.innerHTML;
-
-        if (/<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b/i.test(text)) {
-          const res = localCompute.hydrateText(text, vaultData, true);
-          if (res.computedCount > 0) {
-            sanitizeAndMountHydration(node, res.hydratedText);
-            node.dataset.safeshareHydrated = "true";
-          }
-        }
-      });
+      runHydrationPass();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
@@ -454,6 +501,7 @@
   setInterval(() => {
     initSafeShareButton();
     initPreInferenceInterception();
+    runHydrationPass();
   }, 1500);
 
   // Initialize inbound streaming local hydration observer
@@ -463,6 +511,7 @@
   window.addEventListener("safeshare:shield_toggle", (e) => {
     const inputEl = findPromptInputElement();
     if (inputEl) updateShieldIndicator(inputEl);
+    runHydrationPass();
   });
 
   // Extension bridge listener: responds to Web Viewer continuation requests

@@ -247,8 +247,36 @@ Bridge + 20% burn reduction\t0.80 × <S2>\t<S3> + <S1> − 2.40 × <S2>\t<S3> + 
   assert(!extractedForShare.includes("⚡ local"), "Extracted text for share payload MUST NOT contain local badge artifacts!");
   console.log("  [✓] Test 13 Passed: DOM extraction zero-leak invariant verified! Outbound share payload is 100% clean of client RAM secrets!");
 
+  // --- TEST 14: HTML ELEMENT SYMBOL NORMALIZATION (<s18></s18>) ---
+  console.log("\n[Test 14] Testing HTML Element Symbol Normalization (<s18></s18> & <s19></s19>)...");
+  const htmlInput = `Monthly burn: <s19></s19>
+Current SVB cash: <s20></s20>
+Bridge amount: <s18></s18>
+SAFE post-money valuation cap: <s21></s21>
+adds <s18></s18> to cash available for operations.
+Defined cap-based dilution: the ownership impact can be estimated using <s18></s18> / <s21></s21>.
+Incremental runway=<s18></s18> / <s19></s19> months`;
+
+  const safeVault = {
+    "<S18>": { value: 1500000, currency: "USD", raw: "$1,500,000" },
+    "<S19>": { value: 145000, currency: "USD", raw: "$145,000" },
+    "<S20>": { value: 820000, currency: "USD", raw: "$820,000" },
+    "<S21>": { value: 18000000, currency: "USD", raw: "$18M" }
+  };
+
+  const htmlHydratedRes = localCompute.hydrateText(htmlInput, safeVault, true);
+  assert(htmlHydratedRes.hydratedText.includes("$145,000"), "Monthly burn must evaluate to $145,000");
+  assert(htmlHydratedRes.hydratedText.includes("$820,000"), "SVB cash must evaluate to $820,000");
+  assert(htmlHydratedRes.hydratedText.includes("$1,500,000"), "Bridge amount must evaluate to $1,500,000");
+  assert(htmlHydratedRes.hydratedText.includes("$18,000,000"), "Valuation cap must evaluate to $18,000,000");
+  assert(htmlHydratedRes.hydratedText.includes("adds <span"), "adds <s18> must be hydrated as badge");
+  assert(htmlHydratedRes.hydratedText.includes("8.33%"), "dilution ratio must evaluate to 8.33%");
+  assert(htmlHydratedRes.hydratedText.includes("10.34"), "incremental runway must evaluate to 10.34");
+  assert(!htmlHydratedRes.hydratedText.includes("<s18></s18>"), "All <s18> HTML tags must be resolved!");
+  console.log("  [✓] Test 14 Passed: All browser-generated <s18></s18> HTML tags successfully parsed and hydrated into numbers!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 13 PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE AUDITS PASSED 100%!");
+  console.log("   ALL 14 PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE AUDITS PASSED 100%!");
   console.log("================================================================================\n");
 }
 
