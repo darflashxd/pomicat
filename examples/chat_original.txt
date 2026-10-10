@@ -1,0 +1,2 @@
+User: Gaji saya Rp 3.000.000 per bulan. Kalau saya nabung 30%, berapa per bulan dan setahun?
+Assistant: Kalau kamu menabung 30%, itu Rp 900.000 per bulan. Sisanya Rp 2.100.000 untuk kebutuhan bulanan. Dalam setahun terkumpul Rp 10.800.000.

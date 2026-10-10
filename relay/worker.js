@@ -1,21 +1,41 @@
 /**
- * SafeShare-AI — Zero-Knowledge Cloudflare Worker with D1 Database & Static Assets
+ * SafeShare-AI — Cloudflare Worker relay (D1 storage + static viewer)
  * 
  * Features:
- * - 100% Serverless: Runs on Cloudflare Global Edge network across 300+ cities.
- * - 0% Laptop Dependency: Senders and developers can turn off their laptops completely.
- * - Cloudflare D1 SQL Backend: 100k writes/day, 5M reads/day on 100% free tier.
- * - Zero-Knowledge: Only encrypted ciphertext is stored. The decryption key (#) never touches the server.
+ * - Stores ciphertext in Cloudflare D1 (KV fallback); runs without the sender online.
+ * - Server-blind: only ciphertext is stored. The decryption key (#fragment) never reaches the server.
  * - Strict 24-Hour Expiration: Auto-purges expired records via SQL timestamp checks.
  * - Atomic Burn-After-Reading: Single-use links shredded immediately upon first retrieval.
  * - Single-Project Serving: Delivers the Web Viewer static assets directly from edge cache.
  */
 
+// Pages allowed to call the API cross-origin (content-script fallback upload).
+// The viewer is same-origin and the extension background worker is not subject to CORS.
+const ALLOWED_ORIGINS = new Set([
+  "https://chatgpt.com",
+  "https://chat.openai.com",
+  "https://claude.ai",
+  "https://chat.deepseek.com"
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function randomToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const origin = request.headers.get("Origin");
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "null",
+      "Vary": "Origin",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
       "Access-Control-Allow-Headers": "Content-Type",
       "X-Robots-Tag": "noindex, noarchive, nofollow, nosnippet",
@@ -40,7 +60,9 @@ export default {
           });
         }
 
-        if (typeof id !== "string" || id.length > 128) {
+        // The ID is generated client-side (crypto.randomUUID) because it is bound inside the
+        // ciphertext; only accept a real UUID so it stays unguessable.
+        if (typeof id !== "string" || !UUID_RE.test(id)) {
           return new Response(JSON.stringify({ error: "Invalid share ID format" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -66,26 +88,28 @@ export default {
         const now = Date.now();
         const expiresAt = now + (ttlSec * 1000);
 
+        const revokeToken = randomToken();
+        const revokeHash = await sha256Hex(revokeToken);
+        const conflict = () => new Response(JSON.stringify({ error: "Share ID already exists" }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+
         // Store into Cloudflare D1 Database if bound
         if (env.DB) {
-          const existing = await env.DB.prepare(
-            "SELECT id FROM shares WHERE id = ? AND expires_at > ?"
-          ).bind(id, now).first();
-
-          if (existing) {
-            return new Response(JSON.stringify({ error: "Share ID already exists" }), {
-              status: 409,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
+          try {
+            // Plain INSERT: the PRIMARY KEY rejects any attempt to overwrite an existing share.
+            await env.DB.prepare(
+              "INSERT INTO shares (id, ciphertext, created_at, expires_at, burn_on_read, view_count, revoke_hash) VALUES (?, ?, ?, ?, ?, 0, ?)"
+            )
+              .bind(id, ciphertext, now, expiresAt, burnFlag, revokeHash)
+              .run();
+          } catch (e) {
+            if (/UNIQUE|constraint/i.test(e.message)) return conflict();
+            throw e;
           }
 
-          await env.DB.prepare(
-            "INSERT OR REPLACE INTO shares (id, ciphertext, created_at, expires_at, burn_on_read, view_count) VALUES (?, ?, ?, ?, ?, 0)"
-          )
-            .bind(id, ciphertext, now, expiresAt, burnFlag)
-            .run();
-
-          // Lazy background cleanup of expired records (Zero extra cost)
+          // Lazy background cleanup of expired records
           if (ctx && ctx.waitUntil) {
             ctx.waitUntil(
               env.DB.prepare("DELETE FROM shares WHERE expires_at < ?").bind(now).run()
@@ -93,14 +117,10 @@ export default {
           }
         } else if (env.SAFESHARE_KV) {
           const existing = await env.SAFESHARE_KV.get(id);
-          if (existing) {
-            return new Response(JSON.stringify({ error: "Share ID already exists" }), {
-              status: 409,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-          }
+          if (existing) return conflict();
           // Fallback to KV if configured
-          await env.SAFESHARE_KV.put(id, JSON.stringify({ ciphertext, created_at: now, burn_on_read: burnFlag }), {
+          // ponytail: KV get-then-put is not atomic; D1 is the supported backend.
+          await env.SAFESHARE_KV.put(id, JSON.stringify({ ciphertext, created_at: now, burn_on_read: burnFlag, revoke_hash: revokeHash }), {
             expirationTtl: ttlSec
           });
         }
@@ -109,6 +129,7 @@ export default {
           JSON.stringify({
             status: "stored",
             id,
+            revoke_token: revokeToken,
             expires_in: ttlSec,
             expires_at: expiresAt,
             burn_on_read: isBurn
@@ -126,24 +147,38 @@ export default {
       }
     }
 
-    // 2. API: Revoke / Emergency Shred (GET or POST /api/revoke/:id)
+    // 2. API: Revoke (POST /api/revoke/:id with {"token": "<revoke_token from create>"})
     if (url.pathname.startsWith("/api/revoke/")) {
+      const json = (body, status) => new Response(JSON.stringify(body), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+      // POST only: a GET would let link previewers and prefetchers delete shares.
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
       const shareId = url.pathname.replace(/^\/api\/revoke\//, "").trim();
       try {
+        const { token } = await request.json().catch(() => ({}));
+        if (typeof token !== "string" || !token) return json({ error: "Missing revoke token" }, 401);
+        const tokenHash = await sha256Hex(token);
+
+        let deleted = false;
         if (env.DB) {
-          await env.DB.prepare("DELETE FROM shares WHERE id = ?").bind(shareId).run();
+          const res = await env.DB.prepare("DELETE FROM shares WHERE id = ? AND revoke_hash = ?")
+            .bind(shareId, tokenHash).run();
+          deleted = (res.meta?.changes || 0) > 0;
         } else if (env.SAFESHARE_KV) {
-          await env.SAFESHARE_KV.delete(shareId);
+          const raw = await env.SAFESHARE_KV.get(shareId);
+          if (raw && JSON.parse(raw).revoke_hash === tokenHash) {
+            await env.SAFESHARE_KV.delete(shareId);
+            deleted = true;
+          }
         }
-        return new Response(JSON.stringify({ status: "revoked", id: shareId }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
+        // Same response for "wrong token" and "not found" so the endpoint can't probe IDs.
+        if (!deleted) return json({ error: "Not found or invalid token" }, 404);
+        return json({ status: "revoked", id: shareId }, 200);
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
+        return json({ error: err.message }, 500);
       }
     }
 

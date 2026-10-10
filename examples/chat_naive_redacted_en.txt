@@ -1,0 +1,2 @@
+User: My salary is <SALARY> a month. If I save 20%, how much is that per month and per year?
+Assistant: Saving 20% means $1,000 per month, leaving $4,000 for expenses. Over a year that adds up to $12,000.

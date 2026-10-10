@@ -14,7 +14,7 @@ from optimum.onnxruntime.configuration import AutoQuantizationConfig
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_INPUT_DIR = os.path.join(BASE_DIR, "model_output", "best_model")
-ONNX_OUTPUT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "extension", "models", "onnx"))
+ONNX_OUTPUT_DIR = os.path.join(BASE_DIR, "model_output", "onnx")  # not shipped in the extension
 
 
 def export_and_quantize():

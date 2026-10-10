@@ -1,7 +1,7 @@
 /**
  * SafeShare-AI — Modal Controller (Calm Security with User-Controlled Redaction)
  * Coordinates the 3-Tier Redaction Pipeline, Granular Customization Engine,
- * and Zero-Knowledge Encryption Flow.
+ * and end-to-end encrypted sharing flow.
  */
 
 const SS_CATEGORIES = {
@@ -83,7 +83,7 @@ class SafeShareModal {
             </div>
             <div>
               <div class="safeshare-title">Share Privately</div>
-              <div class="safeshare-version-tag">Zero-Knowledge Enclave</div>
+              <div class="safeshare-version-tag">End-to-end encrypted</div>
             </div>
           </div>
           <button class="safeshare-close-btn" id="safeshare-close-btn" aria-label="Close modal">
@@ -213,19 +213,20 @@ class SafeShareModal {
           </div>
           <h3 class="result-title">Private link ready</h3>
           <p class="result-desc">
-            End-to-end encrypted with AES-256-GCM. The decryption key exists solely in the URL fragment and never touches server logs.
+            Encrypted with AES-256-GCM in your browser. The key is in the URL fragment, which browsers never send to the server.
           </p>
 
           <div class="result-url-box">
             <div class="result-url-text" id="result-url-display">https://...</div>
             <button class="btn-copy-url" id="btn-copy-url">Copy Link</button>
+            <button class="btn-copy-url" id="btn-revoke-url" style="display: none;">Revoke</button>
           </div>
 
           <div class="result-meta-notice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            <span>Search engine crawl-immune & anti-scraping protected</span>
+            <span>Server and search engines only see ciphertext. Anyone with the full link can read it.</span>
           </div>
         </div>
 
@@ -902,6 +903,7 @@ class SafeShareModal {
         };
 
         let uploaded = false;
+        let revokeToken = null;
 
         // Auto-retry wake-up loop for privileged background script
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -933,6 +935,7 @@ class SafeShareModal {
 
             if (response && response.success) {
               uploaded = true;
+              revokeToken = response.data && response.data.revoke_token;
               break;
             } else {
               throw new Error((response && response.error) || "Relay upload returned unsuccessful");
@@ -955,6 +958,7 @@ class SafeShareModal {
             });
             if (uploadRes.ok) {
               uploaded = true;
+              revokeToken = (await uploadRes.json()).revoke_token;
             }
           } catch (fetchErr) {
             console.warn("[SafeShare] Direct edge fetch fallback failed:", fetchErr);
@@ -982,6 +986,24 @@ class SafeShareModal {
           copyBtn.innerText = "Copied! ✓";
           setTimeout(() => (copyBtn.innerText = "Copy Link"), 2500);
         };
+
+        // Revoke button. ponytail: the token only lives in this modal; persist it in
+        // extension storage if users need to revoke after closing the dialog.
+        const revokeBtn = document.getElementById("btn-revoke-url");
+        if (revokeToken) {
+          revokeBtn.style.display = "";
+          revokeBtn.onclick = async () => {
+            const api = typeof browser !== "undefined" ? browser : chrome;
+            const res = await api.runtime.sendMessage({
+              action: "REVOKE_SHARE",
+              relayUrl,
+              shareId: encResult.shareId,
+              token: revokeToken
+            });
+            revokeBtn.innerText = res && res.success ? "Revoked ✓" : "Revoke failed";
+            revokeBtn.disabled = !!(res && res.success);
+          };
+        }
       } catch (err) {
         console.error("[SafeShare] Encryption error:", err);
         btn.innerText = "Error Encrypting";

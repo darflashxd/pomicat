@@ -327,7 +327,7 @@ async function runComparativeBenchmark() {
 }
 
 function generateMarkdownReport(scenarioCount, metrics) {
-  const reportPath = path.join(__dirname, "..", "BENCHMARK_COMPARATIVE_REPORT.md");
+  const reportPath = path.join(__dirname, "..", "docs", "archive", "BENCHMARK_COMPARATIVE_REPORT.md");
 
   const tableRows = metrics.map(m => {
     return `| **${m.engine}** | **${m.ser}** | **${m.udr}** | **${m.dalr}** | **${m.f1}** | ${m.latency} | ${m.ram} |`;

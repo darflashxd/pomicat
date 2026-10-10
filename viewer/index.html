@@ -67,13 +67,13 @@
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               <polyline points="9 12 11 14 15 10"/>
             </svg>
-            <span>Verified Enclave</span>
+            <span>Integrity checked (AES-GCM)</span>
           </div>
         </div>
 
         <!-- Subtle Watermark Notice (Quiet & Unobtrusive) -->
         <div id="forensic-notice-banner" class="forensic-banner">
-          <span>Protected view · Traceable export</span>
+          <span>Copy deterrence on · not copy protection</span>
           <span id="forensic-meta-tag" class="forensic-tag">Recipient: Active</span>
         </div>
 
@@ -122,7 +122,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            <span>Security Guarantees</span>
+            <span>What this page does and does not protect</span>
           </div>
           <button id="btn-close-security-modal" class="dialog-close" aria-label="Close dialog">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
@@ -137,8 +137,8 @@
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             <div>
-              <strong style="color: var(--text-primary); font-size: 13px;">Zero-Knowledge Client Decryption</strong>
-              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Data is decrypted inside your browser memory with AES-256-GCM. The decryption key never reaches any server.</div>
+              <strong style="color: var(--text-primary); font-size: 13px;">Decrypted in your browser</strong>
+              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">AES-256-GCM. The key is in the link's #fragment, which browsers do not send to the server. Anyone holding the full link can read this page.</div>
             </div>
           </li>
           <li>
@@ -146,8 +146,8 @@
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             <div>
-              <strong style="color: var(--text-primary); font-size: 13px;">Crawler & Indexer Immune</strong>
-              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Search bots only receive encrypted ciphertext and cannot index conversation contents.</div>
+              <strong style="color: var(--text-primary); font-size: 13px;">Not indexable</strong>
+              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Crawlers that see the link without the #fragment only get ciphertext. Links can expire, burn after one read, or be revoked by the sender.</div>
             </div>
           </li>
           <li>
@@ -155,8 +155,8 @@
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             <div>
-              <strong style="color: var(--text-primary); font-size: 13px;">Memory Zeroing & Anti-Scraping</strong>
-              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Active tamper guard immediately purges plaintexts from RAM upon unauthorized inspection.</div>
+              <strong style="color: var(--text-primary); font-size: 13px;">Copy deterrence (not protection)</strong>
+              <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Glyph scrambling, an invisible watermark and a DevTools check make casual copying harder. A screenshot defeats all of them: once text is on screen, the reader can keep it.</div>
             </div>
           </li>
         </ul>
@@ -165,7 +165,7 @@
 
     <!-- Footer -->
     <footer class="viewer-footer">
-      <div>SafeShare · Zero-Knowledge AI Privacy</div>
+      <div>SafeShare · end-to-end encrypted AI chat sharing</div>
       <div class="viewer-footer-links">
         <a href="https://github.com" target="_blank" rel="noopener">Open Source</a>
         <span>·</span>

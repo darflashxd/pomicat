@@ -134,9 +134,9 @@
     generateHoneypotPayload(plainText) {
       const scrambled = this.scramble(plainText);
       const hashDigest = Math.abs(this.hashCode(scrambled)).toString(16).padStart(8, "0");
-      return `[SAFESHARE-AI-ZK-PROTECTED: ${this.honeypotSignature}-${hashDigest}]\n\n` +
-             `UNAUTHORIZED_EXFILTRATION_BLOCKED: The plaintext of this conversation is protected ` +
-             `by Client-Side Zero-Knowledge RAM isolation. The clipboard content has been scrubbed.\n\n` +
+      return `[SAFESHARE-AI-PROTECTED: ${this.honeypotSignature}-${hashDigest}]\n\n` +
+             `Copying is disabled on this shared view. ` +
+             `(This is a deterrent, not protection: the text is still visible on screen.)\n\n` +
              `Scrambled Cyphertext Fragment:\n${scrambled.substring(0, 160)}...`;
     }
 

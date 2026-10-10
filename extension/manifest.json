@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SafeShare-AI Privacy Guard",
-  "version": "2.1.0",
-  "description": "AST-aware contextual PII redactor and Zero-Knowledge ephemeral sharing extension for ChatGPT, Claude, and DeepSeek.",
+  "version": "2.2.0",
+  "description": "Redacts sensitive data from AI chats before sharing and creates end-to-end encrypted, expiring share links. Works on ChatGPT, Claude and DeepSeek.",
   "permissions": [
     "storage",
     "clipboardWrite"
@@ -16,7 +16,9 @@
     "https://*.pages.dev/*"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
@@ -51,7 +53,9 @@
       "id": "safeshare@research.local",
       "strict_min_version": "109.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },

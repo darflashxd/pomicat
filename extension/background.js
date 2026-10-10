@@ -43,4 +43,16 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return true; // Required by Chrome MV3 to keep message channel open asynchronously
   }
+
+  if (request.action === "REVOKE_SHARE") {
+    const { relayUrl, shareId, token } = request;
+    fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token })
+    })
+      .then((response) => sendResponse({ success: response.ok }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
 });

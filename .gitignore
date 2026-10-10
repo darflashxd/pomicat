@@ -2,11 +2,14 @@
 # SafeShare-AI — Production .gitignore
 # ==============================================================================
 
-# 1. Knowledge Graphs & Graphify (STRICT: Never commit to git)
+# 1. AI tooling: knowledge graphs (graphify) and Claude / agent config (never commit)
 graphify-out/
 **/graphify-out/
 .graphify*
 **/.graphify*
+.claude/
+CLAUDE.md
+CLAUDE.local.md
 
 # 2. Python Environments & Caches
 venv/
@@ -21,7 +24,7 @@ dist/
 build/
 
 # 3. Model Weights & Large Checkpoints (>100MB violates GitHub limits)
-# Note: Model weights are distributed via Google Drive (see MODELS_SETUP.md)
+# Model weights are not in git (see MODELS_SETUP.md)
 *.onnx
 *.safetensors
 *.pt
@@ -60,3 +63,14 @@ Thumbs.db
 .opencode/
 *.swp
 *.swo
+
+# 8. Generated data and build outputs
+# Regenerate with: python data/generate_dataset.py (seeded, byte-identical output)
+data/train.json
+data/val.json
+data/test.json
+# Extension builds go to GitHub Releases, not git
+*.zip
+*.xpi
+.venv-*/
+tools/eval/data/

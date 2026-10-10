@@ -4,7 +4,7 @@
  * without ever executing eval() or new Function().
  * 
  * Guarantees:
- * 1. Absolute security: Pure Dijkstra Shunting-Yard RPN parser (XSS/Injection immune).
+ * 1. No eval(): a shunting-yard RPN parser, so expressions cannot run code.
  * 2. Deterministic execution: Handles operators (+, -, *, /, ^, %), parentheses, and variables (<S1>, S1).
  * 3. Formatted hydration: Formats results into target currency/locale (IDR, USD, EUR, GBP).
  */

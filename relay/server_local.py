@@ -2,15 +2,18 @@
 """
 SafeShare-AI — Local Serverless & Static Relay Daemon
 Provides:
-1. REST API: Store & Retrieve Zero-Knowledge Ciphertext
+1. REST API: store and retrieve ciphertext (the key never reaches the server)
 2. Atomic Burn-After-Reading: Shreds payload immediately on single read
 3. Static Web Server: Hosts the Web Viewer and Enclave Engines locally
 4. Port: 8787
 """
 
 import os
+import re
 import json
 import time
+import hashlib
+import secrets
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = 8787
@@ -39,11 +42,21 @@ def save_storage(data):
 
 STORAGE = load_storage()
 
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+ALLOWED_ORIGINS = {
+    "https://chatgpt.com",
+    "https://chat.openai.com",
+    "https://claude.ai",
+    "https://chat.deepseek.com",
+}
+
 
 class SafeShareHandler(BaseHTTPRequestHandler):
     def _send_cors(self, status=200, content_type="application/json"):
         self.send_response(status)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        self.send_header("Access-Control-Allow-Origin", origin if origin in ALLOWED_ORIGINS else "null")
+        self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("X-Robots-Tag", "noindex, noarchive, nofollow")
@@ -85,24 +98,25 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "Missing id or ciphertext"}).encode())
                     return
 
-                if len(share_id) > 128:
+                if not UUID_RE.match(share_id):
                     self._send_cors(400)
-                    self.wfile.write(json.dumps({"error": "Invalid share id length"}).encode())
+                    self.wfile.write(json.dumps({"error": "Invalid share ID format"}).encode())
                     return
 
-                # Prevent arbitrary collision / overwrite of active existing share
+                # Never overwrite an existing share, expired or not
                 now_ts = time.time()
-                existing = STORAGE.get(share_id)
-                if existing and existing.get("expires_at", 0) > now_ts:
+                if share_id in STORAGE:
                     self._send_cors(409)
                     self.wfile.write(json.dumps({"error": "Share ID already exists"}).encode())
                     return
 
                 is_burn = bool(burn_on_read) or ttl == "burn"
                 ttl_sec = 86400 if ttl == "burn" else int(ttl)
+                revoke_token = secrets.token_hex(32)
 
                 STORAGE[share_id] = {
                     "ciphertext": ciphertext,
+                    "revoke_hash": hashlib.sha256(revoke_token.encode()).hexdigest(),
                     "is_burn": is_burn,
                     "expires_at": now_ts + ttl_sec,
                     "view_count": 0
@@ -113,6 +127,7 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     "status": "stored",
                     "id": share_id,
+                    "revoke_token": revoke_token,
                     "burn_on_read": is_burn
                 }).encode())
                 print(f"[+] Stored encrypted payload for ID: {share_id} (Burn: {is_burn})")
@@ -137,12 +152,21 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self._send_cors(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
         elif self.path.startswith("/api/revoke/"):
-            # Also support POST /api/revoke/:id
             share_id = self.path.replace("/api/revoke/", "").strip()
-            if share_id in STORAGE:
-                del STORAGE[share_id]
-                save_storage(STORAGE)
-                print(f"[!] REVOKE (POST): Shredded payload for ID: {share_id}")
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                token = json.loads(self.rfile.read(length) or b"{}").get("token", "")
+            except Exception:
+                token = ""
+            item = STORAGE.get(share_id)
+            token_hash = hashlib.sha256(str(token).encode()).hexdigest()
+            if not token or not item or not secrets.compare_digest(item.get("revoke_hash", ""), token_hash):
+                self._send_cors(404)
+                self.wfile.write(json.dumps({"error": "Not found or invalid token"}).encode())
+                return
+            del STORAGE[share_id]
+            save_storage(STORAGE)
+            print(f"[!] REVOKE: Shredded payload for ID: {share_id}")
             self._send_cors(200)
             self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
         else:
@@ -177,15 +201,10 @@ class SafeShareHandler(BaseHTTPRequestHandler):
         global STORAGE
         clean_path = self.path.split("?")[0].split("#")[0]
 
-        # 0. REST API: Revoke / Shred payload on security tamper
+        # Revoke is POST-only so link previewers and prefetchers can't delete shares
         if clean_path.startswith("/api/revoke/"):
-            share_id = clean_path.replace("/api/revoke/", "").strip()
-            if share_id in STORAGE:
-                del STORAGE[share_id]
-                save_storage(STORAGE)
-                print(f"[!] EMERGENCY REVOKE (GET): Shredded payload for ID: {share_id}")
-            self._send_cors(200)
-            self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
+            self._send_cors(405)
+            self.wfile.write(json.dumps({"error": "Method not allowed"}).encode())
             return
 
         # 1. REST API: Get encrypted payload

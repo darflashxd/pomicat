@@ -71,7 +71,8 @@ class HeuristicsRedactor {
         id: "SWIFT_BIC",
         name: "SWIFT / BIC Banking Code",
         category: "CREDENTIALS",
-        regex: /\b((?:(?:swift(?:\s+code|\s+bic)?|bic)\s*[:=\-]?\s*))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/gi,
+        // Code must be uppercase and separated from the keyword ("swift movement", "bicarbonate" are not codes)
+        regex: /\b((?:(?:[Ss][Ww][Ii][Ff][Tt](?:\s+[Cc][Oo][Dd][Ee]|\s+[Bb][Ii][Cc])?|[Bb][Ii][Cc])(?:\s*[:=\-]\s*|\s+)))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g,
         replacement: "$1[REDACTED_SWIFT_BIC]"
       },
       // 2. Credit Card Numbers (13-19 digits with Luhn verification & Fail-Closed Context Fallback)
@@ -81,6 +82,8 @@ class HeuristicsRedactor {
         category: "FINANCIAL",
         regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{13,19}\b/g,
         validator: (raw, index, text) => {
+          // Digits inside a DOI or URL path are identifiers, not cards
+          if (text && /(?:doi\.org\/|\b10\.\d{4,9}\/|https?:\/\/)\S*$/i.test(text.substring(Math.max(0, index - 120), index))) return false;
           if (this.luhnCheck(raw)) return true;
           // Fail-closed fallback: if Luhn fails, but surrounding context explicitly indicates a card number, redact it!
           if (text) {
@@ -121,7 +124,7 @@ class HeuristicsRedactor {
         id: "UNIVERSAL_RECORD_IDENTIFIER",
         name: "Account / Record Identifier",
         category: "FINANCIAL",
-        regex: /\b((?:(?:checking|savings|bank|loan|credit|mortgage|deposit)\s+account(?:\s+number)?|(?:(?:account|acct|loan|policy|claim|member|group|booking|pnr|e-?ticket|record|case|docket|invoice|order|tracking)(?:\s+(?:#|id|number|no\.?|code|reference|\bref\b))?)|(?:sofi|wf|wells\s+fargo|chase|citi|bofa|aetna|cigna|united|metlife)\s+(?:account|loan|policy))\s*(?:[:=\-]|is)?\s*#?)([A-Za-z0-9]{1,8}[-_/][A-Za-z0-9_-]{4,24}|1Z[0-9A-Z]{16}|[0-9]{6,18}|(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,12})\b/gi,
+        regex: /\b((?:(?:checking|savings|bank|loan|credit|mortgage|deposit)\s+account(?:\s+number)?|(?:(?:account|acct|loan|policy|claim|member|group|booking|pnr|e-?ticket|record|case|docket|invoice|order|tracking)(?:\s+(?:#|id|number|no\.?|code|reference|\bref\b))?)|(?:sofi|wf|wells\s+fargo|chase|citi|bofa|aetna|cigna|united|metlife)\s+(?:account|loan|policy))\s*(?:[:=\-]|is)?\s*#?)((?=[A-Za-z_/-]*\d)[A-Za-z0-9]{1,8}[-_/][A-Za-z0-9_-]{4,24}|1Z[0-9A-Z]{16}|[0-9]{6,18}|(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,12})\b/gi,
         validator: (raw, index, text) => {
           const clean = raw.trim();
           if (/^(?:active|pending|closed|open|true|false|none|null|undefined|ready)$/i.test(clean)) return false;
@@ -629,7 +632,8 @@ class HeuristicsRedactor {
         id: "US_PLATE",
         name: "US/International License Plate",
         category: "PROFILE",
-        regex: /\b((?:(?:license\s+plate|plate(?:\s+number)?)\s*[:=\-~]?(?:\s*is)?\s*))([A-Z0-9]{5,8})\b/gi,
+        // At least one digit, so "Plate count method" is not a plate
+        regex: /\b((?:(?:license\s+plate|plate(?:\s+number)?)\s*[:=\-~]?(?:\s*is)?\s*))((?=[A-Z]*\d)[A-Z0-9]{5,8})\b/gi,
         replacement: "$1[REDACTED_LICENSE_PLATE]"
       },
       // 16u. Vehicle Identification Number (VIN - 17 alphanumeric ISO 3779 standard)
@@ -753,7 +757,7 @@ class HeuristicsRedactor {
         regex: /┌──\(([a-zA-Z0-9._-]+)㉿([a-zA-Z0-9._-]+)\)-\[([~/\w\s\p{L}.-]*)\](?:\s*[\r\n]+\s*└─[\$#])?/gu,
         replacement: "┌──([user]㉿[host])-[~/[sandbox_path]]\n└─$"
       },
-      // 14. Modern Zsh / Powerline Prompt (e.g. Mon 28 Sep - 18:24  ~  @darflashxd )
+      // 14. Modern Zsh / Powerline Prompt (e.g. Mon 28 Sep - 18:24  ~  @jdoe_dev )
       {
         id: "POWERLINE_ZSH_PROMPT",
         name: "Powerline & Modern Zsh Prompt",
@@ -806,7 +810,8 @@ class HeuristicsRedactor {
         id: "WHOAMI_USER_OUTPUT",
         name: "Whoami or USER Command Output",
         category: "SYSTEM",
-        regex: /((?:\bwhoami|\$USER)(?:\s*[:=>\->]+\s*|\s+))([a-zA-Z0-9._-]+)\b/gi,
+        // Case-sensitive: $USER is the shell variable, $user is a PHP/Perl variable
+        regex: /((?:\b[Ww][Hh][Oo][Aa][Mm][Ii]|\$USER)(?:\s*[:=>\->]+\s*|\s+))([a-zA-Z0-9._-]+)\b/g,
         replacement: "$1[user]"
       },
       // 21. Internal Hostname user@host (Non-TLD, developer handles)
@@ -814,7 +819,8 @@ class HeuristicsRedactor {
         id: "UNIX_USER_HOST",
         name: "Internal User & Hostname",
         category: "SYSTEM",
-        regex: /\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9_-]+)(?!\.[a-zA-Z]{2,})\b/g,
+        // Host must contain a letter: CSS "wght@400" or "pkg@1" are not user@host
+        regex: /\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9_-]*[a-zA-Z][a-zA-Z0-9_-]*)(?!\.[a-zA-Z]{2,})\b/g,
         replacement: "[user]@[host]"
       },
       // 22. User Home Directory Paths (Linux / macOS / Windows)
@@ -974,6 +980,10 @@ class HeuristicsRedactor {
       while ((match = regex.exec(text)) !== null) {
         const raw = match[0];
         if (pattern.validator && !pattern.validator(raw, match.index, text)) {
+          continue;
+        }
+        // Purely numeric matches inside a URL or DOI are identifiers (doi.org/10.1128/..., /posts/123...)
+        if (/^[\d\s.\-\/]+$/.test(raw) && /(?:https?:\/\/|doi\.org\/|www\.)\S*$/i.test(text.substring(Math.max(0, match.index - 200), match.index))) {
           continue;
         }
 

@@ -1,32 +1,28 @@
 {
   "name": "safeshare-ai",
-  "version": "2.1.0",
-  "description": "Client-Side Zero-Knowledge Privacy Guard & Algebraic Reconstruction Defense for Generative AI Chats",
-  "main": "extension/content_script.js",
+  "version": "2.2.0",
+  "description": "Redacts sensitive data from AI chat transcripts, blocks algebraic recovery of redacted numbers, and shares the result as an end-to-end encrypted link.",
+  "main": "bin/safeshare.js",
+  "bin": {
+    "safeshare": "bin/safeshare.js"
+  },
+  "files": [
+    "bin/",
+    "extension/engine/heuristics.js",
+    "extension/engine/contextual.js",
+    "extension/engine/pseudonymizer.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js && node test_adversarial_vulnerabilities_audit.js && node test_privacybench_ood.js && node test_multiturn_live_scenarios.js && node test_universal_domain_invariance.js && node test_symbolic_local_compute.js && node test_blackhat_global_pii_adversarial_suite.js && node test_real_world_global_pii_stress.js && node test_blackhat_deep_adversarial_vulnerabilities.js",
-    "test:all": "node test_edge_cases.js && node test_de_jembras_benchmark.js && node test_v3_extreme_stress.js && node test_uncopyable_audit.js && node test_financial_international_suite.js && node test_comprehensive_international_suite.js && node test_adversarial_vulnerabilities_audit.js && node test_privacybench_ood.js && node test_multiturn_live_scenarios.js && node test_universal_domain_invariance.js && node test_symbolic_local_compute.js && node test_real_chatgpt_output.js && node test_extreme_stress_cases.js && node test_casual_chat_stress.js && node autonomous_deep_audit.js && node test_blackhat_global_pii_adversarial_suite.js && node test_real_world_global_pii_stress.js && node test_blackhat_deep_adversarial_vulnerabilities.js",
-    "test:deep": "node test_blackhat_deep_adversarial_vulnerabilities.js",
+    "test": "node tests/run_all.js",
     "benchmark": "node tools/benchmark_comparative.js",
-    "test:realpii": "node test_real_world_global_pii_stress.js",
-    "test:blackhat": "node test_blackhat_global_pii_adversarial_suite.js",
-    "test:symbolic": "node test_symbolic_local_compute.js",
-    "test:universal": "node test_universal_domain_invariance.js",
-    "test:multiturn": "node test_multiturn_live_scenarios.js",
-    "test:privacybench": "node test_privacybench_ood.js",
-    "test:adversarial": "node test_adversarial_vulnerabilities_audit.js",
-    "test:comprehensive": "node test_comprehensive_international_suite.js",
-    "test:financial": "node test_financial_international_suite.js",
-    "test:jembras": "node test_de_jembras_benchmark.js",
-    "test:stress": "node test_v3_extreme_stress.js",
-    "test:enclave": "node test_uncopyable_audit.js",
-    "test:edge": "node test_edge_cases.js",
-    "test:audit": "node autonomous_deep_audit.js",
-    "relay:local": "python3 relay/server_local.py"
+    "relay:local": "python relay/server_local.py",
+    "demo": "node bin/safeshare.js invert examples/chat_naive_redacted.txt"
   },
   "keywords": [
     "privacy",
-    "zero-knowledge",
     "aes-gcm",
     "llm-security",
     "blackhat-arsenal",
@@ -34,12 +30,13 @@
     "data-redaction",
     "algebraic-reconstruction",
     "chrome-extension",
-    "firefox-addon"
+    "firefox-addon",
+    "e2e-encryption"
   ],
-  "author": "SafeShare-AI Research Team",
+  "author": "SafeShare-AI contributors",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/darflashxd/safeshare-ai.git"
+    "url": "https://github.com/darflashxd/safeshare.git"
   }
 }

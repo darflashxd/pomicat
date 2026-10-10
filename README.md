@@ -1,188 +1,180 @@
-# SafeShare-AI 🛡️
+# SafeShare
 
-> **Client-Side Zero-Knowledge Privacy Guard & Algebraic Reconstruction Defense for Generative AI Chats**  
-> *Targeted for Black Hat Asia 2027 Arsenal & Academic Peer-Reviewed Publications*
+Redaction leaks. SafeShare finds what the redaction left behind.
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Manifest](https://img.shields.io/badge/Manifest-V3_Compliant-success.svg)](extension/manifest.json)
-[![Cryptography](https://img.shields.io/badge/Crypto-AES--256--GCM_WebCrypto-critical.svg)](extension/engine/crypto.js)
-[![Edge Relay](https://img.shields.io/badge/Relay-Cloudflare_D1_Serverless-orange.svg)](relay/worker.js)
-[![Audit](https://img.shields.io/badge/Security_Audit-100%25_Passed-brightgreen.svg)](AUDIT_BENCHMARK_REPORT.md)
+When you share an AI chat, removing the obvious secret is not enough. If you redact your salary
+but the assistant's answer still says "saving 30% gives Rp 900.000 a month, Rp 10.800.000 a
+year", anyone can work the salary back out: 10.800.000 / 12 / 30% = 3.000.000.
 
----
+SafeShare is three things:
 
-## 1. The Core Problem: The Public AI Share Link Crisis (2023–2026)
+1. **An inversion attack** (`safeshare invert`) that recovers hidden numbers from chats that were
+   already redacted by any tool.
+2. **A redactor** that removes personal data and the derived numbers that would give it away,
+   for ChatGPT, Claude and DeepSeek (browser extension) or any text (CLI, proxy).
+3. **An encrypted share link.** The chat is encrypted in your browser with AES-256-GCM, and the
+   key stays in the URL `#fragment`, which browsers do not send to the server. Links expire,
+   can burn after one read, and can be revoked.
 
-Across major consumer Large Language Model (LLM) platforms (**ChatGPT, Claude, Grok, Google Gemini, DeepSeek**), the native *"Share Conversation Link"* feature has repeatedly led to massive exposure of private user data:
-* **Unauthenticated Public URLs:** Shared conversation links are public web pages. Commercial search engines (Googlebot, Bingbot) and archive crawlers index these URLs automatically.
-* **Massive Sensitive Data Exposure:** Tens of thousands of private chats containing developer API keys, database credentials, psychiatric medical records, tax IDs, and confidential salaries have been indexed publicly.
-* **Vendor Reactive `noindex` Fallacy:** Vendors only slapped `<meta name="robots" content="noindex">` after public leaks went viral. However, `noindex` only stops search results listing; **it never encrypts the document**. Anyone or any bot possessing the link can read, scrape, and archive it freely.
-* **The Algebraic Inversion Attack:** Naive redaction simply replaces a secret with `[REDACTED]`. However, when an AI assistant calculates derived metrics (e.g., 30% savings rate, 1-year accumulation of Rp 10.8M, multi-year timelines), an attacker easily performs mathematical inversion:
-  $$\text{Original Salary} = \frac{\text{Rp } 10.800.000 / 12}{30\%} = \mathbf{\text{Rp } 3.000.000}$$
-  The original secret is completely recovered through the back door!
+![demo](docs/demo.gif)
 
-**SafeShare-AI** solves this fundamentally by providing a **zero-knowledge, client-side browser enclave** that purges sensitive entities before prompts leave the client, blocks mathematical inversion, and encrypts chats end-to-end such that intermediaries and search engines are mathematically blind (**server-blind**).
-
----
-
-## 2. Six-Tier Defense-in-Depth Architecture
-
-```text
-[Raw Conversation Input (ChatGPT / Claude / DeepSeek)]
-                       │
-                       ▼
-[Tier 1: Deterministic Heuristic Scanner] (<2ms, deterministic regex)
-├── Indonesian NIK / KTP (16 digits calendar & region verified)
-├── Credit Cards (Luhn Algorithm checksum verification)
-├── Official IDs: NPWP Tax ID, Indonesian Passport, BPJS Kesehatan/TK, SIM Driver License
-├── Academic Identifiers: NIM / NPM / NRP / Student ID
-├── API Keys & Credentials: OpenAI, Stripe live keys, GitHub tokens, AWS keys, JWT
-├── Database URIs: postgresql://, mysql://, redis:// with passwords
-├── High-Entropy Secrets: EVM Wallets (0x...), BIP-39 12-Word Seed Phrases, Linux /etc/shadow Hashes
-└── Terminal Shell Prompts: Zsh Powerline (@user ), Kali Linux, macOS (%), Windows CMD/PS, Git Author, SSH Keys
-                       │
-                       ▼
-[Tier 2: Contextual Integrity AI] (Multilingual DistilBERT)
-├── Fine-tuned on GPU RTX 4060 across 62,000 contrastive bilingual samples
-├── Distinguishes 1st-person private disclosures ("my salary", "gaji saya") vs.
-│   Public aggregate benchmarks ("Indeed average salary", "Glassdoor median")
-└── Zero False Positive on technical code syntax, CTF assembly, and public market research
-                       │
-                       ▼
-[Tier 3: Canonical Equivalence & Adversary-Oracle Solver]
-├── Universal Numeric Lexer: Normalizes Indonesian & English numerals (10.8M, 10,8 juta, 45 jeti)
-├── Adversary-Oracle Loop: Simulates attacker inversion using periodic constants (12, 24, 36, 60 months)
-├── Scale-Free Utility Preservation: Preserves safe scale-free ratios (30%, 40%) while suppressing unsafe absolute sums
-└── Whole-Token Span Slicing: Eliminates regex substring mangling (no Rp32.[REDACTED] artifacts)
-                       │
-                       ▼
-[Tier 4: Zero-Knowledge Client Cryptography] (AES-256-GCM)
-├── Encrypted in client browser RAM using W3C WebCrypto SubtleCrypto (256-bit key + 96-bit random IV)
-└── Decryption key placed EXCLUSIVELY in the URL Hash Fragment (#key) RFC 3986 (Server & Googlebot blind)
-                       │
-                       ▼
-[Tier 5: Cloudflare Global Edge & D1 Serverless Storage]
-├── Runs serverlessly across 300+ edge cities (0% sender laptop dependency)
-├── Cloudflare D1 SQL storage with configurable TTL (24 hours, 3 days, 7 days)
-└── Atomic Burn-After-Reading (Single-use links shredded immediately on first view)
-                       │
-                       ▼
-[Tier 6: Post-Decryption Enclave & Traitor Tracing]
-├── Dynamic Glyph Scrambling: Deranges character glyphs to defeat DOM text scraping
-├── Forensic Steganography: Invisible zero-width Unicode HMAC for non-repudiation and traitor tracing
-├── Active Tamper Guard: Instantly zeroizes RAM and shreds URL hash if DevTools/debugger is triggered
-└── Universal 1-Click Continue: Bridges sanitized prompts directly to fresh ChatGPT/Claude tabs with zero clipboard leak
-```
-
----
-
-## 3. Quickstart: Installation & Usage
-
-### A. End-User Browser Extension (Chrome / Brave / Firefox)
-The extension package is **100% self-contained** (~70 KB) and requires no local servers or model downloads for normal end-users:
-
-#### Google Chrome / Brave / Edge:
-1. Download or clone this repository.
-2. Open your browser and navigate to `chrome://extensions` (or `brave://extensions`).
-3. Enable **"Developer mode"** in the top-right corner.
-4. Click **"Load unpacked"** and select the `extension/` directory.
-5. Open ChatGPT (`chatgpt.com`), Claude (`claude.ai`), or DeepSeek (`chat.deepseek.com`). SafeShare will automatically monitor and sanitize outgoing shared prompts.
-
-#### Mozilla Firefox:
-1. Navigate to `about:debugging#/runtime/this-firefox`.
-2. Click **"Load Temporary Add-on..."** and select `extension/manifest.json`.
-
----
-
-### B. Running Local Zero-Knowledge Relay & Viewer (Offline Testing)
-If you wish to host the relay and web viewer locally without relying on Cloudflare Edge:
-```bash
-# Launch the local serverless relay daemon on port 8787
-npm run relay:local
-# Or directly via Python:
-python3 relay/server_local.py
-```
-Open `http://localhost:8787` in your browser. The web viewer will load with the local zero-knowledge decryption engine.
-
----
-
-## 4. Empirical Security Benchmarks & Automated Tests
-
-SafeShare-AI includes an extensive suite of automated test scripts covering edge cases, adversarial stress tests, and real-world failure benchmarks:
+## Try the attack
 
 ```bash
-# Run the core test suite:
-npm test
-
-# Run all 8 test suites & comprehensive deep audits:
-npm run test:all
+git clone https://github.com/darflashxd/safeshare && cd safeshare
+node bin/safeshare.js invert examples/chat_naive_redacted.txt
 ```
 
-### Specific Benchmark Suites:
-* **`npm run test:privacybench`** — Evaluates the **SafeShare-PrivacyBench Out-of-Distribution (OOD)** human conversational benchmark to compute formal cybersecurity metrics: Secret Exposure Rate (SER), Utility Degradation Rate (UDR), and human detection recall.
-* **`npm run test:adversarial`** — Tests 10 advanced adversarial evasion vectors: zero-width character evasion (\u200B in API keys), obfuscated/defanged emails ([at]/[dot]), email sign-off closing names, raw 9-digit SSN, international passports, multi-chain crypto (Solana Base58, Bitcoin Bech32), DevSecOps .env/YAML password blocks, HTTP Basic Auth Base64 headers, Indian Tech LPA compensation, and anti-over-redaction on general English "project management".
-* **`npm run test:comprehensive`** — Evaluates 37 extensive multi-domain adversarial English scenarios across Cybersecurity/DevOps (Anthropic Claude keys, GCP API keys, HuggingFace, NPM, WireGuard, curl basic auth), Healthcare/HIPAA (psychotropics, oncology staging, clinical MDD transcripts), Workplace/HR (PIPs, Title VII harassment, unannounced NDA codenames), and unexpected edge cases (Markdown tables, code comments, obfuscated PII).
-* **`npm run test:financial`** — Evaluates international financial PII, Silicon Valley executive tech compensation (TC, base, RSUs, ISO strike price), direct banking (US SSN, EIN, ABA routing number, IBAN, SWIFT/BIC), GAAP parentheses negative numbers, corporate burn rates, and macroeconomic zero-false-positive controls.
-* **`npm run test:jembras`** — Tests the real-world **De Jembras** case study: verifies multi-year algebraic accumulation suppression (Rp 10.8M, 21.6M, 54M) while preserving scale-free percentages (30%, 40%) and key-value form delimiters (`name :`, `NIM :`).
-* **`npm run test:stress`** — Runs 16 out-of-the-box V3 extreme stress vectors (Indonesian NPWP, Passport, SIM, BPJS, EVM wallet, BIP-39 mnemonic, Stripe secret keys, Linux shadow hashes, Kubernetes YAML preservation).
-* **`npm run test:enclave`** — Validates the post-decryption enclave (tamper guard memory zeroing, zero-width steganography traitor-tracing, and glyph scrambler).
-* **`npm run test:audit`** — Runs the master 57-check autonomous security audit across all 5 verification phases.
-
----
-
-## 5. Dataset & Machine Learning R&D
-
-SafeShare-AI is powered by the **SafeShare-PrivacyBench V3** dataset using a Probabilistic Context-Free Grammar (PCFG) and Template-Disjoint Partitioning:
-* **Dataset Size:** 85,000+ balanced contrastive sentences across global tech compensation, DevSecOps secrets, healthcare disclosures, and macroeconomic controls.
-* **Split:** 80% Train (68,000), 10% Validation (8,500), 10% Test (8,500) partitioned with **Disjoint Template Sets** to eliminate template memorization leakage.
-* **Out-of-Distribution (OOD) Human Benchmark:** `data/test_ood_human.json` containing human conversational prompts for formal SER (Secret Exposure Rate) and UDR (Utility Degradation Rate) evaluation.
-* **Labeling:** 11 BIO token classification labels (`B-SENSITIVE_FINANCIAL`, `I-SENSITIVE_FINANCIAL`, `B-SENSITIVE_HEALTH`, `B-SENSITIVE_CORP`, `B-SENSITIVE_LEGAL_HR`, `B-SENSITIVE_USER`, etc.).
-* **Base Architecture:** `distilbert/distilbert-base-multilingual-cased`.
-* **Hardware:** NVIDIA GeForce RTX 4060 Laptop GPU (FP16 Tensor Cores, CUDA 12.4).
-
-### Developer Model Weights:
-Because model weights exceed GitHub's 100MB file limit, researchers wishing to run the PyTorch / ONNX evaluation pipeline should refer to [`MODELS_SETUP.md`](MODELS_SETUP.md) for Google Drive download instructions.
-
----
-
-## 6. Repository Layout
-
-```text
-safeshare-ai/
-├── extension/             # Browser extension (Chrome & Firefox MV3)
-│   ├── engine/            # Heuristics, Contextual, Pseudonymizer, Crypto
-│   ├── ui/                # Modern Calm Security modal dialog
-│   └── models/onnx/       # Model configs, tokenizers, vocab
-├── viewer/                # Client-Side Zero-Knowledge Web Enclave
-│   ├── engine/            # Glyph scrambler, Steganography, Tamper guard, Bridge
-│   ├── index.html         # Lock screen & decrypted chat viewer
-│   ├── app.js             # Client controller
-│   └── crypto.js          # WebCrypto AES-256-GCM decryptor
-├── relay/                 # Cloudflare Global Edge Worker & Local Daemon
-│   ├── worker.js          # Cloudflare Worker code
-│   ├── wrangler.toml      # Cloudflare D1 configuration
-│   ├── schema.sql         # D1 SQL database schema
-│   └── server_local.py    # Local standalone relay server
-├── data/                  # 62,000 labeled dataset & synthetic generator
-├── training/              # Fine-tuning, evaluation, and ONNX quantization scripts
-├── docs/                  # Full research blueprints & academic briefs
-│   ├── BLUEPRINT_SAFESHARE_DEFENSE.md
-│   ├── RESEARCH_JOURNEY_ROADMAP.md
-│   ├── AUDIT_BENCHMARK_REPORT.md
-│   ├── RANGKUMAN_FITUR_DAN_DATASET.md
-│   ├── LLM_CHAT_PRIVACY_RESEARCH_BRIEF.md
-│   └── deepresearch/      # Next-gen research blueprints and review papers
-├── package.json           # NPM scripts for running all audits
-├── requirements.txt       # Python dependencies for ML R&D
-├── .gitignore             # Strict exclusion of graphify, venv, and large weights
-├── LICENSE                # Apache 2.0 Open-Source License
-└── README.md              # Project documentation
+```
+Most likely hidden value: Rp 3.000.000 (agreed by 3 visible numbers)
+    Rp 900.000 / 30%
+    Rp 2.100.000 / (100% - 30%)
+    Rp 10.800.000 / 12 / 30%
 ```
 
----
+Then redact with SafeShare and attack again:
 
-## 7. License & Credits
+```bash
+node bin/safeshare.js redact examples/chat_original.txt | node bin/safeshare.js invert
+# No hidden values recovered.
+```
 
-Distributed under the **Apache 2.0 License**. See [`LICENSE`](LICENSE) for details.
+The attack looks for one value that several visible numbers agree on, using ratios found in the
+text and common periods (months, weeks, quarters, years), and ranks candidates by how simple the
+explanation is. Use it on synthetic data or data you own.
 
-Developed by the **SafeShare-AI Research Team** for submission to **Black Hat Asia 2027 Arsenal** and academic publications in AI privacy and context security.
+## How redaction works
+
+| Layer | What it does | Code |
+|---|---|---|
+| Pattern rules | Regex plus checksums: Indonesian NIK/NPWP/BPJS, cards (Luhn), IBAN, API keys, DB URIs, JWTs, seed phrases, shell prompts and home paths, 20+ national IDs | `extension/engine/heuristics.js` |
+| Contextual rules | Separates "my salary" / "gaji saya" from "the average salary" / "rata-rata gaji". Rule-based, no ML model. | `extension/engine/contextual.js` |
+| Inversion defense | Normalises numbers across formats (`10,8 juta`, `10.8M`, `Rp 10.800.000`), then removes every visible number that can be derived from a redacted one. Ratios such as 30% are kept, because on their own they reveal nothing. | `extension/engine/pseudonymizer.js` |
+
+Redacted values become consistent placeholders (`[REDACTED_FINANCIAL_1]`) across the whole
+conversation, so the chat still reads naturally.
+
+## Measured accuracy
+
+Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md).
+
+| | SafeShare | Presidio |
+|---|---|---|
+| General PII, ai4privacy held-out English (token F1) | 0.21 | 0.79 |
+| Precision on what it does redact (token) | 0.97 | 0.93 |
+| Hidden salary recovered by `invert` after redaction (example chats) | no | yes |
+
+- **SafeShare is not a general PII detector.** It catches emails, SSNs, cards, keys and
+  credentials well, but has no named-entity recognition, so most names, cities and addresses are
+  missed. Run Presidio (or similar) for those, and SafeShare for derived numbers.
+- **On real chats** (500 WildChat conversations), 6.4% got at least one redaction, and roughly a
+  third of those redactions were correct. The rest are over-redaction (fiction character names,
+  research-paper health terms, numbers in maths walkthroughs).
+- The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
+  measurement.
+
+## Limits
+
+- Detection is rule-based. Phrasing the rules don't cover will be missed. A DistilBERT model
+  was trained and scored F1 0.64 on held-out data, so it isn't shipped ([MODELS_SETUP.md](MODELS_SETUP.md)).
+- Social-media handles in casual phrasing ("follow me at @name") are not caught.
+- Anyone holding the full link can read the share. The viewer's anti-copy features (glyph
+  scrambling, zero-width watermark, DevTools check) are deterrence only: a screenshot defeats them.
+- Not covered yet: text inside images, cookies in pasted HAR files, combinations of
+  quasi-identifiers (job + city + company size).
+
+## Install
+
+### Browser extension (Chrome, Edge, Brave, Firefox)
+
+Download the zip from [Releases](https://github.com/darflashxd/safeshare/releases), or use
+the `extension/` folder directly.
+
+- **Chrome / Edge / Brave:** copy `extension/manifest.chrome.json` over `extension/manifest.json`
+  (the default manifest is the Firefox one), open `chrome://extensions`, turn on Developer mode,
+  click "Load unpacked" and choose the `extension/` folder. The Chrome release zip already has
+  the right manifest.
+- **Firefox:** open `about:debugging#/runtime/this-firefox`, click "Load Temporary Add-on" and
+  choose `extension/manifest.json`.
+
+Open chatgpt.com, claude.ai or chat.deepseek.com and click the SafeShare button to review the
+redactions and create a link.
+
+### CLI and library (Node 18+, no dependencies)
+
+```bash
+node bin/safeshare.js redact chat.txt
+node bin/safeshare.js invert redacted.txt        # exit code 2 if something was recovered
+node bin/safeshare.js share chat.txt --burn --ttl 3600 --relay http://127.0.0.1:8787
+```
+
+`npm link` (or `npm i -g .`) installs it as `safeshare`.
+
+Input is plain text with `User:` / `Assistant:` lines, or a JSON array of `{role, content}`.
+
+```js
+const { redactTurns, invert } = require("safeshare-ai"); // after npm install <path-to-repo>
+```
+
+### Proxy for OpenAI-compatible APIs
+
+```bash
+node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
+# then point your SDK at http://127.0.0.1:8788/v1
+```
+
+Every chat message is redacted before it leaves your machine. Responses are not restored.
+
+### Policy file
+
+```json
+{
+  "preset": "pci",
+  "disable": ["SYSTEM"],
+  "allow": ["support@acme.com", "/^ACME-INTERNAL-\\d+$/"],
+  "rules": [{ "id": "ACME_TICKET", "pattern": "ACME-\\d{6}", "replacement": "[TICKET]" }]
+}
+```
+
+Pass it with `--policy policy.json` to `redact`, `share` or `proxy`. Presets (`pci`, `hipaa`,
+`gdpr`) limit redaction to the relevant categories. They help with scoping; they are not
+compliance certifications.
+
+## Relay
+
+The relay stores ciphertext only.
+
+- **Local / offline:** `python relay/server_local.py` serves the API and the viewer on
+  `http://127.0.0.1:8787`.
+- **Cloudflare:** `cd relay && npx wrangler d1 execute safeshare-db --remote --file schema.sql && npx wrangler deploy`.
+  If you are upgrading an existing database, run `ALTER TABLE shares ADD COLUMN revoke_hash TEXT;`.
+
+API: `POST /api/share` `{id (UUID), ciphertext, ttl, burn_on_read}` returns a `revoke_token`.
+`GET /api/share/:id` returns the ciphertext. `POST /api/revoke/:id` `{token}` deletes the share.
+
+## Development
+
+```bash
+npm test                                   # all tests in tests/
+python data/generate_dataset.py            # regenerate the synthetic training data (seeded)
+python tools/build_extension.py            # dist/SafeShare-<version>-chrome.zip and -firefox.zip
+python tools/make_demo_gif.py              # docs/demo.gif (start relay/server_local.py first for the share step)
+```
+
+```
+bin/        CLI, library entry point, proxy
+extension/  browser extension (engine/, ui/)
+viewer/     share-link viewer page
+relay/      Cloudflare Worker, D1 schema, local Python relay
+examples/   synthetic chats for the demo
+tests/      regression tests
+tools/      evaluation harness (tools/eval), benchmarks, demo scripts
+training/   DistilBERT experiment (not shipped)
+docs/       Arsenal abstract; docs/archive has older notes
+```
+
+See [DEMO.md](DEMO.md) for the booth walkthrough.
+
+## License
+
+Apache 2.0

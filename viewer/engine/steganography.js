@@ -8,7 +8,7 @@
  *   - \u200D : Zero-Width Joiner (Field Delimiter)
  * 
  * Provides:
- *   1. Non-Repudiation & Traitor Tracing (Identifies exact recipient, session, and timestamp)
+ *   1. Recipient watermark (deterrence only: removed by stripping zero-width characters)
  *   2. Tamper-Proof HMAC-SHA256 Signature (Detects forged or mutated watermarks)
  *   3. Distributed Paragraph Embedding (Survives partial quotation or paragraph deletion)
  *   4. Zero Visual Impact (Invisible to human eyes in all modern fonts and renderers)

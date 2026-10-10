@@ -16,6 +16,24 @@
  * the original secret parameter (e.g. 10.8M / 12 / 0.30 = 3M).
  * If reconstructable, suppresses the minimal hitting set using whole-token spans.
  */
+// Function words and programming type names that are never part of a person's name.
+const COMMON_WORDS = new Set(("the a an and or but if of to in on at by for with from as is are was were be been being " +
+  "that this these those it its he she they them his her their we our you your i me my one ones would could should " +
+  "will can may might must shall do does did done have has had not no yes so than then there here what which who whom " +
+  "whose when where why how all any some each every both more most other such only own same too very just also now " +
+  "about into over after before under again further once out up down off above below between through during without " +
+  "yang dan di ke dari ini itu untuk dengan pada adalah akan juga tidak atau saya aku kamu anda dia mereka kami kita " +
+  "string str int integer long double float boolean bool char byte object any list map array dict set tuple void null " +
+  "none true false item items name names value values key data type id").split(/\s+/));
+
+// A learned "name" must be letters only, contain no common words, and (for loose forms such as
+// "I'm X" or "name: X") start each token with a capital letter.
+function looksLikeName(tokens, { requireCapital = false } = {}) {
+  return tokens.length > 0 && tokens.every((t) =>
+    /^\p{L}[\p{L}'-]*$/u.test(t) && t.length >= 2 && !COMMON_WORDS.has(t.toLowerCase()) &&
+    (!requireCapital || /^\p{Lu}/u.test(t)));
+}
+
 class AdversaryOracleSolver {
   constructor(tolerance = 0.015) {
     this.tolerance = tolerance;
@@ -139,19 +157,17 @@ class AdversaryOracleSolver {
       } else if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(cleanLower)) {
         val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
       } else {
-        if (cleanLower.includes(".") && !cleanLower.includes(",")) {
-          val = parseFloat(cleanLower);
-        } else if (cleanLower.includes(",") && !cleanLower.includes(".")) {
-          const parts = cleanLower.split(",");
-          if (parts[1] && parts[1].length === 3) {
-            val = parseInt(cleanLower.replace(/\D/g, ""), 10);
-          } else {
-            val = parseFloat(cleanLower.replace(",", "."));
-          }
+        // Strip currency prefix first: "Rp 900.000" used to parse as NaN and slip past the solver.
+        const num = cleanLower.replace(/[^\d.,]/g, "");
+        if (/^\d{1,3}(?:[.,]\d{3})+$/.test(num)) {
+          // Grouped thousands in either locale: 900.000, 10.800.000, 1,500
+          val = parseInt(num.replace(/[.,]/g, ""), 10);
+        } else if (/[.,]\d{3}[.,]\d{1,2}$/.test(num)) {
+          // Mixed separators: the last one is the decimal point (1.234,56 / 1,234.56)
+          const i = Math.max(num.lastIndexOf("."), num.lastIndexOf(","));
+          val = parseFloat(num.slice(0, i).replace(/[.,]/g, "") + "." + num.slice(i + 1));
         } else {
-          const digits = cleanLower.replace(/\D/g, "");
-          if (digits.length >= 4) val = parseInt(digits, 10);
-          else val = parseInt(digits, 10) || 0;
+          val = parseFloat(num.replace(",", ".")) || 0;
         }
       }
 
@@ -644,9 +660,10 @@ class ConsistentPseudonymizer {
         }
       }
 
-      // 3. Individual name tokens (>= 3 chars to prevent false matches with prepositions)
+      // 3. Individual name tokens (>= 3 chars, never a common word: one bad name must not
+      //    turn every "that" in the chat into a placeholder)
       for (let w of words) {
-        if (w.length >= 3) {
+        if (w.length >= 3 && !COMMON_WORDS.has(w.toLowerCase())) {
           variants.push(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
         }
       }
@@ -696,9 +713,14 @@ class ConsistentPseudonymizer {
             if (nameTokens.length >= 4) break; // Max 4 words for a realistic name
           }
           if (nameTokens.length > 0 && !nameStopWords.has(nameTokens[0].toLowerCase())) {
-            // Ensure for "i am / i'm", it looks like a proper name (starts with uppercase)
-            if (/^(?:i\s*[\x27\x60]?\s*(?:am|m)|call\s+me)/i.test(nm[0]) && !/^[A-Z]/.test(nameTokens[0])) {
-              // skip
+            const isLooseForm = /^(?:i\s*[\x27\x60]?\s*(?:am|m)|call\s+me)/i.test(nm[0]);
+            const lineStart = turn.content.lastIndexOf("\n", nm.index) + 1;
+            const lineEnd = turn.content.indexOf("\n", nm.index);
+            const line = turn.content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+            if (!looksLikeName(nameTokens, { requireCapital: isLooseForm })) {
+              // skip: code, prose fragments ("one that would carry") or type names
+            } else if (/[:=\-]\s*$/.test(nm[0]) && /[{}()\[\];<>"'`]|\b(?:val|var|let|const|def|fn|func|public|private)\b/.test(line)) {
+              // skip: "name: String" style key-value inside code
             } else {
               userIntroMatches.push({
                 turnIndex: idx,
@@ -721,7 +743,7 @@ class ConsistentPseudonymizer {
               if (foundIdx !== -1) employeeColIdx = foundIdx;
             } else if (!line.includes("---") && cells[employeeColIdx]) {
               const cellVal = cells[employeeColIdx].trim();
-              if (cellVal && !/^[-\s]+$/.test(cellVal) && cellVal.split(/\s+/).length <= 4) {
+              if (cellVal && cellVal.split(/\s+/).length <= 4 && looksLikeName(cellVal.split(/\s+/))) {
                 userIntroMatches.push({
                   turnIndex: idx,
                   raw: cellVal,

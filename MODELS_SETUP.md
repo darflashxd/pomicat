@@ -1,40 +1,27 @@
-# SafeShare-AI: Panduan Distribusi Model ONNX & Ekstensi Browser
+# Model (research only)
 
-Dokumen ini menjelaskan perbedaan antara **paket ekstensi peramban siap pakai (End-User)** dan **bobot model riset Python (Developer/Researcher)** agar tidak terjadi kebingungan saat berbagi dengan pengguna lain.
+The browser extension does **not** use a machine-learning model. Tier 2 ("contextual rules",
+`extension/engine/contextual.js`) is regex-based and needs no download.
 
----
+A DistilBERT token classifier (`distilbert-base-multilingual-cased`, 11 BIO labels) was
+trained as an experiment. On its held-out split it scored:
 
-## 1. Untuk Pengguna Ekstensi (End-Users / Teman / Evaluator)
+| precision | recall | F1   | token accuracy |
+|-----------|--------|------|----------------|
+| 0.61      | 0.68   | 0.64 | 0.95           |
 
-Jika kamu hanya ingin menggunakan ekstensi SafeShare-AI di browser (Chrome / Firefox / Brave):
-* **TIDAK PERLU mengunduh model ONNX 129 MB sama sekali.**
-* Paket ekstensi peramban (`SafeShare-AI-Firefox.xpi` ~30 KB dan `SafeShare-AI-Chrome.zip` ~70 KB) bersifat **100% mandiri (*Self-Contained*)**.
-* Seluruh aturan redaksi PII, aljabar proyeksi, pemetaan medis, shell prompt, dan enkripsi ZK AES-256-GCM telah tertanam langsung di engine JavaScript native (`heuristics.js`, `contextual.js`, `pseudonymizer.js`, `crypto.js`).
-* Cukup pasang file `.xpi` (Firefox) atau folder zip (Chrome) $\to$ langsung berfungsi instan tanpa dependensi server atau model eksternal.
+(`training/model_output/evaluation_metrics.json`.) That is not good enough to ship, so it isn't
+shipped.
 
----
+## Reproduce
 
-## 2. Untuk Peneliti & Pengembang Python (Developer R&D)
+```bash
+pip install -r requirements.txt
+python data/generate_dataset.py               # writes data/train.json, val.json, test.json (seeded)
+python training/train_token_classifier.py     # writes training/model_output/best_model
+python training/evaluate_model.py
+python training/export_onnx.py                # optional: training/model_output/onnx
+```
 
-Berkas model ONNX (`model.onnx` ~515 MB dan `model_quantized.onnx` ~129 MB) melebihi batas upload maksimal GitHub (100 MB per file). Bobot model ini **hanya diperlukan oleh developer** yang ingin menjalankan skrip evaluasi Python / PyTorch (`evaluate_model.py`, `export_onnx.py`, atau `train_token_classifier.py`).
-
-### Alur Setup Developer yang Baru Git Clone:
-1. Unduh `safeshare_quantized_onnx.zip` dari tautan Google Drive tim yang tertera di `HANDOFF.md`:
-   `https://drive.google.com/drive/folders/1gloPMGJ770SF6IXrDofkNn9TMOfIvbKi?usp=sharing`
-2. Ekstrak seluruh isinya ke direktori:
-   ```text
-   extension/models/onnx/quantized/
-   ```
-3. Struktur berkas yang diharapkan untuk evaluasi Python:
-   ```text
-   extension/models/onnx/quantized/
-   ├── model_quantized.onnx   (~129 MB)
-   ├── config.json
-   ├── ort_config.json
-   ├── tokenizer.json
-   └── vocab.txt
-   ```
-4. Jalankan evaluasi benchmark:
-   ```bash
-   python training/evaluate_model.py
-   ```
+The generated data and the weights are not committed. The data script is seeded and produces
+byte-identical files on every run.

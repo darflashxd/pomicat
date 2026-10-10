@@ -1,28 +1,19 @@
 /**
- * SafeShare-AI — Tier 2: Contextual Integrity Classifier
- * Connects to ONNX Runtime Web / Transformers.js to execute local in-browser inference.
- * Differentiates contextual personal data (e.g. personal salary, private diagnosis)
- * from statistical / public / educational data.
+ * SafeShare-AI — Tier 2: Contextual rules
+ * Rule-based (regex) classifier that separates personal disclosures ("my salary",
+ * "gaji saya") from public or statistical figures ("average salary", "rata-rata").
+ * No ML model runs here. A DistilBERT token classifier was trained (see training/,
+ * held-out F1 0.64) but is not shipped in the extension.
  */
+
+const CODE_AT_WORDS = new Set(("import media keyframes font-face supports charset page layer tailwind apply " +
+  "override deprecated param returns return throws type typedef property example see since author version " +
+  "app router test before after component injectable input output viewchild hostlistener " +
+  "dataclass staticmethod classmethod property pytest mock patch").split(" "));
 
 class ContextualClassifier {
   constructor() {
-    this.session = null;
-    this.id2label = {
-      0: "O",
-      1: "B-SENSITIVE_FINANCIAL",
-      2: "I-SENSITIVE_FINANCIAL",
-      3: "B-SENSITIVE_HEALTH",
-      4: "I-SENSITIVE_HEALTH",
-      5: "B-SENSITIVE_CORP",
-      6: "I-SENSITIVE_CORP",
-      7: "B-SENSITIVE_LEGAL_HR",
-      8: "I-SENSITIVE_LEGAL_HR",
-      9: "B-SENSITIVE_USER",
-      10: "I-SENSITIVE_USER"
-    };
-
-    // Contextual trigger patterns for high-speed local inference (1st & 2nd person, Casual, Advice, & Elliptical)
+    // Contextual trigger patterns (1st & 2nd person, Casual, Advice, & Elliptical)
     this.personalAnchors = [
       /\b(?:gaji|penghasilan|upah|bonus|take home pay|thp|kompensasi|uang saku|pendapatan|tunjangan|remunerasi)(?:\s+\w+)?\s*(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku)?\b/i,
       /\b(?:gajiku|penghasilanku|upahku|gajimu|penghasilanmu)\b/i,
@@ -50,7 +41,7 @@ class ContextualClassifier {
       /\b(?:saya dijatuhi sanksi|saya dipanggil hrd|saya kena sp|saya di-phk)\b/i,
       /\b(?:sanksi untuk Anda|peringatan untuk Anda|pemutusan hubungan kerja Anda)\b/i,
       /\b(?:i was placed on|my termination|my disciplinary warning|unjustified pip|your disciplinary warning)\b/i,
-      /\b(?:@darflashxd|@dracraaah|@budianto|@[\w.-]{3,})\b/i,
+      /\b@[\w.-]{3,}\b/i,
       /\b(?:tc|total\s+comp(?:ensation)?|base\s+salary|annual\s+salary|monthly\s+salary|take-home|hourly\s+rate|rsu|rsus|equity|stock\s+options?|strike\s+price|409a|vesting|cliff)\b/i,
       /\b(?:sign-on\s+bonus|relocation\s+(?:bonus|stipend)|retention\s+bonus|severance(?:\s+package)?|settlement\s+amount|retainer\s+fee)\b/i,
       /\b(?:burn\s+rate|monthly\s+burn|cash\s+runway|runway|arr|mrr|acv|ebitda|gross\s+margins?|safe\s+note|valuation\s+cap|post-money|pre-money)\b/i,
@@ -170,9 +161,17 @@ class ContextualClassifier {
           const beforeInLine = sent.substring(lineStart, matchIndex);
           if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) continue;
 
-          // If a 4-digit number looks like a calendar year (1950-2040), ensure explicit financial context
-          if (/^\d{4}$/.test(matchStr)) {
-            const num = parseInt(matchStr, 10);
+          // Numbers inside URLs / DOIs are identifiers
+          if (/(?:https?:\/\/|doi\.org\/|www\.)\S*$/i.test(sent.substring(Math.max(0, matchIndex - 200), matchIndex))) continue;
+
+          // "25m high", "100m away": metres, not millions
+          if (/^\d[\d.,]*\s*m$/i.test(matchStr) && /^\s*(?:high|tall|long|wide|deep|away|above|below|apart|across|radius|diameter)\b|^\s*\/\s*s\b/i.test(afterText)) continue;
+
+          // If a 4-digit number looks like a calendar year (1950-2040), ensure explicit financial context.
+          // Parentheses are stripped first so citation years like "(2021)" are treated as years too.
+          const bareNum = matchStr.replace(/^\(\s*|\s*\)$/g, "");
+          if (/^\d{4}$/.test(bareNum)) {
+            const num = parseInt(bareNum, 10);
             if (num >= 1950 && num <= 2040) {
               const prevSnippet = sent.substring(Math.max(0, matchIndex - 30), matchIndex);
               const nextSnippet = sent.substring(matchIndex + matchStr.length, matchIndex + matchStr.length + 30);
@@ -217,12 +216,17 @@ class ContextualClassifier {
           });
         }
 
-        // User handle / nickname check (e.g. @darflashxd)
+        // User handle / nickname check (e.g. @jdoe_dev)
         const userHandleMatches = sent.matchAll(/(?<![a-zA-Z0-9._-])@([a-zA-Z0-9._-]{3,30})/gi);
         const ignoredHandles = new Set(["protected.local", "localhost", "internal", "sandbox_db", "example.com"]);
         for (const m of userHandleMatches) {
           const handleLower = m[1].toLowerCase();
           if (ignoredHandles.has(handleLower) || handleLower.endsWith(".local") || handleLower.endsWith(".internal")) {
+            continue;
+          }
+          // CSS at-rules, decorators and doc tags (@import, @media, @Override, @param, @app.route)
+          const lineAround = sent.slice(sent.lastIndexOf("\n", m.index) + 1, (sent.indexOf("\n", m.index) + 1 || sent.length + 1) - 1);
+          if (CODE_AT_WORDS.has(handleLower.split(".")[0]) || /[;{}()=<>]/.test(lineAround)) {
             continue;
           }
           detected.push({
