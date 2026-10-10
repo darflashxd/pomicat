@@ -68,7 +68,12 @@ class ContextualClassifier {
       /\b(?:therapy\s+session|psychotherapy|counseling|childhood\s+trauma|trauma|panic\s+attacks?|suicidal\s+ideation|self-harm|ptsd)\b/i,
       /\b(?:checking\s+account|savings\s+account|debit\s+card|credit\s+card|autopay|declined|insufficient\s+funds|overdraft|chargeback|card\s+transaction|available\s+balance|do\s+not\s+honor|card\s+ending\s+in|ends\s+in\s+\d{4})\b/i,
       /\b(?:health\s+insurance|dental\s+insurance|vision\s+insurance|medical\s+bill(?:ing)?|insurance\s+claim|claim\s+number|member\s+id|group\s+number|in-network|out-of-network|deductible|coinsurance|copay(?:ment)?|out-of-pocket|explanation\s+of\s+benefits|eob)\b/i,
-      /\b(?:rent|renting|landlord|struggling\s+hard|cooked|paycheck)\b/i
+      /\b(?:rent|renting|landlord|struggling\s+hard|cooked|paycheck)\b/i,
+      /\b(?:my\s+(?:wife|husband|partner|fiancee?|son|daughter|child|children|kids?|mom|dad|mother|father|parents?|brother|sister|family)|istri\s+saya|suami\s+saya|anak\s+saya|ibu\s+saya|ayah\s+saya)\b/i,
+      /\b(?:our\s+(?:son|daughter|children|kids?)|anak\s+kami)\b/i,
+      /\b(?:my\s+date\s+of\s+birth|i\s+was\s+born|tanggal\s+lahir\s+saya|saya\s+lahir)\b/i,
+      /\b(?:i\s+am\s+(?:a\s+)?(?:\d{1,2}\s*(?:yo|years\s+old)?\s*)?(?:gay|lesbian|bisexual|transgender|queer|muslim|christian|catholic|hindu|buddhist|jewish|mormon|atheist|agnostic))\b/i,
+      /\b(?:saya\s+(?:seorang\s+)?(?:muslim|kristen|katolik|hindu|buddha|konghucu|penghayat|gay|lesbi|biseksual|transgender))\b/i
     ];
 
     this.publicAnchors = [
@@ -250,6 +255,33 @@ class ContextualClassifier {
             category: "SENSITIVE_LEGAL_HR",
             sentence: sent,
             confidence: 0.95
+          });
+        }
+
+        // Family member names (e.g. "my wife Jessica", "our 5-year-old son Lucas", "anak saya Budi")
+        const familyMatches = sent.matchAll(/(?:(?:(?:my|our)\s+(?:wife|husband|fiancee?|partner|mother|father|mom|dad|brother|sister)|(?:istri|suami|ibu|ayah)\s+saya)\s+(?:named\s+)?)([A-Z][a-z]+)(?=\s+(?:and\b|who\b|is\b|attends?\b|goes\b|works?\b|lives?\b|dan\b|yang\b)|[,.;\n\r]|$)|(?:(?:(?:our|my)\s+(?:\d{1,2}[-\s]year[-\s]old\s+)?(?:son|daughter|child|kid|boy|girl)|anak\s+(?:saya|kami))\s+(?:named\s+)?)([A-Z][a-z]+)/gi);
+        for (const m of familyMatches) {
+          const name = m[1] || m[2];
+          if (name && name.length >= 2 && !["The", "A", "An", "In", "On", "At", "My", "Our", "And"].includes(name)) {
+            detected.push({
+              turnIndex,
+              raw: name,
+              category: "SENSITIVE_USER",
+              sentence: sent,
+              confidence: 0.95
+            });
+          }
+        }
+
+        // Special Category Demographics / Sexual Orientation / Religious Affiliation in 1st person
+        const demoMatches = sent.matchAll(/\b(?:bisexual(?:\s+female|\s+male)?|homosexual|transgender|asexual|pansexual|non-binary|gay|lesbian|penganut\s+[A-Za-z]+|attending\s+[A-Z][a-zA-Z\s]+(?:Islamic|Baptist|Catholic|Methodist|Lutheran|Orthodox|Jewish|Synagogue|Mosque|Temple|Pesantren))\b/gi);
+        for (const m of demoMatches) {
+          detected.push({
+            turnIndex,
+            raw: m[0],
+            category: "SENSITIVE_USER",
+            sentence: sent,
+            confidence: 0.92
           });
         }
       }

@@ -296,6 +296,25 @@ class AdversaryOracleSolver {
           }
         }
 
+        // 6. Pairwise Additive / System of Equations Inversion (e.g. (A + B)/2 = secret or A - B = secret)
+        if (!isLeak && tokens.length >= 2) {
+          for (const other of tokens) {
+            if (other === token) continue;
+            if (this.isSafePublicSpan(text, other.start, other.end)) continue;
+            const sum = token.val + other.val;
+            const diff = Math.abs(token.val - other.val);
+            if (
+              Math.abs(sum / 2 - secret) / secret <= this.tolerance ||
+              Math.abs(diff / 2 - secret) / secret <= this.tolerance ||
+              Math.abs(sum - secret) / secret <= this.tolerance ||
+              Math.abs(diff - secret) / secret <= this.tolerance
+            ) {
+              isLeak = true;
+              break;
+            }
+          }
+        }
+
         if (isLeak) {
           const lineStart = Math.max(0, text.lastIndexOf("\n", token.start));
           const nextNl = text.indexOf("\n", token.end);
@@ -755,11 +774,12 @@ class ConsistentPseudonymizer {
       .filter(e => !isNaN(e.val) && e.val >= 1000);
 
     const derivedPatterns = [];
-    if (financialNums.length >= 2) {
-      const sorted = [...financialNums].sort((a, b) => b.val - a.val);
-      const valA = sorted[0].val; // e.g. 28.5M
-      const valB = sorted[1].val; // e.g. 14.2M
-      const diff = valA - valB;   // e.g. 14.3M
+    const uniqueFinancialVals = Array.from(new Set(financialNums.map(e => e.val))).sort((a, b) => b - a);
+
+    if (uniqueFinancialVals.length >= 2) {
+      const valA = uniqueFinancialVals[0]; // Primary/highest financial value e.g. 28.5M
+      const valB = uniqueFinancialVals[1]; // Secondary financial value e.g. 14.2M
+      const diff = valA - valB;
 
       if (diff >= 100000) {
         const diffM = diff / 1e6;
@@ -776,19 +796,27 @@ class ConsistentPseudonymizer {
       }
 
       // Debt ratio e.g. 14.2 / 28.5 = 49.8%
-      const ratio = ((valB / valA) * 100).toFixed(1);
-      const ratioDot = ratio.replace(".", "\\.");
-      const ratioComma = ratio.replace(".", ",");
-      derivedPatterns.push({
-        pattern: `\\b(?:${ratioDot}|${ratioComma})\\s*%(?!\\w)`,
-        replacement: "[REDACTED_DEBT_RATIO]"
-      });
+      if (valA > 0) {
+        const ratioNum = (valB / valA) * 100;
+        if (ratioNum >= 15 && ratioNum <= 95) {
+          const ratio = ratioNum.toFixed(1);
+          const ratioDot = ratio.replace(".", "\\.");
+          const ratioComma = ratio.replace(".", ",");
+          derivedPatterns.push({
+            pattern: `\\b(?:${ratioDot}|${ratioComma})\\s*%(?!\\w)`,
+            replacement: "[REDACTED_DEBT_RATIO]"
+          });
+        }
+      }
     }
 
     // Neutralize Percentage Projection Clusters & Compound Residuals
     const percentages = [5, 10, 12, 15, 20, 25, 30, 35, 40, 50];
-    for (const item of financialNums) {
-      const val = item.val;
+    const fullConvText = updatedTurns.map(t => t.content || "").join(" ").toLowerCase();
+    const hasSalaryContext = /\b(?:salary|gaji|upah|penghasilan|pay|compensation|thp)\b/i.test(fullConvText);
+    const projectionTag = hasSalaryContext ? "[REDACTED_PROJECTED_SALARY]" : "[REDACTED_BUDGET_ALLOCATION]";
+
+    for (const val of uniqueFinancialVals) {
       for (const p of percentages) {
         const total = Math.round(val * (1 + p / 100));
         const delta = Math.round(val * (p / 100));
@@ -802,11 +830,11 @@ class ConsistentPseudonymizer {
           // 1. Full formatted total
           derivedPatterns.push({
             pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${candTotal.toLocaleString("id-ID").replace(/\./g, "\\.")})\\b`,
-            replacement: "[REDACTED_PROJECTED_SALARY]"
+            replacement: projectionTag
           });
           derivedPatterns.push({
             pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${candTotal.toLocaleString("en-US").replace(/,/g, ",")})\\b`,
-            replacement: "[REDACTED_PROJECTED_SALARY]"
+            replacement: projectionTag
           });
 
           // 2. Abbreviated millions total (e.g. 33 juta, 33 jt)
@@ -815,7 +843,7 @@ class ConsistentPseudonymizer {
           const totComma = candM.toString().replace(".", ",");
           derivedPatterns.push({
             pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?(?:${totDot}|${totComma})\\s*(?:juta|jt|million|m))\\b`,
-            replacement: "[REDACTED_PROJECTED_SALARY]"
+            replacement: projectionTag
           });
         }
 
@@ -841,8 +869,8 @@ class ConsistentPseudonymizer {
         }
 
         // 5. Compound Residual Formula: (Gaji * (1 + p)) - Hutang
-        if (financialNums.length >= 2) {
-          const debtVal = financialNums.find(f => f.val < val)?.val;
+        if (uniqueFinancialVals.length >= 2) {
+          const debtVal = uniqueFinancialVals.find(v => v < val);
           if (debtVal) {
             const remainder = total - debtVal;
             if (remainder >= 1000) {
@@ -872,51 +900,45 @@ class ConsistentPseudonymizer {
           if (midVal >= 1000 && midVal !== val) {
             derivedPatterns.push({
               pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${midVal.toLocaleString("id-ID").replace(/\./g, "\\.")})\\b`,
-              replacement: "[REDACTED_PROJECTED_SALARY]"
+              replacement: projectionTag
             });
             const mM = midVal / 1e6;
             derivedPatterns.push({
               pattern: `(?<![\\d.,])(?:(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?(?:${mM.toString().replace(".", "\\.")}|${mM.toString().replace(".", ",")})\\s*(?:juta|jt|million|m))\\b`,
-              replacement: "[REDACTED_PROJECTED_SALARY]"
+              replacement: projectionTag
             });
           }
         }
       }
     }
 
-    // Build replacement clusters for all target entities
-    const replacementRules = [];
-
+    // 1. Build replacement clusters for all target entities (Highest Priority)
+    const baseRules = [];
     for (const ent of allTargets) {
       const pseudo = this.getPseudonym(ent.raw, ent.category);
       const variants = this.buildEquivalenceVariants(ent.raw, ent.category, allTargets);
 
       for (const v of variants) {
-        replacementRules.push({
+        baseRules.push({
           regexStr: v,
           replacement: pseudo,
-          length: v.length
+          length: v.length,
+          isDerived: false
         });
       }
     }
+    baseRules.sort((a, b) => b.length - a.length);
 
-    // Add derived arithmetic patterns
-    for (const dp of derivedPatterns) {
-      replacementRules.push({
-        regexStr: dp.pattern,
-        replacement: dp.replacement,
-        length: dp.pattern.length
-      });
-    }
-
-    // Add cross-turn sweep rules from Tier 1 Heuristic Detections (Credit cards, CVV, Card expiry, Account IDs)
+    // 2. Add cross-turn sweep rules from Tier 1 Heuristic Detections
+    const heuristicRules = [];
     for (const hd of heuristicDetections) {
       if (hd && hd.raw) {
         const hEsc = hd.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        replacementRules.push({
+        heuristicRules.push({
           regexStr: `\\b${hEsc}\\b`,
           replacement: hd.replacement,
-          length: hd.raw.length
+          length: hd.raw.length,
+          isDerived: false
         });
 
         const token = hd.secretToken || hd.raw;
@@ -925,10 +947,11 @@ class ConsistentPseudonymizer {
         if (hd.type === "ENGLISH_PHYSICAL_ADDRESS" || hd.type === "ADDRESS_ID") {
           if (token && token.length >= 6) {
             const aEsc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            replacementRules.push({
+            heuristicRules.push({
               regexStr: `\\b${aEsc}\\b`,
               replacement: "[REDACTED_ADDRESS]",
-              length: token.length
+              length: token.length,
+              isDerived: false
             });
           }
         }
@@ -937,35 +960,81 @@ class ConsistentPseudonymizer {
         if (hd.type === "CARD_EXPIRY_DATE") {
           const m = token.match(/((?:0[1-9]|1[0-2])[\/-](?:20)?\d{2})/);
           if (m) {
-            replacementRules.push({
+            heuristicRules.push({
               regexStr: `\\b${m[1]}\\b`,
               replacement: "[REDACTED_CARD_EXPIRY]",
-              length: m[1].length
+              length: m[1].length,
+              isDerived: false
             });
           }
         }
 
         // Special handling for card security codes (e.g. "CVV 339" -> also sweep raw code "339")
         if (hd.type === "CARD_SECURITY_CODE") {
-          const m = token.match(/\b([0-9]{3,4})\b/);
-          if (m) {
-            replacementRules.push({
-              regexStr: `\\b${m[1]}\\b`,
+          const cleanDigits = (token || "").replace(/\D/g, "");
+          if (cleanDigits.length >= 3 && cleanDigits.length <= 4) {
+            heuristicRules.push({
+              regexStr: `\\b${cleanDigits}\\b`,
               replacement: "[REDACTED_CVV]",
-              length: m[1].length
+              length: cleanDigits.length,
+              isDerived: false
             });
+            const spacedDigits = cleanDigits.split("").join("\\s+");
+            heuristicRules.push({
+              regexStr: `\\b${spacedDigits}\\b`,
+              replacement: "[REDACTED_CVV]",
+              length: spacedDigits.length,
+              isDerived: false
+            });
+          }
+        }
+
+        // Special handling for international identity numbers and life PII (sweep raw normalized token)
+        if ([
+          "UK_NINO", "CA_SIN", "IN_AADHAAR", "IN_PAN", "SG_NRIC",
+          "BR_CPF", "ES_DNI", "IT_CODICE_FISCALE", "UK_SORT_CODE",
+          "IN_IFSC", "AU_BSB", "UK_NHS", "US_MRN", "GITHUB_FINE_GRAINED", "TELEGRAM_BOT_TOKEN",
+          "ID_DOB", "ID_MOTHER_MAIDEN", "ID_PLATE_RI", "US_PLATE", "VEHICLE_VIN", "DEVICE_IMEI",
+          "NETWORK_IPV6", "HARDWARE_MAC", "GPS_COORDINATES", "CN_CITIZEN_ID", "KR_RRN",
+          "JP_MY_NUMBER", "AU_TFN", "AU_MEDICARE", "MX_CURP", "MX_RFC"
+        ].includes(hd.type)) {
+          if (token && token.length >= 3) {
+            const rawClean = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            heuristicRules.push({
+              regexStr: `\\b${rawClean}\\b`,
+              replacement: hd.replacement,
+              length: token.length,
+              isDerived: false
+            });
+            // If token contains hyphens, spaces, colons, or dots, also sweep unformatted variant
+            const unspaced = token.replace(/[\s\-_.:]/g, "");
+            if (unspaced.length >= 5 && unspaced !== token) {
+              heuristicRules.push({
+                regexStr: `\\b${unspaced}\\b`,
+                replacement: hd.replacement,
+                length: unspaced.length,
+                isDerived: false
+              });
+            }
           }
         }
 
         // Special handling for credit/debit card numbers (sweep raw digits, spaced, and dashed)
         if (hd.type === "CREDIT_CARD") {
           const cardDigits = token.replace(/\D/g, "");
-          if (cardDigits.length >= 15 && cardDigits.length <= 19) {
+          if (cardDigits.length >= 13 && cardDigits.length <= 19) {
+            heuristicRules.push({ regexStr: `\\b${cardDigits}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: cardDigits.length, isDerived: false });
             const spaced = cardDigits.replace(/(\d{4})/g, "$1 ").trim();
-            const dashed = cardDigits.replace(/(\d{4})/g, "$1-").slice(0, -1);
-            replacementRules.push({ regexStr: `\\b${cardDigits}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: cardDigits.length });
-            replacementRules.push({ regexStr: `\\b${spaced.replace(/\s+/g, "\\s+")}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: spaced.length });
-            replacementRules.push({ regexStr: `\\b${dashed}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: dashed.length });
+            const dashed = cardDigits.replace(/(\d{4})/g, "$1-").replace(/-$/, "");
+            heuristicRules.push({ regexStr: `\\b${spaced.replace(/\s+/g, "\\s+")}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: spaced.length, isDerived: false });
+            heuristicRules.push({ regexStr: `\\b${dashed}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: dashed.length, isDerived: false });
+            // Amex 4-6-5 format
+            if (cardDigits.length === 15) {
+              const amexDashed = `${cardDigits.slice(0, 4)}-${cardDigits.slice(4, 10)}-${cardDigits.slice(10)}`;
+              const amexSpaced = `${cardDigits.slice(0, 4)} ${cardDigits.slice(4, 10)} ${cardDigits.slice(10)}`;
+              heuristicRules.push({ regexStr: `\\b${amexDashed}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: amexDashed.length, isDerived: false });
+              heuristicRules.push({ regexStr: `\\b${amexSpaced.replace(/\s+/g, "\\s+")}\\b`, replacement: "[REDACTED_CARD_NUMBER]", length: amexSpaced.length, isDerived: false });
+            }
           }
         }
 
@@ -974,20 +1043,30 @@ class ConsistentPseudonymizer {
           const idVal = token;
           if (idVal && idVal.length >= 4) {
             const idEsc = idVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            replacementRules.push({ regexStr: `\\b${idEsc}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length });
+            heuristicRules.push({ regexStr: `\\b${idEsc}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length, isDerived: false });
 
             const pfxMatch = idVal.match(/^([A-Za-z]{2,6})[-_ ]?(\d{6,14})$/);
             if (pfxMatch) {
-              replacementRules.push({ regexStr: `\\b${pfxMatch[1]}[-_ ]?${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length });
-              replacementRules.push({ regexStr: `\\b${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: pfxMatch[2].length });
+              heuristicRules.push({ regexStr: `\\b${pfxMatch[1]}[-_ ]?${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: idVal.length, isDerived: false });
+              heuristicRules.push({ regexStr: `\\b${pfxMatch[2]}\\b`, replacement: "[REDACTED_RECORD_ID]", length: pfxMatch[2].length, isDerived: false });
             }
           }
         }
       }
     }
+    heuristicRules.sort((a, b) => b.length - a.length);
 
-    // Sort replacement rules by pattern specificity (longest pattern first)
-    replacementRules.sort((a, b) => b.length - a.length);
+    // 3. Add derived arithmetic patterns (Lowest priority, applies only to non-base calculations in assistant turns)
+    const derivedRules = [];
+    for (const dp of derivedPatterns) {
+      derivedRules.push({
+        regexStr: dp.pattern,
+        replacement: dp.replacement,
+        length: dp.pattern.length,
+        isDerived: true
+      });
+    }
+    derivedRules.sort((a, b) => b.length - a.length);
 
     // Helper to check if a match is inside an existing bracket tag e.g. [REDACTED_...]
     const isInsideBracket = (text, offset, length) => {
@@ -1001,18 +1080,22 @@ class ConsistentPseudonymizer {
       if (nextClose === -1 || (nextOpen !== -1 && nextClose > nextOpen)) {
         return false;
       }
-      return true;
+      const bracketContent = text.substring(lastOpen, nextClose + 1);
+      return /^\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]$/.test(bracketContent);
     };
 
-    // Global sweep across EVERY turn in the conversation, never mutating inside existing [bracket tags]
-    for (const rule of replacementRules) {
+    const solverHelper = new AdversaryOracleSolver();
+    const allDerivedLeaks = [];
+
+    // Step A: Apply Base Rules (Immutable Primary User Secrets)
+    for (const rule of baseRules) {
       const reg = new RegExp(rule.regexStr, "gi");
       for (let turn of updatedTurns) {
         if (turn.content) {
           turn.content = turn.content.replace(reg, (match, ...args) => {
             const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
             if (isInsideBracket(turn.content, offset, match.length)) {
-              return match; // Inside [REDACTED_...], preserve!
+              return match;
             }
             return rule.replacement;
           });
@@ -1020,19 +1103,91 @@ class ConsistentPseudonymizer {
       }
     }
 
+    // Step B: Apply Heuristic Cross-Turn Sweep Rules
+    for (const rule of heuristicRules) {
+      const reg = new RegExp(rule.regexStr, "gi");
+      for (let turn of updatedTurns) {
+        if (turn.content) {
+          turn.content = turn.content.replace(reg, (match, ...args) => {
+            const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
+            if (isInsideBracket(turn.content, offset, match.length)) {
+              return match;
+            }
+            return rule.replacement;
+          });
+        }
+      }
+    }
+
+    // Step C: Apply Derived Calculations (Never Overwrites Bracketed Base Secrets)
+    for (const rule of derivedRules) {
+      const reg = new RegExp(rule.regexStr, "gi");
+      for (let turn of updatedTurns) {
+        if (turn.content) {
+          turn.content = turn.content.replace(reg, (match, ...args) => {
+            const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
+            if (isInsideBracket(turn.content, offset, match.length)) {
+              return match;
+            }
+            if (solverHelper.isSafePublicSpan(turn.content, offset, offset + match.length)) {
+              return match; // Safe public benchmark line, preserve!
+            }
+            const cleanMatch = match.trim();
+            if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanMatch.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanMatch.toLowerCase())))) {
+              return match;
+            }
+            allDerivedLeaks.push({
+              raw: cleanMatch,
+              replacement: rule.replacement,
+              category: "FINANCIAL",
+              isDerived: true,
+              isAlgebraic: true
+            });
+            return rule.replacement;
+          });
+        }
+      }
+    }
+
     // Syntactic Arrow Sweeper: e.g. "[REDACTED_FINANCIAL_1] → Rp32,775 jt"
-    const arrowRx = /(\[REDACTED_FINANCIAL_\d+\]\s*(?:→|->|menjadi|naik menjadi)\s*)(?:Rp\s*|IDR\s*|\$\s*)?[\d.,]+(?:\s*(?:jt|juta|k|million))?/gi;
+    const arrowRx = /(\[REDACTED_FINANCIAL_\d+\]\s*(?:→|->|menjadi|naik menjadi)\s*)((?:Rp\s*|IDR\s*|\$\s*)?[\d.,]+(?:\s*(?:jt|juta|k|million))?)/gi;
     for (let turn of updatedTurns) {
       if (turn.content) {
-        turn.content = turn.content.replace(arrowRx, "$1[REDACTED_PROJECTED_SALARY]");
+        turn.content = turn.content.replace(arrowRx, (fullMatch, p1, rawNum) => {
+          const cleanNum = rawNum.trim();
+          if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanNum.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanNum.toLowerCase())))) {
+            return fullMatch;
+          }
+          allDerivedLeaks.push({
+            raw: cleanNum,
+            replacement: "[REDACTED_PROJECTED_SALARY]",
+            category: "FINANCIAL",
+            isDerived: true,
+            isAlgebraic: true
+          });
+          return `${p1}[REDACTED_PROJECTED_SALARY]`;
+        });
       }
     }
 
     // Syntactic Increment Sweeper: e.g. "Kenaikan hanya:\nRp4,275 jt/bulan"
-    const incRx = /(Kenaikan(?:\s+hanya|\s+sebesar)?\s*:\s*)(?:Rp\s*|IDR\s*|\$\s*)?[\d.,]+(?:\s*(?:jt|juta|k|million))?(?:\s*(?:per bulan|\/bulan))?/gi;
+    const incRx = /(Kenaikan(?:\s+hanya|\s+sebesar)?\s*:\s*)((?:Rp\s*|IDR\s*|\$\s*)?[\d.,]+(?:\s*(?:jt|juta|k|million))?(?:\s*(?:per bulan|\/bulan))?)/gi;
     for (let turn of updatedTurns) {
       if (turn.content) {
-        turn.content = turn.content.replace(incRx, "$1[REDACTED_SALARY_INCREMENT]");
+        turn.content = turn.content.replace(incRx, (fullMatch, p1, rawNum) => {
+          const cleanNum = rawNum.trim();
+          if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanNum.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanNum.toLowerCase())))) {
+            return fullMatch;
+          }
+          allDerivedLeaks.push({
+            raw: cleanNum,
+            replacement: "[REDACTED_SALARY_INCREMENT]",
+            category: "FINANCIAL",
+            isDerived: true,
+            isAlgebraic: true
+          });
+          return `${p1}[REDACTED_SALARY_INCREMENT]`;
+        });
       }
     }
 
@@ -1055,13 +1210,26 @@ class ConsistentPseudonymizer {
       }
     }
 
+    // Deduplicate combined leaks by raw string and replacement tag
+    const seenLeakRaws = new Set();
+    const combinedLeaks = [];
+    for (const lk of [...allSolverLeaks, ...allDerivedLeaks]) {
+      if (lk && lk.raw) {
+        const k = `${lk.raw.toLowerCase()}::${lk.replacement}`;
+        if (!seenLeakRaws.has(k)) {
+          seenLeakRaws.add(k);
+          combinedLeaks.push(lk);
+        }
+      }
+    }
+
     return {
       anonymizedTurns: updatedTurns,
       mappings: Array.from(this.entityMap.entries()).map(([k, v]) => {
         const [cat, raw] = k.split("::");
         return { category: cat, original: raw, pseudonym: v };
       }),
-      solverLeaks: allSolverLeaks
+      solverLeaks: combinedLeaks
     };
   }
 }

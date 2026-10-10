@@ -81,16 +81,33 @@
 
   /**
    * Finds the active prompt input area across ChatGPT, Claude, and DeepSeek.
+   * Strictly filters out sidebar items, chat rename inputs, and non-composer elements.
    */
   function findPromptInputElement() {
-    return (
-      document.querySelector("#prompt-textarea") ||
-      document.querySelector("div[contenteditable='true'][data-id]") ||
-      document.querySelector("div[contenteditable='true']") ||
-      document.querySelector("fieldset div[contenteditable='true']") ||
-      document.querySelector("textarea[data-id]") ||
+    const isValidInput = (el) => {
+      if (!el || typeof document === "undefined" || !document.body || !document.body.contains(el)) return false;
+      // Exclude sidebar search, chat rename input, and elements inside modals/headers
+      if (el.closest("#safeshare-modal-backdrop, aside, nav, [class*='sidebar'], header")) return false;
+      return true;
+    };
+
+    const candidates = [
+      document.querySelector("#prompt-textarea"),
+      document.querySelector("form textarea"),
+      document.querySelector("form [contenteditable='true']"),
+      document.querySelector("div.ProseMirror[contenteditable='true']"),
+      document.querySelector("[data-testid='chat-input']"),
+      document.querySelector("textarea[data-id='root']"),
+      document.querySelector("textarea[placeholder*='Message' i], textarea[placeholder*='Pesan' i], textarea[placeholder*='Ask' i]"),
+      document.querySelector("div[contenteditable='true'][data-placeholder]"),
+      document.querySelector("fieldset div[contenteditable='true']"),
       document.querySelector("textarea")
-    );
+    ];
+
+    for (const el of candidates) {
+      if (isValidInput(el)) return el;
+    }
+    return null;
   }
 
   /**
@@ -129,39 +146,45 @@
 
   /**
    * Manages the subtle Privacy Shield Chip indicator near the input prompt area.
+   * Enforces Active Re-Parenting Invariant: if React unmounts/replaces the composer form,
+   * stale orphan bars/indicators are cleaned up and remounted directly above the active composer.
    */
   function updateShieldIndicator(inputEl) {
-    if (!symbolicRewriter || !inputEl) return;
+    if (!symbolicRewriter || !inputEl || typeof document === "undefined" || !document.body) return;
 
-    let indicator = document.getElementById("safeshare-shield-indicator");
     const isEnabled = isPreInferenceEnabled();
 
-    if (!indicator) {
+    // 1. Locate the active prompt composer container or form
+    const composerForm = inputEl.closest("form") || inputEl.closest("[class*='composer']") || inputEl.closest("fieldset") || inputEl.closest("div.relative") || inputEl.parentElement;
+    if (!composerForm || !composerForm.parentElement) return;
+
+    // 2. Active Re-Parenting Invariant for safeshare-shield-bar:
+    // If bar does not exist, or is detached, or is NOT directly before the active composerForm:
+    let bar = document.getElementById("safeshare-shield-bar");
+    if (!bar || !document.body.contains(bar) || bar.parentElement !== composerForm.parentElement || bar.nextElementSibling !== composerForm) {
+      if (bar) bar.remove(); // Remove stale or misplaced bar
+      bar = document.createElement("div");
+      bar.id = "safeshare-shield-bar";
+      bar.style.cssText = "display: flex; justify-content: flex-end; width: 100%; margin-bottom: 6px; padding: 0 4px; pointer-events: none; z-index: 99999;";
+      composerForm.parentElement.insertBefore(bar, composerForm);
+    }
+
+    // 3. Active Re-Parenting Invariant for safeshare-shield-indicator:
+    // If indicator does not exist, or is detached, or is NOT a child of the active bar:
+    let indicator = document.getElementById("safeshare-shield-indicator");
+    if (!indicator || !document.body.contains(indicator) || indicator.parentElement !== bar) {
+      if (indicator) indicator.remove(); // Remove stale indicator
       indicator = document.createElement("div");
       indicator.id = "safeshare-shield-indicator";
       indicator.title = "Pre-Inference Symbolic Shield: Click to toggle on/off";
-      indicator.addEventListener("click", () => {
+      indicator.addEventListener("click", (e) => {
+        e.stopPropagation();
         const nextState = !isPreInferenceEnabled();
         localStorage.setItem("safeshare_pre_inference", nextState ? "true" : "false");
         updateShieldIndicator(inputEl);
       });
-
-      // Mount shield bar right above the prompt composer to avoid overflow:hidden clipping
-      const composerForm = inputEl.closest("form") || inputEl.closest("[class*='composer']") || inputEl.closest("div.relative") || inputEl.parentElement;
-      let bar = document.getElementById("safeshare-shield-bar");
-      if (!bar && composerForm && composerForm.parentElement) {
-        bar = document.createElement("div");
-        bar.id = "safeshare-shield-bar";
-        bar.style.cssText = "display: flex; justify-content: flex-end; width: 100%; margin-bottom: 6px; padding: 0 4px; pointer-events: none; z-index: 99999;";
-        composerForm.parentElement.insertBefore(bar, composerForm);
-      }
-      if (bar) {
-        indicator.style.pointerEvents = "auto";
-        bar.appendChild(indicator);
-      } else if (inputEl.parentElement) {
-        inputEl.parentElement.style.position = inputEl.parentElement.style.position || "relative";
-        inputEl.parentElement.appendChild(indicator);
-      }
+      indicator.style.pointerEvents = "auto";
+      bar.appendChild(indicator);
     }
 
     if (!isEnabled) {
@@ -196,6 +219,7 @@
       inputEl.dataset.safeshareHooked = "true";
       inputEl.addEventListener("input", () => updateShieldIndicator(inputEl));
       inputEl.addEventListener("focus", () => updateShieldIndicator(inputEl));
+      inputEl.addEventListener("keyup", () => updateShieldIndicator(inputEl));
 
       // Hook Enter key
       inputEl.addEventListener("keydown", (e) => {
@@ -207,7 +231,7 @@
 
     // Hook Send Buttons
     const sendButtons = document.querySelectorAll(
-      "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button"
+      "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button, form button[type='submit']"
     );
     sendButtons.forEach((btn) => {
       if (!btn.dataset.safeshareHooked) {
@@ -237,6 +261,36 @@
   }
 
   /**
+   * Safely mounts locally computed HTML badges without XSS injection or ProseMirror corruption.
+   */
+  function sanitizeAndMountHydration(node, htmlStr) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlStr, "text/html");
+      // Strip dangerous tags
+      const dangerous = doc.querySelectorAll("script, iframe, object, embed, style, link, meta");
+      dangerous.forEach(el => el.remove());
+
+      // Strip event handlers and javascript: URLs
+      const allEls = doc.querySelectorAll("*");
+      allEls.forEach(el => {
+        for (let i = el.attributes.length - 1; i >= 0; i--) {
+          const attr = el.attributes[i];
+          const attrName = attr.name.toLowerCase();
+          const attrVal = (attr.value || "").toLowerCase();
+          if (attrName.startsWith("on") || attrVal.startsWith("javascript:") || attrName === "srcdoc") {
+            el.removeAttribute(attr.name);
+          }
+        }
+      });
+
+      node.replaceChildren(...doc.body.childNodes);
+    } catch (_) {
+      node.innerHTML = htmlStr;
+    }
+  }
+
+  /**
    * Hydrates formulas in AI responses with locally computed numbers in client RAM.
    */
   function initLocalHydrationObserver() {
@@ -246,19 +300,19 @@
       if (symbolicVault.size() === 0) return;
       const vaultData = symbolicVault.getAll();
 
-      // Find assistant text containers
+      // Find assistant text containers including paragraphs, list items, tables cells, headers, and math blocks
       const asstNodes = document.querySelectorAll(
-        "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, .font-claude-message p"
+        "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] div.math, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message div, .chat-message-assistant p, .chat-message-assistant td"
       );
 
       asstNodes.forEach((node) => {
         if (node.dataset.safeshareHydrated) return;
         const text = node.innerHTML;
 
-        if (/<S\d+>|\bS\d+\b/.test(text)) {
+        if (/<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b/i.test(text)) {
           const res = localCompute.hydrateText(text, vaultData, true);
           if (res.computedCount > 0) {
-            node.innerHTML = res.hydratedText;
+            sanitizeAndMountHydration(node, res.hydratedText);
             node.dataset.safeshareHydrated = "true";
           }
         }
@@ -269,17 +323,63 @@
   }
 
   /**
+   * Safely extracts an element's text content while reverting any ephemeral local hydration badges
+   * back to their raw symbolic form before exporting or sharing.
+   * INVARIANT: Client-side decrypted RAM secrets MUST NEVER cross into the share payload!
+   */
+  function getCleanNodeContent(containerEl) {
+    if (!containerEl) return "";
+    try {
+      // Clone container to avoid mutating the user's active reading view
+      const clone = containerEl.cloneNode(true);
+      // Find all hydrated local compute spans in the clone
+      const hydratedSpans = clone.querySelectorAll(".ss-local-compute, [data-expr]");
+      hydratedSpans.forEach(span => {
+        const origExpr = span.getAttribute("data-expr");
+        if (origExpr) {
+          // Revert to original symbolic expression e.g. <S10>, <S1> / <S2>
+          const textNode = document.createTextNode(decodeURIComponent(origExpr));
+          span.replaceWith(textNode);
+        }
+      });
+      return (clone.innerText || clone.textContent || "").trim();
+    } catch (_) {
+      return (containerEl.innerText || containerEl.textContent || "").trim();
+    }
+  }
+
+  /**
+   * Identifies whether an element is inside the prompt composer, textarea, UI header/footer, or disclaimer.
+   * Such elements must NEVER be extracted as chat conversation turns.
+   */
+  function isComposerOrUIElement(el) {
+    if (!el) return true;
+    // Exclude anything inside form, prompt-textarea, composer wrapper, textarea, modals, sidebar, nav, header, footer
+    if (el.closest("form, #prompt-textarea, [class*='composer'], .input-area, textarea, [contenteditable='true'], header, nav, footer, aside, #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
+      return true;
+    }
+    // Exclude disclaimer text (e.g. ChatGPT can make mistakes...)
+    const txt = (el.innerText || el.textContent || "").trim();
+    if (/^(?:ChatGPT can make mistakes|Free Research Preview|By messaging ChatGPT|Claude may make mistakes|DeepSeek can make mistakes)/i.test(txt)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Universal extractor for ChatGPT, Claude, and DeepSeek conversation nodes.
+   * Returns empty array [] if the active chat has no messages sent yet.
    */
   function extractConversationTurns() {
     const turns = [];
 
     // 0. High-accuracy ChatGPT data-message-author-role pattern
     const roleDivs = document.querySelectorAll("[data-message-author-role]");
-    if (roleDivs.length > 0) {
-      roleDivs.forEach((el) => {
+    const validRoleDivs = Array.from(roleDivs).filter(el => !isComposerOrUIElement(el));
+    if (validRoleDivs.length > 0) {
+      validRoleDivs.forEach((el) => {
         const role = el.getAttribute("data-message-author-role");
-        const content = el.innerText.trim();
+        const content = getCleanNodeContent(el);
         if (content) {
           turns.push({ role, content });
         }
@@ -289,43 +389,58 @@
 
     // 1. ChatGPT article turn pattern
     const chatGptArticles = document.querySelectorAll("article[data-testid^='conversation-turn']");
-    if (chatGptArticles.length > 0) {
-      chatGptArticles.forEach((art) => {
+    const validArticles = Array.from(chatGptArticles).filter(el => !isComposerOrUIElement(el));
+    if (validArticles.length > 0) {
+      validArticles.forEach((art) => {
         const isAssistant = art.querySelector("[data-message-author-role='assistant']") !== null;
-        const textContent = art.innerText || "";
-        turns.push({
-          role: isAssistant ? "assistant" : "user",
-          content: textContent.trim()
-        });
+        const contentNode = art.querySelector("[data-message-author-role]") || art;
+        const textContent = getCleanNodeContent(contentNode);
+        if (textContent) {
+          turns.push({
+            role: isAssistant ? "assistant" : "user",
+            content: textContent
+          });
+        }
       });
       return turns;
     }
 
     // 2. Claude DOM Pattern
     const claudeMessages = document.querySelectorAll("[data-testid='user-message'], .font-claude-message");
-    if (claudeMessages.length > 0) {
-      claudeMessages.forEach((el) => {
+    const validClaude = Array.from(claudeMessages).filter(el => !isComposerOrUIElement(el));
+    if (validClaude.length > 0) {
+      validClaude.forEach((el) => {
         const isUser = el.getAttribute("data-testid") === "user-message";
-        turns.push({
-          role: isUser ? "user" : "assistant",
-          content: el.innerText.trim()
-        });
+        const textContent = getCleanNodeContent(el);
+        if (textContent) {
+          turns.push({
+            role: isUser ? "user" : "assistant",
+            content: textContent
+          });
+        }
       });
       return turns;
     }
 
-    // 3. Fallback: Generic turn extraction
-    const allParas = document.querySelectorAll("main p, .chat-message, [role='presentation'] p");
-    allParas.forEach((p, idx) => {
-      if (p.innerText.trim()) {
-        turns.push({
-          role: idx % 2 === 0 ? "user" : "assistant",
-          content: p.innerText.trim()
-        });
-      }
-    });
+    // 3. DeepSeek / generic chat message bubble pattern
+    const chatBubbles = document.querySelectorAll(".chat-turn, .chat-message, div[class*='message-bubble'], div[class*='chat-item']");
+    const validBubbles = Array.from(chatBubbles).filter(el => !isComposerOrUIElement(el));
+    if (validBubbles.length > 0) {
+      validBubbles.forEach((el) => {
+        const isAsst = /assistant|ai|bot/i.test(el.className) || el.querySelector("[class*='assistant'], [class*='bot']") !== null;
+        const content = getCleanNodeContent(el);
+        if (content) {
+          turns.push({
+            role: isAsst ? "assistant" : "user",
+            content: content
+          });
+        }
+      });
+      return turns;
+    }
 
-    return turns;
+    // Chat is empty (no messages have been sent yet)
+    return [];
   }
 
   // Periodic check to inject button & prompt shield once UI is loaded
@@ -341,5 +456,24 @@
   window.addEventListener("safeshare:shield_toggle", (e) => {
     const inputEl = findPromptInputElement();
     if (inputEl) updateShieldIndicator(inputEl);
+  });
+
+  // Extension bridge listener: responds to Web Viewer continuation requests
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    if (!event.data || typeof event.data !== "object") return;
+    if (event.data.source === "SAFESHARE_EXTENSION_PING") {
+      const respOrigin = (window && window.location && window.location.origin) ? window.location.origin : "*";
+      window.postMessage({ source: "SAFESHARE_EXTENSION_PONG" }, respOrigin);
+    } else if (event.data.source === "SAFESHARE_FORWARD_TO_AI") {
+      const promptText = event.data.prompt;
+      if (promptText) {
+        const inputEl = findPromptInputElement();
+        if (inputEl) {
+          setInputText(inputEl, promptText);
+          console.log("[SafeShare-AI] Injected continuation prompt directly into active session.");
+        }
+      }
+    }
   });
 })();

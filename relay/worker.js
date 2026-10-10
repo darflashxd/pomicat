@@ -40,6 +40,20 @@ export default {
           });
         }
 
+        if (typeof id !== "string" || id.length > 128) {
+          return new Response(JSON.stringify({ error: "Invalid share ID format" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        if (typeof ciphertext !== "string" || ciphertext.length > 2 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: "Ciphertext exceeds maximum allowed size (2MB)" }), {
+            status: 413,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
         const isBurn = burn_on_read === true || burn_on_read === 1 || ttl === "burn";
         const burnFlag = isBurn ? 1 : 0;
 
@@ -54,6 +68,17 @@ export default {
 
         // Store into Cloudflare D1 Database if bound
         if (env.DB) {
+          const existing = await env.DB.prepare(
+            "SELECT id FROM shares WHERE id = ? AND expires_at > ?"
+          ).bind(id, now).first();
+
+          if (existing) {
+            return new Response(JSON.stringify({ error: "Share ID already exists" }), {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+
           await env.DB.prepare(
             "INSERT OR REPLACE INTO shares (id, ciphertext, created_at, expires_at, burn_on_read, view_count) VALUES (?, ?, ?, ?, ?, 0)"
           )
@@ -67,6 +92,13 @@ export default {
             );
           }
         } else if (env.SAFESHARE_KV) {
+          const existing = await env.SAFESHARE_KV.get(id);
+          if (existing) {
+            return new Response(JSON.stringify({ error: "Share ID already exists" }), {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
           // Fallback to KV if configured
           await env.SAFESHARE_KV.put(id, JSON.stringify({ ciphertext, created_at: now, burn_on_read: burnFlag }), {
             expirationTtl: ttlSec
@@ -142,9 +174,19 @@ export default {
           } else {
             ciphertext = row.ciphertext;
             if (row.burn_on_read === 1) {
-              wasBurned = true;
-              // Immediate shredding from edge database
-              await env.DB.prepare("DELETE FROM shares WHERE id = ?").bind(shareId).run();
+              // Atomic Single-Use Check (TOCTOU Defense): Atomic update lock
+              const updateRes = await env.DB.prepare(
+                "UPDATE shares SET view_count = view_count + 1 WHERE id = ? AND view_count = 0"
+              ).bind(shareId).run();
+
+              if (!updateRes || updateRes.meta?.changes === 0) {
+                // Another concurrent request already burned this record!
+                isExpired = true;
+              } else {
+                wasBurned = true;
+                // Immediate shredding from edge database
+                await env.DB.prepare("DELETE FROM shares WHERE id = ?").bind(shareId).run();
+              }
             } else {
               if (ctx && ctx.waitUntil) {
                 ctx.waitUntil(env.DB.prepare("UPDATE shares SET view_count = view_count + 1 WHERE id = ?").bind(shareId).run());

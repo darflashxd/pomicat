@@ -79,7 +79,7 @@ class HeuristicsRedactor {
         id: "CREDIT_CARD",
         name: "Credit Card",
         category: "FINANCIAL",
-        regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b\d{15,16}\b/g,
+        regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{13,19}\b/g,
         validator: (raw, index, text) => {
           if (this.luhnCheck(raw)) return true;
           // Fail-closed fallback: if Luhn fails, but surrounding context explicitly indicates a card number, redact it!
@@ -93,13 +93,20 @@ class HeuristicsRedactor {
         },
         replacement: "[REDACTED_CARD_NUMBER]"
       },
-      // 2b. Card Security Verification Code (CVV, CVC, CID, Security Code - 3-4 digits)
+      // 2b. Card Security Verification Code (CVV, CVC, CID, CSC, CVN - 3-4 digits formatted, spaced, or conversational)
       {
         id: "CARD_SECURITY_CODE",
         name: "Card Security Code (CVV/CVC)",
         category: "FINANCIAL",
-        regex: /\b((?:cvv2?|cvc2?|cid|security\s+code)\s*[:=\-]?\s*)([0-9]{3,4})\b/gi,
-        replacement: "$1[REDACTED_CVV]"
+        regex: /\b((?:(?:(?:card\s+)?(?:security|verification)\s+(?:code|number|value)|cvv2?|cvc2?|cid|csc|cvn2?|c\s*v\s*v|c\s*v\s*c)(?:\s*\/\s*(?:cvv2?|cvc2?|cid|csc|cvn2?))?)\s*(?:[:=\-~]|is|was|of|equals)?\s*[\[\("']?)([0-9]{3,4}|[0-9]\s+[0-9]\s+[0-9](?:\s+[0-9])?)([\]\)"']?)/gi,
+        replacement: (raw) => {
+          const m = raw.match(/^([\s\S]*?[\[\("']?)([0-9\s]{3,7})([\]\)"']?)$/);
+          if (m) {
+            const prefix = m[1].replace(/[\[\("']$/, "");
+            return `${prefix}[REDACTED_CVV]`;
+          }
+          return "[REDACTED_CVV]";
+        }
       },
       // 2c. Card Expiration Date (MM/YY or MM/YYYY with anchor)
       {
@@ -216,7 +223,7 @@ class HeuristicsRedactor {
         id: "GOOGLE_API_KEY",
         name: "Google Cloud / Maps API Key",
         category: "CREDENTIALS",
-        regex: /\bAIzaSy[A-Za-z0-9_-]{33}\b/g,
+        regex: /\bAIzaSy[A-Za-z0-9_-]{30,35}\b/g,
         replacement: "AIzaSyDummyPlaceholderGoogleApiKey0000"
       },
       // 5a-3. Hugging Face Access Token
@@ -346,12 +353,12 @@ class HeuristicsRedactor {
         regex: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
         replacement: "-----BEGIN PRIVATE KEY-----\n[REDACTED_PRIVATE_KEY_BLOCK]\n-----END PRIVATE KEY-----"
       },
-      // 10. Database Connection Strings (Postgres, MySQL, Mongo, Redis with passwords)
+      // 10. Database Connection Strings (Postgres, MySQL, Mongo, Redis with passwords, supporting URL-encoded schemes)
       {
         id: "DATABASE_URI",
         name: "Database Credentials URI",
         category: "CREDENTIALS",
-        regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^:\s]+:[^@\s]+@[^\s/:]+(?::\d+)?\/[^\s]*/gi,
+        regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)(?::\/\/|%3A%2F%2F)[^:\s]+:[^@\s]+@[^\s/:]+(?::\d+)?\/[^\s]*/gi,
         replacement: "postgresql://postgres:placeholder_password@localhost:5432/sandbox_db"
       },
       // 10b. CLI Curl / Basic Auth Credentials (-u user:password)
@@ -375,7 +382,7 @@ class HeuristicsRedactor {
         id: "ENV_CONFIG_SECRET",
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
+        regex: /\b((?:DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
         replacement: "$1[REDACTED_SECRET]"
       },
       // 10e. YAML Configuration Password & Secret Block
@@ -391,7 +398,7 @@ class HeuristicsRedactor {
         id: "ADDRESS_ID",
         name: "Physical Home/Street Address",
         category: "PROFILE",
-        regex: /\b(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?(?:\s+di|\s+adalah|\s*:)?\s*)([A-Za-z0-9\s.,\/-]+?)(?=\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|[\r\n]|$))/gi,
+        regex: /\b(?:(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?|(?:saya\s+)?tinggal\s+di|rumah(?:\s+saya)?\s+di|domisili(?:\s+di)?)(?:\s+di|\s+adalah|\s*:)?\s*)([A-Za-z0-9\s.,\/-]+?)(?=\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|[\r\n]|$))/gi,
         validator: (raw) => {
           const physicalMarkers = /\b(?:jalan|jl\.?|gang|gg\.?|kampung|kp\.?|komplek|perumahan|dusun|desa|kelurahan|kecamatan|rt\s*\d+|rw\s*\d+|no(?:mor)?\s*\d+|blok\s*[a-z0-9]+)\b/i;
           const computingExclusions = /\b(?:memori|memory|fungsi|function|pointer|register|symbol|instruksi|instruction|hex|libc|gdb|binary|assembly|setcontext|ip|mac|url|socket)\b|&[a-zA-Z_]|0x[0-9a-fA-F]+/i;
@@ -420,7 +427,7 @@ class HeuristicsRedactor {
         id: "PASSPORT_RI",
         name: "Passport Number",
         category: "GOV_ID",
-        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s+number)?)(?:\s+is|\s*[:=\-])?\s*)([A-Z]\d{7,8}|\d{9})\b/gi,
+        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s+number)?)(?:\s+is|\s+was|\s+saya|\s+ku|\s+Anda|\s+kamu|\s*[:=\-])?\s*)([A-Z]\d{7,8}|\d{9})\b/gi,
         replacement: "$1[REDACTED_PASSPORT]"
       },
       // 14. BPJS Kesehatan & Ketenagakerjaan (11-13 digits)
@@ -446,6 +453,289 @@ class HeuristicsRedactor {
         category: "GOV_ID",
         regex: /\b((?:nim|npm|nrp|no\.?\s*mahasiswa|student\s*id|nomor\s*induk\s*mahasiswa)\s*[:=\-]?\s*)([0-9]{8,14})\b/gi,
         replacement: "$1[REDACTED_NIM]"
+      },
+      // 16b. UK National Insurance Number (NINO)
+      {
+        id: "UK_NINO",
+        name: "UK National Insurance Number (NINO)",
+        category: "GOV_ID",
+        regex: /\b((?:(?:nino|national\s+insurance(?:\s+number)?)\s*[:=\-~]?\s*|(?<=\b)))([A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\s*\d{2}\s*\d{2}\s*\d{2}\s*[A-D])\b/gi,
+        replacement: "$1[REDACTED_NINO]"
+      },
+      // 16c. Canadian Social Insurance Number (SIN)
+      {
+        id: "CA_SIN",
+        name: "Canadian Social Insurance Number (SIN)",
+        category: "GOV_ID",
+        regex: /\b((?:(?:sin|social\s+insurance(?:\s+number)?)\s*[:=\-~]?\s*|(?<=\b)))(\d{3}[-\s]\d{3}[-\s]\d{3})\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const window = text.substring(Math.max(0, index - 60), Math.min(text.length, index + raw.length + 60)).toLowerCase();
+          return /\b(?:sin|social\s+insurance|cra|canada|canadian|tax|resident)\b/.test(window);
+        },
+        replacement: "$1[REDACTED_SIN]"
+      },
+      // 16d. Indian Aadhaar Number (12 digits)
+      {
+        id: "IN_AADHAAR",
+        name: "Indian Aadhaar Number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:aadhaar|uidai|adhaar)(?:\s+(?:number|card))?\s*[:=\-~]?\s*|(?<=\b)))([2-9]\d{3}[-\s]\d{4}[-\s]\d{4})\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const window = text.substring(Math.max(0, index - 60), Math.min(text.length, index + raw.length + 60)).toLowerCase();
+          return /\b(?:aadhaar|uidai|adhaar|india|indian|resident|citizen|kyc)\b/.test(window);
+        },
+        replacement: "$1[REDACTED_AADHAAR]"
+      },
+      // 16e. Indian Permanent Account Number (PAN)
+      {
+        id: "IN_PAN",
+        name: "Indian PAN Card Number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:pan(?:\s+(?:card|number))?)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{5}[0-9]{4}[A-Z])\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const window = text.substring(Math.max(0, index - 60), Math.min(text.length, index + raw.length + 60)).toLowerCase();
+          return /\b(?:pan|income\s+tax|tax\s+filing|kyc|india|indian)\b/.test(window);
+        },
+        replacement: "$1[REDACTED_PAN]"
+      },
+      // 16f. Singapore NRIC / FIN
+      {
+        id: "SG_NRIC",
+        name: "Singapore NRIC / FIN",
+        category: "GOV_ID",
+        regex: /\b((?:(?:nric|fin)(?:\s+(?:number|id))?\s*[:=\-~]?\s*|(?<=\b)))([STFGMS]\d{7}[A-Z])\b/gi,
+        replacement: "$1[REDACTED_NRIC]"
+      },
+      // 16g. Brazilian CPF
+      {
+        id: "BR_CPF",
+        name: "Brazilian CPF",
+        category: "GOV_ID",
+        regex: /\b((?:(?:cpf)\s*[:=\-~]?\s*|(?<=\b)))(\d{3}\.\d{3}\.\d{3}-\d{2})\b/gi,
+        replacement: "$1[REDACTED_CPF]"
+      },
+      // 16h. Spanish DNI / NIE
+      {
+        id: "ES_DNI",
+        name: "Spanish DNI / NIE",
+        category: "GOV_ID",
+        regex: /\b((?:(?:dni|nie)\s*[:=\-~]?\s*|(?<=\b)))(\d{8}[A-HJ-NP-TV-Z]|[XYZ]\d{7}[A-HJ-NP-TV-Z])\b/gi,
+        replacement: "$1[REDACTED_DNI]"
+      },
+      // 16i. Italian Codice Fiscale
+      {
+        id: "IT_CODICE_FISCALE",
+        name: "Italian Codice Fiscale",
+        category: "GOV_ID",
+        regex: /\b((?:(?:codice\s+fiscale)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z])\b/gi,
+        replacement: "$1[REDACTED_TAX_ID]"
+      },
+      // 16j. UK Bank Sort Code (6 digits)
+      {
+        id: "UK_SORT_CODE",
+        name: "UK Bank Sort Code",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:sort\s+code)\s*[:=\-~]?\s*))(\d{2}[-\s]\d{2}[-\s]\d{2})\b/gi,
+        replacement: "$1[REDACTED_SORT_CODE]"
+      },
+      // 16k. Indian IFSC Banking Code
+      {
+        id: "IN_IFSC",
+        name: "Indian IFSC Code",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:ifsc(?:\s+code)?)\s*[:=\-~]?\s*))([A-Z]{4}0[A-Z0-9]{6})\b/gi,
+        replacement: "$1[REDACTED_IFSC]"
+      },
+      // 16l. Australian BSB Code
+      {
+        id: "AU_BSB",
+        name: "Australian BSB Banking Code",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:bsb(?:\s+number|\s+code)?)\s*[:=\-~]?\s*))(\d{3}[-\s]\d{3})\b/gi,
+        replacement: "$1[REDACTED_BSB]"
+      },
+      // 16m. UK NHS Number (Healthcare Patient ID)
+      {
+        id: "UK_NHS",
+        name: "UK NHS Number",
+        category: "HEALTH",
+        regex: /\b((?:(?:nhs(?:\s+number)?)\s*[:=\-~]?\s*))(\d{3}[-\s]?\d{3}[-\s]?\d{4})\b/gi,
+        replacement: "$1[REDACTED_HEALTH_ID]"
+      },
+      // 16n. US Hospital Medical Record Number (MRN)
+      {
+        id: "US_MRN",
+        name: "Medical Record Number (MRN)",
+        category: "HEALTH",
+        regex: /\b((?:(?:mrn|medical\s+record(?:\s+number)?|patient(?:\s+record)?\s+id)\s*[:=\-~]?\s*))([A-Za-z0-9]{6,12})\b/gi,
+        replacement: "$1[REDACTED_HEALTH_ID]"
+      },
+      // 16o. GitHub Fine-Grained Personal Access Token
+      {
+        id: "GITHUB_FINE_GRAINED",
+        name: "GitHub Fine-Grained Token",
+        category: "CREDENTIALS",
+        regex: /\b(github_pat_[A-Za-z0-9_]{60,100})\b/g,
+        replacement: "[REDACTED_GITHUB_TOKEN]"
+      },
+      // 16p. Telegram Bot API Token
+      {
+        id: "TELEGRAM_BOT_TOKEN",
+        name: "Telegram Bot API Token",
+        category: "CREDENTIALS",
+        regex: /\b(\d{8,10}:[A-Za-z0-9_-]{35})\b/g,
+        replacement: "[REDACTED_TELEGRAM_TOKEN]"
+      },
+      // 16q. Date of Birth (DoB) - International & Indonesian Formats
+      {
+        id: "ID_DOB",
+        name: "Date of Birth (DoB)",
+        category: "PROFILE",
+        regex: /\b((?:(?:date\s+of\s+birth|dob|born\s+on|birth\s*date|tanggal\s+lahir|tgl\s+lahir|lahir(?:\s+tanggal|\s+pada)?)\s*(?:is|\s*[:=\-~])?\s*))(\d{4}[-/.]\d{2}[-/.]\d{2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4}|(?:(?:\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember))|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))\s+\d{1,2}(?:th|st|nd|rd)?)),?\s+\d{4})\b/gi,
+        replacement: "$1[REDACTED_DOB]"
+      },
+      // 16r. Mother's Maiden Name (Knowledge-Based Authentication Question)
+      {
+        id: "ID_MOTHER_MAIDEN",
+        name: "Mother's Maiden Name",
+        category: "PROFILE",
+        regex: /\b((?:(?:mother(?:\x27?s)?\s+maiden\s+name|nama\s+ibu\s+kandung)(?:\s+saya)?(?:\s+adalah|\s+is|\s*[:=\-~])?\s*))([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,3}?)(?=\s+(?:and\b|is\b|born\b|living\b|from\b|was\b|di\b|dan\b|pada\b)|[,.;\n\r]|$)/gi,
+        replacement: "$1[REDACTED_FAMILY_NAME]"
+      },
+      // 16s. Vehicle License Plates (Indonesian Police Numbers e.g. B 1829 XYZ, D 1234 AB)
+      {
+        id: "ID_PLATE_RI",
+        name: "Indonesian Vehicle License Plate",
+        category: "PROFILE",
+        regex: /\b((?:(?:plat(?:\s+nomor|\s+mobil|\s+motor)?|nomor\s+polisi|nopol)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{1,2}\s+\d{1,4}\s+[A-Z]{1,3})\b/gi,
+        validator: (raw) => {
+          const m = raw.trim().split(/\s+/);
+          if (m.length !== 3) return false;
+          const validPrefixes = new Set([
+            "A","B","D","E","F","G","H","K","L","M","N","P","R","S","T",
+            "AA","AB","AD","AE","AG","BA","BB","BD","BE","BG","BH","BK",
+            "BL","BM","BN","BP","DA","KB","KH","KT","KU","DB","DC","DD",
+            "DE","DG","DH","DK","DM","DN","DT","DW","PA","PB"
+          ]);
+          return validPrefixes.has(m[0].toUpperCase());
+        },
+        replacement: "$1[REDACTED_LICENSE_PLATE]"
+      },
+      // 16t. US/International Vehicle License Plate
+      {
+        id: "US_PLATE",
+        name: "US/International License Plate",
+        category: "PROFILE",
+        regex: /\b((?:(?:license\s+plate|plate(?:\s+number)?)\s*[:=\-~]?(?:\s*is)?\s*))([A-Z0-9]{5,8})\b/gi,
+        replacement: "$1[REDACTED_LICENSE_PLATE]"
+      },
+      // 16u. Vehicle Identification Number (VIN - 17 alphanumeric ISO 3779 standard)
+      {
+        id: "VEHICLE_VIN",
+        name: "Vehicle Identification Number (VIN)",
+        category: "PROFILE",
+        regex: /\b((?:(?:vin|vehicle\s+identification(?:\s+number)?|nomor\s+rangka)\s*(?:is|\s*[:=\-~])?\s*))([A-HJ-NPR-Z0-9]{17})\b/gi,
+        replacement: "$1[REDACTED_VIN]"
+      },
+      // 16v. Mobile Device IMEI (15-digit identifier with context)
+      {
+        id: "DEVICE_IMEI",
+        name: "Mobile Device IMEI",
+        category: "PROFILE",
+        regex: /\b((?:(?:imei|device\s+id)\s*(?:is|\s*[:=\-~])?\s*))(\d{15})\b/gi,
+        replacement: "$1[REDACTED_IMEI]"
+      },
+      // 16w. Network IPv6 Address (Full, Compressed, Local)
+      {
+        id: "NETWORK_IPV6",
+        name: "IPv6 Network Address",
+        category: "SYSTEM",
+        regex: /\b(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})\b/gi,
+        validator: (raw) => {
+          // Exclude simple CSS or code structures
+          return raw.includes(":") && raw.length >= 7;
+        },
+        replacement: "[REDACTED_IPV6]"
+      },
+      // 16x. Hardware MAC Address (Standard Colon, Dash, or Dot formats)
+      {
+        id: "HARDWARE_MAC",
+        name: "Hardware MAC Address",
+        category: "SYSTEM",
+        regex: /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b|\b(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}\b/gi,
+        replacement: "[REDACTED_MAC_ADDRESS]"
+      },
+      // 16y. Precision GPS Coordinates (Latitude & Longitude)
+      {
+        id: "GPS_COORDINATES",
+        name: "Precision GPS Coordinates",
+        category: "PROFILE",
+        regex: /\b(?:(?:coordinates|coords|lat(?:itude)?|lokasi\s+gps)\s*[:=\-~]?\s*[-+]?\d{1,3}\.\d{4,8}\s*[,;\s]\s*(?:long(?:itude)?|lng)?\s*[:=\-~]?\s*[-+]?\d{1,3}\.\d{4,8}|lat\s*[-+]?\d{1,3}\.\d{4,8}\s*,\s*long\s*[-+]?\d{1,3}\.\d{4,8})\b/gi,
+        replacement: "[REDACTED_GPS_COORDINATES]"
+      },
+      // 16z-1. Chinese Resident Identity Card (18 digits)
+      {
+        id: "CN_CITIZEN_ID",
+        name: "Chinese National ID",
+        category: "GOV_ID",
+        regex: /\b((?:(?:citizen\s+id|resident\s+id|id\s+card|shenfenzheng)\s*[:=\-~]?\s*|(?<=\b)))(\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const window = text.substring(Math.max(0, index - 60), Math.min(text.length, index + raw.length + 60)).toLowerCase();
+          return /\b(?:china|chinese|resident|citizen|shenfenzheng|prc|beijing|shanghai|shenzhen)\b/.test(window);
+        },
+        replacement: "$1[REDACTED_NATIONAL_ID]"
+      },
+      // 16z-2. Korean Resident Registration Number (RRN - 13 digits YYMMDD-1XXXXXX)
+      {
+        id: "KR_RRN",
+        name: "Korean Resident Registration Number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:rrn|resident\s+registration(?:\s+number)?)\s*[:=\-~]?\s*|(?<=\b)))(\d{6}[-\s][1-4]\d{6})\b/gi,
+        replacement: "$1[REDACTED_NATIONAL_ID]"
+      },
+      // 16z-3. Japanese My Number (Individual Number - 12 digits)
+      {
+        id: "JP_MY_NUMBER",
+        name: "Japanese My Number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:my\s+number|individual\s+number)(?:\s*\([^)]*\))?\s*(?:is|\s*[:=\-~])?\s*))(\d{4}\s*\d{4}\s*\d{4})\b/gi,
+        replacement: "$1[REDACTED_NATIONAL_ID]"
+      },
+      // 16z-4. Australian Tax File Number (TFN - 8-9 digits)
+      {
+        id: "AU_TFN",
+        name: "Australian Tax File Number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:tfn|tax\s+file\s+number)\s*(?:is|\s*[:=\-~])?\s*))(\d{3}\s*\d{3}\s*\d{2,3})\b/gi,
+        replacement: "$1[REDACTED_TAX_ID]"
+      },
+      // 16z-5. Australian Medicare Number (10-11 digits)
+      {
+        id: "AU_MEDICARE",
+        name: "Australian Medicare Number",
+        category: "HEALTH",
+        regex: /\b((?:(?:medicare(?:\s+number)?)\s*(?:is|\s*[:=\-~])?\s*))([2-6]\d{3}\s*\d{5}\s*\d{1,2})\b/gi,
+        replacement: "$1[REDACTED_HEALTH_ID]"
+      },
+      // 16z-6. Mexican CURP (18 characters)
+      {
+        id: "MX_CURP",
+        name: "Mexican CURP ID",
+        category: "GOV_ID",
+        regex: /\b((?:(?:curp)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d)\b/gi,
+        replacement: "$1[REDACTED_NATIONAL_ID]"
+      },
+      // 16z-7. Mexican RFC Tax ID (12-13 characters)
+      {
+        id: "MX_RFC",
+        name: "Mexican RFC Tax ID",
+        category: "GOV_ID",
+        regex: /\b((?:(?:rfc)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{3,4}\d{6}[A-Z0-9]{3})\b/gi,
+        replacement: "$1[REDACTED_TAX_ID]"
       },
       // 17. Unix / Linux Terminal Shell Prompt (e.g. user@host:~/path$)
       {
@@ -643,13 +933,37 @@ class HeuristicsRedactor {
   }
 
   /**
+   * Normalizes Unicode NFKC and maps Cyrillic/Greek lookalikes (homoglyphs) to Latin ASCII.
+   * Defeats Unicode homoglyph spoofing and fullwidth/bold evasion attacks.
+   */
+  normalizeHomoglyphs(text) {
+    if (!text || typeof text !== "string") return "";
+    // Step 1: Strip zero-width & non-printable evasion markers
+    let s = text.replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E]/g, "");
+    // Step 2: Unicode NFKC Canonical Decomposition & Compatibility Composition
+    s = s.normalize("NFKC");
+    // Step 3: Cyrillic / Greek confusable character mapping to Latin ASCII
+    const confusableMap = {
+      "\u0410": "A", "\u0412": "B", "\u0421": "C", "\u0415": "E", "\u041D": "H",
+      "\u0406": "I", "\u0408": "J", "\u041A": "K", "\u041C": "M", "\u041E": "O",
+      "\u0420": "P", "\u0405": "S", "\u0422": "T", "\u0425": "X", "\u04AE": "Y",
+      "\u0430": "a", "\u0441": "c", "\u0435": "e", "\u0456": "i", "\u0458": "j",
+      "\u043A": "k", "\u043E": "o", "\u0440": "p", "\u0455": "s", "\u0445": "x",
+      "\u0443": "y", "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0397": "H",
+      "\u0399": "I", "\u039A": "K", "\u039C": "M", "\u039D": "N", "\u039F": "O",
+      "\u03A1": "P", "\u03A4": "T", "\u03A7": "X", "\u03BF": "o"
+    };
+    return s.replace(/[\u0410-\u0458\u0391-\u03BF]/g, (ch) => confusableMap[ch] || ch);
+  }
+
+  /**
    * Scans and redacts deterministic secrets and PII from input text.
    * Returns: { sanitizedText, detections: [{ type, matched, offset, length }] }
    */
   scan(text) {
     if (!text) return { sanitizedText: "", detections: [] };
-    // Pre-processing: Strip invisible zero-width evasion characters
-    text = text.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "");
+    // Pre-processing: Apply Homoglyph normalization & strip zero-width characters
+    text = this.normalizeHomoglyphs(text);
     let sanitizedText = text;
     const detections = [];
 
@@ -672,12 +986,17 @@ class HeuristicsRedactor {
           repl = pattern.replacement;
         }
 
+        let secretToken = (match.length > 2 && match[2]) ? match[2] : raw;
+        if (pattern.id === "CARD_SECURITY_CODE" && typeof secretToken === "string") {
+          secretToken = secretToken.replace(/\D/g, "");
+        }
+
         detections.push({
           type: pattern.id,
           name: pattern.name,
           category: pattern.category || "GENERAL",
           raw: raw,
-          secretToken: (match.length > 2 && match[2]) ? match[2] : raw,
+          secretToken: secretToken,
           replacement: repl,
           index: match.index,
           length: raw.length

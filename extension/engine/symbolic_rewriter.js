@@ -26,15 +26,30 @@ class SafeShareSymbolicRewriter {
   }
 
   /**
-   * Parses the currency code from a raw financial text string.
+   * Parses the currency code from a raw financial text string with prompt context awareness.
    * @param {string} raw
+   * @param {string} fullContext
    * @returns {string}
    */
-  detectCurrency(raw) {
-    if (/Rp|IDR/i.test(raw)) return "IDR";
+  detectCurrency(raw, fullContext = "") {
+    if (/Rp|IDR|juta|jt|jeti|miliar|milyar/i.test(raw)) return "IDR";
     if (/\$|USD/i.test(raw)) return "USD";
     if (/€|EUR/i.test(raw)) return "EUR";
     if (/£|GBP/i.test(raw)) return "GBP";
+    if (/₹|INR|LPA|Lakh/i.test(raw)) return "INR";
+
+    // Infer from surrounding prompt context if raw has no explicit currency symbol
+    if (fullContext) {
+      if (/\$|USD|dollars?\b|SF\b|San Francisco|Amazon|Stripe|FAANG|Silicon Valley|\bUS\b|\bNYC\b|\bAustin\b|\bSeattle\b/i.test(fullContext)) return "USD";
+      if (/Rp|IDR|rupiah|gaji|tabungan|kantor|juta|jt|cicilan|Indonesia|Jakarta|Surabaya|Bandung/i.test(fullContext)) return "IDR";
+      if (/€|EUR|euros?\b|Germany|France|Netherlands/i.test(fullContext)) return "EUR";
+      if (/£|GBP|pounds?\b|London|UK\b/i.test(fullContext)) return "GBP";
+
+      // If text is predominantly English without Indonesian indicators, default to USD
+      const hasIndonesian = /\b(?:saya|gaji|kantor|tabungan|pinjol|cicilan|bulan|tahun|dan|di|ke|dari|yang|ini|itu)\b/i.test(fullContext);
+      if (!hasIndonesian) return "USD";
+    }
+
     return "IDR";
   }
 
@@ -43,7 +58,7 @@ class SafeShareSymbolicRewriter {
    * suitable for Pre-Inference symbolic protection.
    * 
    * @param {string} text
-   * @returns {{hasSensitive: boolean, detectedItems: Array<{raw: string, val: number, category: string}>}}
+   * @returns {{hasSensitive: boolean, detectedItems: Array<{raw: string, val: number, category: string, currency: string}>}}
    */
   analyze(text) {
     if (!text || text.trim().length === 0) {
@@ -64,7 +79,7 @@ class SafeShareSymbolicRewriter {
             raw: det.raw,
             val,
             category: "FINANCIAL",
-            currency: this.detectCurrency(det.raw)
+            currency: this.detectCurrency(det.raw, text)
           });
         }
       }
@@ -77,7 +92,8 @@ class SafeShareSymbolicRewriter {
           raw: hDet.raw,
           val: hDet.secretToken || hDet.raw,
           category: hDet.category,
-          type: hDet.type
+          type: hDet.type,
+          currency: this.detectCurrency(hDet.raw, text)
         });
       }
     }

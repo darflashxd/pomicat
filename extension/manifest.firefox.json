@@ -24,7 +24,10 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://claude.ai/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://*.workers.dev/*",
+        "https://*.pages.dev/*",
+        "http://localhost/*"
       ],
       "css": [
         "ui/modal.css"

@@ -55,12 +55,25 @@ class SafeShareCrypto {
   /**
    * Encrypts plain payload object using AES-256-GCM.
    * Prepends the 96-bit random IV to the ciphertext.
+   * Cryptographically binds expMs and shareId inside the encrypted ciphertext.
    */
   async encrypt(payload) {
     const key = await this.generateKey();
     const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
-    const jsonStr = JSON.stringify(payload);
+    const shareId = payload.shareId || crypto.randomUUID();
+
+    const ttlSec = payload.ttl ? (parseInt(payload.ttl, 10) || 86400) : 86400;
+    const expMs = payload.expMs || (Date.now() + (ttlSec * 1000));
+
+    // Authenticated binding: embed expMs and shareId directly inside payload
+    const payloadToEncrypt = Object.assign({}, payload, {
+      shareId,
+      expMs
+    });
+
+    const jsonStr = JSON.stringify(payloadToEncrypt);
     const encodedData = new TextEncoder().encode(jsonStr);
+    const paddedData = this.pad(encodedData, 256);
 
     const encryptedBuffer = await crypto.subtle.encrypt(
       {
@@ -68,7 +81,7 @@ class SafeShareCrypto {
         iv: iv
       },
       key,
-      encodedData
+      paddedData
     );
 
     // Concatenate IV + Ciphertext
@@ -78,10 +91,7 @@ class SafeShareCrypto {
 
     const ciphertextB64 = this.bufferToBase64Url(combinedBuffer.buffer);
     const keyB64 = await this.exportKeyToBase64Url(key);
-    const shareId = crypto.randomUUID();
 
-    const ttlSec = payload.ttl ? (parseInt(payload.ttl, 10) || 86400) : 86400;
-    const expMs = Date.now() + (ttlSec * 1000);
     const fullShareUrl = `${this.viewerBaseUrl}/v/${shareId}#${keyB64}`;
     const standaloneShareUrl = `${this.viewerBaseUrl}/#d=${encodeURIComponent(ciphertextB64)}&k=${encodeURIComponent(keyB64)}&exp=${expMs}`;
 
@@ -97,6 +107,7 @@ class SafeShareCrypto {
 
   /**
    * Decrypts ciphertext using key provided from URI fragment #.
+   * Cryptographically enforces the expiration deadline embedded in the payload.
    */
   async decrypt(ciphertextB64Url, keyB64Url) {
     const key = await this.importKeyFromBase64Url(keyB64Url);
@@ -119,8 +130,47 @@ class SafeShareCrypto {
       ciphertext
     );
 
-    const decodedStr = new TextDecoder().decode(decryptedBuffer);
-    return JSON.parse(decodedStr);
+    const decryptedBytes = new Uint8Array(decryptedBuffer);
+    const unpaddedBytes = this.unpad(decryptedBytes);
+    const decodedStr = new TextDecoder().decode(unpaddedBytes);
+    const parsed = JSON.parse(decodedStr);
+
+    // Cryptographic expiration enforcement: cannot be bypassed by editing URL fragment
+    if (parsed && typeof parsed.expMs === "number" && parsed.expMs > 0) {
+      if (Date.now() > parsed.expMs) {
+        const expErr = new Error("Link expired: the cryptographic expiration deadline has passed.");
+        expErr.code = "EXPIRED";
+        throw expErr;
+      }
+    }
+
+    return parsed;
+  }
+
+  // --- Cryptographic Padding Utilities (Traffic Analysis Mitigation) ---
+
+  /**
+   * Applies PKCS#7 block padding to eliminate ciphertext length leakage.
+   */
+  pad(data, blockSize = 256) {
+    const padLen = blockSize - (data.length % blockSize);
+    const padded = new Uint8Array(data.length + padLen);
+    padded.set(data);
+    padded.fill(padLen, data.length);
+    return padded;
+  }
+
+  /**
+   * Safely strips PKCS#7 block padding with backward-compatibility for legacy unpadded payloads.
+   */
+  unpad(data) {
+    if (data.length === 0) return data;
+    const padLen = data[data.length - 1];
+    if (padLen <= 0 || padLen > 256 || padLen > data.length) return data;
+    for (let i = data.length - padLen; i < data.length; i++) {
+      if (data[i] !== padLen) return data;
+    }
+    return data.slice(0, data.length - padLen);
   }
 
   // --- Buffer Conversion Utilities ---

@@ -276,10 +276,11 @@ class SafeShareModal {
 
       for (const det of hResult.detections) {
         let cat = det.category || "CREDENTIALS";
-        if (det.type === "CREDIT_CARD") cat = "FINANCIAL";
-        else if (["ID_NIK", "ID_NPWP", "PASSPORT_RI", "ID_BPJS", "ID_SIM", "STUDENT_ID", "US_SSN", "US_SSN_RAW", "US_EIN"].includes(det.type)) cat = "GOV_ID";
-        else if (["EMAIL", "PHONE", "ADDRESS_ID", "ENGLISH_PHYSICAL_ADDRESS"].includes(det.type)) cat = "PROFILE";
-        else if (det.type.includes("PROMPT") || det.type.includes("OUTPUT") || det.type.includes("USER_") || det.type.includes("SSH_") || det.type.includes("GIT_")) cat = "SYSTEM";
+        if (["CREDIT_CARD", "CARD_SECURITY_CODE", "CARD_EXPIRY_DATE", "CARD_LAST_FOUR", "PREFIXED_BANK_LOAN_ID", "UNIVERSAL_RECORD_IDENTIFIER", "IBAN_ACCOUNT", "UK_SORT_CODE", "IN_IFSC", "AU_BSB"].includes(det.type)) cat = "FINANCIAL";
+        else if (["ID_NIK", "ID_NPWP", "PASSPORT_RI", "ID_BPJS", "ID_SIM", "STUDENT_ID", "US_SSN", "US_SSN_RAW", "US_EIN", "UK_NINO", "CA_SIN", "IN_AADHAAR", "IN_PAN", "SG_NRIC", "BR_CPF", "ES_DNI", "IT_CODICE_FISCALE", "CN_CITIZEN_ID", "KR_RRN", "JP_MY_NUMBER", "AU_TFN", "MX_CURP", "MX_RFC"].includes(det.type)) cat = "GOV_ID";
+        else if (["UK_NHS", "US_MRN", "AU_MEDICARE"].includes(det.type)) cat = "HEALTH";
+        else if (["EMAIL", "PHONE", "ADDRESS_ID", "ENGLISH_PHYSICAL_ADDRESS", "ID_DOB", "ID_MOTHER_MAIDEN", "ID_PLATE_RI", "US_PLATE", "VEHICLE_VIN", "DEVICE_IMEI", "GPS_COORDINATES"].includes(det.type)) cat = "PROFILE";
+        else if (["NETWORK_IPV6", "HARDWARE_MAC"].includes(det.type) || det.type.includes("PROMPT") || det.type.includes("OUTPUT") || det.type.includes("USER_") || det.type.includes("SSH_") || det.type.includes("GIT_")) cat = "SYSTEM";
 
         const secretVal = det.secretToken || det.raw;
         const tag = this.extractTag(det.replacement);
@@ -320,7 +321,7 @@ class SafeShareModal {
 
     // 2. Scan Tier 3 (Pseudonymizer & Algebraic Solver)
     const allHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections);
-    const { mappings, solverLeaks } = this.pseudonymizer.anonymizeConversation(
+    const { anonymizedTurns, mappings, solverLeaks } = this.pseudonymizer.anonymizeConversation(
       intermediateTurns,
       this.rawContextualEntities,
       allHeuristics
@@ -369,7 +370,7 @@ class SafeShareModal {
       }
     }
 
-    // Solver algebraic leaks into candidates (filter out calendar years)
+    // Solver algebraic leaks and derived calculations into candidates (filter out calendar years)
     if (solverLeaks && Array.isArray(solverLeaks)) {
       for (const leak of solverLeaks) {
         if (!leak.raw) continue;
@@ -377,15 +378,22 @@ class SafeShareModal {
         if (isYear) continue;
 
         const cleanRaw = leak.raw.replace(/[.,;:]+$/, "").trim();
-        const existing = this.candidates.find(c => c.raw.toLowerCase() === cleanRaw.toLowerCase());
+        const existing = this.candidates.find(c => c.raw.toLowerCase() === cleanRaw.toLowerCase() || (c.tag === leak.replacement && c.isAlgebraic));
         if (!existing) {
+          let ruleName = "Derived Math Calculation";
+          if (leak.replacement === "[REDACTED_PROJECTED_SALARY]") ruleName = "Projected Salary / Raise";
+          else if (leak.replacement === "[REDACTED_SALARY_INCREMENT]") ruleName = "Salary Increment";
+          else if (leak.replacement === "[REDACTED_REMAINDER_CASHFLOW]") ruleName = "Cashflow Remainder";
+          else if (leak.replacement === "[REDACTED_DEBT_RATIO]") ruleName = "Debt Ratio";
+          else if (leak.replacement === "[REDACTED_SAVINGS_ACCUMULATION]") ruleName = "Savings Accumulation";
+
           this.candidates.push({
             id: `c_${candIdCounter++}`,
-            role: "assistant",
+            role: leak.role || "assistant",
             turnIndex: -1,
-            category: "FINANCIAL",
-            categoryLabel: SS_CATEGORIES.FINANCIAL.label,
-            ruleName: "Derived Math Calculation",
+            category: leak.category || "FINANCIAL",
+            categoryLabel: SS_CATEGORIES[leak.category || "FINANCIAL"]?.label || "Financial & Salary",
+            ruleName: ruleName,
             raw: cleanRaw,
             fullRaw: cleanRaw,
             tag: leak.replacement,
@@ -394,6 +402,49 @@ class SafeShareModal {
             occurrences: 1,
             isAlgebraic: true
           });
+        }
+      }
+    }
+
+    // Safety-Net Reconciliation Sweep: Ensure EVERY [REDACTED_...] tag appearing in anonymizedTurns has an interactive candidate!
+    if (anonymizedTurns && Array.isArray(anonymizedTurns)) {
+      for (const turn of anonymizedTurns) {
+        const matches = (turn.content || "").match(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g);
+        if (matches) {
+          for (const tag of matches) {
+            const hasCand = this.candidates.some(c => c.tag === tag || c.replacement === tag);
+            if (!hasCand) {
+              let cat = "FINANCIAL";
+              if (tag.includes("HEALTH")) cat = "HEALTH";
+              else if (tag.includes("CORP") || tag.includes("INTERNAL") || tag.includes("SECRET") || tag.includes("TOKEN") || tag.includes("KEY")) cat = "CREDENTIALS";
+              else if (tag.includes("NIK") || tag.includes("SSN") || tag.includes("PASSPORT") || tag.includes("NIM") || tag.includes("ID") || tag.includes("GOV")) cat = "GOV_ID";
+              else if (tag.includes("ADDRESS") || tag.includes("PHONE") || tag.includes("EMAIL") || tag.includes("User")) cat = "PROFILE";
+
+              let ruleName = "Derived Math Calculation";
+              if (tag.includes("PROJECTED_SALARY")) ruleName = "Projected Salary / Raise";
+              else if (tag.includes("SALARY_INCREMENT")) ruleName = "Salary Increment";
+              else if (tag.includes("REMAINDER")) ruleName = "Cashflow Remainder";
+              else if (tag.includes("DEBT_RATIO")) ruleName = "Debt Ratio";
+              else if (tag.includes("SAVINGS_ACCUMULATION")) ruleName = "Savings Accumulation";
+              else if (tag.includes("BUDGET")) ruleName = "Budget Allocation";
+
+              this.candidates.push({
+                id: `c_${candIdCounter++}`,
+                role: turn.role || "assistant",
+                turnIndex: -1,
+                category: cat,
+                categoryLabel: SS_CATEGORIES[cat]?.label || "General",
+                ruleName: ruleName,
+                raw: tag,
+                fullRaw: tag,
+                tag: tag,
+                replacement: tag,
+                enabled: true,
+                occurrences: 1,
+                isAlgebraic: true
+              });
+            }
+          }
         }
       }
     }
@@ -499,7 +550,8 @@ class SafeShareModal {
 
     const disabledLeaks = this.candidates
       .filter(c => !this.activeCategories.has(c.category) || !c.enabled)
-      .map(c => c.raw);
+      .flatMap(c => [c.raw, c.tag, c.replacement, c.fullRaw])
+      .filter(Boolean);
 
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
@@ -540,7 +592,7 @@ class SafeShareModal {
       for (const cand of unmaskedCandidates) {
         const rawEscaped = this.escapeHtml(cand.raw);
         const regRaw = new RegExp(`(?<![\\w])${this.escapeRegExp(rawEscaped)}(?![\\w])`, "gi");
-        htmlContent = replaceOutsideSpans(htmlContent, regRaw, (m) => `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" title="Click to re-redact">${m}<span class="ss-badge-icon">👁️</span></span>`);
+        htmlContent = replaceOutsideSpans(htmlContent, regRaw, (m) => `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" data-tag="${cand.tag}" title="Click to re-redact">${m}<span class="ss-badge-icon">👁️</span></span>`);
       }
 
       // B. Single-pass regex replacing all redacted tags outside existing spans
@@ -552,8 +604,8 @@ class SafeShareModal {
           cand = this.candidates.find(c => c.tag === tag || c.replacement === tag);
         }
         const candId = cand ? cand.id : "c_tag";
-        const rawText = cand ? this.escapeHtml(cand.raw) : tag;
-        return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
+        const rawText = (cand && cand.raw !== cand.tag) ? this.escapeHtml(cand.raw) : tag;
+        return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" data-tag="${tag}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
       });
 
       sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${turn.role.toUpperCase()}]:</div><div class="turn-body">${htmlContent}</div></div>`;
@@ -570,14 +622,22 @@ class SafeShareModal {
       diffSanEl.querySelectorAll(".ss-badge").forEach(badge => {
         badge.addEventListener("click", (e) => {
           e.stopPropagation();
-          const candId = badge.getAttribute("data-cand-id");
-          const cand = this.candidates.find(c => c.id === candId);
+          let candId = badge.getAttribute("data-cand-id");
+          let cand = this.candidates.find(c => c.id === candId);
+          if (!cand) {
+            const badgeTag = badge.getAttribute("data-tag") || (badge.innerText || badge.textContent || "").replace(/[✕👁️⚡ local]/g, "").trim();
+            cand = this.candidates.find(c => c.tag === badgeTag || c.replacement === badgeTag);
+          }
           if (cand) {
             const nextState = !cand.enabled;
             cand.enabled = nextState;
             // Also synchronize all other candidates sharing the exact same raw secret or numeric value
             this.candidates.forEach(other => {
-              if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
+              if (
+                other.raw.toLowerCase() === cand.raw.toLowerCase() ||
+                (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && this.pseudonymizer.parseFinancialValue(other.raw) === this.pseudonymizer.parseFinancialValue(cand.raw) && this.pseudonymizer.parseFinancialValue(cand.raw) > 0) ||
+                (cand.isAlgebraic && other.isAlgebraic && (other.tag === cand.tag || other.raw.toLowerCase() === cand.raw.toLowerCase()))
+              ) {
                 other.enabled = nextState;
               }
             });

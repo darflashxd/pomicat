@@ -347,8 +347,58 @@ function runUniversalDomainInvarianceSuite() {
   assert(modal10.sanitizedTurns[0].content.includes("[REDACTED_FINANCIAL_1]"), "Entity 1 must return cleanly to [REDACTED_FINANCIAL_1]!");
   console.log("  [✓] Domain 10 Passed: Immutable tag binding verified! FINANCIAL_1, 2, and 3 never shift numbers and toggle bidirectionally!");
 
+  // --- DOMAIN 11: ZERO ORPHAN BADGES & SAFE NOTE DERIVED INTERACTIVITY ---
+  console.log("\n[Domain 11] Testing Zero Orphan Badges & SAFE Note Derived Interactivity...");
+  const modal11 = new SafeShareModal();
+  modal11.open([
+    {
+      role: "user",
+      content: "Burn rate is $145,000, cash $820,000, bridge $1,500,000, valuation cap $18m, pre-money $16.5m."
+    },
+    {
+      role: "assistant",
+      content: "SAFE proceeds: $1.5M on $18M cap implies dilution. Pro-forma cash is $2.32M and pre-money is $16.5M. Burn of $145k leaves $820k intact."
+    }
+  ]);
+
+  // Assert that EVERY tag in sanitizedTurns has a matching candidate in modal.candidates!
+  modal11.sanitizedTurns.forEach(turn => {
+    const matches = turn.content.match(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g) || [];
+    for (const tag of matches) {
+      const cand = modal11.candidates.find(c => c.tag === tag || c.replacement === tag);
+      assert(cand, `Tag ${tag} MUST exist as a registered candidate in modal.candidates!`);
+      assert.notStrictEqual(cand.id, "c_tag", `Candidate for tag ${tag} must have a valid unique ID, never c_tag!`);
+    }
+  });
+
+  // Verify that candidates can be unmasked and re-redacted without ghosting
+  const candToTest = modal11.candidates[0];
+  candToTest.enabled = false;
+  modal11.rebuildViews();
+  assert(modal11.sanitizedTurns[0].content.includes(candToTest.raw), `Unmasked entity ${candToTest.raw} must be revealed!`);
+  candToTest.enabled = true;
+  modal11.rebuildViews();
+  assert(modal11.sanitizedTurns[0].content.includes(candToTest.tag), `Re-redacted tag ${candToTest.tag} must be restored!`);
+
+  // Also test algebraic accumulation candidates in De Jembras scenario
+  const modalDeJembras = new SafeShareModal();
+  modalDeJembras.open([
+    {
+      role: "user",
+      content: "name : de jembras\nNIM : 3002455595\nmy salary is Rp 3.000.000 and i want to save for car"
+    },
+    {
+      role: "assistant",
+      content: "Car savings: 30%\n1 year -> 10.8 million\n2 years -> 21.6 million\n5 years -> 54 million"
+    }
+  ]);
+  const algCand = modalDeJembras.candidates.find(c => c.isAlgebraic);
+  assert(algCand, "Algebraic accumulation candidate must be registered in candidates list!");
+  assert.notStrictEqual(algCand.id, "c_tag", "Algebraic candidate must have a valid candidate ID!");
+  console.log("  [✓] Domain 11 Passed: Zero orphan tags confirmed! All derived math badges are registered, interactive, and toggleable!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 10 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
+  console.log("   ALL 11 UNIVERSAL DOMAIN INVARIANCE BENCHMARKS PASSED 100%!");
   console.log("================================================================================\n");
 }
 

@@ -32,6 +32,7 @@
       if (typeof window === "undefined") return;
 
       window.addEventListener("message", (event) => {
+        if (event.source !== window) return;
         if (!event.data || typeof event.data !== "object") return;
         if (event.data.source === "SAFESHARE_EXTENSION_PONG") {
           this.extensionDetected = true;
@@ -39,8 +40,8 @@
         }
       });
 
-      // Ping for extension presence
-      window.postMessage({ source: "SAFESHARE_EXTENSION_PING" }, "*");
+      // Ping for extension presence (only same-origin)
+      window.postMessage({ source: "SAFESHARE_EXTENSION_PING" }, window.location.origin);
     }
 
     /**
@@ -66,7 +67,8 @@
         };
 
         window.addEventListener("message", handler);
-        window.postMessage({ source: "SAFESHARE_EXTENSION_PING" }, "*");
+        const targetOrigin = (window && window.location && window.location.origin) ? window.location.origin : "*";
+      window.postMessage({ source: "SAFESHARE_EXTENSION_PING" }, targetOrigin);
       });
     }
 
@@ -80,11 +82,12 @@
 
       const hasExt = await this.pingExtension(200);
       if (hasExt) {
+        const targetOrigin = window.location.origin;
         window.postMessage({
           source: "SAFESHARE_FORWARD_TO_AI",
           platform: platform,
           prompt: continuationPrompt
-        }, "*");
+        }, targetOrigin);
         return {
           success: true,
           mode: "extension_bridge",
@@ -96,7 +99,8 @@
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
         try {
           await navigator.clipboard.writeText(continuationPrompt);
-          
+          this.scheduleClipboardPurge(30);
+
           // Open platform in new tab
           if (typeof window !== "undefined") {
             window.open(targetUrl, "_blank");
@@ -127,10 +131,20 @@
     }
 
     /**
-     * Clipboard management. Safe no-op to prevent wiping user data.
+     * Ephemeral clipboard management: automatically wipes copied prompt from OS clipboard after timeout.
      */
     scheduleClipboardPurge(seconds = 30) {
-      // Safe no-op: Does not destructively erase clipboard data
+      if (this.autoPurgeTimer) {
+        clearTimeout(this.autoPurgeTimer);
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        this.autoPurgeTimer = setTimeout(async () => {
+          try {
+            await navigator.clipboard.writeText("");
+            console.log("[SafeShare Bridge] Ephemeral clipboard auto-purged after timeout.");
+          } catch (_) {}
+        }, seconds * 1000);
+      }
     }
   }
 

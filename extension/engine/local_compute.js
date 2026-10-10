@@ -22,6 +22,32 @@ class SafeShareLocalCompute {
   }
 
   /**
+   * Normalizes LaTeX notation, Unicode operators, and fractions into standard arithmetic.
+   * @param {string} expr
+   * @returns {string}
+   */
+  cleanMathString(expr) {
+    if (!expr || typeof expr !== "string") return "";
+    let s = expr;
+    // Normalize LaTeX angle brackets \langle S1\rangle -> <S1>
+    s = s.replace(/\\langle\s*([A-Za-z0-9_]+)\s*\\rangle/gi, "<$1>");
+    s = s.replace(/⟨\s*([A-Za-z0-9_]+)\s*⟩/g, "<$1>");
+    s = s.replace(/&lt;\s*([A-Za-z0-9_]+)\s*&gt;/gi, "<$1>");
+    // Normalize LaTeX fractions \frac{a}{b} -> ((a)/(b))
+    s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gi, "(($1) / ($2))");
+    // Normalize LaTeX parens & operators
+    s = s.replace(/\\left\(/gi, "(").replace(/\\right\)/gi, ")");
+    s = s.replace(/\\cdot|\\times/gi, "*");
+    // Normalize Unicode math operators
+    s = s.replace(/[−–—]/g, "-");
+    s = s.replace(/[×·]/g, "*");
+    // Insert multiplication for juxtaposition e.g. 0.15( -> 0.15 * (
+    s = s.replace(/(\d+(?:\.\d+)?)\s*\(/g, "$1 * (");
+    s = s.replace(/(\d+(?:\.\d+)?)\s*(<[A-Za-z0-9_]+>)/g, "$1 * $2");
+    return s.trim();
+  }
+
+  /**
    * Tokenizes a mathematical expression string containing numbers, operators, parentheses, and variables.
    * @param {string} expr - e.g. "12 * 0.30 * <S1>" or "(S1 * 1.15) - 500000"
    * @returns {Array<{type: string, value: string|number}>}
@@ -29,7 +55,7 @@ class SafeShareLocalCompute {
   tokenize(expr) {
     const tokens = [];
     let i = 0;
-    const clean = expr.trim();
+    const clean = this.cleanMathString(expr);
 
     while (i < clean.length) {
       const ch = clean[i];
@@ -222,12 +248,30 @@ class SafeShareLocalCompute {
   }
 
   /**
-   * Formats a raw number according to currency specifications.
+   * Formats a raw number according to currency or percentage specifications.
    * @param {number} val
-   * @param {string} currency - e.g. "IDR", "USD", "EUR", "GBP"
+   * @param {string} currency - e.g. "USD", "IDR", "EUR", "GBP"
+   * @param {string} expr - optional original expression for percentage/ratio detection
+   * @param {string} afterSnippet - optional trailing text for unit/duration detection
    * @returns {string}
    */
-  formatValue(val, currency = "IDR") {
+  formatValue(val, currency = "USD", expr = "", afterSnippet = "") {
+    // 1. Percentage / Dimensionless Ratio check
+    const isRatioOrPercentage = /%|frac|ESOP|reduction|dilution|ownership|ratio/i.test(expr) || (val > 0 && val < 1 && !/months?|bulan|days?|hari|years?|tahun/i.test(afterSnippet));
+    if (isRatioOrPercentage) {
+      const pct = val * 100;
+      const roundedPct = Math.round(pct * 100) / 100;
+      return `${roundedPct}%`;
+    }
+
+    // 2. Unit duration check (e.g. runway months: <S1> / <S2> months)
+    const isDuration = val < 500 && (/months?|bulan|days?|hari|years?|tahun/i.test(afterSnippet) || (expr.includes("/") && !/%|frac/i.test(expr)));
+    if (isDuration) {
+      const roundedDur = Math.round(val * 100) / 100;
+      return `${roundedDur}`;
+    }
+
+    // 3. Currency amount
     const rounded = Math.abs(val - Math.round(val)) < 1e-4 ? Math.round(val) : Math.round(val * 100) / 100;
     if (currency === "IDR" || currency === "Rp") {
       return `Rp ${Math.round(rounded).toLocaleString("id-ID")}`;
@@ -241,7 +285,7 @@ class SafeShareLocalCompute {
     if (currency === "GBP" || currency === "£") {
       return `£${rounded.toLocaleString("en-GB", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
     }
-    return `${rounded.toLocaleString()}`;
+    return `$${rounded.toLocaleString("en-US")}`;
   }
 
   /**
@@ -249,11 +293,11 @@ class SafeShareLocalCompute {
    * and replaces them with formatted locally computed values.
    * 
    * Supported patterns:
-   *  - "0.30 * <S1>" -> "Rp 900.000"
-   *  - "12 * 0.30 * <S1>" -> "Rp 10.800.000"
-   *  - "<S1> * 15%" -> "Rp 450.000"
-   *  - "<S1> + <S2>" -> "Rp 3.450.000"
-   *  - "<S1>" (standalone variable) -> "Rp 3.000.000"
+   *  - "0.30 * <S1>" -> "$900" or "Rp 900.000"
+   *  - "<S3> − 3 × <S2>" -> "$385,000"
+   *  - "\[\text{ESOP after SAFE} = 0.15\left(1-\frac{\langle S1\rangle}{\langle S4\rangle}\right)\]" -> "\[\text{ESOP after SAFE} = 13.75\%\]"
+   *  - "<S1> / <S2> months" -> "10.34 months"
+   *  - "<S1>" (standalone variable) -> "$1,500,000"
    * 
    * @param {string} text
    * @param {Record<string, {value: number, currency: string, raw: string}>} vault
@@ -266,7 +310,7 @@ class SafeShareLocalCompute {
     }
 
     const symbolTable = {};
-    let defaultCurrency = "IDR";
+    let defaultCurrency = "USD";
     for (const [k, obj] of Object.entries(vault)) {
       symbolTable[k] = obj.value;
       const stripped = k.replace(/[<>]/g, "");
@@ -275,21 +319,40 @@ class SafeShareLocalCompute {
     }
 
     const evaluations = [];
+    const escapeAttr = (str) => String(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-    // Regex matching symbolic mathematical expressions containing variables e.g. <S1> or S1
-    // Matches single-line mathematical phrases without crossing newlines
-    const formulaRx = /(?:\(\s*)?(?:(?:\d+(?:\.\d+)?%?|[A-Za-z0-9_]+|<[A-Za-z0-9_]+>)[ \t]*[-+*\/^%][ \t]*)+(?:<[A-Za-z0-9_]+>|[A-Za-z0-9_]+|\d+(?:\.\d+)?%?)(?:\s*\))?(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?|<S\d+>(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?|\bS\d+\b(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    let hydratedText = text;
 
-    let hydratedText = text.replace(formulaRx, (fullMatch) => {
-      // Must contain at least one known symbol from vault
+    // Phase 1: Process LaTeX display math blocks \[ ... \] or $$ ... $$
+    const latexBlockRx = /(\\\[|\$\$)([\s\S]*?)(\\\]|\$\$)/g;
+    hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, inner, closeTag) => {
+      if (!/<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b/i.test(inner)) return fullMatch;
+      const eq = inner.match(/^([\s\S]*?=\s*)([\s\S]+)$/);
+      if (eq) {
+        const leftSide = eq[1];
+        const rightSide = eq[2].trim();
+        try {
+          const val = this.compute(rightSide, symbolTable);
+          const formatted = this.formatValue(val, defaultCurrency, rightSide).replace("%", "\\%");
+          evaluations.push({ expr: rightSide, val, formatted });
+          return `${openTag}${leftSide}${formatted}${closeTag}`;
+        } catch (_) {
+          return fullMatch;
+        }
+      }
+      return fullMatch;
+    });
+
+    // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and parentheses)
+    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+
+    hydratedText = hydratedText.replace(multiTermRx, (fullMatch, offset) => {
       const hasKnownSymbol = Object.keys(vault).some(k => {
         const bare = k.replace(/[<>]/g, "");
         return fullMatch.includes(k) || fullMatch.includes(bare);
       });
-
       if (!hasKnownSymbol) return fullMatch;
 
-      // Extract time period suffix if attached (e.g. 0.30 * <S1>/month -> expr: "0.30 * <S1>", suffix: "/month")
       const timeSuffixRx = /\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b/i;
       let suffix = "";
       let mathExpr = fullMatch;
@@ -299,18 +362,62 @@ class SafeShareLocalCompute {
         mathExpr = fullMatch.replace(timeSuffixRx, "").trim();
       }
 
+      const nextNl2 = hydratedText.indexOf("\n", offset + fullMatch.length);
+      const limitIdx2 = nextNl2 === -1 ? offset + fullMatch.length + 30 : Math.min(nextNl2, offset + fullMatch.length + 30);
+      const afterSnippet = hydratedText.substring(offset + fullMatch.length, limitIdx2);
       try {
         const val = this.compute(mathExpr, symbolTable);
-        const formatted = this.formatValue(val, defaultCurrency);
+        // Find currency of involved variables if any
+        let itemCurrency = defaultCurrency;
+        for (const [k, obj] of Object.entries(vault)) {
+          if (mathExpr.includes(k) && obj.currency) {
+            itemCurrency = obj.currency;
+            break;
+          }
+        }
+        const formatted = this.formatValue(val, itemCurrency, mathExpr, afterSnippet);
         evaluations.push({ expr: mathExpr.trim(), val, formatted });
 
         if (htmlBadges) {
-          return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${mathExpr.trim()}">${formatted}${suffix}<span class="ss-compute-tag">⚡ local</span></span>`;
+          return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}<span class="ss-compute-tag">⚡ local</span></span>`;
         }
         return `${formatted}${suffix}`;
       } catch (_) {
         return fullMatch;
       }
+    });
+
+    // Phase 3: Process standalone variables
+    const standaloneVarRx = /(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b)(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+
+    hydratedText = hydratedText.replace(standaloneVarRx, (fullMatch, offset) => {
+      const symbolKey = Object.keys(vault).find(k => {
+        const bare = k.replace(/[<>]/g, "");
+        return fullMatch.includes(k) || fullMatch.includes(bare);
+      });
+      if (!symbolKey) return fullMatch;
+
+      const item = vault[symbolKey];
+      const timeSuffixRx = /\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b/i;
+      let suffix = "";
+      let mathExpr = fullMatch;
+      const sm = fullMatch.match(timeSuffixRx);
+      if (sm) {
+        suffix = sm[0];
+        mathExpr = fullMatch.replace(timeSuffixRx, "").trim();
+      }
+
+      const nextNl3 = hydratedText.indexOf("\n", offset + fullMatch.length);
+      const limitIdx3 = nextNl3 === -1 ? offset + fullMatch.length + 30 : Math.min(nextNl3, offset + fullMatch.length + 30);
+      const afterSnippet = hydratedText.substring(offset + fullMatch.length, limitIdx3);
+      const val = item.value;
+      const formatted = this.formatValue(val, item.currency || defaultCurrency, mathExpr, afterSnippet);
+      evaluations.push({ expr: mathExpr.trim(), val, formatted });
+
+      if (htmlBadges) {
+        return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}<span class="ss-compute-tag">⚡ local</span></span>`;
+      }
+      return `${formatted}${suffix}`;
     });
 
     return {

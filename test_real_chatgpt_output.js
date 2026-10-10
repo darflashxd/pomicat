@@ -150,6 +150,7 @@ console.log("  [✓] Cek 6: Zat generik escitalopram tersensor otomatis via medi
 // 7. Check Market Statistics Preserved
 assert(anonymizedTurns[1].content.includes("Rp25,91 juta"), "Data survei Indeed Rp25,91 juta harus tetap utuh");
 assert(anonymizedTurns[1].content.includes("Rp26,1 juta"), "Data survei Glassdoor Rp26,1 juta harus tetap utuh");
+assert(anonymizedTurns[1].content.includes("16,9–30 juta"), "Data rentang Glassdoor 16,9-30 juta harus tetap utuh tanpa over-redaction");
 assert(anonymizedTurns[1].content.includes("Rp402,7 juta"), "Data survei Levels.fyi Rp402,7 juta harus tetap utuh");
 console.log("  [✓] Cek 7: Data pasar industri (Indeed, Glassdoor, Levels.fyi) 100% UTUH!");
 

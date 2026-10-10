@@ -26,6 +26,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Extract Decryption Key and Parameters from URI Fragment # BEFORE any URL mutation
+  const rawHash = window.location.hash.replace(/^#/, "").trim();
+
   // 0. Pre-Flight Check: Ephemeral Revocation Status Check for this specific shareId
   const ZeroizerEngine = typeof SafeShareMemoryZeroizer !== "undefined" ? SafeShareMemoryZeroizer : (typeof SafeShareTamperGuard !== "undefined" ? SafeShareTamperGuard : null);
   if (ZeroizerEngine && shareId && ZeroizerEngine.isPoisoned(shareId)) {
@@ -53,9 +56,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     memoryZeroizer.start();
   }
 
-  // Extract Decryption Key and Parameters from URI Fragment #
-  const rawHash = window.location.hash.replace(/^#/, "").trim();
-
   const lockScreen = document.getElementById("crawler-lock-screen");
   const chatView = document.getElementById("chat-content-view");
   const messagesContainer = document.getElementById("messages-container");
@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         recipientId = hashParams.get("r");
       }
 
-      // Enforce strict 24-hour expiration deadline
+      // Enforce strict expiration deadline check
       if (exp > 0 && Date.now() > exp) {
         lockScreen.style.display = "block";
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired";
@@ -86,8 +86,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       console.error("[SafeShare Viewer] Standalone decryption error:", err);
       lockScreen.style.display = "block";
-      lockScreen.querySelector("h2").innerText = "Decryption Failed";
-      lockScreen.querySelector("p").innerText = "The secret key is invalid or the data is corrupted.";
+      if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
+        lockScreen.querySelector("h2").innerText = "⏱️ Link Expired";
+        lockScreen.querySelector("p").innerText = "This link has passed its expiration deadline set by the sender and has been destroyed.";
+      } else {
+        lockScreen.querySelector("h2").innerText = "Decryption Failed";
+        lockScreen.querySelector("p").innerText = "The secret key is invalid or the data is corrupted.";
+      }
       return;
     }
   } else {
@@ -119,8 +124,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) {
       console.error("[SafeShare Viewer] Relay decryption error:", err);
       lockScreen.style.display = "block";
-      lockScreen.querySelector("h2").innerText = "Decryption Failed";
-      lockScreen.querySelector("p").innerText = "The link may have expired or the relay server is currently offline.";
+      if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
+        lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Shredded";
+        lockScreen.querySelector("p").innerText = "This link has passed its expiration deadline or has been shredded after read (Burn-After-Reading).";
+      } else {
+        lockScreen.querySelector("h2").innerText = "Decryption Failed";
+        lockScreen.querySelector("p").innerText = "The link may have expired or the relay server is currently offline.";
+      }
       return;
     }
   }
@@ -186,7 +196,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 2. Populate Native High-Fidelity Enclave Messages Stream
   if (messagesContainer) {
     messagesContainer.innerHTML = "";
-    decryptedData.turns.forEach((turn) => {
+    watermarkedTurns.forEach((turn) => {
       const bubble = document.createElement("div");
       bubble.className = `chat-bubble chat-bubble-${turn.role}`;
       

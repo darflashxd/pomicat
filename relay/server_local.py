@@ -67,13 +67,36 @@ class SafeShareHandler(BaseHTTPRequestHandler):
         global STORAGE
         if self.path == "/api/share" or self.path == "/api/create":
             length = int(self.headers.get("Content-Length", 0))
+            if length > 2 * 1024 * 1024:
+                self._send_cors(413)
+                self.wfile.write(json.dumps({"error": "Payload exceeds maximum allowed size (2MB)"}).encode())
+                return
+
             raw_body = self.rfile.read(length).decode("utf-8")
             try:
                 data = json.loads(raw_body)
-                share_id = data["id"]
-                ciphertext = data["ciphertext"]
+                share_id = str(data.get("id", "")).strip()
+                ciphertext = data.get("ciphertext")
                 ttl = data.get("ttl", 86400)
                 burn_on_read = data.get("burn_on_read", False)
+
+                if not share_id or not ciphertext:
+                    self._send_cors(400)
+                    self.wfile.write(json.dumps({"error": "Missing id or ciphertext"}).encode())
+                    return
+
+                if len(share_id) > 128:
+                    self._send_cors(400)
+                    self.wfile.write(json.dumps({"error": "Invalid share id length"}).encode())
+                    return
+
+                # Prevent arbitrary collision / overwrite of active existing share
+                now_ts = time.time()
+                existing = STORAGE.get(share_id)
+                if existing and existing.get("expires_at", 0) > now_ts:
+                    self._send_cors(409)
+                    self.wfile.write(json.dumps({"error": "Share ID already exists"}).encode())
+                    return
 
                 is_burn = bool(burn_on_read) or ttl == "burn"
                 ttl_sec = 86400 if ttl == "burn" else int(ttl)
@@ -81,7 +104,7 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 STORAGE[share_id] = {
                     "ciphertext": ciphertext,
                     "is_burn": is_burn,
-                    "expires_at": time.time() + ttl_sec,
+                    "expires_at": now_ts + ttl_sec,
                     "view_count": 0
                 }
                 save_storage(STORAGE)
@@ -98,6 +121,11 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
         elif self.path == "/api/chat":
             length = int(self.headers.get("Content-Length", 0))
+            if length > 512 * 1024:
+                self._send_cors(413)
+                self.wfile.write(json.dumps({"error": "Payload exceeds maximum allowed size"}).encode())
+                return
+
             raw_body = self.rfile.read(length).decode("utf-8")
             try:
                 data = json.loads(raw_body)
@@ -108,23 +136,35 @@ class SafeShareHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_cors(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
+        elif self.path.startswith("/api/revoke/"):
+            # Also support POST /api/revoke/:id
+            share_id = self.path.replace("/api/revoke/", "").strip()
+            if share_id in STORAGE:
+                del STORAGE[share_id]
+                save_storage(STORAGE)
+                print(f"[!] REVOKE (POST): Shredded payload for ID: {share_id}")
+            self._send_cors(200)
+            self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
         else:
             self._send_cors(404)
 
     def _call_ai_gateway(self, messages):
         try:
             import urllib.request
-            url = "http://localhost:20128/v1/chat/completions"
+            gateway_url = os.environ.get("NINEROUTER_URL", "http://localhost:20128/v1/chat/completions")
+            api_key = os.environ.get("NINEROUTER_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
             headers = {
-                "Authorization": "Bearer sk-041e26cade4b727c-uxshhh-c951aec7",
                 "Content-Type": "application/json"
             }
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
             payload = {
-                "model": "ag/gemini-3.8-flash-low",
+                "model": os.environ.get("SAFESHARE_LLM_MODEL", "ag/gemini-3.8-flash-low"),
                 "messages": messages,
                 "stream": False
             }
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers)
+            req = urllib.request.Request(gateway_url, data=json.dumps(payload).encode("utf-8"), headers=headers)
             with urllib.request.urlopen(req, timeout=30) as resp:
                 res_json = json.loads(resp.read().decode("utf-8"))
                 return res_json["choices"][0]["message"]["content"]
@@ -228,11 +268,12 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
 
 def run():
-    server = HTTPServer(("0.0.0.0", PORT), SafeShareHandler)
+    host = os.environ.get("SAFESHARE_HOST", "127.0.0.1")
+    server = HTTPServer((host, PORT), SafeShareHandler)
     print(f"================================================================")
-    print(f"[*] SafeShare-AI Integrated Server Active on Port {PORT}")
-    print(f"[*] Web Viewer: http://localhost:{PORT}")
-    print(f"[*] Relay API : http://localhost:{PORT}/api/share")
+    print(f"[*] SafeShare-AI Integrated Server Active on {host}:{PORT}")
+    print(f"[*] Web Viewer: http://{host}:{PORT}")
+    print(f"[*] Relay API : http://{host}:{PORT}/api/share")
     print(f"================================================================")
     try:
         server.serve_forever()
