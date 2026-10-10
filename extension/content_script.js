@@ -329,6 +329,10 @@
    */
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
+    // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
+    if (!containerEl.querySelector(".ss-local-compute, [data-expr]")) {
+      return (containerEl.innerText || containerEl.textContent || "").trim();
+    }
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
@@ -342,7 +346,8 @@
           span.replaceWith(textNode);
         }
       });
-      return (clone.innerText || clone.textContent || "").trim();
+      const cleanText = clone.innerText || clone.textContent || "";
+      return cleanText.trim() || (containerEl.innerText || containerEl.textContent || "").trim();
     } catch (_) {
       return (containerEl.innerText || containerEl.textContent || "").trim();
     }
@@ -352,10 +357,10 @@
    * Identifies whether an element is inside the prompt composer, textarea, UI header/footer, or disclaimer.
    * Such elements must NEVER be extracted as chat conversation turns.
    */
-  function isComposerOrUIElement(el) {
+  function isPromptInputOrUIElement(el) {
     if (!el) return true;
-    // Exclude anything inside form, prompt-textarea, composer wrapper, textarea, modals, sidebar, nav, header, footer
-    if (el.closest("form, #prompt-textarea, [class*='composer'], .input-area, textarea, [contenteditable='true'], header, nav, footer, aside, #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
+    // Strictly exclude the user prompt composer input, form, and SafeShare UI
+    if (el.closest("form, #prompt-textarea, fieldset, textarea, #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
       return true;
     }
     // Exclude disclaimer text (e.g. ChatGPT can make mistakes...)
@@ -373,9 +378,9 @@
   function extractConversationTurns() {
     const turns = [];
 
-    // 0. High-accuracy ChatGPT data-message-author-role pattern
+    // Strategy 0: High-accuracy ChatGPT data-message-author-role pattern
     const roleDivs = document.querySelectorAll("[data-message-author-role]");
-    const validRoleDivs = Array.from(roleDivs).filter(el => !isComposerOrUIElement(el));
+    const validRoleDivs = Array.from(roleDivs).filter(el => !isPromptInputOrUIElement(el));
     if (validRoleDivs.length > 0) {
       validRoleDivs.forEach((el) => {
         const role = el.getAttribute("data-message-author-role");
@@ -384,16 +389,17 @@
           turns.push({ role, content });
         }
       });
-      return turns;
+      if (turns.length > 0) return turns;
     }
 
-    // 1. ChatGPT article turn pattern
-    const chatGptArticles = document.querySelectorAll("article[data-testid^='conversation-turn']");
-    const validArticles = Array.from(chatGptArticles).filter(el => !isComposerOrUIElement(el));
-    if (validArticles.length > 0) {
-      validArticles.forEach((art) => {
-        const isAssistant = art.querySelector("[data-message-author-role='assistant']") !== null;
-        const contentNode = art.querySelector("[data-message-author-role]") || art;
+    // Strategy 1: ChatGPT conversation-turn pattern (both article and div tags)
+    const chatGptTurns = document.querySelectorAll("[data-testid^='conversation-turn']");
+    const validTurns = Array.from(chatGptTurns).filter(el => !isPromptInputOrUIElement(el));
+    if (validTurns.length > 0) {
+      validTurns.forEach((turnEl) => {
+        const isAssistant = turnEl.querySelector("[data-message-author-role='assistant'], div.markdown, [data-testid*='assistant']") !== null;
+        // Prefer content subnode if present
+        const contentNode = turnEl.querySelector("[data-message-author-role], div.markdown, div.whitespace-pre-wrap") || turnEl;
         const textContent = getCleanNodeContent(contentNode);
         if (textContent) {
           turns.push({
@@ -402,15 +408,16 @@
           });
         }
       });
-      return turns;
+      if (turns.length > 0) return turns;
     }
 
-    // 2. Claude DOM Pattern
-    const claudeMessages = document.querySelectorAll("[data-testid='user-message'], .font-claude-message");
-    const validClaude = Array.from(claudeMessages).filter(el => !isComposerOrUIElement(el));
-    if (validClaude.length > 0) {
-      validClaude.forEach((el) => {
-        const isUser = el.getAttribute("data-testid") === "user-message";
+    // Strategy 2: Claude DOM Pattern
+    const claudeUserNodes = document.querySelectorAll("[data-testid='user-message'], div[class*='user-message']");
+    const claudeAsstNodes = document.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+    if (claudeUserNodes.length > 0 || claudeAsstNodes.length > 0) {
+      const allClaude = document.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+      Array.from(allClaude).filter(el => !isPromptInputOrUIElement(el)).forEach((el) => {
+        const isUser = el.getAttribute("data-testid") === "user-message" || (el.className && el.className.includes("user-message"));
         const textContent = getCleanNodeContent(el);
         if (textContent) {
           turns.push({
@@ -419,24 +426,24 @@
           });
         }
       });
-      return turns;
+      if (turns.length > 0) return turns;
     }
 
-    // 3. DeepSeek / generic chat message bubble pattern
-    const chatBubbles = document.querySelectorAll(".chat-turn, .chat-message, div[class*='message-bubble'], div[class*='chat-item']");
-    const validBubbles = Array.from(chatBubbles).filter(el => !isComposerOrUIElement(el));
-    if (validBubbles.length > 0) {
-      validBubbles.forEach((el) => {
-        const isAsst = /assistant|ai|bot/i.test(el.className) || el.querySelector("[class*='assistant'], [class*='bot']") !== null;
-        const content = getCleanNodeContent(el);
-        if (content) {
+    // Strategy 3: DeepSeek & generic markdown message turns
+    const deepseekNodes = document.querySelectorAll("div.ds-markdown, div[class*='ds-markdown'], .chat-message, div[class*='message-bubble']");
+    const validDeepseek = Array.from(deepseekNodes).filter(el => !isPromptInputOrUIElement(el));
+    if (validDeepseek.length > 0) {
+      validDeepseek.forEach((el) => {
+        const isAsst = /assistant|ai|bot|markdown/i.test(el.className) || el.querySelector("[class*='assistant'], [class*='bot']") !== null;
+        const textContent = getCleanNodeContent(el);
+        if (textContent) {
           turns.push({
             role: isAsst ? "assistant" : "user",
-            content: content
+            content: textContent
           });
         }
       });
-      return turns;
+      if (turns.length > 0) return turns;
     }
 
     // Chat is empty (no messages have been sent yet)
