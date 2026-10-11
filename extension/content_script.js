@@ -322,7 +322,8 @@
 
     // Selector for all assistant message content containers
     const asstNodes = document.querySelectorAll(
-      "[data-message-author-role='assistant'], [data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td"
+      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] pre, [data-markdown-text-style='assistant-message'] code, [data-markdown-text-style='assistant-message'] span.katex, [data-markdown-text-style='assistant-message'] div[class*='math'], " +
+      "[data-message-author-role='assistant'],[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td"
     );
 
     asstNodes.forEach((node) => {
@@ -446,6 +447,28 @@
 
   function extractRawTurns() {
     const turns = [];
+
+    // Strategy A (ChatGPT, 2026 layout): user bubbles and assistant markdown carry readable
+    // data attributes; class names are hashed and change between releases.
+    const bubbles = Array.from(document.querySelectorAll(
+      "[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']"
+    )).filter(el => !isPromptInputOrUIElement(el));
+    if (bubbles.length > 0) {
+      // A reply can be split over several markdown blocks: join blocks of the same turn
+      let lastKey = null;
+      for (const el of bubbles) {
+        const role = el.matches("[data-user-message-bubble='true']") ? "user" : "assistant";
+        const unit = el.closest("[data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id]");
+        const key = unit ? (unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id")) : el;
+        const content = getCleanNodeContent(el);
+        if (!content) continue;
+        const prev = turns[turns.length - 1];
+        if (prev && prev.role === role && key === lastKey) prev.content += "\n\n" + content;
+        else turns.push({ role, content });
+        lastKey = key;
+      }
+      if (turns.length > 0) return turns;
+    }
 
     // Strategy 0: High-accuracy ChatGPT data-message-author-role pattern
     const roleDivs = document.querySelectorAll("[data-message-author-role]");

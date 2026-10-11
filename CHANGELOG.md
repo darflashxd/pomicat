@@ -9,6 +9,10 @@
   repeat the same message (nested page elements); both are now removed when the chat is read and
   when the continuation prompt is built. The prompt also explains `<S1>`-style placeholders.
 
+- ChatGPT's 2026 page layout (hashed class names, no `data-message-author-role`): the extension
+  found no assistant replies, and the on-screen number display stopped working. It now reads
+  `data-user-message-bubble` / `data-markdown-text-style="assistant-message"` first.
+
 ### Changed
 - The continuation prompt explains the placeholders and asks the model not to reconstruct them,
   keeps the newest turns whole, shortens long older answers, drops the oldest turns past a size
