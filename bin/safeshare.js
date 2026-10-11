@@ -237,6 +237,8 @@ async function presidioHits(turns, policy) {
       if (/[{};]|=>|->|==|\s=\s|\b\w+\(|^\s*(?:#define|def|class|import|from|const|let|var|val|fn|func|public|private|return)\b/.test(line)) continue;
       // Names and places: only capitalised words ("mov", "val", "client.x" are not names)
       if (r.entity_type === "PERSON" || r.entity_type === "LOCATION") {
+        // All-caps acronyms ("NIK", "API") are not people
+        if (r.entity_type === "PERSON" && /^[A-Z]{2,6}$/.test(raw.trim())) continue;
         // Places may contain numbers ("Southeast 28th Street", "Grid Road 641"); names may not.
         const ok = (w, k) => /^\p{Lu}[\p{L}'’.-]*:?$/u.test(w) || (k > 0 && NAME_PARTICLES.test(w)) ||
           (r.entity_type === "LOCATION" && /^\d+\p{L}*,?$/u.test(w));

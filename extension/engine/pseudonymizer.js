@@ -492,9 +492,23 @@ class ConsistentPseudonymizer {
         pseudonym = `[HR_DISCIPLINARY_RECORD_${this.counters.HR++}]`;
         break;
       case "SENSITIVE_USER":
-      case "USER":
+      case "USER": {
+        // "Rina" after "Rina Kusuma" (or the reverse) is the same person: reuse the label
+        const words = rawEntity.trim().toLowerCase().split(/\s+/);
+        for (const [k, v] of this.entityMap) {
+          const m = /^(?:SENSITIVE_)?USER::(.+)$/.exec(k);
+          if (!m) continue;
+          const other = m[1].split(/\s+/);
+          const shorter = words.length <= other.length ? words : other;
+          const longer = shorter === words ? other : words;
+          if (shorter.every((w) => longer.includes(w))) {
+            this.entityMap.set(key, v);
+            return v;
+          }
+        }
         pseudonym = `[User_${letterLabel(this.counters.USER++)}]`;
         break;
+      }
       default:
         // Other categories (e.g. LOCATION from an external detector) get their own numbered label
         this.counters[category] = this.counters[category] || 1;
@@ -723,7 +737,8 @@ class ConsistentPseudonymizer {
           const nameTokens = [];
           for (const w of words) {
             const clean = w.toLowerCase().replace(/[^a-z]/g, "");
-            if (nameStopWords.has(clean)) break;
+            // A name ends at the first stop word or common word: "Rina Kusuma and I live" -> "Rina Kusuma"
+            if (nameStopWords.has(clean) || COMMON_WORDS.has(clean)) break;
             nameTokens.push(w);
             if (nameTokens.length >= 4) break; // Max 4 words for a realistic name
           }

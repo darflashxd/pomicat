@@ -71,7 +71,7 @@ and 500 WildChat conversations:
 
 | setting | ai4privacy token F1 | token P | WildChat conversations touched |
 |---|---|---|---|
-| SafeShare alone | 0.211 | 0.970 | 7.8% |
+| SafeShare alone | 0.213 | 0.969 | 7.8% |
 | + Presidio, `names: personal` (default) | 0.310 | 0.980 | 8.8% |
 | + Presidio, `names: all` | 0.667 | 0.957 | 71% |
 | + Presidio, `names: all`, dates on | 0.780 | 0.926 | – |

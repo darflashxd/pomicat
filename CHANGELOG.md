@@ -17,6 +17,9 @@
 - Short entities were replaced inside other words ("spatial" → "s[LOCATION_1]tial").
 - Name labels ran past `[User_Z]` into symbols; now `[User_AA]`, `[User_AB]`, ...
 - `invert` treated range endpoints as real values.
+- "I'm Rina Kusuma and I live…" was not caught (the name now ends at "and").
+- A first name on its own ("Hi Rina!") now reuses the full name's label.
+- Presidio's person tag on acronyms ("NIK", "API") is ignored.
 
 
 ## 2.2.0 (2026-10-10)

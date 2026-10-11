@@ -31,6 +31,14 @@ out = text(redactTurns(
 assert(out.includes("Rina") && out.includes("Rp 3.000.000"), out);
 assert(!out.includes("3201012304950001") && !out.includes("sk-proj-ab12"), out);
 
+// A self-introduced name stops at "and", and the first name alone gets the same label
+out = text(redactTurns([
+  { role: "user", content: "Hi, I'm Rina Kusuma and I live in Bandung." },
+  { role: "assistant", content: "Hi Rina! Rina Kusuma is a lovely name." }
+]));
+assert(!/Rina|Kusuma/.test(out), out);
+assert.strictEqual(new Set(out.match(/\[User_[A-Z]+\]/g)).size, 1, "one person, one label: " + out);
+
 assert.throws(() => redactTurns(chat, { profile: "everyone" }), /Unknown profile/);
 assert.throws(() => redactTurns(chat, { numbers: "blur" }), /Unknown numbers mode/);
 
