@@ -2,10 +2,12 @@
 /**
  * SafeShare CLI and library.
  *
- *   safeshare redact [file] [--policy policy.json] [--json]
+ *   safeshare redact [file] [options] [--json]
  *   safeshare invert [file] [--json]
- *   safeshare share  [file] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn] [--policy policy.json]
- *   safeshare proxy  [--port 8788] [--upstream https://api.openai.com] [--policy policy.json]
+ *   safeshare share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]
+ *   safeshare proxy  [options] [--port 8788] [--upstream https://api.openai.com]
+ *
+ * options: --profile public|trusted, --numbers remove|range, --presidio <url>, --policy <file>
  *
  * Input is a file or stdin: either a JSON array of {role, content}, or plain text where
  * turns start with "User:" / "Assistant:" (anything else is one user turn).
@@ -19,7 +21,7 @@ const path = require("path");
 const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ContextualClassifier = require("../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
-const { AdversaryOracleSolver } = ConsistentPseudonymizer;
+const { invert, bucket, formatRange, generalizeNumbers } = require("../extension/engine/policy.js");
 
 // ---------------------------------------------------------------------------
 // Policy: presets, custom rules, allowlist
@@ -92,87 +94,169 @@ function buildEngines(policy = {}) {
 // Redact
 // ---------------------------------------------------------------------------
 
-function redactTurns(turns, policy = {}) {
+// Profiles answer "who will read this?":
+//   public  (default) everything personal goes, including your own numbers and anything derived
+//   trusted           keep names and your own numbers; remove only IDs, keys, cards and contacts
+const PROFILES = ["public", "trusted"];
+const NUMBER_MODES = ["remove", "range"];
+
+function checkPolicy(policy) {
+  if (policy.profile && !PROFILES.includes(policy.profile)) {
+    throw new Error(`Unknown profile "${policy.profile}". Use one of: ${PROFILES.join(", ")}`);
+  }
+  if (policy.numbers && !NUMBER_MODES.includes(policy.numbers)) {
+    throw new Error(`Unknown numbers mode "${policy.numbers}". Use one of: ${NUMBER_MODES.join(", ")}`);
+  }
+}
+
+// Step 1: hard patterns (keys, IDs, cards, contacts) and contextual hits.
+function scanTurns(turns, policy) {
+  checkPolicy(policy);
   const { heuristics, contextual, filterContextual } = buildEngines(policy);
-  const pseudonymizer = new ConsistentPseudonymizer();
+  const trusted = policy.profile === "trusted";
   const intermediate = [];
-  const contextHits = [];
+  const hits = [];
   turns.forEach((t, i) => {
     const h = heuristics.scan(t.content);
-    contextHits.push(...filterContextual(contextual.classifyTurn(h.sanitizedText, i)));
+    if (!trusted) hits.push(...filterContextual(contextual.classifyTurn(h.sanitizedText, i)));
     intermediate.push({ role: t.role, content: h.sanitizedText });
   });
-  return pseudonymizer.anonymizeConversation(intermediate, contextHits).anonymizedTurns;
+  return { intermediate, hits };
+}
+
+// Step 2: consistent placeholders, the inversion defense, and optional range generalization.
+function finishTurns(intermediate, hits, policy) {
+  const pseudonymizer = new ConsistentPseudonymizer();
+  const removed = pseudonymizer.anonymizeConversation(intermediate, hits, [], {
+    keepNames: policy.profile === "trusted"
+  }).anonymizedTurns;
+  if (policy.numbers !== "range") return removed;
+  // Only amounts the user stated get a range; figures the assistant derived stay removed.
+  const userAmounts = new Set(
+    hits.filter((h) => h.category === "SENSITIVE_FINANCIAL" && intermediate[h.turnIndex]?.role === "user")
+      .map((h) => h.raw.trim().toLowerCase())
+  );
+  return generalizeNumbers(removed, pseudonymizer, userAmounts);
+}
+
+/** Synchronous redaction with the built-in engines. */
+function redactTurns(turns, policy = {}) {
+  const { intermediate, hits } = scanTurns(turns, policy);
+  return finishTurns(intermediate, hits, policy);
+}
+
+/** Redaction that can also use an external Presidio analyzer (policy.presidio). */
+async function redact(turns, policy = {}) {
+  const { intermediate, hits } = scanTurns(turns, policy);
+  if (policy.presidio) hits.push(...(await presidioHits(intermediate, policy)));
+  return finishTurns(intermediate, hits, policy);
 }
 
 // ---------------------------------------------------------------------------
-// Invert (the attack)
+// Presidio: names, places and contacts the rules can't find
 // ---------------------------------------------------------------------------
 
-const PERIODS = [12, 52, 4, 2, 3, 24, 36, 60]; // months, weeks, quarters, multi-year spans
-// Occam weighting: monthly<->yearly (12) is the usual step, other periods are less likely.
-const periodCost = (c) => (c === 12 ? 1 : 2);
+// Presidio entity -> pseudonymizer category. PERSON reuses SafeShare's name handling so a
+// name stays the same placeholder in every turn. DATE_TIME and NRP are left out by default:
+// in chats they mostly hit phrases like "a year" or nationalities.
+const PRESIDIO_CATEGORIES = {
+  PERSON: "USER",
+  LOCATION: "LOCATION",
+  EMAIL_ADDRESS: "EMAIL",
+  PHONE_NUMBER: "PHONE",
+  CREDIT_CARD: "CARD",
+  IBAN_CODE: "ACCOUNT",
+  US_BANK_NUMBER: "ACCOUNT",
+  US_SSN: "ID",
+  US_PASSPORT: "ID",
+  US_DRIVER_LICENSE: "ID",
+  UK_NHS: "ID",
+  MEDICAL_LICENSE: "ID",
+  IP_ADDRESS: "IP_ADDRESS",
+  DATE_TIME: "DATE",
+  NRP: "GROUP"
+};
+// Every Presidio recognizer runs except these, which are noisy in chats ("a year", "French", links)
+const PRESIDIO_SKIP = new Set(["DATE_TIME", "NRP", "URL"]);
+// A trusted reader may see names and places; contacts and IDs still go.
+const PRESIDIO_TRUSTED_SKIP = new Set(["PERSON", "LOCATION"]);
+const NAME_PARTICLES = /^(?:van|von|de|der|den|du|del|della|da|di|la|le|bin|binti|al|el)$/;
+// names: "personal" (default) keeps a name/place only when the user's own sentence ties it to
+// them ("my wife Rina", "I live in Bandung", "teman saya Budi"). Celebrities, story characters
+// and places in essays pass through. names: "all" redacts every name Presidio finds.
+// The name or place must come right after words that tie it to the user.
+const RELATION = "wife|husband|son|daughter|kid|child|mom|mum|mother|dad|father|parent|sister|brother|sibling|cousin|aunt|uncle|grandma|grandpa|grandmother|grandfather|friend|best friend|boss|colleague|coworker|co-worker|manager|supervisor|teacher|neighbou?r|landlord|tenant|doctor|therapist|partner|girlfriend|boyfriend|fianc[eé]e?|ex|roommate|lawyer|client|student";
+const RELATION_ID = "istri|suami|anak|ibu|ayah|bapak|kakak|adik|teman|sahabat|bos|atasan|pacar|tetangga|dokter|guru";
+const PERSONAL_BEFORE = {
+  PERSON: new RegExp(
+    `(?:\\b(?:my|our)\\s+(?:\\w+\\s+)?(?:${RELATION})|\\bmy name is|\\bi'?m|\\bi am|\\bcall me|\\bthis is|` +
+    `\\bnama\\s+(?:saya|ku|aku|gue)|\\b(?:${RELATION_ID})\\s+(?:saya|ku|aku|gue|gw|kami))\\s*,?\\s*(?:named\\s+|called\\s+|is\\s+|bernama\\s+|namanya\\s+)?$`, "i"),
+  LOCATION: /(?:\b(?:i|we)\s+(?:live|lived|am living|are living|stay|work|grew up|moved|was born|were born)\s+(?:in|at|to|near)|\b(?:i'?m|i am|we're|we are)\s+(?:[\w'-]+\s+){0,4}(?:from|based in|located in)|\bmy (?:home|address|apartment|house|office|school|hometown) is (?:in|at)?|\b(?:tinggal|kerja|bekerja|lahir|kuliah|sekolah)\s+di|\bsaya dari|\baku dari)\s*$/i
+};
+// Presidio's ID recognizers (driver licence, bank number, ...) fire on short codes; ask for some confidence.
+const PRESIDIO_MIN_SCORE = { US_DRIVER_LICENSE: 0.3, US_BANK_NUMBER: 0.3, US_ITIN: 0.3, US_PASSPORT: 0.3 };
 
 /**
- * Returns hidden-value candidates that at least `minSupport` distinct visible numbers agree
- * on. Consistent numbers also agree on every rescaled value (x2, /60, ...), so candidates are
- * ranked by support, then by how simple the explanation is (total operation cost).
- * Result: [{ value, support, cost, derivations: [string], currency }]
+ * policy.presidio = "http://127.0.0.1:5002"
+ *   or { url, names: "personal"|"all", entities: ["PERSON", ...], skip: ["DATE_TIME"], threshold: 0, language: "en" }
+ * Without `entities`, all recognizers run except `skip` (default PRESIDIO_SKIP).
  */
-function invert(text, { tolerance = 0.015, minSupport = 2, limit = 3 } = {}) {
-  const tokens = new AdversaryOracleSolver(tolerance).lexNumericSpans(text);
-  const amounts = tokens.filter((t) => !t.isRatio && !t.isSmallInt);
-  const ratios = tokens.filter((t) => t.isRatio && t.val > 0 && t.val < 1);
-  const factors = [
-    ...ratios.map((r) => ({ v: r.val, label: r.raw })),
-    ...ratios.map((r) => ({ v: 1 - r.val, label: `(100% - ${r.raw})` }))
-  ];
-
-  const near = (a, b) => Math.abs(a - b) / b <= tolerance;
-  const visible = amounts.map((a) => a.val);
-  const cands = [];
-  for (const a of amounts) {
-    const add = (v, how, cost) => {
-      if (v >= 100 && !visible.some((x) => near(v, x))) cands.push({ v, how, cost, src: a.start });
-    };
-    for (const c of PERIODS) {
-      add(a.val / c, `${a.raw} / ${c}`, periodCost(c));
-      add(a.val * c, `${a.raw} × ${c}`, periodCost(c));
-    }
-    for (const f of factors) {
-      add(a.val / f.v, `${a.raw} / ${f.label}`, 1);
-      for (const c of PERIODS) {
-        add(a.val / c / f.v, `${a.raw} / ${c} / ${f.label}`, 1 + periodCost(c));
-        add((a.val * c) / f.v, `${a.raw} × ${c} / ${f.label}`, 1 + periodCost(c));
+async function presidioHits(turns, policy) {
+  const cfg = typeof policy.presidio === "string" ? { url: policy.presidio } : policy.presidio;
+  const skip = new Set(cfg.skip ?? PRESIDIO_SKIP);
+  const wanted = (type) =>
+    (cfg.entities ? cfg.entities.includes(type) : !skip.has(type)) &&
+    (policy.profile !== "trusted" || !PRESIDIO_TRUSTED_SKIP.has(type));
+  const isPlaceholder = /^\[[^\]]*\]$|^\[|\]$/;
+  const hits = [];
+  for (const [i, t] of turns.entries()) {
+    if (!t.content.trim()) continue;
+    const res = await fetch(`${cfg.url.replace(/\/$/, "")}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: t.content, language: cfg.language || "en", entities: cfg.entities, score_threshold: cfg.threshold ?? 0 })
+    });
+    if (!res.ok) throw new Error(`Presidio returned ${res.status}: ${await res.text()}`);
+    const codeSpans = [...t.content.matchAll(/```[\s\S]*?(?:```|$)|`[^`\n]+`/g)].map((m) => [m.index, m.index + m[0].length]);
+    for (const r of await res.json()) {
+      if (!wanted(r.entity_type)) continue;
+      if (r.score < (PRESIDIO_MIN_SCORE[r.entity_type] || 0)) continue;
+      let raw = t.content.slice(r.start, r.end);
+      // ID-style hits must look like an ID: 5+ chars with a digit, not part of a URL or identifier
+      // (skips "O3", "x86", "n_vocab", DOI fragments)
+      if (/(?:https?:\/\/|doi\.org\/|www\.)\S*$/i.test(t.content.slice(Math.max(0, r.start - 200), r.start))) continue;
+      if (["ID", "ACCOUNT"].includes(PRESIDIO_CATEGORIES[r.entity_type])) {
+        if (raw.length < 5 || !/\d/.test(raw) || /[_]/.test(raw)) continue;
+        if (/[\w.-]$/.test(t.content[r.start - 1] || "") || /^[\w-]/.test(t.content[r.end] || "")) continue;
       }
+      // Don't re-redact SafeShare's own placeholders
+      if (!raw.trim() || isPlaceholder.test(raw.trim())) continue;
+      // Skip anything inside code: code blocks, or lines with code signals ("Jane (my wife)" is fine)
+      const line = t.content.slice(t.content.lastIndexOf("\n", r.start) + 1, (t.content.indexOf("\n", r.end) + 1 || t.content.length + 1) - 1);
+      if (codeSpans.some(([s, e]) => r.start >= s && r.start < e)) continue;
+      if (/[{};]|=>|->|==|\s=\s|\b\w+\(|^\s*(?:#define|def|class|import|from|const|let|var|val|fn|func|public|private|return)\b/.test(line)) continue;
+      // Names and places: only capitalised words ("mov", "val", "client.x" are not names)
+      if (r.entity_type === "PERSON" || r.entity_type === "LOCATION") {
+        // Places may contain numbers ("Southeast 28th Street", "Grid Road 641"); names may not.
+        const ok = (w, k) => /^\p{Lu}[\p{L}'’.-]*:?$/u.test(w) || (k > 0 && NAME_PARTICLES.test(w)) ||
+          (r.entity_type === "LOCATION" && /^\d+\p{L}*,?$/u.test(w));
+        // Trim stray words Presidio includes at the edges ("5:26:32 AM Vãnia Viviana:" -> "Vãnia Viviana")
+        const words = raw.trim().split(/\s+/);
+        while (words.length && !(ok(words[0], 0) && words[0] !== "AM" && words[0] !== "PM")) words.shift();
+        while (words.length && !ok(words[words.length - 1], 1)) words.pop();
+        if (!words.length || !words.every(ok)) continue;
+        raw = words.join(" ").replace(/[:,]$/, "");
+        const at = t.content.indexOf(raw, r.start);
+        if (at === -1) continue;
+        if ((cfg.names || "personal") === "personal") {
+          if (t.role !== "user") continue;
+          if (!PERSONAL_BEFORE[r.entity_type].test(t.content.slice(Math.max(0, at - 60), at))) continue;
+        }
+      }
+      hits.push({ turnIndex: i, raw, category: PRESIDIO_CATEGORIES[r.entity_type] || r.entity_type });
     }
   }
-
-  // Cluster candidates that land on the same value; keep the cheapest derivation per source.
-  const clusters = [];
-  for (const c of cands) {
-    let k = clusters.find((k) => near(c.v, k.value));
-    if (!k) clusters.push((k = { value: c.v, bySource: new Map() }));
-    const prev = k.bySource.get(c.src);
-    if (!prev || c.cost < prev.cost) k.bySource.set(c.src, c);
-  }
-
-  const currency = (amounts.find((a) => /Rp|IDR/i.test(a.raw)) && "IDR") ||
-    (amounts.find((a) => /\$|USD/.test(a.raw)) && "USD") || null;
-  return clusters
-    .map((k) => {
-      const ds = [...k.bySource.values()];
-      return {
-        value: k.value,
-        support: ds.length,
-        cost: ds.reduce((n, d) => n + d.cost, 0),
-        derivations: ds.map((d) => d.how),
-        currency
-      };
-    })
-    .filter((k) => k.support >= minSupport)
-    .sort((a, b) => b.support - a.support || a.cost - b.cost)
-    .slice(0, limit);
+  return hits;
 }
 
 function formatMoney(v, currency) {
@@ -230,10 +314,16 @@ function main(argv) {
     return i === -1 ? undefined : rest.splice(i, 2)[1];
   };
   const bool = (name) => rest.includes(name) && rest.splice(rest.indexOf(name), 1).length > 0;
+  const policy = loadPolicy(flag("--policy"));
+  // Command-line switches override the policy file
+  for (const [name, key] of [["--profile", "profile"], ["--numbers", "numbers"], ["--presidio", "presidio"]]) {
+    const v = flag(name);
+    if (v !== undefined) policy[key] = v;
+  }
   const opts = {
     json: bool("--json"),
     burn: bool("--burn"),
-    policy: loadPolicy(flag("--policy")),
+    policy,
     relay: flag("--relay") || "http://127.0.0.1:8787",
     ttl: Number(flag("--ttl") || 86400),
     port: Number(flag("--port") || 8788),
@@ -245,22 +335,31 @@ function main(argv) {
   if (!["redact", "invert", "share"].includes(cmd)) {
     console.error(
       "Usage:\n" +
-      "  safeshare redact [file] [--policy policy.json] [--json]\n" +
+      "  safeshare redact [file] [options] [--json]\n" +
       "  safeshare invert [file] [--json]\n" +
-      "  safeshare share  [file] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn] [--policy policy.json]\n" +
-      "  safeshare proxy  [--port 8788] [--upstream https://api.openai.com] [--policy policy.json]"
+      "  safeshare share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]\n" +
+      "  safeshare proxy  [options] [--port 8788] [--upstream https://api.openai.com]\n" +
+      "\n" +
+      "Options:\n" +
+      "  --profile public|trusted   who will read it (default public)\n" +
+      "  --numbers remove|range     remove your amounts, or show them as ranges like Rp 2–5 juta\n" +
+      "  --presidio <url>           also use a Presidio analyzer for names, places, contacts\n" +
+      "  --policy <file>            rules, allowlist, presets (see README)"
     );
     process.exit(cmd ? 1 : 0);
   }
 
   const input = fs.readFileSync(rest[0] ? path.resolve(rest[0]) : 0, "utf8");
+  const fail = (e) => {
+    console.error(e.message);
+    process.exitCode = 1;
+  };
 
-  if (cmd === "redact") return console.log(formatTurns(redactTurns(parseTurns(input), opts.policy), opts.json));
+  if (cmd === "redact") {
+    return redact(parseTurns(input), opts.policy).then((t) => console.log(formatTurns(t, opts.json)), fail);
+  }
   if (cmd === "share") {
-    return share(redactTurns(parseTurns(input), opts.policy), opts).catch((e) => {
-      console.error(e.message);
-      process.exitCode = 1;
-    });
+    return redact(parseTurns(input), opts.policy).then((t) => share(t, opts)).catch(fail);
   }
 
   const text = input.trim().startsWith("[") ? JSON.parse(input).map((t) => t.content).join("\n") : input;
@@ -275,6 +374,6 @@ function main(argv) {
   process.exitCode = 2; // non-zero so CI can fail on a leaky redaction
 }
 
-module.exports = { redactTurns, invert, buildEngines, PRESETS };
+module.exports = { redact, redactTurns, invert, buildEngines, PRESETS, bucket, formatRange };
 
 if (require.main === module) main(process.argv.slice(2));

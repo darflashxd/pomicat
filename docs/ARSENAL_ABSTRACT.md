@@ -21,10 +21,12 @@ OpenAI-compatible proxy, and handles Indonesian and English number formats.
 1. A naively redacted chat, and the salary recovered from it in one command.
 2. The same chat redacted by SafeShare: nothing recovered.
 3. An encrypted, burn-after-read share link served from a local relay.
-4. Honest numbers: on held-out ai4privacy data, Presidio beats SafeShare at general PII
-   (token F1 0.79 vs 0.21), yet Presidio leaves the salary and every derived figure in place,
-   and masking only the salary still lets `invert` recover it. SafeShare is the layer that closes
-   that gap, not a replacement for entity detection.
+4. Honest numbers. On held-out ai4privacy data, SafeShare + Presidio matches Presidio
+   (token F1 0.78 vs 0.79), but only SafeShare blocks `invert`: Presidio leaves the salary and
+   every derived figure in place. And the benchmark misleads: redacting every name, as it
+   rewards, rewrites 71% of 500 real WildChat conversations. Deciding whether a name or number
+   belongs to the user is the open problem.
+5. Sharing a salary chat as "Rp 2–5 juta": useful, and the attack recovers nothing.
 
 ## Limits we will state
 

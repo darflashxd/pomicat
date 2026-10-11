@@ -54,6 +54,15 @@ node bin/safeshare.js invert /tmp/safe.txt
 The derived amounts are gone too, the 30% ratio is kept because a ratio alone reveals nothing,
 and the attack prints `No hidden values recovered.`
 
+## 4b. Keep it useful (30 s)
+
+```bash
+node bin/safeshare.js redact examples/chat_original.txt --numbers range
+```
+
+"You can still share a chat about your salary: it says Rp 2–5 juta, the derived numbers are
+gone, and the attack gets nothing."
+
 ## 5. Encrypted, burn-after-read link (60 s)
 
 ```bash
@@ -74,7 +83,10 @@ don't pretend otherwise. What we control is what's in the text and how long the 
 
 - **"Does it use AI?"** No. Detection is rules plus the inversion solver. We trained a
   DistilBERT model and it scored F1 0.64, so it isn't shipped (`MODELS_SETUP.md`).
-- **"How accurate is it?"** Show `tools/eval/README.md` and the numbers from the held-out run.
+- **"How accurate is it?"** Alone it's weak on names (no NER). With `--presidio` it matches
+  Presidio on ai4privacy (0.78 vs 0.79) and still blocks the inversion attack. But redacting
+  every name rewrites 71% of real chats, so the default only redacts names tied to the user
+  (`tools/eval/RESULTS.md`).
 - **"Can I use it without the browser?"** `safeshare proxy` sits in front of any
   OpenAI-compatible API and redacts messages before they leave.
 

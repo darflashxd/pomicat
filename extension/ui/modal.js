@@ -26,10 +26,18 @@ class SafeShareModal {
     this.isInspectorOpen = false;
 
     this.sanitizedTurns = [];
+    // Who will read the link: "public" removes your own numbers and names too; "trusted" keeps
+    // them and removes only IDs, keys, cards and contacts. Numbers: "remove" or "range".
+    this.profile = "public";
+    this.numbersMode = "remove";
     this.loadPreferences();
   }
 
   loadPreferences() {
+    try {
+      if (localStorage.getItem("safeshare_profile") === "trusted") this.profile = "trusted";
+      if (localStorage.getItem("safeshare_numbers") === "range") this.numbersMode = "range";
+    } catch (_) {}
     try {
       const saved = localStorage.getItem("safeshare_active_categories");
       if (saved) {
@@ -119,6 +127,18 @@ class SafeShareModal {
           <div class="policy-bar-left">
             <span class="policy-label">Policy Categories:</span>
             <div class="policy-pills-list" id="policy-pills-list"></div>
+          </div>
+          <div class="policy-mode-group">
+            <label class="policy-label" for="safeshare-profile">Reader</label>
+            <select id="safeshare-profile" class="policy-select" title="Public: also removes your own numbers and names. Trusted: keeps them, removes only IDs, keys, cards and contacts.">
+              <option value="public">Anyone with the link</option>
+              <option value="trusted">Someone I trust</option>
+            </select>
+            <label class="policy-label" for="safeshare-numbers">Amounts</label>
+            <select id="safeshare-numbers" class="policy-select" title="Range shows your amounts as a band like Rp 2–5 juta; derived figures stay removed.">
+              <option value="remove">Remove</option>
+              <option value="range">Show as range</option>
+            </select>
           </div>
           <button class="btn-toggle-inspector" id="btn-toggle-inspector" title="Customize detected items individually">
             <span class="inspector-gear-icon">⚙️</span>
@@ -519,8 +539,9 @@ class SafeShareModal {
       });
     }
 
-    // 2. Filter active contextual entities based on user toggles
-    const activeContextual = (this.rawContextualEntities || []).filter(e => {
+    // 2. Filter active contextual entities based on user toggles (none for a trusted reader)
+    const trusted = this.profile === "trusted";
+    const activeContextual = trusted ? [] : (this.rawContextualEntities || []).filter(e => {
       const cleanE = e.raw.replace(/[.,;:]+$/, "").trim();
       const eVal = this.pseudonymizer.parseFinancialValue(cleanE);
       const cand = this.candidates.find(c =>
@@ -561,11 +582,19 @@ class SafeShareModal {
       {
         masterEntityMap: this.masterEntityMap,
         disabledLeaks,
-        disabledFinancialVals
+        disabledFinancialVals,
+        keepNames: trusted
       }
     );
 
     this.sanitizedTurns = anonymizedTurns;
+    if (this.numbersMode === "range" && !trusted) {
+      // Only amounts the user stated become ranges; the assistant's derived figures stay removed
+      const userAmounts = new Set(activeContextual
+        .filter(e => e.category === "SENSITIVE_FINANCIAL" && this.currentTurns[e.turnIndex]?.role === "user")
+        .map(e => e.raw.trim().toLowerCase()));
+      this.sanitizedTurns = SafeSharePolicy.generalizeNumbers(anonymizedTurns, this.pseudonymizer, userAmounts);
+    }
 
     // Helper to replace text without penetrating existing <span ...>...</span> badges
     const replaceOutsideSpans = (html, regex, replacer) => {
@@ -576,8 +605,8 @@ class SafeShareModal {
     };
 
     // 4. Build output displays and interactive badges
-    for (let tIdx = 0; tIdx < anonymizedTurns.length; tIdx++) {
-      const turn = anonymizedTurns[tIdx];
+    for (let tIdx = 0; tIdx < this.sanitizedTurns.length; tIdx++) {
+      const turn = this.sanitizedTurns[tIdx];
       sanitizedTextPlain += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
 
       let htmlContent = this.escapeHtml(turn.content);
@@ -832,6 +861,17 @@ class SafeShareModal {
   bindEvents(backdrop) {
     backdrop.querySelector("#safeshare-close-btn").addEventListener("click", () => this.removeExisting());
     backdrop.querySelector("#btn-cancel").addEventListener("click", () => this.removeExisting());
+
+    // Reader profile and amount display
+    for (const [id, key, storageKey] of [["#safeshare-profile", "profile", "safeshare_profile"], ["#safeshare-numbers", "numbersMode", "safeshare_numbers"]]) {
+      const sel = backdrop.querySelector(id);
+      sel.value = this[key];
+      sel.addEventListener("change", () => {
+        this[key] = sel.value;
+        try { localStorage.setItem(storageKey, sel.value); } catch (_) {}
+        this.rebuildViews();
+      });
+    }
 
     // Toggle Inspector Drawer
     const toggleInspectorBtn = backdrop.querySelector("#btn-toggle-inspector");

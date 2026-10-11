@@ -9,8 +9,8 @@
 const http = require("http");
 const { Readable } = require("stream");
 
-function redactMessages(messages, policy) {
-  const { redactTurns } = require("./safeshare.js");
+async function redactMessages(messages, policy) {
+  const { redact } = require("./safeshare.js");
   // Collect every text segment as a turn so the pseudonymizer keeps placeholders consistent.
   const slots = [];
   messages.forEach((m, i) => {
@@ -21,7 +21,7 @@ function redactMessages(messages, policy) {
       });
     }
   });
-  const redacted = redactTurns(slots.map(({ role, content }) => ({ role, content })), policy);
+  const redacted = await redact(slots.map(({ role, content }) => ({ role, content })), policy);
   const out = JSON.parse(JSON.stringify(messages));
   slots.forEach((s, k) => {
     if (s.j === undefined) out[s.i].content = redacted[k].content;
@@ -39,7 +39,7 @@ function start({ port = 8788, upstream = "https://api.openai.com", policy = {} }
 
       if (req.method === "POST" && /\/chat\/completions$/.test(req.url) && body.length) {
         const json = JSON.parse(body.toString("utf8"));
-        if (Array.isArray(json.messages)) json.messages = redactMessages(json.messages, policy);
+        if (Array.isArray(json.messages)) json.messages = await redactMessages(json.messages, policy);
         body = Buffer.from(JSON.stringify(json));
       }
 

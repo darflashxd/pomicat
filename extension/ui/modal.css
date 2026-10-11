@@ -1004,3 +1004,20 @@
     align-items: flex-start;
   }
 }
+
+/* Reader profile and amount display */
+.policy-mode-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.policy-select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--ss-bg-elevated);
+  border: 1px solid var(--ss-border);
+  color: var(--ss-text-primary);
+  cursor: pointer;
+}

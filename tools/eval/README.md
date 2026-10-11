@@ -33,6 +33,7 @@ Gold format is the ai4privacy one: `source_text` plus `privacy_mask: [{value, la
 3. Run and score:
    ```bash
    node tools/eval/run_safeshare.js gold.jsonl > out_safeshare.jsonl
+   node tools/eval/run_safeshare.js gold.jsonl --presidio http://127.0.0.1:5002 > out_safeshare_presidio.jsonl
    python tools/eval/run_presidio.py gold.jsonl > out_presidio.jsonl
    python tools/eval/run_gitleaks.py gold.jsonl > out_gitleaks.jsonl
    python tools/eval/score.py gold.jsonl out_safeshare.jsonl out_presidio.jsonl out_gitleaks.jsonl
@@ -45,7 +46,8 @@ gitleaks only looks for secrets, so compare it on the credential labels only.
 - **IndoNLU NERGrit / NERP**: Indonesian names, places and organisations. Convert the BIO tags
   to `privacy_mask` spans and run the same commands.
 - **WildChat**: real user-to-LLM chats with no PII labels. Use it to measure false positives:
-  sample conversations, run `safeshare redact`, and hand-label what was removed.
+  `node tools/eval/wildchat_fp.js 500 out.jsonl [--presidio URL [--names all]]` logs every
+  redaction with context for hand-labelling.
 - **Inversion**: `node bin/safeshare.js invert` on redacted chats measures how often hidden
   numbers can be recovered from other tools' output.
 

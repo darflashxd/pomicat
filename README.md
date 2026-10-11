@@ -58,18 +58,24 @@ conversation, so the chat still reads naturally.
 
 Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md).
 
-| | SafeShare | Presidio |
-|---|---|---|
-| General PII, ai4privacy held-out English (token F1) | 0.21 | 0.79 |
-| Precision on what it does redact (token) | 0.97 | 0.93 |
-| Hidden salary recovered by `invert` after redaction (example chats) | no | yes |
+| | ai4privacy token F1 | real chats touched (WildChat) | hidden salary recoverable |
+|---|---|---|---|
+| SafeShare alone | 0.21 | 7.8% | no |
+| SafeShare + Presidio, `names: personal` (default) | 0.31 | 8.8% | no |
+| SafeShare + Presidio, `names: all` + dates | 0.78 | 71% | no |
+| Presidio alone | 0.79 | – | yes |
 
-- **SafeShare is not a general PII detector.** It catches emails, SSNs, cards, keys and
-  credentials well, but has no named-entity recognition, so most names, cities and addresses are
-  missed. Run Presidio (or similar) for those, and SafeShare for derived numbers.
-- **On real chats** (500 WildChat conversations), 6.4% got at least one redaction, and roughly a
-  third of those redactions were correct. The rest are over-redaction (fiction character names,
-  research-paper health terms, numbers in maths walkthroughs).
+- **Alone, SafeShare is not a general PII detector.** It has no named-entity recognition. With
+  `--presidio` it uses Presidio for names, places, phones and IDs, and with every name and date
+  turned on it matches Presidio (0.78 vs 0.79) while also blocking the inversion attack.
+- **Benchmarks and real chats disagree about names.** ai4privacy labels every name as PII; real
+  chats are full of names that aren't the user's (celebrities, story characters, authors). Turning
+  all names on touches 71% of real conversations. The default, `names: personal`, only redacts a
+  name or place tied to the user ("my wife Rina", "I live in Bandung") and touches 8.8%.
+- Deciding whether a name or number belongs to the user is the part that needs a trained
+  model; the rules here are the stopgap.
+- The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
+  measurement.
 - The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
   measurement.
 
@@ -125,10 +131,38 @@ node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
 
 Every chat message is redacted before it leaves your machine. Responses are not restored.
 
+### Who will read it, and how to show amounts
+
+| | `--profile public` (default) | `--profile trusted` |
+|---|---|---|
+| Keys, IDs, cards, contacts | removed | removed |
+| Your own amounts and anything derived from them | removed (or a range) | kept |
+| Your name, family, places tied to you | removed | kept |
+
+`--numbers range` shows your own amounts as a band instead of a placeholder: "Gaji saya
+Rp 3.000.000" becomes "Gaji saya Rp 2–5 juta". Derived figures stay removed, and the range is
+only used if `invert` can't recover the original from it. The extension has the same two
+choices ("Reader" and "Amounts") in the share dialog.
+
+### Presidio for names, places and IDs
+
+```bash
+pip install presidio-analyzer && python -m spacy download en_core_web_lg
+python tools/presidio_server.py                      # or the official presidio-analyzer Docker image
+node bin/safeshare.js redact chat.txt --presidio http://127.0.0.1:5002
+```
+
+In a policy file: `"presidio": { "url": "...", "names": "personal" | "all", "skip": ["DATE_TIME", "NRP", "URL"] }`.
+Presidio's default model is English, so Indonesian names are only caught by SafeShare's own
+rules ("nama saya …"). The browser extension doesn't use Presidio.
+
 ### Policy file
 
 ```json
 {
+  "profile": "public",
+  "numbers": "range",
+  "presidio": "http://127.0.0.1:5002",
   "preset": "pci",
   "disable": ["SYSTEM"],
   "allow": ["support@acme.com", "/^ACME-INTERNAL-\\d+$/"],

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SafeShare-AI Privacy Guard",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Redacts sensitive data from AI chats before sharing and creates end-to-end encrypted, expiring share links. Works on ChatGPT, Claude and DeepSeek.",
   "permissions": [
     "storage",
@@ -36,6 +36,7 @@
         "engine/heuristics.js",
         "engine/contextual.js",
         "engine/pseudonymizer.js",
+        "engine/policy.js",
         "engine/crypto.js",
         "engine/symbolic_vault.js",
         "engine/symbolic_rewriter.js",

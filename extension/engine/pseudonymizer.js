@@ -26,12 +26,23 @@ const COMMON_WORDS = new Set(("the a an and or but if of to in on at by for with
   "string str int integer long double float boolean bool char byte object any list map array dict set tuple void null " +
   "none true false item items name names value values key data type id").split(/\s+/));
 
+// Lowercase name particles allowed after the first token ("Vincent van Gogh", "Mohammed bin Salman")
+const NAME_PARTICLES = new Set("van von de der den du del della da di la le bin binti al el".split(" "));
+
 // A learned "name" must be letters only, contain no common words, and (for loose forms such as
-// "I'm X" or "name: X") start each token with a capital letter.
+// "I'm X") start each token with a capital letter.
 function looksLikeName(tokens, { requireCapital = false } = {}) {
-  return tokens.length > 0 && tokens.every((t) =>
-    /^\p{L}[\p{L}'-]*$/u.test(t) && t.length >= 2 && !COMMON_WORDS.has(t.toLowerCase()) &&
-    (!requireCapital || /^\p{Lu}/u.test(t)));
+  return tokens.length > 0 && tokens.every((t, i) =>
+    (i > 0 && NAME_PARTICLES.has(t)) ||
+    (/^\p{L}[\p{L}'-]*$/u.test(t) && t.length >= 2 && !COMMON_WORDS.has(t.toLowerCase()) &&
+      (!requireCapital || /^\p{Lu}/u.test(t))));
+}
+
+// 1 -> A, 26 -> Z, 27 -> AA (spreadsheet style), so name labels never run into symbols
+function letterLabel(n) {
+  let s = "";
+  for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
 }
 
 class AdversaryOracleSolver {
@@ -482,10 +493,12 @@ class ConsistentPseudonymizer {
         break;
       case "SENSITIVE_USER":
       case "USER":
-        pseudonym = `[User_${String.fromCharCode(64 + this.counters.USER++)}]`;
+        pseudonym = `[User_${letterLabel(this.counters.USER++)}]`;
         break;
       default:
-        pseudonym = `[ANONYMIZED_ENTITY_${this.counters.PROJECT++}]`;
+        // Other categories (e.g. LOCATION from an external detector) get their own numbered label
+        this.counters[category] = this.counters[category] || 1;
+        pseudonym = `[${category}_${this.counters[category]++}]`;
     }
 
     this.entityMap.set(key, pseudonym);
@@ -499,7 +512,9 @@ class ConsistentPseudonymizer {
   buildEquivalenceVariants(raw, category, allEntities = []) {
     const variants = [];
     const escapedRaw = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    variants.push(escapedRaw);
+    // Whole-token match: a short value like "pa" must not be replaced inside "spatial".
+    // Amounts keep the plain form so "Rp3.000.000" still matches "3.000.000".
+    variants.push(category === "SENSITIVE_FINANCIAL" ? escapedRaw : `(?<!\\w)${escapedRaw}(?!\\w)`);
 
     if (category === "SENSITIVE_FINANCIAL") {
       variants.push(`\\b${escapedRaw}\\b`);
@@ -699,7 +714,7 @@ class ConsistentPseudonymizer {
     ]);
 
     turns.forEach((turn, idx) => {
-      if (turn.role === "user") {
+      if (turn.role === "user" && !options.keepNames) {
         const nameIntroRx = /(?:(?:(?:\b(?:nama\s+(?:lengkap\s+)?(?:saya|gw|gue|ku)|namaku|perkenalkan\s+(?:nama\s+saya|saya|namaku)?|panggil\s+(?:saja\s+)?(?:saya|aku)|my\s+(?:full\s+)?name\s+is|i\s*[\x27\x60]?\s*(?:am|m)|call\s+me|halo\s+saya))\s+)|(?:(?:\b(?:nama\s+lengkap|full\s+name|name|nama)\s*[:=\-]\s*)))([^,.\n!?]+)/gi;
         let nm;
         while ((nm = nameIntroRx.exec(turn.content)) !== null) {
@@ -1257,6 +1272,7 @@ class ConsistentPseudonymizer {
 }
 
 ConsistentPseudonymizer.AdversaryOracleSolver = AdversaryOracleSolver;
+ConsistentPseudonymizer.looksLikeName = looksLikeName;
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ConsistentPseudonymizer;

@@ -1,13 +1,16 @@
-// Usage: node tools/eval/wildchat_fp.js 500 tools/eval/data/wildchat_redactions.jsonl
+// Usage: node tools/eval/wildchat_fp.js 500 tools/eval/data/wildchat_redactions.jsonl [--presidio http://127.0.0.1:5002 [--names personal|all]]
 // Samples English WildChat-1M conversations (real user<->ChatGPT chats, no PII labels) via the
 // Hugging Face datasets-server, runs SafeShare on each, and writes every redaction with its
 // context so they can be hand-labelled as true or false positives.
 // The data stays local (tools/eval/data is gitignored); it can contain real personal data.
 const fs = require("fs");
-const { redactTurns } = require("../../bin/safeshare.js");
+const { redact } = require("../../bin/safeshare.js");
 
-const [n = "500", outPath = "tools/eval/data/wildchat_redactions.jsonl"] = process.argv.slice(2);
-const PLACEHOLDER = /\[(?:REDACTED|CONFIDENTIAL|User_|user_)[^\]]*\]|\[[a-z_]+\]|sk-dummy[\w-]*|ghp_dummy\w*|placeholder_password/g;
+const [n = "500", outPath = "tools/eval/data/wildchat_redactions.jsonl", ...rest] = process.argv.slice(2);
+const arg = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
+const policy = arg("--presidio") ? { presidio: { url: arg("--presidio"), names: arg("--names") || "personal" } } : {};
+// Any SafeShare placeholder ([REDACTED_X], [User_A], [LOCATION_2], [user], ...); ones already in the source are skipped below
+const PLACEHOLDER = /\[[A-Za-z][A-Za-z_]*(?:_\d+)?\]|\[user_\d+@protected\.local\]|sk-dummy[\w-]*|ghp_dummy\w*|placeholder_password/g;
 
 async function rows(offset, length) {
   const url = `https://datasets-server.huggingface.co/rows?dataset=allenai/WildChat-1M&config=default&split=train&offset=${offset}&length=${length}`;
@@ -28,7 +31,7 @@ async function rows(offset, length) {
       seen++;
       const turns = row.conversation.map((t) => ({ role: t.role, content: t.content || "" }));
       let red;
-      try { red = redactTurns(turns); } catch { continue; }
+      try { red = await redact(turns, policy); } catch { continue; }
       let hit = false;
       red.forEach((t, i) => {
         for (const m of t.content.matchAll(PLACEHOLDER)) {

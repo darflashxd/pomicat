@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.3.0 (2026-10-11)
+
+### New
+- Reader profiles: `public` (default) removes your own amounts and names too; `trusted` keeps
+  them and removes only keys, IDs, cards and contacts. In the CLI (`--profile`) and the
+  extension's share dialog ("Reader").
+- Range mode: your own amounts shown as a band ("Rp 2–5 juta") instead of a placeholder; derived
+  figures stay removed and the range is dropped if `invert` could recover the original.
+  `--numbers range`, or "Amounts" in the share dialog.
+- `--presidio <url>`: Presidio for names, places, phones and IDs, with `names: personal` (only
+  names tied to the user) or `all`. `tools/presidio_server.py` runs a compatible analyzer.
+- `extension/engine/policy.js`: the inversion attack and range logic, shared by CLI and extension.
+
+### Fixed
+- Short entities were replaced inside other words ("spatial" → "s[LOCATION_1]tial").
+- Name labels ran past `[User_Z]` into symbols; now `[User_AA]`, `[User_AB]`, ...
+- `invert` treated range endpoints as real values.
+
+
 ## 2.2.0 (2026-10-10)
 
 ### New

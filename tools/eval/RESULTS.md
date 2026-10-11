@@ -1,4 +1,4 @@
-# Evaluation results (2026-10-10, SafeShare 2.2.0)
+# Evaluation results (2026-10-10 and 2026-10-11, SafeShare 2.2.0 and 2.3.0)
 
 All runs are reproducible with the commands in [README.md](README.md). Raw data and outputs
 stay in `tools/eval/data/` (gitignored).
@@ -63,6 +63,37 @@ Most likely hidden value: $5,000 (agreed by 3 visible numbers)
 ```
 
 After SafeShare redaction, `invert` recovers nothing on the same chats (Indonesian and English).
+
+## 5. SafeShare + Presidio (2.3.0)
+
+`--presidio` adds Presidio's recognizers (names, places, phones, IDs). Same 2,000 ai4privacy rows
+and 500 WildChat conversations:
+
+| setting | ai4privacy token F1 | token P | WildChat conversations touched |
+|---|---|---|---|
+| SafeShare alone | 0.211 | 0.970 | 7.8% |
+| + Presidio, `names: personal` (default) | 0.310 | 0.980 | 8.8% |
+| + Presidio, `names: all` | 0.667 | 0.957 | 71% |
+| + Presidio, `names: all`, dates on | 0.780 | 0.926 | – |
+| Presidio alone | 0.792 | 0.926 | – |
+
+With every name and date on, SafeShare + Presidio matches Presidio on the benchmark (per label:
+passports 1.00, SSNs 1.00, tax numbers 0.98, phones 0.70, streets 0.75) and adds the inversion
+defense. But on real chats that setting rewrites 71% of conversations, mostly celebrity names,
+story characters, authors in citations and places in essays.
+
+`names: personal` only accepts a name or place that directly follows words tying it to the user
+("my wife", "my name is", "I'm", "teman saya", "I live in", "tinggal di"). Hand check of the 6
+conversations it adds over SafeShare alone: a self-introduction, a business location, a passport
+number, two users' LAN IP addresses (reasonable) and a DOI read as a phone number (since fixed).
+
+Presidio exposed four engine bugs, fixed with tests: short entities replaced inside words
+("spatial" → "s[LOCATION_1]tial"), name labels running past `[User_Z]` into symbols, Presidio's
+person tags on code tokens ("mov", "val"), and its ID recognizers firing on "O3", "x86", "RAID-Z1".
+
+**The gap between the two rows is the training problem.** The benchmark counts every name as
+PII; real users mostly mention names that aren't theirs. Rules can only approximate "is this
+about the user?". That is what a trained contextual model should learn, measured on both sets.
 
 ## What this means for the project
 

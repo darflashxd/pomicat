@@ -14,17 +14,19 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 - [x] Policy file, presets, npm package, CLI, OpenAI-compatible proxy
 - [x] Viewer reframed as deterrence
 - [x] Booth demo (`DEMO.md`), offline `share` flow verified in a browser, `docs/demo.gif`
-- [x] Release zips rebuilt: `dist/SafeShare-2.2.0-{chrome,firefox}.zip`; notes in `CHANGELOG.md`
+- [x] 2.3.0: reader profiles (public / trusted), range mode for amounts, Presidio integration with `names: personal`; in CLI and extension
+- [x] Release zips rebuilt: `dist/SafeShare-2.3.0-{chrome,firefox}.zip`; notes in `CHANGELOG.md`
 
 ## Left for you
 - [ ] `git push` (committed locally, not pushed)
-- [ ] GitHub Release v2.2.0: upload the two zips from `dist/`, paste `CHANGELOG.md` 2.2.0 as notes
+- [ ] GitHub Release v2.3.0: upload the two zips from `dist/`, paste `CHANGELOG.md` 2.3.0 (and 2.2.0) as notes
 - [ ] Cloudflare: `wrangler login`, then `ALTER TABLE shares ADD COLUMN revoke_hash TEXT;` and `wrangler deploy`
 - [ ] Confirm CFP dates and form fields on blackhat.com
 - [ ] Fill presenter names and bios in `docs/ARSENAL_ABSTRACT.md`, then submit
 
 ## Worth doing before the talk (from the evaluation)
-- [ ] Decide the positioning: SafeShare as an inversion layer on top of an entity detector (Presidio), since alone it misses most names and addresses (token F1 0.21 vs 0.79)
-- [ ] Optional: plug Presidio (or a trained NER model) into `redact` for names/addresses
+- [x] Positioning: inversion layer on top of an entity detector; `--presidio` matches Presidio (0.78 vs 0.79) and blocks `invert`
+- [ ] After acceptance: train a "does this name / number belong to the user?" classifier (label WildChat + ConfAIde/PrivacyLens), replacing the `names: personal` rules; report on both ai4privacy and WildChat
+- [ ] Indonesian names and places with Presidio (needs a multilingual spaCy model, e.g. xx_ent_wiki_sm)
 - [ ] Remaining over-redaction on real chats: fiction character names, health terms in research text, maths walkthroughs
 - [ ] Not covered: casual @handles, text in images, HAR cookies, quasi-identifier combinations
