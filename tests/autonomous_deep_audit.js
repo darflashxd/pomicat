@@ -479,7 +479,7 @@ async function runAutonomousDeepAudit() {
   // Universal Continue Bridge
   const bridge = new SafeShareExtensionBridge();
   const forwardResult = await bridge.forwardToAIPlatform("ChatGPT", testPayload.turns);
-  recordCheck("Universal Continue bridge generated clean prompt without plaintext credentials", forwardResult.continuationPrompt.includes("sanitized summary"));
+  recordCheck("Universal Continue bridge generated clean prompt without plaintext credentials", forwardResult.continuationPrompt.includes("placeholder"));
   recordCheck("Bridge executed with valid mode", ["extension_bridge", "clipboard_autopurge", "manual"].includes(forwardResult.mode));
 
   // ===========================================================================

@@ -44,6 +44,23 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Required by Chrome MV3 to keep message channel open asynchronously
   }
 
+  // "Continue in ChatGPT/Claude/DeepSeek" from a share page: open the chat site and leave the
+  // prompt for the content script there to paste once the input box exists.
+  if (request.action === "OPEN_CHAT_WITH_PROMPT") {
+    const urls = { ChatGPT: "https://chatgpt.com/", Claude: "https://claude.ai/new", DeepSeek: "https://chat.deepseek.com/" };
+    const url = urls[request.platform];
+    if (!url || typeof request.prompt !== "string") {
+      sendResponse({ success: false, error: "Unknown platform" });
+      return false;
+    }
+    webExtApi.storage.local
+      .set({ safeshare_pending_continuation: { platform: request.platform, prompt: request.prompt, at: Date.now() } })
+      .then(() => webExtApi.tabs.create({ url }))
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (request.action === "REVOKE_SHARE") {
     const { relayUrl, shareId, token } = request;
     fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {

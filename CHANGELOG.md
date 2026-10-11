@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- "Continue in ChatGPT / Claude / DeepSeek" did nothing when the extension was installed: it now
+  opens the chat site in a new tab and pastes the prompt once the input box appears.
+
+### Changed
+- The continuation prompt explains the placeholders and asks the model not to reconstruct them,
+  keeps the newest turns whole, shortens long older answers, drops the oldest turns past a size
+  budget (with a note), and strips the viewer's zero-width watermark.
+- The extension can use a local relay for testing (`safeshare_relay` in extension storage), and
+  is allowed to reach `localhost` / `127.0.0.1`.
+- `TESTING.md`: step-by-step manual checklist for the browser parts.
+
+
 ## 2.3.0 (2026-10-11)
 
 ### New

@@ -114,7 +114,7 @@ async function runUncopyableEnclaveAudit() {
 
   const bridgeResult = await bridge.forwardToAIPlatform("ChatGPT", testTurns);
   assert.strictEqual(typeof bridgeResult, "object");
-  assert(bridgeResult.continuationPrompt.includes("sanitized summary"), "Continuation prompt must be formatted");
+  assert(bridgeResult.continuationPrompt.includes("placeholder"), "Continuation prompt must be formatted");
   assert(["extension_bridge", "clipboard_autopurge", "manual"].includes(bridgeResult.mode), "Mode must be secure extension, auto-purge, or manual");
   console.log("  [✓] Audit 5 Passed: Zero-Clipboard Continuation Bridge verified (No OS clipboard dump)!");
 

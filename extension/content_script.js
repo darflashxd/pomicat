@@ -523,13 +523,38 @@
       window.postMessage({ source: "SAFESHARE_EXTENSION_PONG" }, respOrigin);
     } else if (event.data.source === "SAFESHARE_FORWARD_TO_AI") {
       const promptText = event.data.prompt;
-      if (promptText) {
-        const inputEl = findPromptInputElement();
-        if (inputEl) {
-          setInputText(inputEl, promptText);
-          console.log("[SafeShare-AI] Injected continuation prompt directly into active session.");
-        }
+      if (!promptText) return;
+      const inputEl = findPromptInputElement();
+      if (inputEl) {
+        setInputText(inputEl, promptText);
+        console.log("[SafeShare-AI] Injected continuation prompt directly into active session.");
+      } else {
+        // On a share page there is no chat box: open the chat site and paste it there
+        const api = typeof browser !== "undefined" ? browser : chrome;
+        api.runtime.sendMessage({ action: "OPEN_CHAT_WITH_PROMPT", platform: event.data.platform, prompt: promptText });
       }
     }
   });
+
+  // Paste a continuation prompt left by the background worker (see OPEN_CHAT_WITH_PROMPT)
+  (function deliverPendingContinuation() {
+    const api = typeof browser !== "undefined" ? browser : chrome;
+    if (!api || !api.storage || !api.storage.local) return;
+    const hostFor = { ChatGPT: /chatgpt\.com|chat\.openai\.com/, Claude: /claude\.ai/, DeepSeek: /chat\.deepseek\.com/ };
+    Promise.resolve(api.storage.local.get("safeshare_pending_continuation")).then((res) => {
+      const pending = res && res.safeshare_pending_continuation;
+      if (!pending || Date.now() - pending.at > 2 * 60 * 1000) return; // stale after 2 minutes
+      if (!hostFor[pending.platform] || !hostFor[pending.platform].test(location.hostname)) return;
+      api.storage.local.remove("safeshare_pending_continuation");
+      let tries = 0;
+      const timer = setInterval(() => {
+        const inputEl = findPromptInputElement();
+        if (inputEl || ++tries > 40) clearInterval(timer); // chat apps render the input late; give up after ~20s
+        if (inputEl) {
+          setInputText(inputEl, pending.prompt);
+          console.log("[SafeShare-AI] Pasted continuation prompt into the new chat.");
+        }
+      }, 500);
+    });
+  })();
 })();

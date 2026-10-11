@@ -76,8 +76,7 @@
      * Injects continuation context directly into the target AI platform.
      */
     async forwardToAIPlatform(platform, turns) {
-      const cleanContext = turns.map(t => `${t.role.toUpperCase()}: ${t.content}`).join("\n\n");
-      const continuationPrompt = `Here is a sanitized summary of our previous conversation context:\n\n"""\n${cleanContext}\n"""\n\nPlease continue the discussion from the context above: `;
+      const continuationPrompt = SafeShareExtensionBridge.buildContinuationPrompt(turns);
       const targetUrl = PLATFORM_URLS[platform] || "https://chatgpt.com";
 
       const hasExt = await this.pingExtension(200);
@@ -128,6 +127,38 @@
         continuationPrompt: continuationPrompt,
         message: `Please open ${platform} manually and paste continuation prompt.`
       };
+    }
+
+    /**
+     * Builds the hand-off prompt for a new chat, within a size budget:
+     *  - explains the placeholders and asks the model not to reconstruct them
+     *  - keeps the newest turns whole, shortens long older answers, drops the oldest turns
+     * No model is involved, so nothing leaves the browser to make it.
+     */
+    static buildContinuationPrompt(turns, { budget = 12000, longTurn = 1500 } = {}) {
+      const header =
+        "Continue an earlier conversation. Private details were removed before it was shared: " +
+        "anything in square brackets, like [User_A] or [REDACTED_FINANCIAL_1], is a placeholder. " +
+        "Keep using the same placeholders, and don't guess or work out the values behind them.";
+      const footer = "Pick up from the last message above. My next message follows.";
+      // Strip the viewer's zero-width watermark: it is noise (and tokens) for the next model
+      const fmt = (t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content.replace(/[​-‍⁠﻿]/g, "").trim()}`;
+      const shorten = (t) => t.content.length <= longTurn ? t
+        : { ...t, content: t.content.slice(0, longTurn).trimEnd() + " […shortened]" };
+
+      const kept = [];
+      let used = header.length + footer.length + 40;
+      for (let i = turns.length - 1; i >= 0; i--) {
+        // The last two turns stay whole; older long answers are shortened
+        const turn = i >= turns.length - 2 ? turns[i] : shorten(turns[i]);
+        const text = fmt(turn);
+        if (used + text.length > budget && kept.length) break;
+        kept.unshift(text.length > budget ? text.slice(0, budget - used) + " […shortened]" : text);
+        used += text.length + 2;
+      }
+      const omitted = turns.length - kept.length;
+      const note = omitted ? `(${omitted} earlier message${omitted === 1 ? "" : "s"} omitted)\n\n` : "";
+      return `${header}\n\n---\n${note}${kept.join("\n\n")}\n---\n\n${footer}`;
     }
 
     /**

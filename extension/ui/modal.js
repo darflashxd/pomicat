@@ -931,6 +931,14 @@ class SafeShareModal {
           ttl: ttl
         };
 
+        // Optional relay override for local testing:
+        //   chrome.storage.local.set({ safeshare_relay: "http://127.0.0.1:8787" })
+        try {
+          const api = typeof browser !== "undefined" ? browser : chrome;
+          const { safeshare_relay } = await api.storage.local.get("safeshare_relay");
+          if (safeshare_relay) this.crypto.relayBaseUrl = this.crypto.viewerBaseUrl = safeshare_relay.replace(/\/$/, "");
+        } catch (_) {}
+
         const encResult = await this.crypto.encrypt(payload);
         let finalShareUrl = encResult.fullShareUrl;
 
