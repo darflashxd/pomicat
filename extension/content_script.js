@@ -221,44 +221,68 @@
       inputEl.addEventListener("input", () => updateShieldIndicator(inputEl));
       inputEl.addEventListener("focus", () => updateShieldIndicator(inputEl));
       inputEl.addEventListener("keyup", () => updateShieldIndicator(inputEl));
-
-      // Hook Enter key
-      inputEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-          handlePreInferencePromptSubmit(inputEl);
-        }
-      }, true); // Capture phase
     }
 
-    // Hook Send Buttons
-    const sendButtons = document.querySelectorAll(
-      "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button, form button[type='submit']"
-    );
-    sendButtons.forEach((btn) => {
-      if (!btn.dataset.safeshareHooked) {
-        btn.dataset.safeshareHooked = "true";
-        btn.addEventListener("click", () => handlePreInferencePromptSubmit(inputEl), true);
-      }
-    });
-
+    installSubmitGuard();
     updateShieldIndicator(inputEl);
   }
 
-  function handlePreInferencePromptSubmit(inputEl) {
-    if (!isPreInferenceEnabled() || !symbolicRewriter) return;
+  const SEND_BUTTON_SELECTOR =
+    "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button, form button[type='submit']";
+  let submitGuardInstalled = false;
+  let resubmitting = false;
 
-    try {
-      const currentText = getInputText(inputEl);
-      if (!currentText || currentText.trim().length === 0) return;
+  /**
+   * Holds a send until the rewrite is in place. Listens on window in the capture phase, so it runs
+   * before the chat site's own Enter / send handlers (ChatGPT handles them above the input box).
+   * If the prompt needs rewriting: cancel this send, rewrite, give the editor (ProseMirror keeps
+   * its own copy of the text) a moment to sync, then send again.
+   */
+  function installSubmitGuard() {
+    if (submitGuardInstalled) return;
+    submitGuardInstalled = true;
 
-      const rewritten = symbolicRewriter.rewrite(currentText);
-      if (rewritten.isTransformed) {
-        console.log("[SafeShare-AI] Pre-Inference Rewrite applied:", rewritten.symbols);
-        setInputText(inputEl, rewritten.sanitizedPrompt);
+    const guard = (e, resend) => {
+      if (resubmitting || !isPreInferenceEnabled() || !symbolicRewriter) return;
+      const inputEl = findPromptInputElement();
+      if (!inputEl) return;
+      let rewritten;
+      try {
+        const text = getInputText(inputEl);
+        if (!text || !text.trim()) return;
+        rewritten = symbolicRewriter.rewrite(text);
+      } catch (err) {
+        console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
+        return;
       }
-    } catch (err) {
-      console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
-    }
+      if (!rewritten.isTransformed) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setInputText(inputEl, rewritten.sanitizedPrompt);
+      console.log("[SafeShare-AI] Pre-Inference Rewrite applied:", rewritten.symbols);
+      setTimeout(() => {
+        resubmitting = true;
+        try { resend(inputEl); } finally { setTimeout(() => (resubmitting = false), 300); }
+      }, 120);
+    };
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+      const inputEl = findPromptInputElement();
+      if (!inputEl || !(e.target === inputEl || inputEl.contains(e.target))) return;
+      guard(e, () => {
+        const btn = document.querySelector(SEND_BUTTON_SELECTOR);
+        if (btn && !btn.disabled) btn.click();
+        else inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true, cancelable: true }));
+      });
+    }, true);
+
+    window.addEventListener("click", (e) => {
+      const btn = e.target && e.target.closest && e.target.closest(SEND_BUTTON_SELECTOR);
+      if (!btn) return;
+      guard(e, () => btn.click());
+    }, true);
   }
 
   /**
@@ -436,7 +460,7 @@
   function tidyTurns(turns) {
     const out = [];
     for (const t of turns) {
-      const content = t.content.replace(/\s*\[PRIVACY PROTOCOL:[^\]]*\]\s*/g, "\n").trim();
+      const content = t.content.replace(/\s*\[(?:PRIVACY PROTOCOL|PROTOKOL PRIVASI):[^\]]*\]\s*/g, "\n").trim();
       if (!content) continue;
       const prev = out[out.length - 1];
       if (prev && prev.role === t.role && prev.content === content) continue;

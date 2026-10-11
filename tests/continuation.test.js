@@ -41,3 +41,8 @@ assert(!p.includes("PRIVACY PROTOCOL"), p);
 assert.strictEqual(p.split("User: My salary is <S1>").length - 1, 1, "duplicates kept: " + p);
 assert(p.includes("<S1>, is a placeholder"), p);
 console.log("continuation: old-link cleanup ok");
+
+// Indonesian shield instruction is stripped too
+p = build([{ role: "user", content: "Gaji saya <S2> per bulan.\n\n[PROTOKOL PRIVASI: Perlakukan variabel <S2> sebagai parameter angka tetap (contoh: 0.30 * <S2>).]" }]);
+assert(!p.includes("PROTOKOL PRIVASI") && p.includes("User: Gaji saya <S2> per bulan."), p);
+console.log("continuation: Indonesian instruction stripped");

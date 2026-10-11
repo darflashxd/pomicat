@@ -146,7 +146,7 @@
       // older versions still contain it): both are noise for the next model
       const fmt = (t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content
         .replace(/[​-‍⁠﻿]/g, "")
-        .replace(/\s*\[PRIVACY PROTOCOL:[^\]]*\]\s*/g, "\n")
+        .replace(/\s*\[(?:PRIVACY PROTOCOL|PROTOKOL PRIVASI):[^\]]*\]\s*/g, "\n")
         .trim()}`;
       // Drop a turn identical to the one before it (duplicate extraction in older links)
       turns = turns.filter((t, i) => !(i > 0 && t.role === turns[i - 1].role && t.content === turns[i - 1].content));

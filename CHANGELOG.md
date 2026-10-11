@@ -13,6 +13,11 @@
   found no assistant replies, and the on-screen number display stopped working. It now reads
   `data-user-message-bubble` / `data-markdown-text-style="assistant-message"` first.
 
+- The send-time shield could lose the race on ChatGPT: the site handles Enter above the input
+  box, so the message went out with the real salary. The shield now listens first (window,
+  capture phase), holds the send, rewrites, lets the editor sync, then sends once.
+- The Indonesian shield instruction ("[PROTOKOL PRIVASI: …]") is stripped from shared chats too.
+
 ### Changed
 - The continuation prompt explains the placeholders and asks the model not to reconstruct them,
   keeps the newest turns whole, shortens long older answers, drops the oldest turns past a size
