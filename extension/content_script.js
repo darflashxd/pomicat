@@ -13,12 +13,58 @@
   const symbolicRewriter = (typeof SafeShareSymbolicRewriter !== "undefined" && symbolicVault) ? new SafeShareSymbolicRewriter(symbolicVault) : null;
   const localCompute = typeof SafeShareLocalCompute !== "undefined" ? new SafeShareLocalCompute() : null;
 
-  function isPreInferenceEnabled() {
+  // Before-sending protection ("shield") mode, chosen from the chip above the chat input:
+  //   "all"     replace IDs, keys, cards, emails, phones, and turn amounts into <S1> (default)
+  //   "amounts" only turn amounts into <S1>
+  //   "off"     send as typed
+  const SHIELD_MODES = {
+    all: "Protect IDs + amounts",
+    amounts: "Protect amounts only",
+    off: "Off (send as typed)"
+  };
+  function getShieldMode() {
     try {
-      return localStorage.getItem("safeshare_pre_inference") !== "false";
+      const m = localStorage.getItem("safeshare_shield_mode");
+      if (SHIELD_MODES[m]) return m;
+      return localStorage.getItem("safeshare_pre_inference") === "false" ? "off" : "all"; // older setting
     } catch (_) {
-      return true;
+      return "all";
     }
+  }
+  function setShieldMode(mode) {
+    try { localStorage.setItem("safeshare_shield_mode", mode); } catch (_) {}
+  }
+  function isPreInferenceEnabled() {
+    return getShieldMode() !== "off";
+  }
+
+  const shieldIdScanner = typeof HeuristicsRedactor !== "undefined" ? new HeuristicsRedactor() : null;
+  /**
+   * What the shield would send: in "all" mode, hard identifiers are replaced first (same rules as
+   * sharing), then amounts become <S1>. Returns { isTransformed, sanitizedPrompt, count }.
+   */
+  function shieldRewrite(text, { dryRun = false } = {}) {
+    let out = text;
+    let count = 0;
+    if (getShieldMode() === "all" && shieldIdScanner) {
+      const scan = shieldIdScanner.scan(text);
+      if (scan.detections.length) {
+        out = scan.sanitizedText;
+        count += scan.detections.length;
+      }
+    }
+    // Dry run (chip preview while typing): analyze() does not store values in the vault
+    if (dryRun) {
+      const analysis = symbolicRewriter.analyze(out);
+      count += analysis.hasSensitive ? analysis.detectedItems.length : 0;
+      return { isTransformed: count > 0, sanitizedPrompt: out, count };
+    }
+    const rewritten = symbolicRewriter.rewrite(out);
+    if (rewritten.isTransformed) {
+      out = rewritten.sanitizedPrompt;
+      count += (rewritten.symbols || []).length || 1;
+    }
+    return { isTransformed: out !== text, sanitizedPrompt: out, count };
   }
 
   function initSafeShareButton() {
@@ -176,13 +222,13 @@
       if (indicator) indicator.remove(); // Remove stale indicator
       indicator = document.createElement("div");
       indicator.id = "safeshare-shield-indicator";
-      indicator.title = "Pre-Inference Symbolic Shield: Click to toggle on/off";
+      indicator.title = "SafeShare: what to protect before sending (click to change)";
       indicator.addEventListener("click", (e) => {
         e.stopPropagation();
-        const nextState = !isPreInferenceEnabled();
-        localStorage.setItem("safeshare_pre_inference", nextState ? "true" : "false");
-        updateShieldIndicator(inputEl);
-        runHydrationPass();
+        toggleShieldMenu(indicator, () => {
+          updateShieldIndicator(findPromptInputElement() || inputEl);
+          runHydrationPass();
+        });
       });
       indicator.style.pointerEvents = "auto";
       bar.appendChild(indicator);
@@ -190,20 +236,52 @@
 
     if (!isEnabled) {
       indicator.className = "shield-disabled";
-      indicator.innerHTML = `<span>🛡️ Shield Off</span>`;
+      indicator.textContent = "🛡️ Protection off ▾";
       return;
     }
 
-    const currentText = getInputText(inputEl);
-    const analysis = symbolicRewriter.analyze(currentText);
+    const mode = getShieldMode();
+    let count = 0;
+    try { count = shieldRewrite(getInputText(inputEl), { dryRun: true }).count; } catch (_) {}
+    indicator.className = "shield-active";
+    indicator.textContent = count
+      ? `🛡️ ${count} item${count > 1 ? "s" : ""} will be protected ▾`
+      : `🛡️ ${mode === "all" ? "Protecting IDs + amounts" : "Protecting amounts"} ▾`;
+  }
 
-    if (analysis.hasSensitive) {
-      indicator.className = "shield-active";
-      indicator.innerHTML = `<span>🛡️ ${analysis.detectedItems.length} Secret${analysis.detectedItems.length > 1 ? "s" : ""} Protected (&lt;S1&gt;)</span>`;
-    } else {
-      indicator.className = "shield-active";
-      indicator.innerHTML = `<span>🛡️ Shield Ready</span>`;
+  /** Small menu under the chip to pick the before-sending protection mode. */
+  function toggleShieldMenu(anchor, onChange) {
+    const existing = document.getElementById("safeshare-shield-menu");
+    if (existing) {
+      existing.remove();
+      return;
     }
+    const menu = document.createElement("div");
+    menu.id = "safeshare-shield-menu";
+    const title = document.createElement("div");
+    title.className = "shield-menu-title";
+    title.textContent = "Before sending, protect:";
+    menu.appendChild(title);
+    const current = getShieldMode();
+    for (const [mode, label] of Object.entries(SHIELD_MODES)) {
+      const opt = document.createElement("button");
+      opt.type = "button";
+      opt.className = "shield-menu-option" + (mode === current ? " selected" : "");
+      opt.textContent = (mode === current ? "● " : "○ ") + label;
+      opt.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setShieldMode(mode);
+        menu.remove();
+        onChange();
+      });
+      menu.appendChild(opt);
+    }
+    const note = document.createElement("div");
+    note.className = "shield-menu-note";
+    note.textContent = "Names and places are removed when you share.";
+    menu.appendChild(note);
+    anchor.parentElement.appendChild(menu);
+    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
   }
 
   /**
@@ -250,7 +328,7 @@
       try {
         const text = getInputText(inputEl);
         if (!text || !text.trim()) return;
-        rewritten = symbolicRewriter.rewrite(text);
+        rewritten = shieldRewrite(text);
       } catch (err) {
         console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
         return;
@@ -260,7 +338,7 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       setInputText(inputEl, rewritten.sanitizedPrompt);
-      console.log("[SafeShare-AI] Pre-Inference Rewrite applied:", rewritten.symbols);
+      console.log("[SafeShare-AI] Protected before sending:", rewritten.count, "item(s)");
       setTimeout(() => {
         resubmitting = true;
         try { resend(inputEl); } finally { setTimeout(() => (resubmitting = false), 300); }

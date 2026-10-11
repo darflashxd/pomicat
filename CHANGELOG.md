@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### New
+- Before-sending protection menu: click the chip above the chat input to choose "Protect IDs +
+  amounts" (new default: NIK, cards, keys, emails and phones are replaced, amounts become `<S1>`),
+  "Protect amounts only", or "Off". The chip shows how many items will be protected as you type.
+
 ### Fixed
 - "Continue in ChatGPT / Claude / DeepSeek" did nothing when the extension was installed: it now
   opens the chat site in a new tab and pastes the prompt once the input box appears.

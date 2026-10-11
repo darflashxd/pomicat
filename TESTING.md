@@ -27,6 +27,8 @@ Paste this as your message in a new chat (it's fake data):
 > salary is $5,000 a month and my NIK is 3201012304950001. If we save 20%, how much per month and
 > per year?
 
+- [ ] Before sending, the chip above the input says "🛡️ 2 items will be protected" (salary + NIK); click it to see the three modes
+- [ ] After sending, your message in the chat shows `<S1>` and `[REDACTED_NIK]`, and the answer shows real computed numbers on your screen
 - [ ] After the answer arrives, the SafeShare button appears on the page
 - [ ] Clicking it opens the dialog, and **both** your message and the answer are in "Original"
 - [ ] The right side hides Rina, Sarah, the salary, the NIK, and the assistant's $1,000 / $4,000 / $12,000

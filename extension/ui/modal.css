@@ -1021,3 +1021,44 @@
   color: var(--ss-text-primary);
   cursor: pointer;
 }
+
+/* Before-sending protection menu (opens from the shield chip) */
+#safeshare-shield-bar { position: relative; }
+#safeshare-shield-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 4px;
+  z-index: 100000;
+  min-width: 230px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(24, 24, 27, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  pointer-events: auto;
+}
+#safeshare-shield-menu .shield-menu-title {
+  font-size: 11px;
+  color: #a1a1aa;
+  padding: 2px 6px 6px;
+}
+#safeshare-shield-menu .shield-menu-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #e4e4e7;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+#safeshare-shield-menu .shield-menu-option:hover { background: rgba(255, 255, 255, 0.06); }
+#safeshare-shield-menu .shield-menu-option.selected { color: #34d399; }
+#safeshare-shield-menu .shield-menu-note {
+  font-size: 10.5px;
+  color: #71717a;
+  padding: 6px 6px 2px;
+}
