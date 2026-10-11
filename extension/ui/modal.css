@@ -649,7 +649,7 @@
   font-size: 11.5px;
   cursor: pointer;
   transition: all 0.15s ease;
-  user-select: none;
+  user-select: text;
 }
 
 .ss-badge-redacted {
@@ -680,6 +680,7 @@
 .ss-badge-icon {
   font-size: 9px;
   opacity: 0.8;
+  user-select: none;
 }
 
 /* Local Compute Hydrated Badge */

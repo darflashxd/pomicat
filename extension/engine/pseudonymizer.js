@@ -217,8 +217,8 @@ class AdversaryOracleSolver {
       for (let j = i + 1; j < secretValues.length; j++) {
         const sA = secretValues[i];
         const sB = secretValues[j];
-        if (sA + sB >= 500) extendedSecrets.add(sA + sB);
-        if (Math.abs(sA - sB) >= 500) extendedSecrets.add(Math.abs(sA - sB));
+        if (sA + sB >= 100) extendedSecrets.add(sA + sB);
+        if (Math.abs(sA - sB) >= 100) extendedSecrets.add(Math.abs(sA - sB));
       }
     }
 
@@ -227,7 +227,7 @@ class AdversaryOracleSolver {
     for (let i = 0; i < cur.length; i++) {
       for (let j = i + 1; j < cur.length; j++) {
         const diff = Math.abs(cur[i] - cur[j]);
-        if (diff >= 500 && extendedSecrets.size < 500) {
+        if (diff >= 100 && extendedSecrets.size < 500) {
           extendedSecrets.add(diff);
         }
       }
@@ -239,7 +239,7 @@ class AdversaryOracleSolver {
         for (const r of [0.05, 0.08, 0.10, 0.15, 0.20, 0.249, 0.25, 0.30]) {
           const rm = r / 12;
           const pmt = Math.round(s * (rm / (1 - Math.pow(1 + rm, -12))));
-          if (pmt > 500) extendedSecrets.add(pmt);
+          if (pmt > 100) extendedSecrets.add(pmt);
         }
       }
     }
@@ -249,7 +249,7 @@ class AdversaryOracleSolver {
     for (let i = 0; i < cur2.length; i++) {
       for (let j = i + 1; j < cur2.length; j++) {
         const diff = Math.abs(cur2[i] - cur2[j]);
-        if (diff >= 500 && extendedSecrets.size < 1000) {
+        if (diff >= 100 && extendedSecrets.size < 1000) {
           extendedSecrets.add(diff);
         }
       }
@@ -356,17 +356,26 @@ class AdversaryOracleSolver {
           const lineEnd = nextNl === -1 ? text.length : nextNl;
           const line = text.substring(lineStart, lineEnd).toLowerCase();
 
+          // Context window before token (up to 35 chars) accurately captures descriptors without bleeding into adjacent clauses
+          const localBefore = text.substring(Math.max(0, token.start - 35), token.start).toLowerCase();
+
           let tag = "[REDACTED_BUDGET_ALLOCATION]";
           // 1. Direct equality with user base secrets takes precedence over derived labels!
           if (secretValues.some(sv => Math.abs(token.val - sv) / sv <= this.tolerance)) {
             tag = "[REDACTED_FINANCIAL_1]";
+          } else if (/\b(?:year|years|tahun|timeline|akumulasi)\b/i.test(localBefore)) {
+            tag = "[REDACTED_SAVINGS_ACCUMULATION]";
+          } else if (/\b(?:kenaikan|increment|delta|tambahan|raise)\b/i.test(localBefore)) {
+            tag = "[REDACTED_SALARY_INCREMENT]";
+          } else if (/\b(?:naik|proyeksi|projected|menjadi|target)\b/i.test(localBefore)) {
+            tag = "[REDACTED_PROJECTED_SALARY]";
+          } else if (/\b(?:sisa|remainder|remaining|cicilan|cashflow|kpr|payoff|discretionary|available)\b/i.test(localBefore)) {
+            tag = "[REDACTED_REMAINDER_CASHFLOW]";
+          } else if (/\b(?:pro-forma|runway|pre-money|burn|budget|anggaran|alokasi|car|cars|food|transport|saving|savings|tabungan|rent|groceries|spend|spending)\b/i.test(localBefore)) {
+            tag = "[REDACTED_BUDGET_ALLOCATION]";
           } else if (/\b(?:year|years|tahun|timeline|akumulasi)\b/i.test(line)) {
             tag = "[REDACTED_SAVINGS_ACCUMULATION]";
-          } else if (/\b(?:kenaikan|increment|delta|tambahan|raise)\b/i.test(line)) {
-            tag = "[REDACTED_SALARY_INCREMENT]";
-          } else if (/\b(?:naik|proyeksi|projected|menjadi|target)\b/i.test(line)) {
-            tag = "[REDACTED_PROJECTED_SALARY]";
-          } else if (/\b(?:sisa|remainder|cicilan|cashflow|kpr|debt|payoff|discretionary|available)\b/i.test(line)) {
+          } else if (/\b(?:sisa|remainder|remaining|cicilan|cashflow|kpr|debt|payoff|discretionary|available)\b/i.test(line)) {
             tag = "[REDACTED_REMAINDER_CASHFLOW]";
           } else if (/\b(?:pro-forma|runway|pre-money|burn|budget|anggaran|alokasi|car|cars|food|transport|saving|savings|tabungan|rent|groceries)\b/i.test(line)) {
             tag = "[REDACTED_BUDGET_ALLOCATION]";
@@ -1264,6 +1273,7 @@ class ConsistentPseudonymizer {
         if (turn.content && turn.role === "assistant") {
           turn.content = solver.solveAndRedact(turn.content, financialSecrets, options.disabledLeaks || []);
           if (solver.lastLeaks && solver.lastLeaks.length > 0) {
+            turn.solverLeaks = [...solver.lastLeaks].sort((a, b) => (a.start || 0) - (b.start || 0));
             allSolverLeaks.push(...solver.lastLeaks);
           }
         }

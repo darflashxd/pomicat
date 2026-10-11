@@ -129,6 +129,7 @@ class ContextualClassifier {
         // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances)
         const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
+        const finSpans = [];
         const finMatches = sent.matchAll(finRegex);
         for (const m of finMatches) {
           const matchIndex = m.index;
@@ -182,12 +183,36 @@ class ContextualClassifier {
             }
           }
 
+          finSpans.push([matchIndex, matchIndex + matchStr.length]);
           detected.push({
             turnIndex,
             raw: matchStr,
             category: "SENSITIVE_FINANCIAL",
             sentence: sent,
             confidence: 0.98
+          });
+        }
+
+        // Contextual 2-3 digit expense numbers (e.g. "car payment is 580", "car is 450", "rent of 600", "fee is 50", "gym is 40", "580/mo")
+        const shortExpenseRx = /\b(?:(?:payment|car\s+payment|rent|auto|lease|fee|bill|cost|spend|spending|gaji|sewa|cicilan|bayar|iuran|tarif)\s+(?:is|of|for|about|around|sebesar|adalah|:)?\s*(\d{2,3})\b|(?<![.,\d])(\d{2,3})\s*(?:\/mo|\/month|monthly|\/yr|\/year|\/bulan|per\s+bulan|\/minggu)\b)/gi;
+        const shortExpenseMatches = sent.matchAll(shortExpenseRx);
+        for (const sm of shortExpenseMatches) {
+          const rawNum = sm[1] || sm[2];
+          if (!rawNum) continue;
+          const matchIndex = sm.index + sm[0].lastIndexOf(rawNum);
+
+          if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
+          if (addressSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
+          if (finSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
+          if (detected.some(d => d.turnIndex === turnIndex && d.raw === rawNum)) continue;
+
+          finSpans.push([matchIndex, matchIndex + rawNum.length]);
+          detected.push({
+            turnIndex,
+            raw: rawNum,
+            category: "SENSITIVE_FINANCIAL",
+            sentence: sent,
+            confidence: 0.95
           });
         }
 

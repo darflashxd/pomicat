@@ -393,13 +393,14 @@ class SafeShareModal {
 
     // Solver algebraic leaks and derived calculations into candidates (filter out calendar years)
     if (solverLeaks && Array.isArray(solverLeaks)) {
-      for (const leak of solverLeaks) {
+      const orderedLeaks = [...solverLeaks].sort((a, b) => (a.start || 0) - (b.start || 0));
+      for (const leak of orderedLeaks) {
         if (!leak.raw) continue;
         const isYear = /^(?:19[5-9]\d|20[0-4]\d)$/.test(leak.raw.trim());
         if (isYear) continue;
 
         const cleanRaw = leak.raw.replace(/[.,;:]+$/, "").trim();
-        const existing = this.candidates.find(c => c.raw.toLowerCase() === cleanRaw.toLowerCase() || (c.tag === leak.replacement && c.isAlgebraic));
+        const existing = this.candidates.find(c => c.raw.toLowerCase() === cleanRaw.toLowerCase());
         if (!existing) {
           let ruleName = "Derived Math Calculation";
           if (leak.replacement === "[REDACTED_PROJECTED_SALARY]") ruleName = "Projected Salary / Raise";
@@ -423,6 +424,8 @@ class SafeShareModal {
             occurrences: 1,
             isAlgebraic: true
           });
+        } else {
+          existing.occurrences = (existing.occurrences || 1) + 1;
         }
       }
     }
@@ -572,8 +575,8 @@ class SafeShareModal {
 
     const disabledLeaks = this.candidates
       .filter(c => !this.activeCategories.has(c.category) || !c.enabled)
-      .flatMap(c => [c.raw, c.tag, c.replacement, c.fullRaw])
-      .filter(Boolean);
+      .flatMap(c => [c.raw, c.fullRaw])
+      .filter(r => r && !r.startsWith("[REDACTED_"));
 
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
@@ -615,7 +618,7 @@ class SafeShareModal {
       const unmaskedCandidates = this.candidates
         .filter(cand => {
           const isCatActive = this.activeCategories.has(cand.category);
-          return !(isCatActive && cand.enabled) && cand.raw;
+          return !(isCatActive && cand.enabled) && cand.raw && !cand.raw.startsWith("[REDACTED_");
         })
         .sort((a, b) => b.raw.length - a.raw.length);
 
@@ -627,9 +630,24 @@ class SafeShareModal {
 
       // B. Single-pass regex replacing all redacted tags outside existing spans
       const turnDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
+      const turnLeaks = turn.solverLeaks || [];
+      let solverLeakIdx = 0;
+
       htmlContent = replaceOutsideSpans(htmlContent, /\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
-        // Find matching candidate: prefer one belonging to this turn or detections
-        let cand = this.candidates.find(c => (c.tag === tag || c.replacement === tag) && turnDets.some(d => (d.secretToken || d.raw).toLowerCase() === c.raw.toLowerCase()));
+        let cand = null;
+        // 1. If this is a solver leak in an assistant turn, match in exact occurrence order
+        if (solverLeakIdx < turnLeaks.length) {
+          const leak = turnLeaks[solverLeakIdx];
+          if (leak && leak.replacement === tag) {
+            solverLeakIdx++;
+            cand = this.candidates.find(c => c.raw.toLowerCase() === leak.raw.toLowerCase());
+          }
+        }
+        // 2. Prefer one belonging to this turn or detections
+        if (!cand) {
+          cand = this.candidates.find(c => (c.tag === tag || c.replacement === tag) && turnDets.some(d => (d.secretToken || d.raw).toLowerCase() === c.raw.toLowerCase()));
+        }
+        // 3. Fallback to candidate matching tag
         if (!cand) {
           cand = this.candidates.find(c => c.tag === tag || c.replacement === tag);
         }
@@ -661,13 +679,12 @@ class SafeShareModal {
           if (cand) {
             const nextState = !cand.enabled;
             cand.enabled = nextState;
-            // Also synchronize all other candidates sharing the exact same raw secret or numeric value
+            const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
             this.candidates.forEach(other => {
-              if (
-                other.raw.toLowerCase() === cand.raw.toLowerCase() ||
-                (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && this.pseudonymizer.parseFinancialValue(other.raw) === this.pseudonymizer.parseFinancialValue(cand.raw) && this.pseudonymizer.parseFinancialValue(cand.raw) > 0) ||
-                (cand.isAlgebraic && other.isAlgebraic && (other.tag === cand.tag || other.raw.toLowerCase() === cand.raw.toLowerCase()))
-              ) {
+              const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
+              const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
+              const isSameFinVal = (cand.category === "FINANCIAL" && other.category === "FINANCIAL" && candVal > 0 && otherVal === candVal);
+              if (isSameRaw || isSameFinVal) {
                 other.enabled = nextState;
               }
             });
@@ -782,6 +799,8 @@ class SafeShareModal {
   renderInspectorList() {
     const container = document.getElementById("inspector-items-container");
     if (!container) return;
+    const drawerEl = document.getElementById("safeshare-inspector-drawer");
+    const savedScrollTop = drawerEl ? drawerEl.scrollTop : 0;
     container.innerHTML = "";
 
     if (this.candidates.length === 0) {
@@ -813,6 +832,7 @@ class SafeShareModal {
 
         const card = document.createElement("div");
         card.className = `inspector-item-card ${isItemActive ? "item-active" : "item-inactive"}`;
+        card.style.cursor = "pointer";
         card.innerHTML = `
           <div class="item-card-left">
             <div class="item-icon">${meta.icon}</div>
@@ -838,11 +858,15 @@ class SafeShareModal {
         `;
 
         const inputEl = card.querySelector(".cand-toggle-input");
-        inputEl.addEventListener("change", (e) => {
-          const nextState = e.target.checked;
+        const toggleHandler = (e) => {
+          const nextState = inputEl.checked;
           cand.enabled = nextState;
+          const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
           this.candidates.forEach(other => {
-            if (other.raw.toLowerCase() === cand.raw.toLowerCase() || (other.category === "FINANCIAL" && cand.category === "FINANCIAL" && other.raw.replace(/[^\d]/g, "") === cand.raw.replace(/[^\d]/g, ""))) {
+            const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
+            const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
+            const isSameFinVal = (cand.category === "FINANCIAL" && other.category === "FINANCIAL" && candVal > 0 && otherVal === candVal);
+            if (isSameRaw || isSameFinVal) {
               other.enabled = nextState;
             }
           });
@@ -851,10 +875,23 @@ class SafeShareModal {
             this.savePreferences();
           }
           this.rebuildViews();
+        };
+
+        inputEl.addEventListener("change", toggleHandler);
+
+        // Entire row clickable for intuitive toggling
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".ss-switch")) return;
+          inputEl.checked = !inputEl.checked;
+          toggleHandler(e);
         });
 
         container.appendChild(card);
       }
+    }
+
+    if (drawerEl && savedScrollTop > 0) {
+      drawerEl.scrollTop = savedScrollTop;
     }
   }
 

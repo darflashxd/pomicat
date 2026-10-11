@@ -113,6 +113,7 @@
     });
 
     pill.addEventListener("click", () => {
+      handleSessionRouteChange();
       const turns = extractConversationTurns();
       if (turns.length === 0) {
         alert("SafeShare: No active conversation found in the current chat window.");
@@ -126,32 +127,57 @@
   }
 
   /**
+   * Helper to check if an element is genuinely visible in the active document layout.
+   * Excludes elements inside aria-hidden, inert, or display:none containers (e.g. inactive SPA chat panes).
+   */
+  function isVisibleElement(el) {
+    if (!el || !el.isConnected) return false;
+    if (el.closest("[aria-hidden='true'], [inert], .hidden, [hidden]")) return false;
+    if (typeof el.checkVisibility === "function") {
+      try {
+        if (!el.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true })) return false;
+      } catch (_) {}
+    }
+    try {
+      const s = window.getComputedStyle ? window.getComputedStyle(el) : null;
+      if (s && (s.display === "none" || s.visibility === "hidden" || s.visibility === "collapse")) {
+        return false;
+      }
+    } catch (_) {}
+    return el.offsetWidth > 0 || el.offsetHeight > 0 || (el.getClientRects && el.getClientRects().length > 0);
+  }
+
+  /**
    * Finds the active prompt input area across ChatGPT, Claude, and DeepSeek.
    * Strictly filters out sidebar items, chat rename inputs, and non-composer elements.
    */
   function findPromptInputElement() {
     const isValidInput = (el) => {
       if (!el || typeof document === "undefined" || !document.body || !document.body.contains(el)) return false;
+      if (!isVisibleElement(el)) return false;
       // Exclude sidebar search, chat rename input, and elements inside modals/headers
       if (el.closest("#safeshare-modal-backdrop, aside, nav, [class*='sidebar'], header")) return false;
       return true;
     };
 
-    const candidates = [
-      document.querySelector("#prompt-textarea"),
-      document.querySelector("form textarea"),
-      document.querySelector("form [contenteditable='true']"),
-      document.querySelector("div.ProseMirror[contenteditable='true']"),
-      document.querySelector("[data-testid='chat-input']"),
-      document.querySelector("textarea[data-id='root']"),
-      document.querySelector("textarea[placeholder*='Message' i], textarea[placeholder*='Pesan' i], textarea[placeholder*='Ask' i]"),
-      document.querySelector("div[contenteditable='true'][data-placeholder]"),
-      document.querySelector("fieldset div[contenteditable='true']"),
-      document.querySelector("textarea")
+    const selectors = [
+      "#prompt-textarea",
+      "form textarea",
+      "form [contenteditable='true']",
+      "div.ProseMirror[contenteditable='true']",
+      "[data-testid='chat-input']",
+      "textarea[data-id='root']",
+      "textarea[placeholder*='Message' i], textarea[placeholder*='Pesan' i], textarea[placeholder*='Ask' i]",
+      "div[contenteditable='true'][data-placeholder]",
+      "fieldset div[contenteditable='true']",
+      "textarea"
     ];
 
-    for (const el of candidates) {
-      if (isValidInput(el)) return el;
+    for (const sel of selectors) {
+      const matches = document.querySelectorAll(sel);
+      for (const el of matches) {
+        if (isValidInput(el)) return el;
+      }
     }
     return null;
   }
@@ -509,6 +535,7 @@
    */
   function isPromptInputOrUIElement(el) {
     if (!el) return true;
+    if (!isVisibleElement(el)) return true;
     // Strictly exclude the user prompt composer input, form, and SafeShare UI
     if (el.closest("form, #prompt-textarea, fieldset, textarea, #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
       return true;
@@ -519,6 +546,27 @@
       return true;
     }
     return false;
+  }
+
+  /**
+   * Scopes search to the active conversation container hosting the visible prompt composer.
+   * Prevents querying background/unmounted chat session panes in React/Next.js SPAs.
+   */
+  function getActiveConversationRoot() {
+    const inputEl = findPromptInputElement();
+    if (inputEl) {
+      const main = inputEl.closest("main, [role='main']");
+      if (main && isVisibleElement(main)) return main;
+      const form = inputEl.closest("form");
+      if (form && form.parentElement) {
+        const parentMain = form.parentElement.closest("main, [role='main']");
+        if (parentMain && isVisibleElement(parentMain)) return parentMain;
+        return form.parentElement;
+      }
+    }
+    const mains = Array.from(document.querySelectorAll("main, [role='main']")).filter(isVisibleElement);
+    if (mains.length > 0) return mains[mains.length - 1];
+    return document.body;
   }
 
   /**
@@ -548,11 +596,22 @@
   }
 
   function extractRawTurns() {
+    const root = getActiveConversationRoot();
+    let turns = extractTurnsFromContainer(root);
+    if (turns.length === 0 && root !== document.body) {
+      // Fallback: search document.body for visible turns only
+      turns = extractTurnsFromContainer(document.body);
+    }
+    return turns;
+  }
+
+  function extractTurnsFromContainer(container) {
+    if (!container) return [];
     const turns = [];
 
     // Strategy A (ChatGPT, 2026 layout): user bubbles and assistant markdown carry readable
     // data attributes; class names are hashed and change between releases.
-    const bubbles = Array.from(document.querySelectorAll(
+    const bubbles = Array.from(container.querySelectorAll(
       "[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']"
     )).filter(el => !isPromptInputOrUIElement(el));
     if (bubbles.length > 0) {
@@ -573,7 +632,7 @@
     }
 
     // Strategy 0: High-accuracy ChatGPT data-message-author-role pattern
-    const roleDivs = document.querySelectorAll("[data-message-author-role]");
+    const roleDivs = container.querySelectorAll("[data-message-author-role]");
     // Outermost only: a message element can contain another element with the same attribute
     const validRoleDivs = Array.from(roleDivs).filter(el =>
       !isPromptInputOrUIElement(el) && !(el.parentElement && el.parentElement.closest("[data-message-author-role]")));
@@ -589,7 +648,7 @@
     }
 
     // Strategy 1: ChatGPT conversation-turn pattern (both article and div tags)
-    const chatGptTurns = document.querySelectorAll("[data-testid^='conversation-turn']");
+    const chatGptTurns = container.querySelectorAll("[data-testid^='conversation-turn']");
     const validTurns = Array.from(chatGptTurns).filter(el => !isPromptInputOrUIElement(el));
     if (validTurns.length > 0) {
       validTurns.forEach((turnEl) => {
@@ -608,10 +667,10 @@
     }
 
     // Strategy 2: Claude DOM Pattern
-    const claudeUserNodes = document.querySelectorAll("[data-testid='user-message'], div[class*='user-message']");
-    const claudeAsstNodes = document.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+    const claudeUserNodes = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message']");
+    const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
     if (claudeUserNodes.length > 0 || claudeAsstNodes.length > 0) {
-      const allClaude = document.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+      const allClaude = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
       Array.from(allClaude).filter(el => !isPromptInputOrUIElement(el)).forEach((el) => {
         const isUser = el.getAttribute("data-testid") === "user-message" || (el.className && el.className.includes("user-message"));
         const textContent = getCleanNodeContent(el);
@@ -626,7 +685,7 @@
     }
 
     // Strategy 3: DeepSeek & generic markdown message turns
-    const deepseekNodes = document.querySelectorAll("div.ds-markdown, div[class*='ds-markdown'], .chat-message, div[class*='message-bubble']");
+    const deepseekNodes = container.querySelectorAll("div.ds-markdown, div[class*='ds-markdown'], .chat-message, div[class*='message-bubble']");
     const validDeepseek = Array.from(deepseekNodes).filter(el => !isPromptInputOrUIElement(el));
     if (validDeepseek.length > 0) {
       validDeepseek.forEach((el) => {
@@ -646,12 +705,32 @@
     return [];
   }
 
-  // Periodic check to inject button & prompt shield once UI is loaded
+  let lastRecordedUrl = (typeof location !== "undefined" ? location.href : "");
+  function handleSessionRouteChange() {
+    if (typeof location === "undefined" || location.href === lastRecordedUrl) return;
+    lastRecordedUrl = location.href;
+
+    // 1. Close any open modal from previous session
+    const existing = document.getElementById("safeshare-modal-backdrop");
+    if (existing) existing.remove();
+
+    // 2. Clear ephemeral symbolic vault from previous session
+    if (symbolicVault) symbolicVault.clear();
+
+    // 3. Re-sync input and shield indicator for new session
+    const inputEl = findPromptInputElement();
+    if (inputEl) updateShieldIndicator(inputEl);
+  }
+
+  window.addEventListener("popstate", handleSessionRouteChange);
+
+  // Periodic check to inject button & prompt shield once UI is loaded and track SPA navigation
   setInterval(() => {
+    handleSessionRouteChange();
     initSafeShareButton();
     initPreInferenceInterception();
     runHydrationPass();
-  }, 1500);
+  }, 500);
 
   // Initialize inbound streaming local hydration observer
   initLocalHydrationObserver();

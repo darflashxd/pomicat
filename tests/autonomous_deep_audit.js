@@ -372,6 +372,7 @@ async function runAutonomousDeepAudit() {
     })
   });
   recordCheck("Cloudflare Edge POST /api/share returned HTTP 201 Created", uploadRes.status === 201);
+  const uploadData = await uploadRes.json();
 
   // Retrieve Ciphertext from Cloudflare Global Edge
   console.log("  [*] Retrieving ciphertext from Cloudflare Global Edge via GET...");
@@ -402,8 +403,12 @@ async function runAutonomousDeepAudit() {
   console.log("--------------------------------------------------------------------------------");
 
   console.log("  [*] Disagreeable tamper signal: Sending emergency revocation to Cloudflare Edge...");
-  const revokeRes = await safeFetch(`${CLOUDFLARE_EDGE}/api/revoke/${enc.shareId}`);
-  recordCheck("Cloudflare Edge GET /api/revoke/:id returned HTTP 200", revokeRes.status === 200);
+  const revokeRes = await safeFetch(`${CLOUDFLARE_EDGE}/api/revoke/${enc.shareId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: uploadData.revoke_token })
+  });
+  recordCheck("Cloudflare Edge POST /api/revoke/:id returned HTTP 200", revokeRes.status === 200);
 
   // Second fetch attempt after shredding
   console.log("  [*] Verifying record destruction: Re-querying shredded link...");
