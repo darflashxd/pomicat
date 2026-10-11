@@ -3,11 +3,21 @@
 ## Unreleased
 
 ### New
+- `invert` also recovers a hidden birth year from stated ages ("I am 28", "in 2020 at 22"); when
+  SafeShare hides a birth date it now hides stated ages too.
+- Relay hardening: max 512 KB per share, 10 uploads and 60 reads per minute per IP (Cloudflare
+  rate-limit bindings; the local relay does the same), and a daily cron that deletes expired
+  shares. Run `npx wrangler@4 deploy` to apply; see `DEPLOY.md`.
+- `DEPLOY.md` (Cloudflare step by step), `LABELLING.md` and `tools/eval/make_label_sheet.js` /
+  `label_agreement.py` (labelling kit for the "is this about the writer?" model),
+  `tools/eval/inversion_wild.js` (looks for the inversion attack in real WildChat chats).
+- README: threat model and the "didn't the vendors fix this?" answer.
 - Before-sending protection menu: click the chip above the chat input to choose "Protect IDs +
   amounts" (new default: NIK, cards, keys, emails and phones are replaced, amounts become `<S1>`),
   "Protect amounts only", or "Off". The chip shows how many items will be protected as you type.
 
 ### Fixed
+- `invert` counted a number repeated several times as several pieces of evidence.
 - "Continue in ChatGPT / Claude / DeepSeek" did nothing when the extension was installed: it now
   opens the chat site in a new tab and pastes the prompt once the input box appears.
 - Shared chats included the send-time shield's "[PRIVACY PROTOCOL: …]" instruction, and could

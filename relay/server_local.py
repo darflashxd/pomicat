@@ -50,6 +50,23 @@ ALLOWED_ORIGINS = {
     "https://chat.deepseek.com",
 }
 
+# Same limits as the Cloudflare worker: 512 KB per share, per-IP requests per minute
+MAX_BODY = 512 * 1024 + 4096
+LIMITS = {"upload": 10, "read": 60}
+_hits = {}
+
+
+def allowed(kind, ip):
+    """Sliding one-minute window per (kind, ip)."""
+    now = time.time()
+    recent = [t for t in _hits.get((kind, ip), []) if now - t < 60]
+    if len(recent) >= LIMITS[kind]:
+        _hits[(kind, ip)] = recent
+        return False
+    recent.append(now)
+    _hits[(kind, ip)] = recent
+    return True
+
 
 class SafeShareHandler(BaseHTTPRequestHandler):
     def _send_cors(self, status=200, content_type="application/json"):
@@ -79,10 +96,22 @@ class SafeShareHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         global STORAGE
         if self.path == "/api/share" or self.path == "/api/create":
+            if not allowed("upload", self.client_address[0]):
+                self._send_cors(429)
+                self.wfile.write(json.dumps({"error": "Too many requests, try again in a minute"}).encode())
+                return
             length = int(self.headers.get("Content-Length", 0))
-            if length > 2 * 1024 * 1024:
+            if length > MAX_BODY:
+                # Discard the body (bounded) so the client gets a readable 413 instead of a reset
+                remaining = min(length, 8 * 1024 * 1024)
+                while remaining > 0:
+                    chunk = self.rfile.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                self.close_connection = True
                 self._send_cors(413)
-                self.wfile.write(json.dumps({"error": "Payload exceeds maximum allowed size (2MB)"}).encode())
+                self.wfile.write(json.dumps({"error": "Share too large (max 512 KB)"}).encode())
                 return
 
             raw_body = self.rfile.read(length).decode("utf-8")
@@ -209,6 +238,10 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
         # 1. REST API: Get encrypted payload
         if clean_path.startswith("/api/share/"):
+            if not allowed("read", self.client_address[0]):
+                self._send_cors(429)
+                self.wfile.write(json.dumps({"error": "Too many requests, try again in a minute"}).encode())
+                return
             share_id = clean_path.replace("/api/share/", "").strip()
             item = STORAGE.get(share_id)
 

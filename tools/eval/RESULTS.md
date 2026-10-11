@@ -95,6 +95,47 @@ person tags on code tokens ("mov", "val"), and its ID recognizers firing on "O3"
 PII; real users mostly mention names that aren't theirs. Rules can only approximate "is this
 about the user?". That is what a trained contextual model should learn, measured on both sets.
 
+## 6. Does the inversion attack happen in real chats? (2026-10-11)
+
+`tools/eval/inversion_wild.js` on 20,000 English WildChat-1M conversations (one parquet shard,
+`tools/eval/wildchat_to_cache.py`). For each chat where SafeShare's rules find an amount the user
+stated: mask exactly those amounts everywhere (what an entity-by-entity redactor does), then
+attack. "Recovered" = a top-3 `invert` guess within 1.5% of a masked amount; a decoy value
+(amount × 1.37) measures chance hits.
+
+| | all chats with a stated amount | personal money only* |
+|---|---|---|
+| conversations | 235 of 20,000 | **10 of 20,000 (0.05%)** |
+| masked amount still visible in another format | 37 (15.7%) | 0 |
+| recovered by `invert` (top 3) | 3 (1.3%), all coincidences on reading | 0 |
+| chance hits on the decoy | 0 | 0 |
+| after SafeShare: visible / recovered | 30 (12.8%) / 0 | 0 / 0 |
+
+\* the amount is in a sentence like "my salary / our rent / I pay / gaji saya …", under 100 million.
+
+**Reading the results honestly:**
+- In WildChat (2023, general-purpose chats), people very rarely share their own finances, and in
+  those few chats nothing leaked through derived numbers. **We could not measure a real-world rate
+  for the inversion attack from this data.** The attack is demonstrated on controlled examples
+  (`examples/`), not yet observed in the wild.
+- The "all chats" column is noisy: most detected "amounts" are company figures, data tables, IDs
+  and years, where a 1.5% match happens by chance. The 12.8% left visible after SafeShare are of
+  that kind; none are personal money.
+- Running this found and fixed a bug: `invert` counted a number repeated three times as three
+  pieces of evidence. Support now counts distinct values.
+
+**What would measure it properly:** realistic personal-finance prompts (salary, rent, debt,
+budgets, in Indonesian and English) sent to current models, so the replies and their derived
+numbers are real; then entity redaction and `invert` as above. That needs model API access and is
+the next experiment.
+
+## 7. A second inference: birth year from stated ages
+
+A redacted birth date is undone by "I am 28" (plus the current year) or "I graduated in 2020 at
+22". `invert` now reports this when a text hides a birth date (`examples/chat_birthdate_naive.txt`
+→ 1998 or 1997), and SafeShare hides stated ages whenever it hides a birth date
+(`tests/birthyear.test.js`). Ages alone are left as they are.
+
 ## What this means for the project
 
 SafeShare's value is the inversion defense, not entity detection. The natural setup is to run a

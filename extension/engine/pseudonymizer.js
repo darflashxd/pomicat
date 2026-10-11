@@ -38,6 +38,14 @@ function looksLikeName(tokens, { requireCapital = false } = {}) {
       (!requireCapital || /^\p{Lu}/u.test(t))));
 }
 
+// Stated ages, shared by the defence (below) and the attack (policy.js inferBirthYears):
+//   age:   "I am 28 years old", "I'm 28.", "you are 28 in 2026", "umur saya 28 tahun"
+//   atAge: "in 2020 at 22", "tahun 2020 di usia 22"
+const AGE_PATTERNS = {
+  age: /\b(?:i'?m|i am|you'?re|you are|aged?|at the age of|umur(?:\s+saya)?|usia(?:\s+saya)?|berumur|berusia)\s+(\d{1,2})(?=\s*(?:years?(?:\s+old)?|yrs?|y\/o|yo|tahun|th)\b|\s*[,.!?]|\s+(?:in|on|this|now|sekarang)\b|\s*$)/i,
+  atAge: /\b(?:in|tahun)\s+((?:19|20)\d{2})\s*,?\s+(?:at|when i was|pada usia|di usia|umur)\s+(?:age\s+)?(\d{1,2})\b/i
+};
+
 // 1 -> A, 26 -> Z, 27 -> AA (spreadsheet style), so name labels never run into symbols
 function letterLabel(n) {
   let s = "";
@@ -1275,6 +1283,16 @@ class ConsistentPseudonymizer {
       }
     }
 
+    // A hidden birth date is undone by "I am 28" + the current year, or "in 2020 at 22":
+    // once a birth date is redacted anywhere, hide stated ages everywhere too.
+    if (updatedTurns.some(t => /\[REDACTED_DOB\]/.test(t.content))) {
+      for (const t of updatedTurns) {
+        t.content = t.content
+          .replace(new RegExp(AGE_PATTERNS.age.source, "gi"), (m, n) => m.replace(n, "[REDACTED_AGE]"))
+          .replace(new RegExp(AGE_PATTERNS.atAge.source, "gi"), (m, y, n) => m.replace(new RegExp(`\\b${n}\\b(?!.*\\b${n}\\b)`), "[REDACTED_AGE]"));
+      }
+    }
+
     return {
       anonymizedTurns: updatedTurns,
       mappings: Array.from(this.entityMap.entries()).map(([k, v]) => {
@@ -1288,6 +1306,7 @@ class ConsistentPseudonymizer {
 
 ConsistentPseudonymizer.AdversaryOracleSolver = AdversaryOracleSolver;
 ConsistentPseudonymizer.looksLikeName = looksLikeName;
+ConsistentPseudonymizer.AGE_PATTERNS = AGE_PATTERNS;
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ConsistentPseudonymizer;

@@ -1,18 +1,54 @@
 /**
  * SafeShare-AI — Shared policy helpers (used by the extension and the CLI)
  *  - invert(): the inversion attack. Finds a hidden value that several visible numbers agree on.
+ *  - inferBirthYears(): the same idea for dates. A hidden birth date comes back from "I am 28"
+ *    plus the current year, or "in 2020 at 22".
  *  - generalizeNumbers(): replaces the user's own amounts with ranges ("Rp 2–5 juta") and keeps
  *    them only if invert() can't recover the originals.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) {
-    module.exports = factory(require("./pseudonymizer.js").AdversaryOracleSolver);
+    module.exports = factory(require("./pseudonymizer.js"));
   } else {
     // Top-level classes in content scripts are global bindings, not window properties
     // eslint-disable-next-line no-undef
-    root.SafeSharePolicy = factory(ConsistentPseudonymizer.AdversaryOracleSolver);
+    root.SafeSharePolicy = factory(ConsistentPseudonymizer);
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (AdversaryOracleSolver) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Pseudonymizer) {
+  const { AdversaryOracleSolver, AGE_PATTERNS } = Pseudonymizer;
+
+  /**
+   * Birth years implied by stated ages. Each statement gives two candidates (birthday passed or
+   * not yet); years that several statements agree on come first.
+   * Result: [{ year, support, derivations: [string] }]
+   */
+  function inferBirthYears(text, { now = new Date().getFullYear() } = {}) {
+    const cands = [];
+    for (const m of text.matchAll(new RegExp(AGE_PATTERNS.atAge.source, "gi"))) {
+      const y = +m[1], a = +m[2];
+      cands.push({ years: [y - a, y - a - 1], how: `${a} in ${y}` });
+    }
+    for (const m of text.matchAll(new RegExp(AGE_PATTERNS.age.source, "gi"))) {
+      const a = +m[1];
+      if (a < 10) continue;
+      // Reference year: one written right after the age ("28 in 2026"), else this year
+      const after = text.slice(m.index + m[0].length, m.index + m[0].length + 40);
+      const ref = (/^\D{0,20}?\b((?:19|20)\d{2})\b/.exec(after) || [])[1];
+      const y = ref ? +ref : now;
+      cands.push({ years: [y - a, y - a - 1], how: `${a} in ${y}${ref ? "" : " (this year)"}` });
+    }
+    const byYear = new Map();
+    for (const c of cands) {
+      for (const y of c.years) {
+        if (!byYear.has(y)) byYear.set(y, new Set());
+        byYear.get(y).add(c.how);
+      }
+    }
+    return [...byYear.entries()]
+      .map(([year, hows]) => ({ year, support: hows.size, derivations: [...hows] }))
+      .sort((a, b) => b.support - a.support || b.year - a.year)
+      .slice(0, 2);
+  }
   // Range generalization: "Rp 3.000.000" -> "Rp 2–5 juta"
 
   // 1-2-5 buckets: wide enough that the exact value can't be read back.
@@ -95,7 +131,8 @@
     const cands = [];
     for (const a of amounts) {
       const add = (v, how, cost) => {
-        if (v >= 100 && !visible.some((x) => near(v, x))) cands.push({ v, how, cost, src: a.start });
+        // Support counts distinct visible values: "565" repeated three times is one piece of evidence
+        if (v >= 100 && !visible.some((x) => near(v, x))) cands.push({ v, how, cost, src: Math.round(a.val * 100) });
       };
       for (const c of PERIODS) {
         add(a.val / c, `${a.raw} / ${c}`, periodCost(c));
@@ -137,5 +174,5 @@
       .slice(0, limit);
   }
 
-  return { invert, bucket, formatRange, currencyOf, generalizeNumbers };
+  return { invert, inferBirthYears, bucket, formatRange, currencyOf, generalizeNumbers };
 });

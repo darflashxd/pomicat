@@ -54,6 +54,16 @@ node bin/safeshare.js invert /tmp/safe.txt
 The derived amounts are gone too, the 30% ratio is kept because a ratio alone reveals nothing,
 and the attack prints `No hidden values recovered.`
 
+## 4a. Not just money (30 s)
+
+```bash
+node bin/safeshare.js invert examples/chat_birthdate_naive.txt
+node bin/safeshare.js redact examples/chat_birthdate_original.txt | node bin/safeshare.js invert
+```
+
+"The birth date was redacted, but 'I am 28' and 'graduated in 2020 at 22' give the year back.
+SafeShare hides the ages too."
+
 ## 4b. Keep it useful (30 s)
 
 ```bash

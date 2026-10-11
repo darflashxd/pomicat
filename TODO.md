@@ -17,14 +17,22 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 - [x] 2.3.0: reader profiles (public / trusted), range mode for amounts, Presidio integration with `names: personal`; in CLI and extension
 - [x] Release zips rebuilt: `dist/SafeShare-2.3.0-{chrome,firefox}.zip`; notes in `CHANGELOG.md`
 
+- [x] Relay: 512 KB cap, per-IP rate limits, daily cleanup cron; `DEPLOY.md` for the Cloudflare account owner
+- [x] Threat model + "didn't the vendors fix this?" in README; Presidio moved to an optional "Advanced" section
+- [x] Second inference: hidden birth year from stated ages (attack + defence + tests)
+- [x] Looked for the attack in 20,000 real WildChat chats (RESULTS.md §6): personal finance is rare (0.05%), no leaks found
+- [x] Labelling kit for friends: `LABELLING.md`, 233-row sheet, agreement script
+
 ## Left for you
 - [ ] `git push` (committed locally, not pushed)
 - [ ] GitHub Release v2.3.0: upload the two zips from `dist/`, paste `CHANGELOG.md` 2.3.0 (and 2.2.0) as notes
-- [ ] Cloudflare: `wrangler login`, then `ALTER TABLE shares ADD COLUMN revoke_hash TEXT;` and `wrangler deploy`
+- [ ] Send `DEPLOY.md` to the friend who owns the Cloudflare account (includes the `ALTER TABLE` step)
+- [ ] Send friends the extension zip + `TESTING.md`, and 2+ friends `tools/eval/data/label_sheet.csv` + `LABELLING.md` (sheet stays private)
 - [ ] Confirm CFP dates and form fields on blackhat.com
 - [ ] Fill presenter names and bios in `docs/ARSENAL_ABSTRACT.md`, then submit
 
 ## Worth doing before the talk (from the evaluation)
+- [ ] Measure the inversion attack properly: realistic personal-finance prompts (ID + EN) sent to current models, then entity redaction + `invert` (needs model API access)
 - [x] Positioning: inversion layer on top of an entity detector; `--presidio` matches Presidio (0.78 vs 0.79) and blocks `invert`
 - [ ] After acceptance: train a "does this name / number belong to the user?" classifier (label WildChat + ConfAIde/PrivacyLens), replacing the `names: personal` rules; report on both ai4privacy and WildChat
 - [ ] Indonesian names and places with Presidio (needs a multilingual spaCy model, e.g. xx_ent_wiki_sm)

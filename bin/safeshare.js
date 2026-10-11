@@ -21,7 +21,7 @@ const path = require("path");
 const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ContextualClassifier = require("../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
-const { invert, bucket, formatRange, generalizeNumbers } = require("../extension/engine/policy.js");
+const { invert, inferBirthYears, bucket, formatRange, generalizeNumbers } = require("../extension/engine/policy.js");
 
 // ---------------------------------------------------------------------------
 // Policy: presets, custom rules, allowlist
@@ -366,16 +366,24 @@ function main(argv) {
 
   const text = input.trim().startsWith("[") ? JSON.parse(input).map((t) => t.content).join("\n") : input;
   const found = invert(text);
-  if (opts.json) return console.log(JSON.stringify(found, null, 2));
-  if (!found.length) return console.log("No hidden values recovered.");
+  // Birth years only matter when the text actually hides a birth date
+  const hidesBirthDate = /\[[^\]]*(?:DOB|BIRTH)[^\]]*\]|<DATE_TIME>/i.test(text);
+  const births = hidesBirthDate ? inferBirthYears(text) : [];
+  if (opts.json) return console.log(JSON.stringify({ amounts: found, birthYears: births }, null, 2));
+  if (!found.length && !births.length) return console.log("No hidden values recovered.");
   found.forEach((f, i) => {
     const label = i === 0 ? "Most likely hidden value" : "Alternative";
     console.log(`${label}: ${formatMoney(f.value, f.currency)} (agreed by ${f.support} visible numbers)`);
     for (const d of f.derivations) console.log(`    ${d}`);
   });
+  if (births.length) {
+    const b = births[0];
+    console.log(`Hidden birth date, but the birth year is ${b.year}${births[1] && births[1].support === b.support ? ` or ${births[1].year}` : ""} (from ${b.support} statement${b.support > 1 ? "s" : ""}):`);
+    for (const d of b.derivations) console.log(`    age ${d}`);
+  }
   process.exitCode = 2; // non-zero so CI can fail on a leaky redaction
 }
 
-module.exports = { redact, redactTurns, invert, buildEngines, PRESETS, bucket, formatRange };
+module.exports = { redact, redactTurns, invert, presidioHits, buildEngines, PRESETS, bucket, formatRange };
 
 if (require.main === module) main(process.argv.slice(2));

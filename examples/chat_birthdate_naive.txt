@@ -1,0 +1,2 @@
+User: I was born on [REDACTED_DOB] and I am 28 years old. I graduated in 2020 at 22.
+Assistant: Since you are 28 in 2026, you could start a pension now.

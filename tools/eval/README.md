@@ -48,7 +48,9 @@ gitleaks only looks for secrets, so compare it on the credential labels only.
 - **WildChat**: real user-to-LLM chats with no PII labels. Use it to measure false positives:
   `node tools/eval/wildchat_fp.js 500 out.jsonl [--presidio URL [--names all]]` logs every
   redaction with context for hand-labelling.
-- **Inversion**: `node bin/safeshare.js invert` on redacted chats measures how often hidden
-  numbers can be recovered from other tools' output.
+- **Inversion in real chats**: `python tools/eval/wildchat_to_cache.py` (one WildChat shard,
+  ~230 MB, kept local) then `node tools/eval/inversion_wild.js 20000`. Writes
+  `data/inversion_wild_report.json`; see RESULTS.md section 6.
+- **Labelling** for the "is this about the writer?" question: see `LABELLING.md` in the repo root.
 
 Report every number, including the categories where SafeShare loses.

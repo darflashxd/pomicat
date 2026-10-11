@@ -19,6 +19,25 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// A shared chat is text: even long ones are well under this. Keeps the relay useless as file hosting.
+const MAX_CIPHERTEXT = 512 * 1024;
+
+/**
+ * Per-IP limits using Cloudflare's rate-limiting bindings (see wrangler.toml).
+ * Returns true if the request may proceed. Without the binding (local tests) everything passes.
+ */
+async function allowed(limiter, request) {
+  if (!limiter) return true;
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const { success } = await limiter.limit({ key: ip });
+  return success;
+}
+
+/** Deletes expired shares; run on upload and once a day by the cron trigger. */
+function purgeExpired(env) {
+  return env.DB ? env.DB.prepare("DELETE FROM shares WHERE expires_at < ?").bind(Date.now()).run() : Promise.resolve();
+}
+
 async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -48,7 +67,20 @@ export default {
     }
 
     // 1. API: Store Encrypted Chat (POST /api/share or POST /api/create)
+    const tooMany = () => new Response(JSON.stringify({ error: "Too many requests, try again in a minute" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" }
+    });
+
     if (request.method === "POST" && (url.pathname === "/api/share" || url.pathname === "/api/create")) {
+      if (!(await allowed(env.UPLOAD_LIMITER, request))) return tooMany();
+      // Refuse oversized bodies before reading them
+      if (Number(request.headers.get("Content-Length") || 0) > MAX_CIPHERTEXT + 4096) {
+        return new Response(JSON.stringify({ error: "Share too large (max 512 KB)" }), {
+          status: 413,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
       try {
         const body = await request.json();
         const { id, ciphertext, ttl, burn_on_read } = body;
@@ -69,8 +101,8 @@ export default {
           });
         }
 
-        if (typeof ciphertext !== "string" || ciphertext.length > 2 * 1024 * 1024) {
-          return new Response(JSON.stringify({ error: "Ciphertext exceeds maximum allowed size (2MB)" }), {
+        if (typeof ciphertext !== "string" || ciphertext.length > MAX_CIPHERTEXT) {
+          return new Response(JSON.stringify({ error: "Share too large (max 512 KB)" }), {
             status: 413,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -110,11 +142,7 @@ export default {
           }
 
           // Lazy background cleanup of expired records
-          if (ctx && ctx.waitUntil) {
-            ctx.waitUntil(
-              env.DB.prepare("DELETE FROM shares WHERE expires_at < ?").bind(now).run()
-            );
-          }
+          if (ctx && ctx.waitUntil) ctx.waitUntil(purgeExpired(env));
         } else if (env.SAFESHARE_KV) {
           const existing = await env.SAFESHARE_KV.get(id);
           if (existing) return conflict();
@@ -184,6 +212,7 @@ export default {
 
     // 3. API: Retrieve Ciphertext (GET /api/share/:id or GET /api/:id)
     if (request.method === "GET" && (url.pathname.startsWith("/api/share/") || (url.pathname.startsWith("/api/") && url.pathname.split("/").length === 3))) {
+      if (!(await allowed(env.READ_LIMITER, request))) return tooMany();
       const shareId = url.pathname.replace(/^\/api\/(?:share\/)?/, "").trim();
       const now = Date.now();
 
@@ -312,5 +341,10 @@ export default {
         headers: corsHeaders
       }
     );
+  },
+
+  // Daily cron (wrangler.toml [triggers]): delete expired shares even when nobody uploads
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpired(env));
   }
 };

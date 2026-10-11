@@ -41,7 +41,13 @@ node bin/safeshare.js redact examples/chat_original.txt | node bin/safeshare.js 
 
 The attack looks for one value that several visible numbers agree on, using ratios found in the
 text and common periods (months, weeks, quarters, years), and ranks candidates by how simple the
-explanation is. Use it on synthetic data or data you own.
+explanation is. It does the same for dates: a hidden birth date comes back from "I am 28" or
+"I graduated in 2020 at 22" (`examples/chat_birthdate_naive.txt`). Use it on synthetic data or
+data you own.
+
+How often this happens in real chats is still open: in 20,000 WildChat conversations, people
+almost never shared their own finances, and nothing leaked in the few that did
+([details](tools/eval/RESULTS.md#6-does-the-inversion-attack-happen-in-real-chats-2026-10-11)).
 
 ## How redaction works
 
@@ -53,6 +59,30 @@ explanation is. Use it on synthetic data or data you own.
 
 Redacted values become consistent placeholders (`[REDACTED_FINANCIAL_1]`) across the whole
 conversation, so the chat still reads naturally.
+
+## Threat model
+
+| Who | What they can do | What SafeShare does |
+|---|---|---|
+| Search engines and crawlers (Google dorking) | Index any share page they find a link to | The server and the page only hold ciphertext; the key is in the `#` part of the link, which browsers never send. `noindex` headers on every response. |
+| Scrapers guessing links | Try share IDs in bulk | IDs are random UUIDs (122 bits), and reads are rate-limited per IP. |
+| Anyone who gets the full link (forwarded, pasted in a public channel) | Read the shared chat | Redaction before sharing, so there is little to read; burn after one view, expiry, and revoke limit how long it's readable. |
+| A reader doing arithmetic on the shared chat | Recover a redacted amount from the numbers around it | The inversion defense removes every derivable figure; `invert` checks it. |
+| The relay operator (Cloudflare, or whoever deploys it) | See ciphertext, IP addresses, timing, sizes | Can't read content. Metadata is visible. |
+| The AI vendor | See whatever you send it | Before-sending protection replaces IDs and amounts (`<S1>`) while you chat; names are still sent. |
+
+**Out of scope:** malware or a compromised browser on your machine, a recipient who screenshots
+the page, and what the vendor already received before you installed SafeShare. The viewer's
+anti-copy features are deterrence only, not protection.
+
+### "Didn't the vendors fix this?"
+
+After shared chats showed up in search results in 2025, vendors removed "make discoverable"
+options and added `noindex`. That stops search listings, but a vendor share link is still a page
+that serves the whole plaintext chat to anyone holding the link, stored by the vendor and usually
+without expiry. Shared links get forwarded, pasted into public channels and archived. SafeShare
+removes the personal details (including derivable numbers) before anything is shared, encrypts so
+the host can't read it, and lets links expire.
 
 ## Measured accuracy
 
@@ -144,7 +174,10 @@ Rp 3.000.000" becomes "Gaji saya Rp 2–5 juta". Derived figures stay removed, a
 only used if `invert` can't recover the original from it. The extension has the same two
 choices ("Reader" and "Amounts") in the share dialog.
 
-### Presidio for names, places and IDs
+### Advanced (CLI only): Presidio for names, places and IDs
+
+SafeShare works without this. It's an optional extra for the CLI and proxy when you also want
+general name and address detection, and it's what the evaluation numbers above use.
 
 ```bash
 pip install presidio-analyzer && python -m spacy download en_core_web_lg
@@ -154,7 +187,8 @@ node bin/safeshare.js redact chat.txt --presidio http://127.0.0.1:5002
 
 In a policy file: `"presidio": { "url": "...", "names": "personal" | "all", "skip": ["DATE_TIME", "NRP", "URL"] }`.
 Presidio's default model is English, so Indonesian names are only caught by SafeShare's own
-rules ("nama saya …"). The browser extension doesn't use Presidio.
+rules ("nama saya …"). The browser extension can't use Presidio (it's Python); a small name
+model running inside the browser is on the roadmap instead.
 
 ### Policy file
 
@@ -180,11 +214,13 @@ The relay stores ciphertext only.
 
 - **Local / offline:** `python relay/server_local.py` serves the API and the viewer on
   `http://127.0.0.1:8787`.
-- **Cloudflare:** `cd relay && npx wrangler d1 execute safeshare-db --remote --file schema.sql && npx wrangler deploy`.
-  If you are upgrading an existing database, run `ALTER TABLE shares ADD COLUMN revoke_hash TEXT;`.
+- **Cloudflare:** step-by-step in [DEPLOY.md](DEPLOY.md) (free plan, about 15 minutes).
 
 API: `POST /api/share` `{id (UUID), ciphertext, ttl, burn_on_read}` returns a `revoke_token`.
 `GET /api/share/:id` returns the ciphertext. `POST /api/revoke/:id` `{token}` deletes the share.
+
+Limits: shares up to 512 KB, 10 uploads and 60 reads per minute per IP (both relays), and
+expired shares are deleted daily.
 
 ## Development
 

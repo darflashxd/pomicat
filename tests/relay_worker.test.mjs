@@ -88,4 +88,29 @@ await post("/api/share", { id: burnId, ciphertext: "CT2", burn_on_read: true });
 assert.equal((await call(`/api/share/${burnId}`)).status, 200);
 assert.equal((await call(`/api/share/${burnId}`)).status, 404);
 
+// Size cap: 512 KB of ciphertext, refused before or after parsing
+assert.equal((await post("/api/share", { id: crypto.randomUUID(), ciphertext: "x".repeat(512 * 1024 + 1) })).status, 413);
+
+// Rate limits: a fake limiter that allows 2 calls per key
+const counts = new Map();
+const fakeLimiter = { async limit({ key }) { const n = (counts.get(key) || 0) + 1; counts.set(key, n); return { success: n <= 2 }; } };
+const limitedEnv = { DB, UPLOAD_LIMITER: fakeLimiter };
+const up = () => worker.fetch(new Request("https://relay.test/api/share", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
+  body: JSON.stringify({ id: crypto.randomUUID(), ciphertext: "CT" })
+}), limitedEnv, ctx);
+assert.equal((await up()).status, 201);
+assert.equal((await up()).status, 201);
+res = await up();
+assert.equal(res.status, 429);
+assert.equal(res.headers.get("Retry-After"), "60");
+
+// Daily cron deletes expired shares
+rows.set("old", { id: "old", ciphertext: "X", expires_at: Date.now() - 1000, burn_on_read: 0, view_count: 0 });
+const waits = [];
+await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) });
+await Promise.all(waits);
+assert.ok(!rows.has("old"), "expired share must be purged by the cron");
+
 console.log("relay worker: all checks passed");

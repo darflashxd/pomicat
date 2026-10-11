@@ -7,31 +7,40 @@
 
 In 2025, shared ChatGPT and Grok conversations were indexed by search engines, exposing
 salaries, health details and credentials. The usual fix is redaction: find the sensitive entity,
-mask it. SafeShare shows why that fails for AI chats. The assistant's answer is full of numbers
-derived from the secret (savings rates, yearly totals, remainders), and these give it back.
-`safeshare invert` takes a chat redacted by any tool and recovers the hidden values by finding
-the one number that several visible figures agree on. SafeShare's redactor then removes the
-secret together with everything derivable from it, keeps harmless ratios so the chat stays
-useful, and shares the result as an end-to-end encrypted link that expires or burns after one
-read. It runs as a browser extension for ChatGPT, Claude and DeepSeek, a CLI, and an
-OpenAI-compatible proxy, and handles Indonesian and English number formats.
+mask it. SafeShare shows why that is not enough for AI chats. The assistant's answer is full of
+figures derived from what the user said (savings, yearly totals, ages, dates), and these give the
+hidden value back. `safeshare invert` takes a chat redacted by any tool and recovers hidden
+amounts by finding the one number several visible figures agree on, and hidden birth years from
+stated ages. SafeShare's redactor removes the secret together with everything derivable from it,
+can show amounts as ranges so the chat stays useful, and shares the result as an end-to-end
+encrypted link that expires or burns after one read. It runs as a browser extension for ChatGPT,
+Claude and DeepSeek (with protection before sending, too), a CLI and an OpenAI-compatible proxy,
+and handles Indonesian and English formats.
 
 ## What we will show
 
-1. A naively redacted chat, and the salary recovered from it in one command.
-2. The same chat redacted by SafeShare: nothing recovered.
-3. An encrypted, burn-after-read share link served from a local relay.
-4. Honest numbers. On held-out ai4privacy data, SafeShare + Presidio matches Presidio
-   (token F1 0.78 vs 0.79), but only SafeShare blocks `invert`: Presidio leaves the salary and
-   every derived figure in place. And the benchmark misleads: redacting every name, as it
-   rewards, rewrites 71% of 500 real WildChat conversations. Deciding whether a name or number
-   belongs to the user is the open problem.
-5. Sharing a salary chat as "Rp 2–5 juta": useful, and the attack recovers nothing.
+1. A naively redacted chat, and the salary recovered from it in one command; the same for a
+   hidden birth date.
+2. The same chats redacted by SafeShare: nothing recovered. Sharing a salary chat as
+   "Rp 2–5 juta" keeps it useful.
+3. An encrypted, burn-after-read share link served from a local relay, and before-sending
+   protection that keeps the salary from the model itself.
+4. Honest measurements:
+   - On held-out ai4privacy data, SafeShare + Presidio matches Presidio (token F1 0.78 vs 0.79),
+     but only SafeShare blocks `invert`: Presidio leaves the salary and every derived figure in
+     place.
+   - The benchmark misleads: redacting every name, as it rewards, rewrites 71% of 500 real
+     WildChat conversations; redacting only names tied to the user touches 9%.
+   - We looked for the inversion attack in 20,000 real WildChat conversations and found that
+     people there almost never share their own finances (0.05%), and nothing leaked in those
+     chats. We'll show what that means for the threat and the controlled benchmark that measures
+     it properly.
 
 ## Limits we will state
 
-Detection is rule-based. Anyone holding the full link can read the share. The viewer's
-anti-copy features are deterrence only.
+Detection is rule-based (an optional Presidio step adds general name detection in the CLI).
+Anyone holding the full link can read the share. The viewer's anti-copy features are deterrence
+only. Deciding whether a name or number belongs to the user is the open problem.
 
 Full evaluation: tools/eval/RESULTS.md.
 
@@ -40,4 +49,3 @@ Full evaluation: tools/eval/RESULTS.md.
 ## Presenters
 
 - Name, affiliation, one-line bio
-

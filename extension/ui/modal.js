@@ -943,7 +943,7 @@ class SafeShareModal {
         let finalShareUrl = encResult.fullShareUrl;
 
         // Upload ciphertext to relay server via background script
-        const relayUrl = this.crypto.relayBaseUrl || "https://safeshare-relay.bleedguard.workers.dev";
+        const relayUrl = this.crypto.relayBaseUrl; // default lives in engine/crypto.js
         const uploadPayload = {
           id: encResult.shareId,
           ciphertext: encResult.ciphertext,
