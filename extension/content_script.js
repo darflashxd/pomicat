@@ -423,11 +423,35 @@
    * Returns empty array [] if the active chat has no messages sent yet.
    */
   function extractConversationTurns() {
+    return tidyTurns(extractRawTurns());
+  }
+
+  /**
+   * Cleans extracted turns before sharing:
+   *  - removes the send-time shield's "[PRIVACY PROTOCOL: ...]" instruction (meant for the model,
+   *    not part of the conversation)
+   *  - drops a turn that repeats the previous one (nested elements matching the same message)
+   */
+  function tidyTurns(turns) {
+    const out = [];
+    for (const t of turns) {
+      const content = t.content.replace(/\s*\[PRIVACY PROTOCOL:[^\]]*\]\s*/g, "\n").trim();
+      if (!content) continue;
+      const prev = out[out.length - 1];
+      if (prev && prev.role === t.role && prev.content === content) continue;
+      out.push({ role: t.role, content });
+    }
+    return out;
+  }
+
+  function extractRawTurns() {
     const turns = [];
 
     // Strategy 0: High-accuracy ChatGPT data-message-author-role pattern
     const roleDivs = document.querySelectorAll("[data-message-author-role]");
-    const validRoleDivs = Array.from(roleDivs).filter(el => !isPromptInputOrUIElement(el));
+    // Outermost only: a message element can contain another element with the same attribute
+    const validRoleDivs = Array.from(roleDivs).filter(el =>
+      !isPromptInputOrUIElement(el) && !(el.parentElement && el.parentElement.closest("[data-message-author-role]")));
     if (validRoleDivs.length > 0) {
       validRoleDivs.forEach((el) => {
         const role = el.getAttribute("data-message-author-role");

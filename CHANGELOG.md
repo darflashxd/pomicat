@@ -5,6 +5,9 @@
 ### Fixed
 - "Continue in ChatGPT / Claude / DeepSeek" did nothing when the extension was installed: it now
   opens the chat site in a new tab and pastes the prompt once the input box appears.
+- Shared chats included the send-time shield's "[PRIVACY PROTOCOL: …]" instruction, and could
+  repeat the same message (nested page elements); both are now removed when the chat is read and
+  when the continuation prompt is built. The prompt also explains `<S1>`-style placeholders.
 
 ### Changed
 - The continuation prompt explains the placeholders and asks the model not to reconstruct them,

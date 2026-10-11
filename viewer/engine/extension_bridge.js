@@ -138,11 +138,18 @@
     static buildContinuationPrompt(turns, { budget = 12000, longTurn = 1500 } = {}) {
       const header =
         "Continue an earlier conversation. Private details were removed before it was shared: " +
-        "anything in square brackets, like [User_A] or [REDACTED_FINANCIAL_1], is a placeholder. " +
+        "anything in square or angle brackets, like [User_A], [REDACTED_FINANCIAL_1] or <S1>, is a placeholder. " +
         "Keep using the same placeholders, and don't guess or work out the values behind them.";
       const footer = "Pick up from the last message above. My next message follows.";
       // Strip the viewer's zero-width watermark: it is noise (and tokens) for the next model
-      const fmt = (t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content.replace(/[​-‍⁠﻿]/g, "").trim()}`;
+      // Strip the viewer's zero-width watermark and any send-time shield instruction (links made by
+      // older versions still contain it): both are noise for the next model
+      const fmt = (t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content
+        .replace(/[​-‍⁠﻿]/g, "")
+        .replace(/\s*\[PRIVACY PROTOCOL:[^\]]*\]\s*/g, "\n")
+        .trim()}`;
+      // Drop a turn identical to the one before it (duplicate extraction in older links)
+      turns = turns.filter((t, i) => !(i > 0 && t.role === turns[i - 1].role && t.content === turns[i - 1].content));
       const shorten = (t) => t.content.length <= longTurn ? t
         : { ...t, content: t.content.slice(0, longTurn).trimEnd() + " […shortened]" };
 

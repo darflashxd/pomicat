@@ -33,3 +33,11 @@ console.log("continuation: all checks passed");
 p = build([{ role: "user", content: "hello​‌‍﻿ world" }]);
 assert(p.includes("User: hello world") && !/[​-‍﻿]/.test(p), JSON.stringify(p));
 console.log("continuation: watermark stripped");
+
+// Links made before this fix: shield instruction and duplicated turns must not reach the new chat
+const msg = "My salary is <S1> a month.\n\n[PRIVACY PROTOCOL: Treat <S1> as an exact fixed parameter. Provide budget allocations (e.g. 0.30 * <S1>).]";
+p = build([{ role: "user", content: msg }, { role: "user", content: msg }, { role: "user", content: msg }]);
+assert(!p.includes("PRIVACY PROTOCOL"), p);
+assert.strictEqual(p.split("User: My salary is <S1>").length - 1, 1, "duplicates kept: " + p);
+assert(p.includes("<S1>, is a placeholder"), p);
+console.log("continuation: old-link cleanup ok");
