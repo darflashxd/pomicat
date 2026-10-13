@@ -132,7 +132,7 @@ class SafeShareCrypto {
 
     const decryptedBytes = new Uint8Array(decryptedBuffer);
     const unpaddedBytes = this.unpad(decryptedBytes);
-    const decodedStr = new TextDecoder().decode(unpaddedBytes);
+    const decodedStr = new TextDecoder().decode(unpaddedBytes).replace(/\0+$/, "");
     const parsed = JSON.parse(decodedStr);
 
     // Cryptographic expiration enforcement: cannot be bypassed by editing URL fragment
@@ -161,14 +161,16 @@ class SafeShareCrypto {
   }
 
   /**
-   * Safely strips PKCS#7 block padding with backward-compatibility for legacy unpadded payloads.
+   * Safely strips block padding with backward-compatibility for legacy unpadded payloads.
+   * Handles blockSize = 256 overflow where 256 is represented as 0 in Uint8Array.
    */
   unpad(data) {
     if (data.length === 0) return data;
-    const padLen = data[data.length - 1];
+    const lastByte = data[data.length - 1];
+    const padLen = lastByte === 0 ? 256 : lastByte;
     if (padLen <= 0 || padLen > 256 || padLen > data.length) return data;
     for (let i = data.length - padLen; i < data.length; i++) {
-      if (data[i] !== padLen) return data;
+      if (data[i] !== lastByte) return data;
     }
     return data.slice(0, data.length - padLen);
   }

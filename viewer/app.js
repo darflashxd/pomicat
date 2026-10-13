@@ -47,10 +47,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     relayUrl: window.SAFESHARE_RELAY_URL || window.location.origin
   }) : null;
 
+  let watermarkedTurns = [];
+
   if (memoryZeroizer) {
     memoryZeroizer.registerZeroizer(() => {
       console.warn("[SafeShare] Zeroing memory and DOM buffers.");
       decryptedData = null;
+      if (watermarkedTurns && Array.isArray(watermarkedTurns)) {
+        watermarkedTurns.length = 0;
+      }
       if (messagesContainer) messagesContainer.innerHTML = "";
     });
     memoryZeroizer.start();
@@ -180,7 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     timestamp: Date.now()
   };
 
-  const watermarkedTurns = decryptedData.turns.map(turn => {
+  watermarkedTurns = decryptedData.turns.map(turn => {
     if (steganography) {
       const watermarkedContent = steganography.embed(turn.content, watermarkMeta, rawHash);
       return { role: turn.role, content: watermarkedContent };
@@ -310,7 +315,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function setupZeroClipboardContinue(turns) {
     const handlePlatformClick = async (platformName) => {
       if (extensionBridge) {
-        const result = await extensionBridge.forwardToAIPlatform(platformName, turns);
+        const summarizeChk = document.getElementById("chk-summarize-context");
+        const summarize = summarizeChk ? summarizeChk.checked : true;
+        const result = await extensionBridge.forwardToAIPlatform(platformName, turns, { summarize });
         if (result.success) {
           alert(`[SafeShare]\n✓ ${result.message}`);
         } else {

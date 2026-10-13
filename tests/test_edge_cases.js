@@ -154,6 +154,26 @@ async function runEdgeCaseAudit() {
   assert(resMulti.anonymizedTurns[1].content.includes("[REDACTED_DEBT_RATIO]"), "Debt ratio must be replaced with [REDACTED_DEBT_RATIO]");
   console.log("  [✓] Multi-Turn Duplicate Debt Ratio Protection verified!");
 
+  // --- TEST 7: EXACT 256-BYTE MULTIPLE (0x00 UINT8ARRAY OVERFLOW) PAYLOAD ---
+  console.log("\n[Audit 7] Testing Exact 256-Byte Block Multiple Payload Decryption...");
+  // Construct a payload whose JSON length is an exact multiple of 256 bytes
+  const baseObj = {
+    turns: [{ role: "user", content: "A" }],
+    shareId: "test-share-id-256",
+    expMs: Date.now() + 86400000
+  };
+  const baseLen = new TextEncoder().encode(JSON.stringify(baseObj)).length;
+  const targetLen = (Math.ceil(baseLen / 256) + 1) * 256;
+  const padNeeded = targetLen - baseLen;
+  baseObj.turns[0].content = "A".repeat(1 + padNeeded);
+  const exactLen = new TextEncoder().encode(JSON.stringify(baseObj)).length;
+  assert.strictEqual(exactLen % 256, 0, "Test payload must be an exact multiple of 256 bytes");
+
+  const enc256 = await cryptoEngine.encrypt(baseObj);
+  const dec256 = await cryptoEngine.decrypt(enc256.ciphertext, enc256.key);
+  assert.strictEqual(dec256.turns[0].content, baseObj.turns[0].content, "256-byte aligned payload must decrypt and parse JSON cleanly");
+  console.log("  [✓] 256-byte Block Multiple Padding Overflow handling verified!");
+
   console.log("\n================================================================================");
   console.log("  ALL AUDIT CHECKS PASSED: 100% PRODUCTION READY & SECURE");
   console.log("================================================================================");

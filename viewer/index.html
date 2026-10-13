@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <title>SafeShare — Private Conversation</title>
   <base href="/">
@@ -86,7 +86,14 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-            <span>Continue conversation:</span>
+            <span>Continue:</span>
+          </div>
+
+          <div class="continuation-options">
+            <label class="continuation-toggle" title="Summarize & compact older messages to save tokens">
+              <input type="checkbox" id="chk-summarize-context" checked>
+              <span>Summarize context</span>
+            </label>
           </div>
           
           <div class="platform-btn-group">

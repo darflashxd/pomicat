@@ -75,8 +75,8 @@
     /**
      * Injects continuation context directly into the target AI platform.
      */
-    async forwardToAIPlatform(platform, turns) {
-      const continuationPrompt = SafeShareExtensionBridge.buildContinuationPrompt(turns);
+    async forwardToAIPlatform(platform, turns, options = {}) {
+      const continuationPrompt = SafeShareExtensionBridge.buildContinuationPrompt(turns, options);
       const targetUrl = PLATFORM_URLS[platform] || "https://chatgpt.com";
 
       const hasExt = await this.pingExtension(200);
@@ -90,6 +90,7 @@
         return {
           success: true,
           mode: "extension_bridge",
+          continuationPrompt: continuationPrompt,
           message: `Injected context directly into ${platform} via SafeShare Extension! (0% Clipboard Footprint)`
         };
       }
@@ -135,7 +136,7 @@
      *  - keeps the newest turns whole, shortens long older answers, drops the oldest turns
      * No model is involved, so nothing leaves the browser to make it.
      */
-    static buildContinuationPrompt(turns, { budget = 12000, longTurn = 1500 } = {}) {
+    static buildContinuationPrompt(turns, { summarize = true, budget = 12000, longTurn = 1500 } = {}) {
       const header =
         "Continue an earlier conversation. Private details were removed before it was shared: " +
         "anything in square or angle brackets, like [User_A], [REDACTED_FINANCIAL_1] or <S1>, is a placeholder. " +
@@ -150,6 +151,13 @@
         .trim()}`;
       // Drop a turn identical to the one before it (duplicate extraction in older links)
       turns = turns.filter((t, i) => !(i > 0 && t.role === turns[i - 1].role && t.content === turns[i - 1].content));
+
+      if (!summarize) {
+        // Full conversation mode: keeps all turns whole without shortening or omitting
+        const allTurns = turns.map(fmt);
+        return `${header}\n\n---\n${allTurns.join("\n\n")}\n---\n\n${footer}`;
+      }
+
       const shorten = (t) => t.content.length <= longTurn ? t
         : { ...t, content: t.content.slice(0, longTurn).trimEnd() + " […shortened]" };
 
