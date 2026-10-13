@@ -27,12 +27,13 @@ assert(p.indexOf("turn 58") < p.indexOf("turn 59"), "chronological order");
 p = build([{ role: "user", content: "y".repeat(50000) }], { budget: 12000 });
 assert(p.length <= 12500, "single huge turn over budget: " + p.length);
 
-// Optional summarize=false: full conversation without shortening or omissions
+// Optional summarize=false: pure conversation turns without template wrapper or omissions
 let pFull = build(long, { summarize: false });
 assert(!pFull.includes("[…shortened]"), "unsummarized must not shorten turns");
 assert(!pFull.includes("omitted"), "unsummarized must not omit turns");
-assert(pFull.includes("turn 0") && pFull.includes("turn 59"), "unsummarized must retain all turns");
-assert(pFull.includes("placeholder") && pFull.includes("don't guess"), "unsummarized keeps safety headers");
+assert(!pFull.includes("Continue an earlier conversation"), "unsummarized must drop template header");
+assert(!pFull.includes("Pick up from the last message above"), "unsummarized must drop template footer");
+assert(pFull.includes("User: turn 0") && pFull.includes("Assistant: turn 59"), "unsummarized must retain all turns");
 console.log("continuation: optional summarize=false verified");
 
 console.log("continuation: all checks passed");

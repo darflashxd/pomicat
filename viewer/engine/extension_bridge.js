@@ -153,9 +153,9 @@
       turns = turns.filter((t, i) => !(i > 0 && t.role === turns[i - 1].role && t.content === turns[i - 1].content));
 
       if (!summarize) {
-        // Full conversation mode: keeps all turns whole without shortening or omitting
+        // Pure unsummarized dialogue mode: returns clean chat turns without template wrappers
         const allTurns = turns.map(fmt);
-        return `${header}\n\n---\n${allTurns.join("\n\n")}\n---\n\n${footer}`;
+        return allTurns.join("\n\n");
       }
 
       const shorten = (t) => t.content.length <= longTurn ? t
