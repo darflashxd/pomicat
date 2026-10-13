@@ -18,14 +18,18 @@ class SafeShareSymbolicVault {
   }
 
   /**
-   * Loads any existing ephemeral secrets from sessionStorage for this tab.
+   * Loads any existing ephemeral secrets from sessionStorage for this tab or specific chat.
    */
-  loadFromSession() {
+  loadFromSession(chatId = null) {
     if (typeof sessionStorage === "undefined") return;
     try {
-      const data = sessionStorage.getItem(`${this.storagePrefix}data`);
+      let data = chatId ? sessionStorage.getItem(`${this.storagePrefix}data_${chatId}`) : null;
+      if (!data) {
+        data = sessionStorage.getItem(`${this.storagePrefix}data`);
+      }
       if (data) {
         const parsed = JSON.parse(data);
+        this.inMemoryVault.clear();
         for (const [k, v] of Object.entries(parsed)) {
           this.inMemoryVault.set(k, v);
           const num = parseInt(k.replace(/\D/g, ""), 10);
@@ -40,14 +44,18 @@ class SafeShareSymbolicVault {
   /**
    * Persists active ephemeral secrets to sessionStorage.
    */
-  saveToSession() {
+  saveToSession(chatId = null) {
     if (typeof sessionStorage === "undefined") return;
     try {
       const obj = {};
       for (const [k, v] of this.inMemoryVault.entries()) {
         obj[k] = v;
       }
-      sessionStorage.setItem(`${this.storagePrefix}data`, JSON.stringify(obj));
+      const serialized = JSON.stringify(obj);
+      sessionStorage.setItem(`${this.storagePrefix}data`, serialized);
+      if (chatId) {
+        sessionStorage.setItem(`${this.storagePrefix}data_${chatId}`, serialized);
+      }
     } catch (_) {}
   }
 
@@ -122,12 +130,15 @@ class SafeShareSymbolicVault {
   /**
    * Completely purges the vault in memory and in sessionStorage.
    */
-  clear() {
+  clear(chatId = null) {
     this.inMemoryVault.clear();
     this.counter = 1;
     if (typeof sessionStorage !== "undefined") {
       try {
         sessionStorage.removeItem(`${this.storagePrefix}data`);
+        if (chatId) {
+          sessionStorage.removeItem(`${this.storagePrefix}data_${chatId}`);
+        }
       } catch (_) {}
     }
   }

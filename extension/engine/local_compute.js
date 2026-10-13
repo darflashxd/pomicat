@@ -39,8 +39,9 @@ class SafeShareLocalCompute {
     s = s.replace(/\\langle\s*s(\d+)\s*\\rangle/gi, "<S$1>");
     // 4. Unicode angle brackets: ⟨S19⟩, ⟨s19⟩
     s = s.replace(/⟨\s*s(\d+)\s*⟩/gi, "<S$1>");
-    // 5. Implicit multiplication for factors before parens containing symbols: 0.25( -> 0.25 * (, 6( -> 6 * (
-    s = s.replace(/(\d+(?:\.\d+)?%?)\s*(?:[×·]|\*|\s)\s*\(\s*(?=[^()]*<S\d+>)/gi, "$1 * (");
+    // 5. Implicit multiplication for factors before parens containing symbols: 0.25( -> 0.25 * (, 6( -> 6 * (, 24×0.25 -> 24 * 0.25
+    s = s.replace(/(\d+(?:\.\d+)?%?)\s*[×·*]?\s*\(\s*(?=[^()]*<S\d+>)/gi, "$1 * (");
+    s = s.replace(/(\d+(?:\.\d+)?%?)\s*[×·]\s*(\d+(?:\.\d+)?)/gi, "$1 * $2");
     return s;
   }
 

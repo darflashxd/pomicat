@@ -448,31 +448,45 @@
     const vaultData = symbolicVault.getAll();
     if (!vaultData || Object.keys(vaultData).length === 0) return;
 
-    // Selector for all assistant and user message content containers
-    const targetNodes = document.querySelectorAll(
-      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] pre, [data-markdown-text-style='assistant-message'] code, [data-markdown-text-style='assistant-message'] span.katex, [data-markdown-text-style='assistant-message'] div[class*='math'], " +
-      "[data-message-author-role='assistant'], [data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td, " +
-      "[data-user-message-bubble='true'], [data-user-message-bubble='true'] div.whitespace-pre-wrap, [data-user-message-bubble='true'] p, [data-message-author-role='user'], [data-message-author-role='user'] p, [data-message-author-role='user'] div.whitespace-pre-wrap, [data-testid='user-message'], div[class*='user-message'], .chat-message-user, .chat-message-user p"
-    );
+    // PASS 1: Hydrate KaTeX LaTeX equations in-place across ChatGPT, Claude, and DeepSeek
+    const katexNodes = document.querySelectorAll("span.katex, div.katex-display, div[class*='math']");
+    katexNodes.forEach((kNode) => {
+      if (kNode.dataset.safeshareHydrated === "true") return;
+      if (isPromptInputOrUIElement(kNode)) return;
 
-    targetNodes.forEach((node) => {
-      if (node.dataset.safeshareHydrated === "true") return;
-      if (node.closest("[data-safeshare-hydrated='true']")) return;
-      if (isPromptInputOrUIElement(node)) return;
-
-      // Check if node is KaTeX with annotation
-      const katexAnnotation = node.querySelector ? node.querySelector("annotation[encoding='application/x-tex']") : null;
-      if (katexAnnotation) {
-        const tex = katexAnnotation.textContent || "";
-        if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs?\d+\b/i.test(tex)) {
-          const res = localCompute.hydrateText(tex, vaultData, true);
-          if (res.computedCount > 0) {
-            sanitizeAndMountHydration(node, res.hydratedText);
-            node.dataset.safeshareHydrated = "true";
-            return;
-          }
+      const annot = kNode.querySelector ? (kNode.querySelector("annotation[encoding='application/x-tex']") || kNode.querySelector("annotation")) : null;
+      const tex = annot ? annot.textContent : "";
+      if (tex && /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs?\d+\b/i.test(tex)) {
+        const res = localCompute.hydrateText(tex, vaultData, true);
+        if (res.computedCount > 0) {
+          const wrapper = document.createElement("span");
+          wrapper.className = "ss-katex-hydrated";
+          wrapper.dataset.safeshareHydrated = "true";
+          sanitizeAndMountHydration(wrapper, res.hydratedText);
+          kNode.replaceWith(wrapper);
         }
       }
+    });
+
+    // PASS 2: Hydrate leaf text blocks (paragraphs, list items, table cells, user bubbles)
+    // STRICT RULE: Never query outer message row containers ([data-message-author-role='assistant'])
+    // to prevent Virtual DOM parent-reconciliation collisions.
+    const leafNodes = document.querySelectorAll(
+      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] pre, [data-markdown-text-style='assistant-message'] code, " +
+      "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, " +
+      ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
+      "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
+      ".chat-message-assistant p, .chat-message-assistant td, " +
+      "[data-user-message-bubble='true'] div.whitespace-pre-wrap, [data-user-message-bubble='true'] p, " +
+      "[data-message-author-role='user'] p, [data-message-author-role='user'] div.whitespace-pre-wrap, " +
+      "[data-testid='user-message'] p, div[class*='user-message'] p, .chat-message-user p"
+    );
+
+    leafNodes.forEach((node) => {
+      if (node.dataset.safeshareHydrated === "true") return;
+      if (isPromptInputOrUIElement(node)) return;
+      // Skip if leaf node contains an un-hydrated KaTeX span (Pass 1 handles KaTeX widgets)
+      if (node.querySelector && node.querySelector("span.katex:not([data-safeshare-hydrated='true'])")) return;
 
       const text = node.innerHTML;
       if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs\d+\b/i.test(text)) {
@@ -509,14 +523,14 @@
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
     // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
-    if (!containerEl.querySelector(".ss-local-compute, [data-expr]")) {
+    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr]")) {
       return (containerEl.innerText || containerEl.textContent || "").trim();
     }
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
       // Find all hydrated local compute spans in the clone
-      const hydratedSpans = clone.querySelectorAll(".ss-local-compute, [data-expr]");
+      const hydratedSpans = clone.querySelectorAll(".ss-local-compute, .ss-katex-hydrated, [data-expr]");
       hydratedSpans.forEach(span => {
         const origExpr = span.getAttribute("data-expr");
         if (origExpr) {
@@ -715,7 +729,7 @@
     lastRecordedUrl = location.href;
 
     const getChatId = (u) => {
-      const m = (u || "").match(/\/c\/([a-zA-Z0-9_-]+)/);
+      const m = (u || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/);
       return m ? m[1] : null;
     };
 
@@ -726,12 +740,21 @@
     const isNewChatToSession = !oldId && !!newId;
     const isSameChat = oldId && newId && oldId === newId;
 
-    if (!isNewChatToSession && !isSameChat) {
-      // Truly different chat session: close modal and clear previous session's vault
+    if (isNewChatToSession && newId && symbolicVault) {
+      // Migrate secrets from "new" session to the newly assigned conversation ID
+      symbolicVault.saveToSession(newId);
+    } else if (!isSameChat) {
+      // Truly different chat session: close modal and load secrets for this session (or clear)
       const existing = document.getElementById("safeshare-modal-backdrop");
       if (existing) existing.remove();
 
-      if (symbolicVault) symbolicVault.clear();
+      if (symbolicVault) {
+        if (newId) {
+          symbolicVault.loadFromSession(newId);
+        } else {
+          symbolicVault.clear();
+        }
+      }
     }
 
     // Re-sync input and shield indicator for new session

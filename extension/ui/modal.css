@@ -684,7 +684,8 @@
 }
 
 /* Local Compute Hydrated Text - Clean Emerald Accent */
-.ss-local-compute {
+.ss-local-compute,
+.ss-katex-hydrated {
   display: inline;
   padding: 1px 6px;
   border-radius: 4px;
