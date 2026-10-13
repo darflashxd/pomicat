@@ -39,6 +39,8 @@ class SafeShareLocalCompute {
     s = s.replace(/\\langle\s*s(\d+)\s*\\rangle/gi, "<S$1>");
     // 4. Unicode angle brackets: ⟨S19⟩, ⟨s19⟩
     s = s.replace(/⟨\s*s(\d+)\s*⟩/gi, "<S$1>");
+    // 5. Implicit multiplication for factors before parens containing symbols: 0.25( -> 0.25 * (, 6( -> 6 * (
+    s = s.replace(/(\d+(?:\.\d+)?%?)\s*(?:[×·]|\*|\s)\s*\(\s*(?=[^()]*<S\d+>)/gi, "$1 * (");
     return s;
   }
 
@@ -380,7 +382,7 @@ class SafeShareLocalCompute {
     });
 
     // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and parentheses)
-    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];

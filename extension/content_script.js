@@ -711,16 +711,30 @@
   let lastRecordedUrl = (typeof location !== "undefined" ? location.href : "");
   function handleSessionRouteChange() {
     if (typeof location === "undefined" || location.href === lastRecordedUrl) return;
+    const oldUrl = lastRecordedUrl;
     lastRecordedUrl = location.href;
 
-    // 1. Close any open modal from previous session
-    const existing = document.getElementById("safeshare-modal-backdrop");
-    if (existing) existing.remove();
+    const getChatId = (u) => {
+      const m = (u || "").match(/\/c\/([a-zA-Z0-9_-]+)/);
+      return m ? m[1] : null;
+    };
 
-    // 2. Clear ephemeral symbolic vault from previous session
-    if (symbolicVault) symbolicVault.clear();
+    const oldId = getChatId(oldUrl);
+    const newId = getChatId(location.href);
 
-    // 3. Re-sync input and shield indicator for new session
+    // If transitioning from root/new chat to the newly created session for the same prompt, KEEP VAULT!
+    const isNewChatToSession = !oldId && !!newId;
+    const isSameChat = oldId && newId && oldId === newId;
+
+    if (!isNewChatToSession && !isSameChat) {
+      // Truly different chat session: close modal and clear previous session's vault
+      const existing = document.getElementById("safeshare-modal-backdrop");
+      if (existing) existing.remove();
+
+      if (symbolicVault) symbolicVault.clear();
+    }
+
+    // Re-sync input and shield indicator for new session
     const inputEl = findPromptInputElement();
     if (inputEl) updateShieldIndicator(inputEl);
   }

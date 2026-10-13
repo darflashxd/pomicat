@@ -683,12 +683,15 @@
   user-select: none;
 }
 
-/* Local Compute Hydrated Text */
+/* Local Compute Hydrated Text - Clean Emerald Accent */
 .ss-local-compute {
   display: inline;
-  color: inherit;
-  font-size: inherit;
-  font-weight: inherit;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  font-weight: 500;
   user-select: text;
 }
 
