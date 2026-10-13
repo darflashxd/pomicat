@@ -683,36 +683,13 @@
   user-select: none;
 }
 
-/* Local Compute Hydrated Badge */
+/* Local Compute Hydrated Text */
 .ss-local-compute {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: all;
-}
-
-.ss-local-compute:hover {
-  background: rgba(16, 185, 129, 0.22);
-  border-color: rgba(16, 185, 129, 0.6);
-}
-
-.ss-compute-tag {
-  font-size: 9px;
-  font-weight: 600;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: rgba(16, 185, 129, 0.25);
-  color: #a7f3d0;
-  letter-spacing: 0.2px;
+  display: inline;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  user-select: text;
 }
 
 /* Privacy Shield Prompt Indicator */

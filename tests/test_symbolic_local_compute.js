@@ -135,10 +135,10 @@ If you save 0.30 * <S1>/month:
   console.log("  [✓] Test 7 Passed: Multi-year accumulations and budget allocations locally hydrated with 100% accuracy!");
 
   // --- TEST 8: INTERACTIVE HTML BADGE RENDERING ---
-  console.log("\n[Test 8] Testing Interactive HTML Badges ([⚡ local])...");
+  console.log("\n[Test 8] Testing Interactive HTML Badges...");
   const htmlHydrated = localCompute.hydrateText("Allocated: 0.30 * <S1>", vaultData, true);
   assert(htmlHydrated.hydratedText.includes("class=\"ss-local-compute\""), "Must contain local compute badge class");
-  assert(htmlHydrated.hydratedText.includes("⚡ local"), "Must contain local tag indicator");
+  assert(!htmlHydrated.hydratedText.includes("⚡ local"), "Must not contain tacky ⚡ local tag");
   assert(htmlHydrated.hydratedText.includes("Rp 900.000"), "Must display calculated value");
   console.log("  [✓] Test 8 Passed: Interactive local badge HTML rendered with encoded formulas!");
 
@@ -227,7 +227,7 @@ Bridge + 20% burn reduction\t0.80 × <S2>\t<S3> + <S1> − 2.40 × <S2>\t<S3> + 
         innerText: "I wanted to ask whether there is flexibility to bring the total annual compensation closer to <S10>."
       };
     },
-    innerText: "I wanted to ask whether there is flexibility to bring the total annual compensation closer to Rp 420.000⚡ local."
+    innerText: "I wanted to ask whether there is flexibility to bring the total annual compensation closer to Rp 420.000."
   };
 
   // Function simulating content_script getCleanNodeContent

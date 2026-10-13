@@ -416,7 +416,7 @@ class SafeShareLocalCompute {
         evaluations.push({ expr: mathExpr.trim(), val, formatted });
 
         if (htmlBadges) {
-          return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}<span class="ss-compute-tag">⚡ local</span></span>`;
+          return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}</span>`;
         }
         return `${formatted}${suffix}`;
       } catch (_) {
@@ -453,7 +453,7 @@ class SafeShareLocalCompute {
       evaluations.push({ expr: mathExpr.trim(), val, formatted });
 
       if (htmlBadges) {
-        return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}<span class="ss-compute-tag">⚡ local</span></span>`;
+        return `<span class="ss-local-compute" data-expr="${encodeURIComponent(mathExpr.trim())}" title="Locally Computed from ${escapeAttr(mathExpr.trim())}">${formatted}${suffix}</span>`;
       }
       return `${formatted}${suffix}`;
     });

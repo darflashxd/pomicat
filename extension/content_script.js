@@ -448,14 +448,17 @@
     const vaultData = symbolicVault.getAll();
     if (!vaultData || Object.keys(vaultData).length === 0) return;
 
-    // Selector for all assistant message content containers
-    const asstNodes = document.querySelectorAll(
+    // Selector for all assistant and user message content containers
+    const targetNodes = document.querySelectorAll(
       "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] pre, [data-markdown-text-style='assistant-message'] code, [data-markdown-text-style='assistant-message'] span.katex, [data-markdown-text-style='assistant-message'] div[class*='math'], " +
-      "[data-message-author-role='assistant'],[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td"
+      "[data-message-author-role='assistant'], [data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, [data-message-author-role='assistant'] div.markdown, [data-message-author-role='assistant'] div[class*='math'], [data-message-author-role='assistant'] span.katex, .font-claude-message, .font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message pre, .font-claude-message code, .chat-message-assistant, .chat-message-assistant p, .chat-message-assistant td, " +
+      "[data-user-message-bubble='true'], [data-user-message-bubble='true'] div.whitespace-pre-wrap, [data-user-message-bubble='true'] p, [data-message-author-role='user'], [data-message-author-role='user'] p, [data-message-author-role='user'] div.whitespace-pre-wrap, [data-testid='user-message'], div[class*='user-message'], .chat-message-user, .chat-message-user p"
     );
 
-    asstNodes.forEach((node) => {
+    targetNodes.forEach((node) => {
       if (node.dataset.safeshareHydrated === "true") return;
+      if (node.closest("[data-safeshare-hydrated='true']")) return;
+      if (isPromptInputOrUIElement(node)) return;
 
       // Check if node is KaTeX with annotation
       const katexAnnotation = node.querySelector ? node.querySelector("annotation[encoding='application/x-tex']") : null;
