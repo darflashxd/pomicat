@@ -774,15 +774,30 @@
       if (!pending || Date.now() - pending.at > 2 * 60 * 1000) return; // stale after 2 minutes
       if (!hostFor[pending.platform] || !hostFor[pending.platform].test(location.hostname)) return;
       api.storage.local.remove("safeshare_pending_continuation");
+
+      const applyPrompt = (inputEl) => {
+        setInputText(inputEl, pending.prompt);
+        console.log("[SafeShare-AI] Pasted continuation prompt into the new chat.");
+      };
+
+      // Immediate check at t=0
+      const immediateInput = findPromptInputElement();
+      if (immediateInput) {
+        applyPrompt(immediateInput);
+        return;
+      }
+
+      // Fast-polling (40ms) so text is injected the instant the composer mounts
       let tries = 0;
       const timer = setInterval(() => {
         const inputEl = findPromptInputElement();
-        if (inputEl || ++tries > 40) clearInterval(timer); // chat apps render the input late; give up after ~20s
         if (inputEl) {
-          setInputText(inputEl, pending.prompt);
-          console.log("[SafeShare-AI] Pasted continuation prompt into the new chat.");
+          clearInterval(timer);
+          applyPrompt(inputEl);
+        } else if (++tries > 100) { // ~4s max
+          clearInterval(timer);
         }
-      }, 500);
+      }, 40);
     });
   })();
 })();
