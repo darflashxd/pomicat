@@ -103,12 +103,22 @@ class ContextualClassifier {
 
       // If personal context is active, extract the corresponding values
       if (isPersonal) {
-        // Pre-compute phone number spans to prevent telephone numbers (e.g. 1-800-869-3557) from being parsed as financial amounts
+        // Pre-compute phone number spans to prevent telephone numbers (e.g. 1-800-869-3557, 0812-3456-7890) from being parsed as financial amounts
         const phoneSpans = [];
-        const phoneRx = /(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]\d{3}[-.\s]\d{4}\b|(?:\+?62|0)8[1-9][0-9]{7,10}\b/g;
+        const phoneRx = /(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
         let pm;
         while ((pm = phoneRx.exec(sent)) !== null) {
           phoneSpans.push([pm.index, pm.index + pm[0].length]);
+        }
+
+        // Pre-compute bank account spans to prevent account numbers (e.g. rekening 1234567890) from being parsed as financial amounts
+        const bankAccountSpans = [];
+        const bankAccRx = /\b(?:(?:nomor\s+)?rekening(?:\s+bank)?|no\.?\s*rek(?:ening)?|rek(?:ening)?(?:\s+(?:bca|mandiri|bni|bri|cimb|jago|jenius|permata|bsi))?|bank\s+account(?:\s+number)?|account\s+number)\s*(?:aku|saya|kamu|Anda|nya)?\s*[:=\-~]?\s*([0-9]{8,18})\b/gi;
+        let bm;
+        while ((bm = bankAccRx.exec(sent)) !== null) {
+          const numStr = bm[1];
+          const numIdx = bm.index + bm[0].lastIndexOf(numStr);
+          bankAccountSpans.push([numIdx, numIdx + numStr.length]);
         }
 
         // Pre-compute address spans to prevent house numbers (e.g. 742 Evergreen Terrace) and postal zip codes from being parsed as financial amounts
@@ -136,8 +146,11 @@ class ContextualClassifier {
           let matchStr = m[0].replace(/[.,;:]+$/, "");
           if (!matchStr) continue;
 
-          // Skip if inside a telephone number or physical address
+          // Skip if inside a telephone number, bank account number, or physical address
           if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
+            continue;
+          }
+          if (bankAccountSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
             continue;
           }
           if (addressSpans.some(([s, e]) => matchIndex >= s && (matchIndex + matchStr.length) <= e)) {
@@ -211,6 +224,7 @@ class ContextualClassifier {
           const matchIndex = sm.index + sm[0].lastIndexOf(rawNum);
 
           if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
+          if (bankAccountSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
           if (addressSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
           if (finSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
           if (detected.some(d => d.turnIndex === turnIndex && d.raw === rawNum)) continue;

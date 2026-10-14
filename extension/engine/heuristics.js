@@ -176,12 +176,21 @@ class HeuristicsRedactor {
         },
         replacement: "$1[REDACTED_CARD_LAST_4]"
       },
+      // 2g. Indonesian & International Bank Account Number (8 to 18 digits with context)
+      {
+        id: "ID_BANK_ACCOUNT",
+        name: "Bank Account Number",
+        category: "FINANCIAL",
+        regex: /\b((?:(?:nomor\s+)?rekening(?:\s+bank)?|no\.?\s*rek(?:ening)?|rek(?:ening)?(?:\s+(?:bca|mandiri|bni|bri|cimb|jago|jenius|permata|bsi))?|bank\s+account(?:\s+number)?|account\s+number)\s*(?:aku|saya|kamu|Anda|nya)?\s*[:=\-~]?\s*)([0-9]{8,18})\b/gi,
+        replacement: "$1[REDACTED_ACCOUNT_NUMBER]"
+      },
       // 3. Email Addresses (Standard and Defanged [at]/[dot]/(at)/(dot))
       {
         id: "EMAIL",
         name: "Email Address",
         category: "PROFILE",
-        regex: /\b[A-Za-z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*|\s*\(at\)\s*)[A-Za-z0-9.-]+(?:\s*\.\s*|\s*\[dot\]\s*|\s*\(dot\)\s*)[A-Za-z]{2,}\b/gi,
+        regex: /\b[A-Za-z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*|\s*\(at\)\s*)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+|\s*\[dot\]\s*[A-Za-z0-9-]+|\s*\(dot\)\s*[A-Za-z0-9-]+)*(?:\.|\s*\[dot\]\s*|\s*\(dot\)\s*)(?:[A-Za-z]{2,12})\b/gi,
+        validator: (raw) => !raw.includes("@protected.local"),
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
       // 4. Phone Numbers (ID: +62/08..., US/International with Toll-Free Hotline Protection)
@@ -189,7 +198,7 @@ class HeuristicsRedactor {
         id: "PHONE",
         name: "Phone Number",
         category: "PROFILE",
-        regex: /(?:\+?62|0)8[1-9][0-9]{7,10}\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+        regex: /(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
         validator: (raw, index, text) => {
           // If it's a toll-free number (800, 888, 877, 866, 855, 844, 833) in corporate/support context, preserve it!
           const digits = raw.replace(/\D/g, "");
@@ -278,14 +287,6 @@ class HeuristicsRedactor {
         replacement: "[REDACTED_SLACK_WEBHOOK]"
       },
       // 5c-2. Slack API Tokens (Bot xoxb-, User xoxp-, App xapp-, Workspace xoxa-, Refresh xoxr-)
-      {
-        id: "SLACK_TOKEN",
-        name: "Slack API Token",
-        category: "CREDENTIALS",
-        regex: /\bxox[baprs]-[0-9]{10,14}-[0-9]{10,14}[a-zA-Z0-9_-]*\b/g,
-        replacement: "[REDACTED_SLACK_TOKEN]"
-      },
-      // 5c-2. Slack API Tokens (Bot xoxb-, User xoxp-, App xapp-, Admin xoxa-, Refresh xoxr-)
       {
         id: "SLACK_TOKEN",
         name: "Slack API Token",
@@ -412,18 +413,32 @@ class HeuristicsRedactor {
         regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
         replacement: "$1[REDACTED_SECRET]"
       },
+      // 10f. Conversational Natural Language Password / Kata Sandi
+      {
+        id: "CONVERSATIONAL_PASSWORD",
+        name: "Password / Passcode Secret",
+        category: "CREDENTIALS",
+        regex: /\b((?:(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:email|akun|saya|ku|login|wifi|laptop|baru))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const lineStart = Math.max(0, text.lastIndexOf("\n", index));
+          const line = text.substring(lineStart, index).toLowerCase();
+          return !/\b(?:def|function|class|import|const|let|var)\s+$/.test(line);
+        },
+        replacement: "$1[REDACTED_PASSWORD]"
+      },
       // 11. Physical Home / Street Address (Expanded for KTP/Domisili and structured forms)
       {
         id: "ADDRESS_ID",
         name: "Physical Home/Street Address",
         category: "PROFILE",
-        regex: /\b(?:(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?|(?:saya\s+)?tinggal\s+di|rumah(?:\s+saya)?\s+di|domisili(?:\s+di)?)(?:\s+di|\s+adalah|\s*:)?\s*)([A-Za-z0-9\s.,\/-]+?)(?=\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|[\r\n]|$))/gi,
+        regex: /\b((?:(?:alamat(?:\s+(?:ktp|domisili|saya|tinggal|rumah))?|(?:saya\s+)?tinggal\s+di|rumah(?:\s+saya)?\s+di|domisili(?:\s+di)?)(?:\s+di|\s+adalah|\s*:)?\s*))([A-Za-z0-9\s.,\/-]+?)(?=\s*[,;]?\s*(?:tolong|mohon|buatkan|rute|jadwal|bisa)\b|(?<!\b(?:jl|no|rt|rw|kel|kec|kp|gg|blok))\.[!?\s]|\s*(?:nomor\s+telfon|nomor\s+hp|no\s+hp|no\s+telp|telfon|telepon|hp|phone|email|nik|nim|npwp|paspor|passport|sim|bpjs|gaji|dan\s+nomor|dengan\s+nomor)\b|[\r\n]|$)/gi,
         validator: (raw) => {
           const physicalMarkers = /\b(?:jalan|jl\.?|gang|gg\.?|kampung|kp\.?|komplek|perumahan|dusun|desa|kelurahan|kecamatan|rt\s*\d+|rw\s*\d+|no(?:mor)?\s*\d+|blok\s*[a-z0-9]+)\b/i;
           const computingExclusions = /\b(?:memori|memory|fungsi|function|pointer|register|symbol|instruksi|instruction|hex|libc|gdb|binary|assembly|setcontext|ip|mac|url|socket)\b|&[a-zA-Z_]|0x[0-9a-fA-F]+/i;
           return physicalMarkers.test(raw) && !computingExclusions.test(raw);
         },
-        replacement: "alamat di [REDACTED_ADDRESS] "
+        replacement: "$1[REDACTED_ADDRESS]"
       },
       // 11b. English Residential / Shipping Address (US / UK Street & Postal Formats)
       {

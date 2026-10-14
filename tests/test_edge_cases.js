@@ -209,6 +209,59 @@ async function runEdgeCaseAudit() {
   assert(!hydrated.hydratedText.includes("s2Rp 4.200.000"), "Favicon URL must not have currency injected");
   console.log("  [✓] Academic Program S1 & Favicon s2 URL Immunity verified!");
 
+  // --- TEST 11: FORMATTED INDONESIAN PHONE NUMBERS (DASHES & SPACES) ---
+  console.log("\n[Audit 11] Testing Formatted Indonesian Phone Numbers...");
+  const phone1 = "nomor WA aku ganti jadi 0812-3456-7890. Save ya!";
+  const scanPhone1 = heuristics.scan(phone1);
+  assert(scanPhone1.sanitizedText.includes("[REDACTED_PHONE]"), "0812-3456-7890 must be redacted");
+  assert(!scanPhone1.sanitizedText.includes("0812-3456-7890"), "Raw phone with hyphens must not leak");
+
+  const phone2 = "HP: +62 812-3456-7890.";
+  const scanPhone2 = heuristics.scan(phone2);
+  assert(scanPhone2.sanitizedText.includes("[REDACTED_PHONE]"), "+62 812-3456-7890 must be redacted");
+  console.log("  [✓] Formatted Indonesian Phone Numbers verified!");
+
+  // --- TEST 12: INDONESIAN BANK ACCOUNT NUMBER ---
+  console.log("\n[Audit 12] Testing Bank Account Number Redaction...");
+  const bankText = "rekening aku 1234567890";
+  const scanBank = heuristics.scan(bankText);
+  assert(scanBank.sanitizedText.includes("[REDACTED_ACCOUNT_NUMBER]"), "Bank account must be redacted as account number");
+  assert(!scanBank.sanitizedText.includes("1234567890"), "Account number digits must not leak");
+  const cDetsBank = contextual.classifyTurn(scanBank.sanitizedText, 0);
+  assert.strictEqual(cDetsBank.length, 0, "Bank account must NOT be detected as financial transaction amount");
+  console.log("  [✓] Bank Account Number Redaction verified!");
+
+  // --- TEST 13: CONVERSATIONAL PASSWORD REDACTION ---
+  console.log("\n[Audit 13] Testing Conversational Password Redaction...");
+  const passText = "Password email saya rahasia123";
+  const scanPass = heuristics.scan(passText);
+  assert(scanPass.sanitizedText.includes("[REDACTED_PASSWORD]"), "Conversational password must be redacted");
+  assert(!scanPass.sanitizedText.includes("rahasia123"), "Plaintext password must not leak");
+  console.log("  [✓] Conversational Password Redaction verified!");
+
+  // --- TEST 14: ADDRESS CLAUSE PRESERVATION & USER INSTRUCTION IMMUNITY ---
+  console.log("\n[Audit 14] Testing Address Clause Preservation & User Prompt Immunity...");
+  const addrPrompt = "Saya tinggal di Jl. Merdeka No.10, Jakarta. Tolong buatkan rute tercepat ke stasiun dan jadwal kereta pagi";
+  const scanAddr = heuristics.scan(addrPrompt);
+  assert(scanAddr.sanitizedText.includes("Saya tinggal di [REDACTED_ADDRESS]."), "User original prefix 'Saya tinggal di ' must be preserved");
+  assert(scanAddr.sanitizedText.includes("Tolong buatkan rute tercepat ke stasiun dan jadwal kereta pagi"), "User prompt instruction must NEVER be truncated or erased");
+  assert(!scanAddr.sanitizedText.includes("Jl. Merdeka No.10"), "Street address must be redacted");
+  console.log("  [✓] Address Clause Preservation & User Prompt Immunity verified!");
+
+  // --- TEST 15: EMAIL SENTENCE BOUNDARY & DOUBLE-BRACKET IMMUNITY ---
+  console.log("\n[Audit 15] Testing Email Sentence Boundary & Double-Bracket Immunity...");
+  const emailSentence1 = "Send it to nicole@gmail.com. don't reply yet";
+  const scanEmail1 = heuristics.scan(emailSentence1);
+  assert(scanEmail1.sanitizedText.includes("@protected.local]. don't reply yet"), "Email must not consume sentence period or next word");
+  assert(!scanEmail1.sanitizedText.includes(".local]'t"), "Must not chop off 'don' from don't");
+  assert(scanEmail1.sanitizedText.includes("don't reply yet"), "Full contraction don't must be preserved");
+
+  const emailSentence2 = "dan email saya budi@gmail.com. NIK saya 3201012304950001";
+  const scanEmail2 = heuristics.scan(emailSentence2);
+  assert(scanEmail2.sanitizedText.includes(". NIK saya"), "Label 'NIK' must not be eaten by preceding email");
+  assert(!scanEmail2.sanitizedText.includes("[[user_"), "Email redaction must not create double brackets [[user_...]]");
+  console.log("  [✓] Email Sentence Boundary & Double-Bracket Immunity verified!");
+
   console.log("\n================================================================================");
   console.log("  ALL AUDIT CHECKS PASSED: 100% PRODUCTION READY & SECURE");
   console.log("================================================================================");
