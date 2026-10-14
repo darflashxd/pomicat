@@ -49,7 +49,7 @@ class HeuristicsRedactor {
         id: "ABA_ROUTING",
         name: "ABA Bank Routing Transit Number",
         category: "CREDENTIALS",
-        regex: /\b((?:(?:routing(?:\s+transit|\s+number)?|aba(?:\s+routing)?)\s*[:=\-]?\s*))(\d{9})\b/gi,
+        regex: /\b((?:(?:routing(?:\s+transit|\s+number)?|aba(?:\s+routing)?)\s*(?:is|was|[:=\-])?\s*))(\d{9})\b/gi,
         validator: (raw) => {
           const digits = raw.replace(/\D/g, "");
           const last9 = digits.slice(-9);
@@ -62,9 +62,13 @@ class HeuristicsRedactor {
         id: "IBAN_ACCOUNT",
         name: "International Bank Account Number (IBAN)",
         category: "FINANCIAL",
-        regex: /\b([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/gi,
-        validator: (raw) => this.validateIBAN(raw),
-        replacement: "[REDACTED_IBAN]"
+        regex: /\b((?:iban\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/gi,
+        validator: (raw, index, text) => {
+          const hasContext = /iban/i.test(raw) || /(?:iban)\s*[:=\-~]?\s*$/i.test(text.substring(Math.max(0, index - 20), index));
+          if (hasContext) return true;
+          return this.validateIBAN(raw);
+        },
+        replacement: "$1[REDACTED_IBAN]"
       },
       // 1f. SWIFT / BIC Code
       {
@@ -176,12 +180,12 @@ class HeuristicsRedactor {
         },
         replacement: "$1[REDACTED_CARD_LAST_4]"
       },
-      // 2g. Indonesian & International Bank Account Number (8 to 18 digits with context)
+      // 2g. Indonesian & International Bank Account Number (8 to 18 digits or hyphenated with context)
       {
         id: "ID_BANK_ACCOUNT",
         name: "Bank Account Number",
         category: "FINANCIAL",
-        regex: /\b((?:(?:nomor\s+)?rekening(?:\s+bank)?|no\.?\s*rek(?:ening)?|rek(?:ening)?(?:\s+(?:bca|mandiri|bni|bri|cimb|jago|jenius|permata|bsi))?|bank\s+account(?:\s+number)?|account\s+number)\s*(?:aku|saya|kamu|Anda|nya)?\s*[:=\-~]?\s*)([0-9]{8,18})\b/gi,
+        regex: /\b((?:(?:nomor\s+)?rekening(?:\s+bank)?|no\.?\s*rek(?:ening)?|rek(?:ening)?(?:\s+(?:bca|mandiri|bni|bri|cimb|jago|jenius|permata|bsi))?|(?:checking|savings|direct\s+deposit|bank)?\s*(?:account|acct)(?:\s+(?:number|no|#))?|(?:dbs|posb|ocbc|uob|chase|bofa|citi|wells\s+fargo)\s+(?:account|acct)?)\s*(?:aku|saya|kamu|Anda|nya|is|was|[:=\-~#])*\s*)([0-9]{3,4}[-\s][0-9]{5,7}[-\s][0-9]|[0-9]{4}[-\s][0-9]{4}[-\s][0-9]{4}|[0-9]{8,18})\b/gi,
         replacement: "$1[REDACTED_ACCOUNT_NUMBER]"
       },
       // 3. Email Addresses (Standard and Defanged [at]/[dot]/(at)/(dot))
@@ -193,12 +197,12 @@ class HeuristicsRedactor {
         validator: (raw) => !raw.includes("@protected.local"),
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
-      // 4. Phone Numbers (ID: +62/08..., US/International with Toll-Free Hotline Protection)
+      // 4. Phone Numbers (ID, SG, UK, AU, IN, US, E.164 Global with Toll-Free Hotline Protection)
       {
         id: "PHONE",
         name: "Phone Number",
         category: "PROFILE",
-        regex: /(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+        regex: /(?:\b(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|\+(?:65[\s.-]?[689]\d{3}[\s.-]?\d{4}|44[\s.-]?(?:0)?\d{2,4}[\s.-]?\d{3,4}[\s.-]?\d{3,4}|61[\s.-]?(?:0)?\d[\s.-]?\d{4}[\s.-]?\d{4}|91[\s.-]?[6-9]\d{4}[\s.-]?\d{5}|[1-9]\d{0,2}[\s.-]?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4})\b|(?<=^|[\s,;:(])(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b)/gi,
         validator: (raw, index, text) => {
           // If it's a toll-free number (800, 888, 877, 866, 855, 844, 833) in corporate/support context, preserve it!
           const digits = raw.replace(/\D/g, "");
@@ -210,7 +214,7 @@ class HeuristicsRedactor {
               return false; // Preserve public business support hotline
             }
           }
-          return true; // Redact personal phone numbers
+          return digits.length >= 7 && digits.length <= 15; // Redact personal phone numbers
         },
         replacement: "[REDACTED_PHONE]"
       },
@@ -413,12 +417,12 @@ class HeuristicsRedactor {
         regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
         replacement: "$1[REDACTED_SECRET]"
       },
-      // 10f. Conversational Natural Language Password / Kata Sandi
+      // 10f. Conversational Natural Language Password / Kata Sandi (Indonesian & English)
       {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:email|akun|saya|ku|login|wifi|laptop|baru))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
+        regex: /\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:for\s+(?:my|the)?|to\s+(?:the)?|of|email|account|user|staging|production|server|db|database|admin|root|akun|saya|ku|login|wifi|laptop|baru))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
@@ -440,12 +444,12 @@ class HeuristicsRedactor {
         },
         replacement: "$1[REDACTED_ADDRESS]"
       },
-      // 11b. English Residential / Shipping Address (US / UK Street & Postal Formats)
+      // 11b. English Residential / Shipping Address (US, UK, Singapore, Global Street & Postal Formats)
       {
         id: "ENGLISH_PHYSICAL_ADDRESS",
-        name: "US/UK Physical Street Address",
+        name: "International Physical Street Address",
         category: "PROFILE",
-        regex: /\b((?:(?:residential|shipping|mailing|home|street|billing)\s+)?address\s*[:=\-]?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy)\b(?:[A-Za-z0-9\s.,\/-]*?(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
+        regex: /\b((?:(?:(?:my|our|home|residential|shipping|mailing|street|billing)\s+)?address\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+)|(?:(?:i|we)\s+)?(?:live|stay|reside)\s+(?:at|in)\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill)\b(?:[A-Za-z0-9\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
         replacement: "$1[REDACTED_ADDRESS]"
       },
       // 12. Indonesian Tax ID (NPWP - 15/16 digits formatted or raw)

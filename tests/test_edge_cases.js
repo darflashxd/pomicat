@@ -262,6 +262,38 @@ async function runEdgeCaseAudit() {
   assert(!scanEmail2.sanitizedText.includes("[[user_"), "Email redaction must not create double brackets [[user_...]]");
   console.log("  [✓] Email Sentence Boundary & Double-Bracket Immunity verified!");
 
+  // --- TEST 16: INTERNATIONAL MULTI-DOMAIN SCENARIOS (SINGAPORE, UK, AUSTRALIA) ---
+  console.log("\n[Audit 16] Testing International Multi-Domain Scenarios (Black Hat Asia Context)...");
+  const sgText = "I stay at 15 Marina Boulevard, Singapore 018940. Mobile +65 9123 4567, DBS account 123-45678-9, base SGD 14,500.";
+  const sgScan = heuristics.scan(sgText);
+  const sgDets = contextual.classifyTurn(sgScan.sanitizedText, 0);
+  const sgRes = pseudonymizer.anonymizeConversation([{ role: "user", content: sgScan.sanitizedText }], sgDets, sgScan.detections);
+  const sgOut = sgRes.anonymizedTurns[0].content;
+  assert(!sgOut.includes("15 Marina Boulevard"), "Singapore physical address must be redacted");
+  assert(!sgOut.includes("+65 9123 4567"), "Singapore phone +65 must be redacted");
+  assert(!sgOut.includes("123-45678-9"), "DBS account number must be redacted");
+  assert(!sgOut.includes("SGD 14,500"), "Singapore SGD salary must be redacted");
+
+  const ukText = "Sort Code 20-04-15, IBAN GB29XAAA20041583726194, diagnosed with stage II lymphoma. Prescribed rituximab 500mg IV.";
+  const ukScan = heuristics.scan(ukText);
+  const ukDets = contextual.classifyTurn(ukScan.sanitizedText, 0);
+  const ukRes = pseudonymizer.anonymizeConversation([{ role: "user", content: ukScan.sanitizedText }], ukDets, ukScan.detections);
+  const ukOut = ukRes.anonymizedTurns[0].content;
+  assert(!ukOut.includes("20-04-15"), "UK Sort code must be redacted");
+  assert(!ukOut.includes("GB29XAAA20041583726194"), "UK IBAN must be redacted");
+  assert(!ukOut.includes("rituximab 500mg"), "Oncology medication rituximab must be redacted");
+
+  const auText = "Tax return 2026. TFN: 123 456 782, BSB: 062-000, Account: 12345678. Gross salary AUD 165,000. Phone +61 412 345 678.";
+  const auScan = heuristics.scan(auText);
+  const auDets = contextual.classifyTurn(auScan.sanitizedText, 0);
+  const auRes = pseudonymizer.anonymizeConversation([{ role: "user", content: auScan.sanitizedText }], auDets, auScan.detections);
+  const auOut = auRes.anonymizedTurns[0].content;
+  assert(!auOut.includes("123 456 782"), "Australia TFN must be redacted");
+  assert(!auOut.includes("062-000"), "Australia BSB must be redacted");
+  assert(!auOut.includes("AUD 165,000"), "Australian salary AUD 165,000 must be redacted");
+  assert(!auOut.includes("+61 412 345 678"), "Australia phone +61 must be redacted");
+  console.log("  [✓] International Multi-Domain Scenarios verified!");
+
   console.log("\n================================================================================");
   console.log("  ALL AUDIT CHECKS PASSED: 100% PRODUCTION READY & SECURE");
   console.log("================================================================================");

@@ -19,6 +19,9 @@ class ContextualClassifier {
       /\b(?:gajiku|penghasilanku|upahku|gajimu|penghasilanmu)\b/i,
       /\b(?:gaji|penghasilan|kompensasi|upah|pendapatan)\s+(?:saya|Anda|kamu|gw|gue|ku|mu)\b/i,
       /\b(?:my|your|our|i|we)\s+(?:\w+\s+){0,3}(?:salary|compensation|earnings|income|take-home|pay|debt|savings|checking|account|debit|card|policy|claim|insurance|bill|billing|loss|net\s+loss|net\s+income|revenue|deficit)\b/i,
+      /\b(?:my|your|our|i|we)?\s*(?:\w+\s+){0,3}(?:monthly\s+base|annual\s+base|base\s+salary|gross\s+salary|gross\s+income|net\s+income|housing\s+allowance|relocation\s+stipend|stipend|remuneration|compensation\s+package)\b/i,
+      /\b(?:base|base\s+pay|base\s+salary|salary|gaji|income|allowance|bonus)\s*(?:is|was|of|sebesar|adalah|[:=])?\s*(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD|AUD|CAD|JPY|¥|HKD|NZD|MYR|₹|INR)?\s*[\d.,]+/i,
+      /\b(?:cpf|superannuation|pension)\b/i,
       /\b(?:i owe|i make|you make|you earn|earning|making)\b/i,
       /\b(?:personal\s+debt|credit\s+card\s+debt|mortgage|student\s+loan|debt|loans)\b/i,
       /\b(?:my|your|saya|Anda)\s+(?:\w+\s+){0,2}(?:base\s+salary|annual\s+salary|monthly\s+salary|monthly\s+income|annual\s+income|gross\s+income|net\s+income|take-home\s+pay|hourly\s+rate)\b/i,
@@ -136,8 +139,8 @@ class ContextualClassifier {
           }
         }
 
-        // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances)
-        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
+        // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances, global currencies: SGD, AUD, CAD, EUR, GBP, CHF, JPY, HKD, NZD, MYR)
+        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
         const finSpans = [];
         const finMatches = sent.matchAll(finRegex);
@@ -239,8 +242,8 @@ class ContextualClassifier {
           });
         }
 
-        // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics, trauma)
-        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:childhood\s+trauma|suicidal\s+ideation|self-harm|ptsd)|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy)(?:\s*[\d.]+\s*mg)?)/gi;
+        // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics, trauma, oncology biologics)
+        const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:childhood\s+trauma|suicidal\s+ideation|self-harm|ptsd)|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|bupropion|rituximab|venlafaxine|effexor|duloxetine|cymbalta|lisdexamfetamine|methotrexate|keytruda|pembrolizumab|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy)(?:\s*[\d.]+\s*mg)?)/gi;
         const healthMatches = sent.matchAll(healthRegex);
         for (const m of healthMatches) {
           detected.push({
