@@ -42,7 +42,7 @@ LABELS = [
 ]
 
 CURRENCIES_ID = ["Rp ", "Rp", "IDR "]
-CURRENCIES_EN = ["$", "USD ", "€", "£", "CHF "]
+CURRENCIES_EN = ["$", "USD ", "€", "£", "CHF ", "SGD ", "AUD ", "CAD ", "EUR ", "GBP ", "¥"]
 CURRENCIES_IN = ["₹", "INR "]
 
 SALARY_NUMS_ID = [
@@ -115,7 +115,8 @@ MEDICATIONS_ID = [
 MEDICATIONS_EN = [
     "Lexapro 20mg", "escitalopram 10mg", "escitalopram 20mg", "Zoloft 50mg", "Wellbutrin XL 150mg",
     "Sertraline 50mg", "Alprazolam 1mg", "Metformin 500mg", "Fluoxetine 20mg", "Lithium Carbonate 300mg",
-    "Adderall XR 20mg", "Ritalin 10mg", "Risperidone 2mg", "Klonopin 0.5mg", "Seroquel 200mg", "Lantus insulin", "Biktarvy"
+    "Adderall XR 20mg", "Ritalin 10mg", "Risperidone 2mg", "Klonopin 0.5mg", "Seroquel 200mg", "Lantus insulin", "Biktarvy",
+    "rituximab 500mg", "venlafaxine 75mg", "duloxetine 60mg", "bupropion 150mg", "methotrexate 25mg", "keytruda 200mg"
 ]
 
 PROJECTS_CORP_EN = [

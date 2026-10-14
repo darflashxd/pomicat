@@ -79,12 +79,12 @@ class HeuristicsRedactor {
         regex: /\b((?:(?:[Ss][Ww][Ii][Ff][Tt](?:\s+[Cc][Oo][Dd][Ee]|\s+[Bb][Ii][Cc])?|[Bb][Ii][Cc])(?:\s*[:=\-]\s*|\s+)))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g,
         replacement: "$1[REDACTED_SWIFT_BIC]"
       },
-      // 2. Credit Card Numbers (13-19 digits with Luhn verification & Fail-Closed Context Fallback)
+      // 2. Credit Card Numbers (12-19 digits with Luhn verification & Fail-Closed Context Fallback)
       {
         id: "CREDIT_CARD",
         name: "Credit Card",
         category: "FINANCIAL",
-        regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{13,19}\b/g,
+        regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{12,19}\b/g,
         validator: (raw, index, text) => {
           // Digits inside a DOI or URL path are identifiers, not cards
           if (text && /(?:doi\.org\/|\b10\.\d{4,9}\/|https?:\/\/)\S*$/i.test(text.substring(Math.max(0, index - 120), index))) return false;
@@ -217,6 +217,41 @@ class HeuristicsRedactor {
           return digits.length >= 7 && digits.length <= 15; // Redact personal phone numbers
         },
         replacement: "[REDACTED_PHONE]"
+      },
+      // 4b. Contextual Phone & Fax Numbers (Formatted, spaced, or prefixed by Phone/Tel/Fax/Mobile)
+      {
+        id: "CONTEXT_PHONE",
+        name: "Contextual Phone / Fax Number",
+        category: "PROFILE",
+        regex: /\b((?:(?:phone|mobile|tel(?:ephone)?|fax|whatsapp|call\s+me\s+at)\s*(?:#|number|no\.?)?)\s*[:=\-]?\s*)([+0-9()][+0-9() -]{5,20}[0-9])\b/gi,
+        validator: (raw) => {
+          const digits = raw.replace(/\D/g, "");
+          return digits.length >= 7 && digits.length <= 15;
+        },
+        replacement: "$1[REDACTED_PHONE]"
+      },
+      // 4c. IPv4 Address (Excluding localhost, broadcast, version markers, and public DNS / CIDR blocks)
+      {
+        id: "IPV4_ADDRESS",
+        name: "IPv4 Network Address",
+        category: "SYSTEM",
+        regex: /(?<=^|[\s,;:(|/\\="'`])(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?=$|[\s,;:)|\/\\="'`])/g,
+        validator: (raw, index, text) => {
+          const val = raw.trim();
+          if (val === "127.0.0.1" || val === "0.0.0.0" || val === "255.255.255.255") return false;
+          // Preserve public DNS providers (Cloudflare, Google, Quad9, OpenDNS)
+          if (/^(?:1\.1\.1\.1|1\.0\.0\.1|8\.8\.8\.8|8\.8\.4\.4|9\.9\.9\.9|208\.67\.222\.222|208\.67\.220\.220)$/.test(val)) return false;
+          if (text) {
+            // Exclude CIDR network masks like /24, /16, /8, /32
+            const after = text.substring(index + raw.length, index + raw.length + 4);
+            if (/^\/\d{1,2}\b/.test(after)) return false;
+
+            const prev = text.substring(Math.max(0, index - 15), index);
+            if (/\b(?:v|version|ver)\s*$/i.test(prev)) return false;
+          }
+          return true;
+        },
+        replacement: "[REDACTED_IP]"
       },
       // 5. OpenAI API Keys (Legacy & Project keys)
       {
@@ -422,7 +457,7 @@ class HeuristicsRedactor {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:for\s+(?:my|the)?|to\s+(?:the)?|of|email|account|user|staging|production|server|db|database|admin|root|akun|saya|ku|login|wifi|laptop|baru))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
+        regex: /\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:for\s+(?:my|the)?|to\s+(?:the)?|of|email|account|user|staging|production|server|db|database|admin|root|akun|saya|ku|login|wifi|laptop|baru|[A-Za-z0-9_-]+))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
@@ -460,12 +495,12 @@ class HeuristicsRedactor {
         regex: /\b((?:npwp(?:\s+pribadi|\s+badan)?\s*[:=\-]?\s*)?)(\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3})\b/gi,
         replacement: "$1[REDACTED_NPWP]"
       },
-      // 13. Indonesian & International Passport (Paspor RI / US / UK)
+      // 13. Indonesian & International Passport (Paspor RI / US / UK / Global Alphanumeric)
       {
-        id: "PASSPORT_RI",
+        id: "PASSPORT_NUMBER",
         name: "Passport Number",
         category: "GOV_ID",
-        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s+number)?)(?:\s+is|\s+was|\s+saya|\s+ku|\s+Anda|\s+kamu|\s*[:=\-])?\s*)([A-Z]\d{7,8}|\d{9})\b/gi,
+        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s*(?:#|id|number|no\.?))?)\s*(?:is|was|saya|ku|Anda|kamu|[:=\-~])*\s*)([A-Z0-9]{2,4}[0-9]{5,8}|[A-Z]\d{7,8}|\d{9})\b/gi,
         replacement: "$1[REDACTED_PASSPORT]"
       },
       // 14. BPJS Kesehatan & Ketenagakerjaan (11-13 digits)
@@ -483,6 +518,22 @@ class HeuristicsRedactor {
         category: "GOV_ID",
         regex: /\b((?:(?:nomor\s+)?sim(?:\s+[a-c])?)\s*[:=\-]?\s*)(\d{12})\b/gi,
         replacement: "$1[REDACTED_SIM]"
+      },
+      // 15b. International Driver's License
+      {
+        id: "DRIVER_LICENSE",
+        name: "Driver License",
+        category: "GOV_ID",
+        regex: /\b((?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,4}[- ]?[A-Z0-9]{4,10}|[0-9]{6,16})\b/gi,
+        replacement: "$1[REDACTED_DRIVER_LICENSE]"
+      },
+      // 15c. International National Identity Card / Citizen ID
+      {
+        id: "NATIONAL_ID_CARD",
+        name: "National Identity Card",
+        category: "GOV_ID",
+        regex: /\b((?:(?:national|citizen|resident|identity|id)\s+(?:card|number|no\.?|id|#))\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,4}[- ]?[A-Z0-9]{5,12})\b/gi,
+        replacement: "$1[REDACTED_NATIONAL_ID]"
       },
       // 16. Academic & Student Identification (NIM, NPM, NRP, Student ID)
       {

@@ -69,6 +69,7 @@ Thumbs.db
 data/train.json
 data/val.json
 data/test.json
+data/benchmarks/
 # Extension builds go to GitHub Releases, not git
 *.zip
 *.xpi
