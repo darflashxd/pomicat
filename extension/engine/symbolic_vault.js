@@ -23,13 +23,12 @@ class SafeShareSymbolicVault {
   loadFromSession(chatId = null) {
     if (typeof sessionStorage === "undefined") return;
     try {
-      let data = chatId ? sessionStorage.getItem(`${this.storagePrefix}data_${chatId}`) : null;
-      if (!data) {
-        data = sessionStorage.getItem(`${this.storagePrefix}data`);
-      }
+      this.inMemoryVault.clear();
+      this.counter = 1;
+      const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
+      const data = sessionStorage.getItem(key);
       if (data) {
         const parsed = JSON.parse(data);
-        this.inMemoryVault.clear();
         for (const [k, v] of Object.entries(parsed)) {
           this.inMemoryVault.set(k, v);
           const num = parseInt(k.replace(/\D/g, ""), 10);
@@ -52,10 +51,8 @@ class SafeShareSymbolicVault {
         obj[k] = v;
       }
       const serialized = JSON.stringify(obj);
-      sessionStorage.setItem(`${this.storagePrefix}data`, serialized);
-      if (chatId) {
-        sessionStorage.setItem(`${this.storagePrefix}data_${chatId}`, serialized);
-      }
+      const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
+      sessionStorage.setItem(key, serialized);
     } catch (_) {}
   }
 
@@ -135,10 +132,9 @@ class SafeShareSymbolicVault {
     this.counter = 1;
     if (typeof sessionStorage !== "undefined") {
       try {
+        const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
+        sessionStorage.removeItem(key);
         sessionStorage.removeItem(`${this.storagePrefix}data`);
-        if (chatId) {
-          sessionStorage.removeItem(`${this.storagePrefix}data_${chatId}`);
-        }
       } catch (_) {}
     }
   }

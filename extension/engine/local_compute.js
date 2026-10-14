@@ -343,11 +343,14 @@ class SafeShareLocalCompute {
 
     let hydratedText = this.preNormalizeHtmlSymbols(text);
 
-    // Helper to prevent nesting inside already-generated ss-local-compute spans
+    // Helper to prevent modifying inside existing spans, pre/code blocks, or HTML tag attributes
     const replaceOutsideSpans = (content, regex, replacer) => {
-      const outerRx = new RegExp(`(<span[^>]*class="[^"]*ss-local-compute[^"]*"[\\s\\S]*?<\\/span>)|(${regex.source})`, regex.flags);
-      return content.replace(outerRx, (match, span, target, ...args) => {
-        if (span) return span;
+      const outerRx = new RegExp(
+        `(<span[^>]*class="[^"]*(?:ss-local-compute|ss-katex-hydrated)[^"]*"[\\s\\S]*?<\\/span>)|(<(?:pre|code)[^>]*>[\\s\\S]*?<\\/(?:pre|code)>)|(<(?![\\/]?[sS]\\d+>)[^>]+>)|(${regex.source})`,
+        regex.flags
+      );
+      return content.replace(outerRx, (match, span, codeBlock, htmlTag, target, ...args) => {
+        if (span || codeBlock || htmlTag) return match;
         return replacer(target, ...args);
       });
     };
@@ -355,7 +358,7 @@ class SafeShareLocalCompute {
     // Phase 1: Process LaTeX display and inline math blocks \[ ... \], $$ ... $$, \( ... \), $ ... $
     const latexBlockRx = /(\\\[|\$\$|\\\(|\$)([\s\S]*?)(\\\]|\$\$|\\\)|\$)/g;
     hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, inner, closeTag) => {
-      if (!/<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b/i.test(inner)) return fullMatch;
+      if (!/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(inner)) return fullMatch;
       const eq = inner.match(/^([\s\S]*?=\s*)([\s\S]+)$/);
       if (eq) {
         const leftSide = eq[1];
@@ -383,10 +386,16 @@ class SafeShareLocalCompute {
     });
 
     // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and parentheses)
-    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
+
+      // Guard: do not match if part of a hyphenated alphanumeric word/token (e.g. xoxb-<S1>-123-token)
+      if (offset > 0 && /[\w-]/.test(hydratedText[offset - 1])) return fullMatch;
+      const endOffset = offset + fullMatch.length;
+      if (endOffset < hydratedText.length && /[\w-]/.test(hydratedText[endOffset])) return fullMatch;
+
       const hasKnownSymbol = Object.keys(vault).some(k => {
         const bare = k.replace(/[<>]/g, "");
         return fullMatch.toLowerCase().includes(k.toLowerCase()) || fullMatch.toLowerCase().includes(bare.toLowerCase());
@@ -427,11 +436,17 @@ class SafeShareLocalCompute {
       }
     });
 
-    // Phase 3: Process standalone variables
-    const standaloneVarRx = /(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|\bS\d+\b)(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    // Phase 3: Process standalone variables (strictly bracketed, never bare S1/S2 words)
+    const standaloneVarRx = /(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>)(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, standaloneVarRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
+
+      // Guard: do not match if part of a hyphenated alphanumeric word/token
+      if (offset > 0 && /[\w-]/.test(hydratedText[offset - 1])) return fullMatch;
+      const endOffset = offset + fullMatch.length;
+      if (endOffset < hydratedText.length && /[\w-]/.test(hydratedText[endOffset])) return fullMatch;
+
       const symbolKey = Object.keys(vault).find(k => {
         const bare = k.replace(/[<>]/g, "");
         return fullMatch.toLowerCase().includes(k.toLowerCase()) || fullMatch.toLowerCase().includes(bare.toLowerCase());

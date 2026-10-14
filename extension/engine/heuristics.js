@@ -277,6 +277,22 @@ class HeuristicsRedactor {
         regex: /\bhttps:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]+\/B[a-zA-Z0-9_]+\/[a-zA-Z0-9_]+\b/g,
         replacement: "[REDACTED_SLACK_WEBHOOK]"
       },
+      // 5c-2. Slack API Tokens (Bot xoxb-, User xoxp-, App xapp-, Workspace xoxa-, Refresh xoxr-)
+      {
+        id: "SLACK_TOKEN",
+        name: "Slack API Token",
+        category: "CREDENTIALS",
+        regex: /\bxox[baprs]-[0-9]{10,14}-[0-9]{10,14}[a-zA-Z0-9_-]*\b/g,
+        replacement: "[REDACTED_SLACK_TOKEN]"
+      },
+      // 5c-2. Slack API Tokens (Bot xoxb-, User xoxp-, App xapp-, Admin xoxa-, Refresh xoxr-)
+      {
+        id: "SLACK_TOKEN",
+        name: "Slack API Token",
+        category: "CREDENTIALS",
+        regex: /\bxox[baprs]-[0-9]{10,14}-[0-9]{10,14}[a-zA-Z0-9_-]*\b/g,
+        replacement: "[REDACTED_SLACK_TOKEN]"
+      },
       // 5d. Ethereum / EVM Wallet Address (0x...)
       {
         id: "EVM_CRYPTO_WALLET",
@@ -380,12 +396,12 @@ class HeuristicsRedactor {
         regex: /(\bAuthorization:\s*Basic\s+)([A-Za-z0-9+/=]{16,})/gi,
         replacement: "$1[REDACTED_BASE64_CREDENTIALS]"
       },
-      // 10d. Environment Variables Secrets (AWS Secret Key, DB Passwords, etc.)
+      // 10d. Environment Variables Secrets (AWS Secret Key, DB Passwords, API Tokens, etc.)
       {
         id: "ENV_CONFIG_SECRET",
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
+        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|AUTH_TOKEN|PRIVATE_KEY|API_KEY|BOT_TOKEN)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
         replacement: "$1[REDACTED_SECRET]"
       },
       // 10e. YAML Configuration Password & Secret Block
@@ -613,17 +629,34 @@ class HeuristicsRedactor {
         id: "ID_PLATE_RI",
         name: "Indonesian Vehicle License Plate",
         category: "PROFILE",
-        regex: /\b((?:(?:plat(?:\s+nomor|\s+mobil|\s+motor)?|nomor\s+polisi|nopol)\s*[:=\-~]?\s*|(?<=\b)))([A-Z]{1,2}\s+\d{1,4}\s+[A-Z]{1,3})\b/gi,
-        validator: (raw) => {
+        regex: /\b((?:(?:plat(?:\s+nomor|\s+mobil|\s+motor)?|nomor\s+polisi|nopol)\s*[:=\-~]?\s*|(?<=\b)))([A-Za-z]{1,2}\s+\d{1,4}\s+[A-Za-z]{1,3})\b/g,
+        validator: (raw, matchIndex, text) => {
+          // If preceded by a dash - or -- or / (e.g. -p 5432), it is a CLI flag or path, not a plate!
+          if (matchIndex > 0 && /[-/]/.test(text[matchIndex - 1])) return false;
+
           const m = raw.trim().split(/\s+/);
-          if (m.length !== 3) return false;
+          if (m.length < 3) return false;
+          const plateTokens = m.slice(-3);
           const validPrefixes = new Set([
             "A","B","D","E","F","G","H","K","L","M","N","P","R","S","T",
             "AA","AB","AD","AE","AG","BA","BB","BD","BE","BG","BH","BK",
             "BL","BM","BN","BP","DA","KB","KH","KT","KU","DB","DC","DD",
             "DE","DG","DH","DK","DM","DN","DT","DW","PA","PB"
           ]);
-          return validPrefixes.has(m[0].toUpperCase());
+          if (!validPrefixes.has(plateTokens[0].toUpperCase())) return false;
+
+          const hasContext = m.length > 3 || /(?:plat(?:\s+nomor|\s+mobil|\s+motor)?|nomor\s+polisi|nopol)\s*[:=\-~]?\s*$/i.test(text.substring(Math.max(0, matchIndex - 30), matchIndex));
+          if (!hasContext) {
+            // Without explicit context, the code and suffix MUST be uppercase
+            if (plateTokens[0] !== plateTokens[0].toUpperCase() || plateTokens[2] !== plateTokens[2].toUpperCase()) return false;
+            const commonWords = new Set([
+              "IF","IN","TO","AT","BY","ON","OF","OR","IS","IT","AS","AN","AM","BE","DO","GO","HE","ME","MY","NO","SO","UP","WE",
+              "FOR","AND","THE","NOT","CAN","OUT","NEW","SEE","RUN","APP","DEV","DB","GIT","SSH","KEY","API","LOG",
+              "DI","KE","YG","DAN","INI","ITU","DARI","ADA","BISA","MAU","AKAN"
+            ]);
+            if (commonWords.has(plateTokens[2].toUpperCase())) return false;
+          }
+          return true;
         },
         replacement: "$1[REDACTED_LICENSE_PLATE]"
       },

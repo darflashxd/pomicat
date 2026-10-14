@@ -456,7 +456,7 @@
 
       const annot = kNode.querySelector ? (kNode.querySelector("annotation[encoding='application/x-tex']") || kNode.querySelector("annotation")) : null;
       const tex = annot ? annot.textContent : "";
-      if (tex && /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs?\d+\b/i.test(tex)) {
+      if (tex && /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(tex)) {
         const res = localCompute.hydrateText(tex, vaultData, true);
         if (res.computedCount > 0) {
           const wrapper = document.createElement("span");
@@ -469,11 +469,11 @@
     });
 
     // PASS 2: Hydrate leaf text blocks (paragraphs, list items, table cells, user bubbles)
-    // STRICT RULE: Never query outer message row containers ([data-message-author-role='assistant'])
-    // to prevent Virtual DOM parent-reconciliation collisions.
+    // STRICT RULE: Never query outer message row containers or code blocks (<pre>/<code>)
+    // to prevent Virtual DOM collisions and preserve programming code syntax.
     const leafNodes = document.querySelectorAll(
-      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] pre, [data-markdown-text-style='assistant-message'] code, " +
-      "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] pre, [data-message-author-role='assistant'] code, " +
+      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, " +
+      "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, " +
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant td, " +
@@ -485,11 +485,12 @@
     leafNodes.forEach((node) => {
       if (node.dataset.safeshareHydrated === "true") return;
       if (isPromptInputOrUIElement(node)) return;
+      if (node.closest("pre, code, .ss-katex-hydrated")) return;
       // Skip if leaf node contains an un-hydrated KaTeX span (Pass 1 handles KaTeX widgets)
       if (node.querySelector && node.querySelector("span.katex:not([data-safeshare-hydrated='true'])")) return;
 
       const text = node.innerHTML;
-      if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\bs\d+\b/i.test(text)) {
+      if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(text)) {
         const res = localCompute.hydrateText(text, vaultData, true);
         if (res.computedCount > 0) {
           sanitizeAndMountHydration(node, res.hydratedText);

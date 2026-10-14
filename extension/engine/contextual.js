@@ -162,6 +162,15 @@ class ContextualClassifier {
           const beforeInLine = sent.substring(lineStart, matchIndex);
           if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) continue;
 
+          // Skip bare numbers without currency/unit that are part of hyphenated tokens (e.g. xoxb-123456-..., uuid-1234),
+          // config assignments (KEY=1234), CLI flags (-p 5432, --port 8080), or inside code
+          if (/^\d+$/.test(matchStr)) {
+            if (/[a-zA-Z0-9]-$/.test(sent.substring(0, matchIndex))) continue;
+            if (/^-[a-zA-Z0-9]/.test(afterText)) continue;
+            if (/\b[A-Za-z0-9_-]+\s*=\s*[^\s]*$/.test(beforeInLine)) continue;
+            if (/(?:^|\s)-+[a-zA-Z0-9_]+\s*$/.test(beforeInLine)) continue;
+          }
+
           // Numbers inside URLs / DOIs are identifiers
           if (/(?:https?:\/\/|doi\.org\/|www\.)\S*$/i.test(sent.substring(Math.max(0, matchIndex - 200), matchIndex))) continue;
 

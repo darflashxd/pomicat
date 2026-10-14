@@ -19,6 +19,7 @@ async function runEdgeCaseAudit() {
   console.log("================================================================================");
 
   const heuristics = new HeuristicsRedactor();
+  const contextual = new ContextualClassifier();
   const pseudonymizer = new ConsistentPseudonymizer();
 
   // --- TEST 1: GAMBAR 1 (Name + Address + Phone) ---
@@ -173,6 +174,40 @@ async function runEdgeCaseAudit() {
   const dec256 = await cryptoEngine.decrypt(enc256.ciphertext, enc256.key);
   assert.strictEqual(dec256.turns[0].content, baseObj.turns[0].content, "256-byte aligned payload must decrypt and parse JSON cleanly");
   console.log("  [✓] 256-byte Block Multiple Padding Overflow handling verified!");
+
+  // --- TEST 8: SLACK BOT API TOKEN & .ENV ENVIRONMENT REDACTION ---
+  console.log("\n[Audit 8] Testing Slack API Token and .env Credentials Redaction...");
+  const envText = "SLACK_BOT_TOKEN=xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx";
+  const hScanEnv = heuristics.scan(envText);
+  assert(!hScanEnv.sanitizedText.includes("123456789012"), "Slack token digits must not leak");
+  assert(hScanEnv.sanitizedText.includes("[REDACTED_SECRET]") || hScanEnv.sanitizedText.includes("[REDACTED_SLACK_TOKEN]"), "Token must be redacted as credentials");
+  const cDetsEnv = contextual.classifyTurn(hScanEnv.sanitizedText, 0);
+  assert.strictEqual(cDetsEnv.length, 0, "No false positive financial entities should be detected in .env Slack token");
+  console.log("  [✓] Slack Bot API Token and .env Credentials Redaction verified!");
+
+  // --- TEST 9: CLI FLAG AND PORT NUMBERS (ANTI-FALSE-POSITIVE LICENSE PLATE) ---
+  console.log("\n[Audit 9] Testing CLI Flags & Technical Ports (Anti-License-Plate False Positive)...");
+  const cliText = "pg_isready -h localhost -p 5432 If your application runs in Docker Compose";
+  const hScanCli = heuristics.scan(cliText);
+  assert(!hScanCli.sanitizedText.includes("[REDACTED_LICENSE_PLATE]"), "CLI flag -p 5432 must NOT be redacted as license plate");
+  assert(hScanCli.sanitizedText.includes("-p 5432"), "Port flag must be preserved");
+  console.log("  [✓] CLI Flags & Technical Ports preserved cleanly!");
+
+  // --- TEST 10: ACADEMIC PROGRAM S1 & FAVICON S2 URL IMMUNITY ---
+  console.log("\n[Audit 10] Testing Academic Program S1 & Favicon s2 URL Immunity...");
+  const s1Text = "BINUS secara resmi mencantumkan Cyber Security sebagai program S1 di bawah SoCS. <img src=\"https://s2.googleusercontent.com/favicons?domain=https://binus.ac.id&sz=32\">";
+  const testVault = {
+    "<S1>": { value: 19800000, raw: "Rp 19.800.000", currency: "IDR" },
+    "<S2>": { value: 4200000, raw: "Rp 4.200.000", currency: "IDR" }
+  };
+  const LocalCompute = require("../extension/engine/local_compute.js");
+  const lc = new LocalCompute();
+  const hydrated = lc.hydrateText(s1Text, testVault, true);
+  assert(hydrated.hydratedText.includes("program S1"), "Program S1 must be preserved untouched");
+  assert(!hydrated.hydratedText.includes("program Rp 19.800.000"), "Program S1 must NOT be replaced with salary");
+  assert(hydrated.hydratedText.includes("s2.googleusercontent.com"), "Favicon URL s2 must NOT be corrupted");
+  assert(!hydrated.hydratedText.includes("s2Rp 4.200.000"), "Favicon URL must not have currency injected");
+  console.log("  [✓] Academic Program S1 & Favicon s2 URL Immunity verified!");
 
   console.log("\n================================================================================");
   console.log("  ALL AUDIT CHECKS PASSED: 100% PRODUCTION READY & SECURE");
