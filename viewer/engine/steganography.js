@@ -29,6 +29,16 @@
   const ZW_ONE = "\u200C";  // Bit 1
   const ZW_DELIM = "\u200C"; // Field delimiter
 
+  function toUtf8Binary(str) {
+    if (typeof TextEncoder !== "undefined") {
+      const bytes = new TextEncoder().encode(str);
+      let bin = "";
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return bin;
+    }
+    return unescape(encodeURIComponent(str));
+  }
+
   // Pure JavaScript SHA-256 implementation (synchronous, portable, dependency-free)
   function sha256(ascii) {
     function rightRotate(value, amount) {
@@ -111,7 +121,9 @@
   }
 
   // HMAC-SHA256
-  function hmacSha256(key, message) {
+  function hmacSha256(rawKey, rawMessage) {
+    const key = toUtf8Binary(String(rawKey || ""));
+    const message = toUtf8Binary(String(rawMessage || ""));
     const blockSize = 64;
     let k = key;
     if (k.length > blockSize) {

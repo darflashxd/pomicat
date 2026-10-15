@@ -33,6 +33,10 @@ class SafeShareSymbolicRewriter {
    */
   detectCurrency(raw, fullContext = "") {
     if (/Rp|IDR|juta|jt|jeti|miliar|milyar/i.test(raw)) return "IDR";
+    if (/S\$|SGD/i.test(raw)) return "SGD";
+    if (/A\$|AUD/i.test(raw)) return "AUD";
+    if (/C\$|CAD/i.test(raw)) return "CAD";
+    if (/CHF/i.test(raw)) return "CHF";
     if (/\$|USD/i.test(raw)) return "USD";
     if (/€|EUR/i.test(raw)) return "EUR";
     if (/£|GBP/i.test(raw)) return "GBP";
@@ -40,6 +44,10 @@ class SafeShareSymbolicRewriter {
 
     // Infer from surrounding prompt context if raw has no explicit currency symbol
     if (fullContext) {
+      if (/S\$|SGD|Singapore\b|DBS\b|OCBC\b|UOB\b/i.test(fullContext)) return "SGD";
+      if (/A\$|AUD|Australia\b|Sydney\b|Melbourne\b|CBA\b/i.test(fullContext)) return "AUD";
+      if (/C\$|CAD|Canada\b|Toronto\b|Vancouver\b|RBC\b/i.test(fullContext)) return "CAD";
+      if (/CHF|Swiss|Zurich|Geneva/i.test(fullContext)) return "CHF";
       if (/\$|USD|dollars?\b|SF\b|San Francisco|Amazon|Stripe|FAANG|Silicon Valley|\bUS\b|\bNYC\b|\bAustin\b|\bSeattle\b/i.test(fullContext)) return "USD";
       if (/Rp|IDR|rupiah|gaji|tabungan|kantor|juta|jt|cicilan|Indonesia|Jakarta|Surabaya|Bandung/i.test(fullContext)) return "IDR";
       if (/€|EUR|euros?\b|Germany|France|Netherlands/i.test(fullContext)) return "EUR";
@@ -51,6 +59,34 @@ class SafeShareSymbolicRewriter {
     }
 
     return "IDR";
+  }
+
+  /**
+   * Syntactic dependency-distance validator:
+   * Ensures bare numbers without explicit currency symbols are within <= 12 tokens
+   * of a financial semantic trigger (salary, debt, valuation, equity, bonus, etc.).
+   * Prevents over-binding non-sensitive numbers (e.g. "Report 2024 page 450").
+   */
+  isWithinDependencyDistance(text, rawMatch, maxTokenDistance = 12) {
+    if (!text || !rawMatch) return false;
+    // Explicit currency symbols/indicators always bind (distance = 0)
+    if (/[$€£¥₹]|(?:Rp|IDR|USD|EUR|GBP|SGD|AUD|CAD|CHF|k|M|miliar|juta)\b/i.test(rawMatch)) {
+      return true;
+    }
+
+    const idx = text.indexOf(rawMatch);
+    if (idx === -1) return true;
+
+    const beforeSlice = text.slice(Math.max(0, idx - 200), idx).trim();
+    const afterSlice = text.slice(idx + rawMatch.length, idx + rawMatch.length + 200).trim();
+
+    const beforeTokens = beforeSlice ? beforeSlice.split(/\s+/).slice(-maxTokenDistance).join(" ") : "";
+    const afterTokens = afterSlice ? afterSlice.split(/\s+/).slice(0, maxTokenDistance).join(" ") : "";
+    const windowContext = `${beforeTokens} ${afterTokens}`;
+
+    const triggerRx = /\b(?:salary|gaji|income|revenue|valuation|arr|mrr|ebitda|burn|runway|bonus|severance|debt|equity|safe|investment|funding|spend|spending|budget|cost|fee|rent|sewa|cicilan|tabungan|payout|compensation|deductible|mortgage|loan|pay)\b/i;
+
+    return triggerRx.test(windowContext);
   }
 
   /**
@@ -75,12 +111,14 @@ class SafeShareSymbolicRewriter {
       if (det.category === "SENSITIVE_FINANCIAL") {
         const val = this.pseudonymizer.parseFinancialValue(det.raw);
         if (!isNaN(val) && val >= 100) {
-          detectedItems.push({
-            raw: det.raw,
-            val,
-            category: "FINANCIAL",
-            currency: this.detectCurrency(det.raw, text)
-          });
+          if (this.isWithinDependencyDistance(text, det.raw, 12)) {
+            detectedItems.push({
+              raw: det.raw,
+              val,
+              category: "FINANCIAL",
+              currency: this.detectCurrency(det.raw, text)
+            });
+          }
         }
       }
     }
@@ -105,6 +143,36 @@ class SafeShareSymbolicRewriter {
   }
 
   /**
+   * Extracts a semantic noun anchor (e.g. GAJI, BONUS, SEWA) preceding a numeric value.
+   * Prevents variable ambiguity and preserves context in algebraic steering.
+   */
+  extractSemanticRole(text, rawMatch, index = 1) {
+    if (!text || !rawMatch) return `S${index}_VAL`;
+    const idx = text.indexOf(rawMatch);
+    if (idx === -1) return `S${index}_VAL`;
+
+    const beforeSlice = text.slice(Math.max(0, idx - 80), idx).trim();
+    const words = beforeSlice.split(/[\s,.:;!?"'()[\]{}]+/).filter(Boolean);
+    const keywords = [
+      "gaji_pokok", "gaji", "salary", "bonus", "sewa", "rent", "tabungan", "savings",
+      "cicilan", "installment", "mortgage", "loan", "hutang", "debt", "pajak", "tax",
+      "omset", "revenue", "income", "pengeluaran", "spending", "expense", "budget", "runway", "burn"
+    ];
+
+    const last3 = words.slice(-3).map(w => w.toLowerCase());
+    for (const kw of keywords) {
+      if (last3.includes(kw) || last3.join("_").includes(kw)) {
+        return `S${index}_${kw.toUpperCase()}`;
+      }
+    }
+    const lastWord = last3[last3.length - 1];
+    if (lastWord && /^[a-z]{3,15}$/.test(lastWord) && !["dan", "di", "ke", "dari", "yang", "ini", "itu", "saya", "kamu", "dia", "anda", "the", "a", "an", "in", "on", "at", "to", "for", "is", "was"].includes(lastWord)) {
+      return `S${index}_${lastWord.toUpperCase()}`;
+    }
+    return `S${index}_VAL`;
+  }
+
+  /**
    * Generates the In-Context Steering Instruction appended to the prompt.
    * Tells the LLM to process symbols as fixed parameters and emit formulas.
    * 
@@ -117,10 +185,10 @@ class SafeShareSymbolicRewriter {
     const symList = symbols.join(", ");
 
     if (language === "id") {
-      return `\n\n[PROTOKOL PRIVASI: Perlakukan variabel ${symList} sebagai parameter angka tetap. Keluarkan rincian anggaran, alokasi biaya, dan proyeksi akumulasi waktu secara eksplisit dalam bentuk formula matematika terhadap ${symList} (contoh: 0.30 * ${symbols[0]}, 12 * 0.30 * ${symbols[0]}).]`;
+      return `\n\n[PROTOKOL PRIVASI: Perlakukan variabel ${symList} sebagai parameter angka tetap. Keluarkan rincian anggaran, alokasi biaya, dan formula matematika terhadap ${symList} secara langsung menggunakan ekspresi aljabar standar (contoh: 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Jangan gunakan tag escape atau persamaan berantai.]`;
     }
 
-    return `\n\n[PRIVACY PROTOCOL: Treat ${symList} as an exact fixed parameter. Provide budget allocations and multi-period accumulations explicitly in proportional algebraic terms of ${symList} (e.g. 0.30 * ${symbols[0]}, 12 * 0.30 * ${symbols[0]}).]`;
+    return `\n\n[PRIVACY PROTOCOL: Treat ${symList} as an exact fixed parameter. Provide budget allocations, spending, and formulas in standard algebraic terms (e.g. 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Do not use escape tags or chained equations.]`;
   }
 
   /**
@@ -151,11 +219,14 @@ class SafeShareSymbolicRewriter {
     // Sort detected items by length (longest match first) to prevent substring collision
     const sorted = [...analysis.detectedItems].sort((a, b) => b.raw.length - a.raw.length);
 
+    let symbolIdx = 1;
     for (const item of sorted) {
       if (item.category === "FINANCIAL" && typeof item.val === "number") {
+        const role = this.extractSemanticRole(rawPrompt, item.raw, symbolIdx++);
         const symbolId = this.vault.register(item.raw, item.val, "FINANCIAL", {
           currency: item.currency,
-          period: "monthly"
+          period: "monthly",
+          role
         });
         generatedSymbols.push(symbolId);
 

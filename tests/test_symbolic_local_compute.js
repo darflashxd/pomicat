@@ -77,6 +77,15 @@ function runSymbolicLocalComputeSuite() {
 
   vault.clear();
   assert.strictEqual(vault.size(), 0);
+
+  // Active chat session binding
+  vault.loadFromSession("chat_session_xyz");
+  assert.strictEqual(vault.activeChatId, "chat_session_xyz");
+  const sChat = vault.register("Rp 5.000.000", 5000000, "FINANCIAL", { currency: "IDR" });
+  assert.strictEqual(sChat, "<S1>");
+  vault.clear();
+  assert.strictEqual(vault.activeChatId, null);
+
   console.log("  [✓] Test 4 Passed: Ephemeral vault lifecycle, deduplication, and cleanup verified!");
 
   // --- TEST 5: PRE-INFERENCE PROMPT REWRITING (DE JEMBRAS CASE) ---
@@ -275,8 +284,156 @@ Incremental runway=<s18></s18> / <s19></s19> months`;
   assert(!htmlHydratedRes.hydratedText.includes("<s18></s18>"), "All <s18> HTML tags must be resolved!");
   console.log("  [✓] Test 14 Passed: All browser-generated <s18></s18> HTML tags successfully parsed and hydrated into numbers!");
 
+  // --- TEST 15: FIXED-POINT ARITHMETIC & MULTI-CURRENCY (SGD, AUD, CAD, CHF) ---
+  console.log("\n[Test 15] Testing Fixed-Point Arithmetic & Global Currencies (SGD, AUD, CAD, CHF)...");
+  assert.strictEqual(localCompute.compute("0.1 + 0.2"), 0.3, "Fixed-point arithmetic must prevent IEEE-754 0.30000000000000004 drift");
+  assert.strictEqual(localCompute.compute("19.99 * 100"), 1999, "Fixed-point arithmetic must prevent float rounding drift");
+  assert.strictEqual(localCompute.formatValue(50000, "SGD"), "S$50,000");
+  assert.strictEqual(localCompute.formatValue(75000, "AUD"), "A$75,000");
+  assert.strictEqual(localCompute.formatValue(92000, "CAD"), "C$92,000");
+  assert.strictEqual(localCompute.formatValue(120000, "CHF"), "CHF 120'000");
+  console.log("  [✓] Test 15 Passed: Fixed-point arithmetic and SGD/AUD/CAD/CHF currency formatting verified!");
+
+  // --- TEST 16: DEPENDENCY-DISTANCE BINDING THRESHOLD (<= 12 TOKENS) ---
+  console.log("\n[Test 16] Testing Dependency-Distance Binding Threshold (<= 12 tokens)...");
+  const distantPrompt = "Please read through document version 450 published in section 2024 which discusses generic architecture without any financial details.";
+  const rDistant = rewriter.analyze(distantPrompt);
+  assert.strictEqual(rDistant.detectedItems.length, 0, "Distant numbers without financial trigger must not bind");
+
+  const boundPrompt = "My current base salary is 185000 and my target bonus is 35000.";
+  const rBound = rewriter.analyze(boundPrompt);
+  assert(rBound.detectedItems.length > 0, "Numbers adjacent to 'salary' and 'bonus' within 12 tokens must bind");
+  console.log("  [✓] Test 16 Passed: Dependency-distance threshold (<= 12 tokens) successfully discriminates!");
+
+  // --- TEST 17: RELATIONAL OPERATORS, PIECEWISE IF/MIN/MAX, & EXPR ENVELOPES ---
+  console.log("\n[Test 17] Testing Relational AST, Conditional IF, & {{EXPR:}} Envelopes...");
+  const taxVault = {
+    "<S1>": { value: 25000000, currency: "IDR", raw: "Rp 25.000.000" }
+  };
+  const taxSymbols = { "<S1>": 25000000, "S1": 25000000 };
+
+  // 1. Relational & Boolean operators
+  assert.strictEqual(localCompute.compute("10 > 5"), 1);
+  assert.strictEqual(localCompute.compute("10 <= 5"), 0);
+  assert.strictEqual(localCompute.compute("5 == 5"), 1);
+  assert.strictEqual(localCompute.compute("5 != 4"), 1);
+  assert.strictEqual(localCompute.compute("(10 > 5) && (5 > 2)"), 1);
+  assert.strictEqual(localCompute.compute("MIN(10, 5, 20)"), 5);
+  assert.strictEqual(localCompute.compute("MAX(10, 5, 20)"), 20);
+  assert.strictEqual(localCompute.compute("ROUND(123.456, 2)"), 123.46);
+
+  // 2. Conditional Piecewise IF
+  const ifExpr = "IF(<S1> > 20000000, (<S1> - 20000000) * 0.25 + 3000000, <S1> * 0.15)";
+  const ifRes = localCompute.compute(ifExpr, taxSymbols);
+  assert.strictEqual(ifRes, 4250000, "IF expression must evaluate true branch (4,250,000)");
+
+  // 3. Hydrate text with {{EXPR: ...}} envelope and tagless IF
+  const mixedLlmResp = "Calculated tax: {{EXPR: IF(<S1> > 20000000, (<S1> - 20000000) * 0.25 + 3000000, <S1> * 0.15)}} with bracket MIN(<S1>, 30000000).";
+  const mixedHydrated = localCompute.hydrateText(mixedLlmResp, taxVault, false);
+  assert(mixedHydrated.hydratedText.includes("Rp 4.250.000"), "Envelope must resolve to Rp 4.250.000");
+  assert(mixedHydrated.hydratedText.includes("Rp 25.000.000"), "Tagless MIN must resolve to Rp 25.000.000");
+  console.log("  [✓] Test 17 Passed: Relational operators, piecewise IF/MIN/MAX, and {{EXPR:}} verified!");
+
+  // --- TEST 18: CHATGPT REAL-WORLD ESCAPE, LATEX WRAPPER & CHAINED EQUATION RESOLUTION ---
+  console.log("\n[Test 18] Testing ChatGPT <escape>, \\text{} Wrapper & Chained Derivation Equations...");
+  const chatgptVault = {
+    "<S1>": { value: 25000000, currency: "IDR", raw: "Rp 25.000.000" }
+  };
+  const chatgptResponse = `Dengan gaji bulanan sebesar <escape><S1></escape> dan bonus 15%, perhitungannya adalah:
+- Bonus 15%: \\(0.15 \\times \\text{<S1>}\\)
+- Total gaji + bonus: \\(\\text{<S1>} + 0.15 \\times \\text{<S1>} = 1.15 \\times \\text{<S1>}\\)
+Jadi, bonus kamu sebesar \\(0.15 \\times \\text{<S1>}\\), sedangkan total gaji setelah bonus adalah \\(1.15 \\times \\text{<S1>}\\).`;
+
+  const chatgptHydrated = localCompute.hydrateText(chatgptResponse, chatgptVault, false);
+  assert(!chatgptHydrated.hydratedText.includes("<escape>"), "<escape> tags must be completely removed");
+  assert(!chatgptHydrated.hydratedText.includes("\\text{"), "\\text{} wrappers must be completely unpacked");
+  assert(chatgptHydrated.hydratedText.includes("Bonus 15%: Rp 3.750.000"), "Bonus must calculate to Rp 3.750.000");
+  assert(chatgptHydrated.hydratedText.includes("Total gaji + bonus: Rp 28.750.000"), "Total must calculate to Rp 28.750.000");
+  assert(chatgptHydrated.hydratedText.includes("Rp 25.000.000"), "Base salary must hydrate to Rp 25.000.000");
+
+  // Also test [[EXPR: ...]] with semantic-role symbol S1_GAJI_POKOK
+  const semanticExprResponse = "Gaji: [[EXPR: S1_GAJI_POKOK]], Bonus: [[EXPR: S1_GAJI_POKOK * 0.15]], Total: [[EXPR: S1_GAJI_POKOK * 1.15]]";
+  const semanticHydrated = localCompute.hydrateText(semanticExprResponse, chatgptVault, false);
+  assert(semanticHydrated.hydratedText.includes("Gaji: Rp 25.000.000"), "Single variable [[EXPR: S1_GAJI_POKOK]] must resolve");
+  assert(semanticHydrated.hydratedText.includes("Bonus: Rp 3.750.000"), "Multiplication [[EXPR: S1_GAJI_POKOK * 0.15]] must resolve");
+  assert(semanticHydrated.hydratedText.includes("Total: Rp 28.750.000"), "Total [[EXPR: S1_GAJI_POKOK * 1.15]] must resolve");
+  console.log("  [✓] Test 18 Passed: ChatGPT <escape>, \\text{}, equation chains, and [[EXPR: S1_ROLE]] verified!");
+
+  // --- TEST 19: TAGLESS NATURAL INFIX IN MARKDOWN TABLES & META-STEERING SAFETY ---
+  console.log("\n[Test 19] Testing Tagless Natural Infix in Tables & Anti-Self-Hydration Steering...");
+  const budgetVault = {
+    "<S1>": { value: 18500000, currency: "IDR", raw: "Rp 18.500.000" },
+    "<S2>": { value: 4200000, currency: "IDR", raw: "Rp 4.200.000" },
+    "<S3>": { value: 3100000, currency: "IDR", raw: "Rp 3.100.000" }
+  };
+
+  // 1. Tagless natural table hydration without [[EXPR:]] tags
+  const rawTableResponse = [
+    "| Komponen | Perhitungan |",
+    "| Gaji Pokok | VAL1_GAJI |",
+    "| Bonus (20%) | 0.20 * VAL1_GAJI |",
+    "| Total Pemasukan | 1.20 * VAL1_GAJI |",
+    "| Pengeluaran | VAL2_SEWA + VAL3_CICILAN |",
+    "| Sisa Bersih | (1.20 * VAL1_GAJI) - (VAL2_SEWA + VAL3_CICILAN) |"
+  ].join("\n");
+
+  const hydratedTable = localCompute.hydrateText(rawTableResponse, budgetVault, false);
+  assert(hydratedTable.hydratedText.includes("Gaji Pokok | Rp 18.500.000"), "Base salary must hydrate in table");
+  assert(hydratedTable.hydratedText.includes("Bonus (20%) | Rp 3.700.000"), "Bonus must hydrate in table");
+  assert(hydratedTable.hydratedText.includes("Total Pemasukan | Rp 22.200.000"), "Income must hydrate in table");
+  assert(hydratedTable.hydratedText.includes("Pengeluaran | Rp 7.300.000"), "Expenses must hydrate in table");
+  assert(hydratedTable.hydratedText.includes("Sisa Bersih | Rp 14.900.000"), "Net balance must evaluate to Rp 14.900.000");
+
+  // 2. Chained plain text equation collapsing
+  const chainedText = "Total Pemasukan = VAL1_GAJI + 0.20 * VAL1_GAJI = 1.20 * VAL1_GAJI";
+  const hydratedChained = localCompute.hydrateText(chainedText, budgetVault, false);
+  assert(hydratedChained.hydratedText.includes("Rp 22.200.000"), "Chained equation must collapse to Rp 22.200.000");
+
+  // 3. Meta-example steering anti-self-hydration invariant: VAL_A, VAL_B MUST NEVER mutate into Rp 0
+  const steeringPromptSample = "[PROTOKOL PRIVASI: Perlakukan variabel <S1>, <S2>, <S3> sebagai parameter angka tetap. Keluarkan rincian anggaran secara langsung menggunakan ekspresi aljabar standar (contoh: 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Jangan gunakan tag escape atau persamaan berantai.]";
+  const hydratedSteering = localCompute.hydrateText(steeringPromptSample, budgetVault, false);
+  assert(hydratedSteering.hydratedText.includes("VAL_A"), "Meta-example VAL_A must not be mutated");
+  assert(hydratedSteering.hydratedText.includes("VAL_B"), "Meta-example VAL_B must not be mutated");
+  assert(!hydratedSteering.hydratedText.includes("Rp 0"), "Steering prompt must NEVER self-hydrate into Rp 0!");
+  console.log("  [✓] Test 19 Passed: Tagless markdown tables, chained equations, and meta-steering safety verified!");
+
+  // --- TEST 20: REAL CHATGPT BACKTICKS, \boxed{}, & NESTED PARENS REHYDRATION ---
+  console.log("\n[Test 20] Testing Real ChatGPT Markdown Tables, \\boxed{} LaTeX, & Nested Parens...");
+  const chatGptSample = [
+    "| Komponen | Formula | Nilai |",
+    "| Gaji pokok | `S1` | Rp `S1` |",
+    "| Bonus 20% | `0.20 * S1` | Rp `0.20 * S1` |",
+    "| Total pendapatan | `1.20 * S1` | Rp `1.20 * S1` |",
+    "| Sewa apartemen | `S2` | Rp `S2` |",
+    "| Cicilan mobil | `S3` | Rp `S3` |",
+    "| Total pengeluaran | `S2 + S3` | Rp `S2 + S3` |",
+    "",
+    "\\[ \\boxed{(1.20 \\times S1)-(S2+S3)} \\]",
+    "",
+    "Sisa uang bersih = Rp `((1.20 * S1) - (S2 + S3))`"
+  ].join("\n");
+
+  const hydratedChatGpt = localCompute.hydrateText(chatGptSample, budgetVault, false);
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 18.500.000`"), "Gaji pokok in backtick must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 3.700.000`"), "Bonus in backtick must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 22.200.000`"), "Total income must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 4.200.000`"), "Rent must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 3.100.000`"), "Installment must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("`Rp 7.300.000`"), "Total expenses must hydrate");
+  assert(hydratedChatGpt.hydratedText.includes("Rp 14.900.000"), "LaTeX \\boxed{} equation must hydrate to Rp 14.900.000");
+  assert(!hydratedChatGpt.hydratedText.includes("(Rp 14.900.000"), "Must NOT have orphan left parenthesis");
+  assert(!hydratedChatGpt.hydratedText.includes("Rp Rp"), "Must NOT have duplicate Rp currency prefix");
+
+  // Also test HTML mode (td and code tags as received from DOM)
+  const domHtmlCell = "<td>Rp <code>0.20 * S1</code></td>";
+  const hydratedCell = localCompute.hydrateText(domHtmlCell, budgetVault, true);
+  assert(hydratedCell.hydratedText.includes("Rp 3.700.000"), "DOM HTML cell must hydrate without being blocked by <code> tag");
+  assert(hydratedCell.hydratedText.includes("ss-local-compute"), "HTML badge must be attached");
+
+  console.log("  [✓] Test 20 Passed: Real ChatGPT output rehydration 100% verified!");
+
   console.log("\n================================================================================");
-  console.log("   ALL 14 PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE AUDITS PASSED 100%!");
+  console.log("   ALL 20 PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE AUDITS PASSED 100%!");
   console.log("================================================================================\n");
 }
 

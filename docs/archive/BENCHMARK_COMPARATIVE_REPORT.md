@@ -20,9 +20,9 @@ This empirical benchmark rigorously measures the **Privacy-Utility Tradeoff** ac
 
 | Architecture Paradigm | Secret Exposure Rate (SER) ⬇ | Utility Degradation Rate (UDR) ⬇ | Algebraic Inversion Leak (DALR) ⬇ | Contextual F1-Score ⬆ | Mean Latency per Chat ⬇ | Client RAM Footprint ⬇ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Presidio-Style Regex DLP** | **91.30%** | **1.71%** | **100.00%** | **15.69%** | 0.03 ms | 15 MB |
+| **Presidio-Style Regex DLP** | **91.30%** | **1.71%** | **100.00%** | **15.69%** | 0.02 ms | 15 MB |
 | **BERT-Small PII NER (Context-Blind)** | **28.26%** | **29.14%** | **100.00%** | **68.75%** | 0.01 ms | 185 MB |
-| **SafeShare-AI (5-Tier Contextual Hybrid)** | **0.00%** | **0.00%** | **0.00%** | **100.00%** | 3.98 ms | 12 MB |
+| **SafeShare-AI (5-Tier Contextual Hybrid)** | **0.00%** | **0.00%** | **0.00%** | **100.00%** | 2.97 ms | 12 MB |
 
 *Note: Lower is better for SER, UDR, DALR, Latency, and RAM. Higher is better for F1-Score.*
 

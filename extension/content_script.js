@@ -39,6 +39,33 @@
   }
 
   const shieldIdScanner = typeof HeuristicsRedactor !== "undefined" ? new HeuristicsRedactor() : null;
+  let directNerPort = null;
+  const pendingNerRequests = new Map();
+
+  async function getDirectOffscreenPort() {
+    if (directNerPort) return directNerPort;
+    const api = typeof browser !== "undefined" ? browser : chrome;
+    if (!api || !api.runtime || !api.runtime.connect) return null;
+
+    try {
+      await api.runtime.sendMessage({ action: "ENSURE_OFFSCREEN_READY" });
+      directNerPort = api.runtime.connect({ name: "OFFSCREEN_DIRECT_NER" });
+      directNerPort.onMessage.addListener((res) => {
+        const resolver = pendingNerRequests.get(res.requestId);
+        if (resolver) {
+          pendingNerRequests.delete(res.requestId);
+          resolver(res.ok ? res.spans : []);
+        }
+      });
+      directNerPort.onDisconnect.addListener(() => {
+        directNerPort = null;
+      });
+      return directNerPort;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /**
    * What the shield would send: in "all" mode, hard identifiers are replaced first (same rules as
    * sharing), then amounts become <S1>. Returns { isTransformed, sanitizedPrompt, count }.
@@ -448,6 +475,16 @@
     const vaultData = symbolicVault.getAll();
     if (!vaultData || Object.keys(vaultData).length === 0) return;
 
+    // Helper: detect if active streaming is ongoing
+    const isStreamingActive = Boolean(
+      document.querySelector(
+        "[data-testid='stop-button'], button[aria-label*='Stop'], [data-is-streaming='true'], .result-streaming, [aria-label*='Stop response']"
+      )
+    );
+
+    const isSymbolicMathContent = (str) =>
+      /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\b(?:VAL\d+|S\d+_[A-Za-z0-9_]+)\b|(?:\d+(?:\.\d+)?%?|[+\-*^×÷·(]|\\times|\\cdot|\\div|\b(?:Rp\.?|IDR|USD|EUR|GBP|\$)\s*`?|(?<!\/)\/(?!\/))\s*S\d+\b|\bS\d+\b\s*(?:[-+*^×÷·)]|\\times|\\cdot|\\div|(?<!\/)\/(?!\/))|<code>[^<]*\bS\d+\b[^<]*<\/code>/i.test(str);
+
     // PASS 1: Hydrate KaTeX LaTeX equations in-place across ChatGPT, Claude, and DeepSeek
     const katexNodes = document.querySelectorAll("span.katex, div.katex-display, div[class*='math']");
     katexNodes.forEach((kNode) => {
@@ -456,7 +493,7 @@
 
       const annot = kNode.querySelector ? (kNode.querySelector("annotation[encoding='application/x-tex']") || kNode.querySelector("annotation")) : null;
       const tex = annot ? annot.textContent : "";
-      if (tex && /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(tex)) {
+      if (tex && isSymbolicMathContent(tex)) {
         const res = localCompute.hydrateText(tex, vaultData, true);
         if (res.computedCount > 0) {
           const wrapper = document.createElement("span");
@@ -468,29 +505,44 @@
       }
     });
 
-    // PASS 2: Hydrate leaf text blocks (paragraphs, list items, table cells, user bubbles)
-    // STRICT RULE: Never query outer message row containers or code blocks (<pre>/<code>)
-    // to prevent Virtual DOM collisions and preserve programming code syntax.
+    // PASS 2: Hydrate leaf text blocks (ONLY ASSISTANT MESSAGES)
+    // STRICT RULE: Never query user message bubbles, prompt inputs, or code blocks (<pre>)
+    // to prevent Virtual DOM collisions and self-hydration loops.
     const leafNodes = document.querySelectorAll(
       "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, " +
       "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, " +
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
-      ".chat-message-assistant p, .chat-message-assistant td, " +
-      "[data-user-message-bubble='true'] div.whitespace-pre-wrap, [data-user-message-bubble='true'] p, " +
-      "[data-message-author-role='user'] p, [data-message-author-role='user'] div.whitespace-pre-wrap, " +
-      "[data-testid='user-message'] p, div[class*='user-message'] p, .chat-message-user p"
+      ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th"
     );
 
     leafNodes.forEach((node) => {
       if (node.dataset.safeshareHydrated === "true") return;
       if (isPromptInputOrUIElement(node)) return;
-      if (node.closest("pre, code, .ss-katex-hydrated")) return;
+      if (node.closest("pre, .ss-katex-hydrated, [data-message-author-role='user'], [data-testid='user-message']")) return;
       // Skip if leaf node contains an un-hydrated KaTeX span (Pass 1 handles KaTeX widgets)
       if (node.querySelector && node.querySelector("span.katex:not([data-safeshare-hydrated='true'])")) return;
 
+      // Quiescence check: if node is within an active streaming block or table, defer until settled
+      if (isStreamingActive) {
+        const table = node.closest("table");
+        if (table) {
+          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, div.ds-markdown, .chat-message-assistant");
+          if (assistantContainer && assistantContainer.lastElementChild === table) return;
+        }
+        const block = node.closest("p, li, td, th") || node;
+        const parentContainer = block.parentElement;
+        if (parentContainer && parentContainer.lastElementChild === block) return;
+      }
+
+      // Check unbalanced parentheses (incomplete streaming expression)
+      const rawText = node.innerText || node.textContent || "";
+      const openParens = (rawText.match(/\(/g) || []).length;
+      const closeParens = (rawText.match(/\)/g) || []).length;
+      if (openParens !== closeParens) return;
+
       const text = node.innerHTML;
-      if (/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(text)) {
+      if (isSymbolicMathContent(text)) {
         const res = localCompute.hydrateText(text, vaultData, true);
         if (res.computedCount > 0) {
           sanitizeAndMountHydration(node, res.hydratedText);
@@ -502,7 +554,9 @@
 
   /**
    * Hydrates formulas in AI responses with locally computed numbers in client RAM.
+   * Uses debounced quiescence to avoid crashing React Fiber streaming loops.
    */
+  let hydrationDebounceTimer = null;
   function initLocalHydrationObserver() {
     if (!localCompute || !symbolicVault) return;
 
@@ -510,7 +564,10 @@
     runHydrationPass();
 
     const observer = new MutationObserver(() => {
-      runHydrationPass();
+      if (hydrationDebounceTimer) clearTimeout(hydrationDebounceTimer);
+      hydrationDebounceTimer = setTimeout(() => {
+        runHydrationPass();
+      }, 350);
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
@@ -554,8 +611,8 @@
   function isPromptInputOrUIElement(el) {
     if (!el) return true;
     if (!isVisibleElement(el)) return true;
-    // Strictly exclude the user prompt composer input, form, and SafeShare UI
-    if (el.closest("form, #prompt-textarea, fieldset, textarea, #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
+    // Strictly exclude the user prompt composer input, form, user bubbles, and SafeShare UI
+    if (el.closest("form, #prompt-textarea, fieldset, textarea, [contenteditable='true'], [data-message-author-role='user'], [data-testid='user-message'], .chat-message-user, [data-user-message-bubble='true'], #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
       return true;
     }
     // Exclude disclaimer text (e.g. ChatGPT can make mistakes...)

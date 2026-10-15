@@ -14,6 +14,7 @@ class SafeShareSymbolicVault {
     this.storagePrefix = storagePrefix;
     this.inMemoryVault = new Map();
     this.counter = 1;
+    this.activeChatId = null;
     this.loadFromSession();
   }
 
@@ -21,6 +22,7 @@ class SafeShareSymbolicVault {
    * Loads any existing ephemeral secrets from sessionStorage for this tab or specific chat.
    */
   loadFromSession(chatId = null) {
+    this.activeChatId = chatId;
     if (typeof sessionStorage === "undefined") return;
     try {
       this.inMemoryVault.clear();
@@ -44,6 +46,7 @@ class SafeShareSymbolicVault {
    * Persists active ephemeral secrets to sessionStorage.
    */
   saveToSession(chatId = null) {
+    if (chatId) this.activeChatId = chatId;
     if (typeof sessionStorage === "undefined") return;
     try {
       const obj = {};
@@ -51,7 +54,7 @@ class SafeShareSymbolicVault {
         obj[k] = v;
       }
       const serialized = JSON.stringify(obj);
-      const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
+      const key = this.activeChatId ? `${this.storagePrefix}data_${this.activeChatId}` : `${this.storagePrefix}data_new`;
       sessionStorage.setItem(key, serialized);
     } catch (_) {}
   }
@@ -80,6 +83,7 @@ class SafeShareSymbolicVault {
     const symbolId = `<S${this.counter++}>`;
     const secretRecord = {
       symbolId,
+      role: metadata.role || null,
       raw: raw.trim(),
       numericValue,
       value: numericValue,
@@ -95,13 +99,19 @@ class SafeShareSymbolicVault {
   }
 
   /**
-   * Retrieves secret record by symbol token (<S1> or S1).
+   * Retrieves secret record by symbol token (<S1>, S1, or role e.g. S1_GAJI).
    * @param {string} symbolId
    * @returns {object|null}
    */
   get(symbolId) {
     const key = symbolId.startsWith("<") && symbolId.endsWith(">") ? symbolId : `<${symbolId}>`;
-    return this.inMemoryVault.get(key) || null;
+    if (this.inMemoryVault.has(key)) return this.inMemoryVault.get(key);
+    for (const record of this.inMemoryVault.values()) {
+      if (record.role === symbolId || `<${record.role}>` === symbolId) {
+        return record;
+      }
+    }
+    return null;
   }
 
   /**
@@ -130,9 +140,11 @@ class SafeShareSymbolicVault {
   clear(chatId = null) {
     this.inMemoryVault.clear();
     this.counter = 1;
+    const targetId = chatId || this.activeChatId;
+    this.activeChatId = null;
     if (typeof sessionStorage !== "undefined") {
       try {
-        const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
+        const key = targetId ? `${this.storagePrefix}data_${targetId}` : `${this.storagePrefix}data_new`;
         sessionStorage.removeItem(key);
         sessionStorage.removeItem(`${this.storagePrefix}data`);
       } catch (_) {}

@@ -8,10 +8,55 @@ console.log("[SafeShare-AI] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
+let creatingOffscreenPromise = null;
+
+async function getOrCreateOffscreenDocument() {
+  if (typeof chrome === "undefined" || !chrome.offscreen || !chrome.offscreen.hasDocument) {
+    return false;
+  }
+  const hasDoc = await chrome.offscreen.hasDocument();
+  if (hasDoc) return true;
+
+  if (creatingOffscreenPromise) {
+    await creatingOffscreenPromise;
+    return true;
+  }
+
+  creatingOffscreenPromise = chrome.offscreen.createDocument({
+    url: "offscreen.html",
+    reasons: ["WORKERS", "BLOBS"],
+    justification: "Run client-side local MiniLM Q4 ONNX NER inference with zero network access."
+  });
+
+  await creatingOffscreenPromise;
+  creatingOffscreenPromise = null;
+  return true;
+}
+
 webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "PING") {
     if (typeof sendResponse === "function") sendResponse({ status: "PONG" });
     return false;
+  }
+
+  if (request.action === "ENSURE_OFFSCREEN_READY" || request.type === "ENSURE_OFFSCREEN_READY") {
+    getOrCreateOffscreenDocument()
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (request.action === "RUN_NER_INFERENCE") {
+    getOrCreateOffscreenDocument()
+      .then(() => {
+        webExtApi.runtime.sendMessage(request, (res) => {
+          if (typeof sendResponse === "function") sendResponse(res || { success: false });
+        });
+      })
+      .catch((err) => {
+        if (typeof sendResponse === "function") sendResponse({ success: false, error: err.message });
+      });
+    return true;
   }
 
   if (request.action === "UPLOAD_TO_RELAY") {

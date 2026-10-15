@@ -38,6 +38,7 @@
         "ui/modal.css"
       ],
       "js": [
+        "engine/span_arbiter.js",
         "engine/heuristics.js",
         "engine/contextual.js",
         "engine/pseudonymizer.js",
@@ -65,5 +66,15 @@
   },
   "action": {
     "default_title": "SafeShare-AI Privacy Guard"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "models/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }

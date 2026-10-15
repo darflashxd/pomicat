@@ -746,7 +746,7 @@ class ConsistentPseudonymizer {
 
     turns.forEach((turn, idx) => {
       if (turn.role === "user" && !options.keepNames) {
-        const nameIntroRx = /(?:(?:(?:\b(?:nama\s+(?:lengkap\s+)?(?:saya|gw|gue|ku)|namaku|perkenalkan\s+(?:nama\s+saya|saya|namaku)?|panggil\s+(?:saja\s+)?(?:saya|aku)|my\s+(?:full\s+)?name\s+is|i\s*[\x27\x60]?\s*(?:am|m)|call\s+me|halo\s+saya))\s+)|(?:(?:\b(?:nama\s+lengkap|full\s+name|name|nama)\s*[:=\-]\s*)))([^,.\n!?]+)/gi;
+        const nameIntroRx = /(?:(?:(?:\b(?:nama\s+(?:lengkap\s+)?(?:saya|gw|gue|ku)|namaku|perkenalkan\s+(?:nama\s+saya|saya|namaku)?|panggil\s+(?:saja\s+)?(?:saya|aku)|my\s+(?:full\s+)?name\s+is|i\s*[\x27\x60]?\s*(?:am|m)|call\s+me|halo\s+saya|dear|by|directed\s+by|requested\s+by)\s+)|(?:\b(?:nama\s+lengkap|full\s+name|name|nama|user|patient|applicant|customer|client|employee|author|account\s+holder|billing\s+address)\s*[:=\-]\s*)))([^,.\n!?]+)/giu;
         let nm;
         while ((nm = nameIntroRx.exec(turn.content)) !== null) {
           const rawPhrase = nm[1].trim();
@@ -775,6 +775,21 @@ class ConsistentPseudonymizer {
                 category: "USER"
               });
             }
+          }
+        }
+
+        // Formal titles / Salutations: e.g. "Dr. Jonathan Vance", "Mr. David Miller", "Mrs. Sara Schwarz"
+        const titleRx = /\b(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)\s+([\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+){1,3})\b/gu;
+        let tr;
+        while ((tr = titleRx.exec(turn.content)) !== null) {
+          const tName = tr[1].trim();
+          const tWords = tName.split(/\s+/);
+          if (tWords.length >= 2 && looksLikeName(tWords, { requireCapital: true })) {
+            userIntroMatches.push({
+              turnIndex: idx,
+              raw: tName,
+              category: "USER"
+            });
           }
         }
 
@@ -819,7 +834,7 @@ class ConsistentPseudonymizer {
 
         // Email sign-off / closing signature detection:
         // e.g. "Best regards,\nDr. Jonathan Vance\nHead of Research"
-        const signOffRx = /(?:(?:Best\s+regards|Warm\s+regards|Kind\s+regards|Sincerely|Regards|Thanks\s+(?:and\s+regards)?|Warmly|Cheers|Respectfully|Yours\s+truly|Salam),?\s*[\r\n]+)(?:(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)[ \t]+)?([A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)+)/gi;
+        const signOffRx = /(?:(?:Best\s+regards|Warm\s+regards|Kind\s+regards|Sincerely|Regards|Thanks\s+(?:and\s+regards)?|Warmly|Cheers|Respectfully|Yours\s+truly|Salam),?\s*[\r\n]+)(?:(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)[ \t]+)?([\p{L}][\p{L}'-]*(?:[ \t]+[\p{L}][\p{L}'-]*){0,3})/giu;
         let so;
         while ((so = signOffRx.exec(turn.content)) !== null) {
           const sigName = so[1].trim();

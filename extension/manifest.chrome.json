@@ -5,7 +5,8 @@
   "description": "Redacts sensitive data from AI chats before sharing and creates end-to-end encrypted, expiring share links. Works on ChatGPT, Claude and DeepSeek.",
   "permissions": [
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "offscreen"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -36,6 +37,7 @@
         "ui/modal.css"
       ],
       "js": [
+        "engine/span_arbiter.js",
         "engine/heuristics.js",
         "engine/contextual.js",
         "engine/pseudonymizer.js",
@@ -52,5 +54,18 @@
   ],
   "action": {
     "default_title": "SafeShare-AI Privacy Guard"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "models/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; object-src 'none';"
   }
 }

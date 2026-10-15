@@ -4,17 +4,15 @@
  * Features:
  * 1. Mode 1: Self-Contained Zero-Server Hash Mode (#d=<ciphertext>&k=<key>&exp=<deadline>)
  * 2. Mode 2: Cloud Relay Mode (/v/:id#<key>)
- * 3. Ephemeral GPU Canvas 2D Viewport (Zero-DOM footprint - 0 text nodes)
- * 4. Dynamic Glyph Scrambler (Decoy honeypot DOM)
- * 5. Zero-width watermark (deterrence only: stripped by Unicode normalization or a screenshot)
- * 6. Active Tamper Guard & RAM Memory Zeroizer
- * 7. Zero-Clipboard Continuation Bridge
+ * 3. Client-Side AES-256-GCM In-Memory Decryption
+ * 4. Zero-width watermark (deterrence only: stripped by Unicode normalization or a screenshot)
+ * 5. RAM Memory Zeroizer on session unload/termination
+ * 6. Zero-Clipboard Continuation Bridge
  */
 
 document.addEventListener("DOMContentLoaded", async () => {
   const cryptoEngine = new SafeShareCrypto();
   const steganography = typeof SafeShareSteganography !== "undefined" ? new SafeShareSteganography() : null;
-  const scrambler = typeof SafeShareFontScrambler !== "undefined" ? new SafeShareFontScrambler() : null;
   const extensionBridge = typeof SafeShareExtensionBridge !== "undefined" ? new SafeShareExtensionBridge() : null;
   // Extract ID from URL params or pathname
   const params = new URLSearchParams(window.location.search);

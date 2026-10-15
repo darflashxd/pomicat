@@ -87,6 +87,14 @@ async function runUncopyableEnclaveAudit() {
   const wrongKeyExtraction = steg.extract(watermarked, "wrong-forged-key");
   assert.strictEqual(wrongKeyExtraction.validSignature, false, "Signature must fail with invalid key");
   assert.strictEqual(wrongKeyExtraction.tampered, true, "Must be flagged as tampered with invalid key");
+
+  // Verify non-ASCII / multibyte Unicode recipientId does not crash SHA-256 HMAC
+  const unicodeMeta = { recipientId: "Budi Utomo 世界 🔐", sessionId: "sess_uni_01", timestamp: 1774580000000 };
+  const unicodeWatermarked = steg.embed("Laporan multibyte unicode.", unicodeMeta, masterKey);
+  const unicodeExtracted = steg.extract(unicodeWatermarked, masterKey);
+  assert.strictEqual(unicodeExtracted.detected, true, "Unicode watermark must be detected");
+  assert.strictEqual(unicodeExtracted.validSignature, true, "Unicode HMAC signature must be valid");
+  assert.strictEqual(unicodeExtracted.metadata.recipientId, "Budi Utomo 世界 🔐");
   console.log("  [+] Embedded Traitor: ", extraction.metadata.recipientId, "at", extraction.metadata.date);
   console.log("  [✓] Audit 3 Passed: Steganographic Traitor Tracing 100% verified!");
 

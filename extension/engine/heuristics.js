@@ -24,17 +24,23 @@ class HeuristicsRedactor {
         validator: (raw) => this.validateSSN(raw),
         replacement: "[REDACTED_SSN]"
       },
-      // 1b-2. US Social Security Number (Raw 9 digits with context)
+      // 1b-2. US Social Security Number (Raw 9-15 digits, JSON/XML, or masked format with context)
       {
         id: "US_SSN_RAW",
         name: "US Social Security Number (Raw)",
         category: "GOV_ID",
-        regex: /\b((?:(?:social\s+security(?:\s+number)?|ssn)(?:\s+is|\s*[:=\-])?\s*))([0-9]{9})\b/gi,
+        regex: /(?:<ssn>([^<]+)<\/ssn>|["']?ssn["']?\s*[:=]\s*["']?([0-9\s*.-]{9,20})["']?|\b((?:(?:social\s+security(?:\s+number)?|ssn)(?:\s+is|\s*[:=\-])?\s*))([0-9\s*.-]{9,20})\b)/gi,
         validator: (raw) => {
+          if (raw.includes("*")) return true;
           const digits = raw.replace(/\D/g, "");
-          return digits.length === 9 && digits !== "000000000" && !digits.startsWith("000") && !digits.startsWith("666");
+          return digits.length >= 9 && digits.length <= 15 && digits !== "000000000" && !digits.startsWith("000") && !digits.startsWith("666");
         },
-        replacement: "$1[REDACTED_SSN]"
+        replacement: (raw) => {
+          const m = /^([^0-9*<"']*(?:<ssn>|["']?ssn["']?\s*[:=]\s*["']?|(?:social\s+security(?:\s+number)?|ssn)(?:\s+is|\s*[:=\-])?\s*))/i.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffix = raw.endsWith("</ssn>") ? "</ssn>" : (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+          return `${prefix}[REDACTED_SSN]${suffix}`;
+        }
       },
       // 1c. US Employer Identification Number (EIN)
       {
@@ -218,17 +224,23 @@ class HeuristicsRedactor {
         },
         replacement: "[REDACTED_PHONE]"
       },
-      // 4b. Contextual Phone & Fax Numbers (Formatted, spaced, or prefixed by Phone/Tel/Fax/Mobile)
+      // 4b. Contextual Phone & Fax Numbers (Formatted, spaced, or prefixed by Phone/Tel/Fax/Mobile/JSON/XML)
       {
         id: "CONTEXT_PHONE",
         name: "Contextual Phone / Fax Number",
         category: "PROFILE",
-        regex: /\b((?:(?:phone|mobile|tel(?:ephone)?|fax|whatsapp|call\s+me\s+at)\s*(?:#|number|no\.?)?)\s*[:=\-]?\s*)([+0-9()][+0-9() -]{5,20}[0-9])\b/gi,
+        regex: /(?:<phone>([^<]+)<\/phone>|["']?(?:phone|mobile|telephone|fax|celular|contact|tel)["']?\s*[:=]\s*["']?([+0-9()][+0-9() ./-]{5,22}[0-9])["']?|\b((?:(?:phone|mobile|tel(?:ephone)?|fax|whatsapp|call\s+(?:me\s+)?at|answering\s+at|reach\s+(?:me|us)\s+at|messages?\s+to|text(?:ing)?\s+to)\s*(?:#|number|no\.?)?)\s*[:=\-]?\s*)([+0-9()][+0-9() ./-]{5,22}[0-9])(?:\s*-(?:Office|Fax|Mobile|Home|Work)\b)?)/gi,
         validator: (raw) => {
           const digits = raw.replace(/\D/g, "");
-          return digits.length >= 7 && digits.length <= 15;
+          return digits.length >= 7 && digits.length <= 16;
         },
-        replacement: "$1[REDACTED_PHONE]"
+        replacement: (raw) => {
+          const m = /^([^0-9+(<"']*(?:<phone>|["']?(?:phone|mobile|telephone|fax|celular|contact|tel)["']?\s*[:=]\s*["']?|(?:phone|mobile|tel(?:ephone)?|fax|whatsapp|call\s+(?:me\s+)?at|answering\s+at|reach\s+(?:me|us)\s+at|messages?\s+to|text(?:ing)?\s+to)\s*(?:#|number|no\.?)?\s*[:=\-]?\s*))/i.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffixM = /(-(?:Office|Fax|Mobile|Home|Work)|<\/phone>|["'])$/i.exec(raw);
+          const suffix = suffixM ? suffixM[1] : "";
+          return `${prefix}[REDACTED_PHONE]${suffix}`;
+        }
       },
       // 4c. IPv4 Address (Excluding localhost, broadcast, version markers, and public DNS / CIDR blocks)
       {
@@ -452,19 +464,43 @@ class HeuristicsRedactor {
         regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
         replacement: "$1[REDACTED_SECRET]"
       },
-      // 10f. Conversational Natural Language Password / Kata Sandi (Indonesian & English)
+      // 10f. Conversational Natural Language Password / Kata Sandi (Indonesian & English, JSON/XML, Logs)
       {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:for\s+(?:my|the)?|to\s+(?:the)?|of|email|account|user|staging|production|server|db|database|admin|root|akun|saya|ku|login|wifi|laptop|baru|[A-Za-z0-9_-]+))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b/gi,
+        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:password|passwd|passcode|kata_sandi)["']?\s*[:=]\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|kata\s+sandi|passcode)(?:\s+(?:for\s+(?:my|the)?|to\s+(?:the)?|of|email|account|user|staging|production|server|db|database|admin|root|akun|saya|ku|login|wifi|laptop|baru|[A-Za-z0-9_-]+))*\s*(?:adalah|is|[:=])?\s+))([^\s\r\n'"]{5,40})\b)/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
           const line = text.substring(lineStart, index).toLowerCase();
           return !/\b(?:def|function|class|import|const|let|var)\s+$/.test(line);
         },
-        replacement: "$1[REDACTED_PASSWORD]"
+        extractToken: (match, raw) => {
+          if (match[1]) return match[1];
+          if (match[2]) return match[2];
+          if (match[3]) return match[3];
+          if (match[5]) return match[5];
+          return raw;
+        },
+        replacement: (raw, matchIndex, text, match) => {
+          if (match && match[4]) return `${match[4]}[REDACTED_PASSWORD]`;
+          if (match && match[1]) return `<password>[REDACTED_PASSWORD]</password>`;
+          if (match && match[2]) {
+            const eqIdx = raw.indexOf("=");
+            const hatIdx = raw.indexOf("^");
+            const delimIdx = (eqIdx !== -1) ? eqIdx : hatIdx;
+            const pfx = (delimIdx !== -1) ? raw.substring(0, delimIdx + 1) : "";
+            return `${pfx}[REDACTED_PASSWORD]`;
+          }
+          if (match && match[3]) {
+            const m = /^([^"']*(?:["']?(?:password|passwd|passcode|kata_sandi)["']?\s*[:=]\s*["']?))/i.exec(raw);
+            const pfx = m ? m[1] : "";
+            const suffix = (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+            return `${pfx}[REDACTED_PASSWORD]${suffix}`;
+          }
+          return "[REDACTED_PASSWORD]";
+        }
       },
       // 11. Physical Home / Street Address (Expanded for KTP/Domisili and structured forms)
       {
@@ -479,13 +515,29 @@ class HeuristicsRedactor {
         },
         replacement: "$1[REDACTED_ADDRESS]"
       },
-      // 11b. English Residential / Shipping Address (US, UK, Singapore, Global Street & Postal Formats)
+      // 11b. English Residential / Shipping Address (US, UK, European & International Street Formats)
       {
         id: "ENGLISH_PHYSICAL_ADDRESS",
         name: "International Physical Street Address",
         category: "PROFILE",
-        regex: /\b((?:(?:(?:my|our|home|residential|shipping|mailing|street|billing)\s+)?address\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent)\s+to\s+)|(?:(?:i|we)\s+)?(?:live|stay|reside)\s+(?:at|in)\s+))((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk)\s+\d+[a-zA-Z]?,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,5}\s+)[A-Za-z0-9\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill)\b(?:[A-Za-z0-9\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}))?)/gi,
-        replacement: "$1[REDACTED_ADDRESS]"
+        regex: /(?:<address>([^<]+)<\/address>|["']?(?:street_address|physical_address|billing_address|shipping_address|address)["']?\s*[:=]\s*["']?([^"'\r\n]{10,120})["']?|\b((?:(?:(?:(?:my|our|home|residential|shipping|mailing|street|billing|physical|company|business|office)\s+)?address(?:\s+of\s+[A-Za-z0-9._\s-]+)?\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent|dispatched)\s+to\s+)|(?:(?:[A-Za-z\p{L}]+(?:\s+[A-Za-z\p{L}]+)?)\s+)?(?:live[s]?|living|stay[s]?|staying|reside[s]?|residing)\s+(?:at|in)\s+|(?:(?:office|store|headquarters|facility|branch)\s+is\s+at\s+))))\s*((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk|Box|PSC)\.?\s+[0-9A-Za-z#]+,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,6}\s+)[A-Za-z0-9\p{L}\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill|Square|Sq|Close|Cl|katu|tie|strasse|str|gatan|vej|weg|allee|calle|rue|via|avda|piazza|utca|u\.)\b(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|[A-Za-z\p{L}\s.-]+?\s+\d+[a-zA-Z]?(?:[A-Za-z0-9\p{L}\s.,\/-]*?\b(?:Apt|Apartment|Suite|Unit|Box|PSC)\.?\s+[0-9A-Za-z#]+)?(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|(?:PSC\s+\d+,\s*Box\s+\d+|PO\s+Box\s+\d+)[A-Za-z0-9\s.,\/-]+))/giu,
+        validator: (raw) => {
+          if (/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/.test(raw)) return false;
+          const computingExclusions = /\b(?:memori|memory|fungsi|function|pointer|register|symbol|instruksi|instruction|hex|libc|gdb|binary|assembly|setcontext|ip|mac|url|socket)\b|&[a-zA-Z_]|0x[0-9a-fA-F]+/i;
+          return !computingExclusions.test(raw);
+        },
+        extractToken: (match, raw) => {
+          if (match[1]) return match[1];
+          if (match[2]) return match[2];
+          if (match[4]) return match[4];
+          return raw;
+        },
+        replacement: (raw) => {
+          const m = /^([^<"']*(?:<address>|["']?(?:street_address|physical_address|billing_address|shipping_address|address)["']?\s*[:=]\s*["']?|(?:(?:(?:my|our|home|residential|shipping|mailing|street|billing|physical|company|business|office)\s+)?address(?:\s+of\s+[A-Za-z0-9._\s-]+)?\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent|dispatched)\s+to\s+)|(?:(?:[A-Za-z\p{L}]+(?:\s+[A-Za-z\p{L}]+)?)\s+)?(?:lives?|staying?|resides?)\s+(?:at|in)\s+|(?:(?:office|store|headquarters|facility|branch)\s+is\s+at\s+))\s*))/iu.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffix = raw.endsWith("</address>") ? "</address>" : (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+          return `${prefix}[REDACTED_ADDRESS]${suffix}`;
+        }
       },
       // 12. Indonesian Tax ID (NPWP - 15/16 digits formatted or raw)
       {
@@ -495,13 +547,18 @@ class HeuristicsRedactor {
         regex: /\b((?:npwp(?:\s+pribadi|\s+badan)?\s*[:=\-]?\s*)?)(\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3})\b/gi,
         replacement: "$1[REDACTED_NPWP]"
       },
-      // 13. Indonesian & International Passport (Paspor RI / US / UK / Global Alphanumeric)
+      // 13. Indonesian & International Passport (Paspor RI / US / UK / Global Alphanumeric, JSON/XML)
       {
         id: "PASSPORT_NUMBER",
         name: "Passport Number",
         category: "GOV_ID",
-        regex: /\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s*(?:#|id|number|no\.?))?)\s*(?:is|was|saya|ku|Anda|kamu|[:=\-~])*\s*)([A-Z0-9]{2,4}[0-9]{5,8}|[A-Z]\d{7,8}|\d{9})\b/gi,
-        replacement: "$1[REDACTED_PASSPORT]"
+        regex: /(?:<passport>([^<]+)<\/passport>|["']?passport(?:_number)?["']?\s*[:=]\s*["']?([A-Z0-9]{6,14})["']?|\b((?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s*(?:#|id|number|no\.?))?)\s*(?:is|was|saya|ku|Anda|kamu|[:=\-~])*\s*)([A-Z0-9]{2,4}[0-9]{4,8}|[A-Z]\d{7,9}|\d{9})\b)/gi,
+        replacement: (raw) => {
+          const m = /^([^A-Z0-9<"']*(?:<passport>|["']?passport(?:_number)?["']?\s*[:=]\s*["']?|(?:(?:nomor\s+)?paspor(?:\s+ri)?|(?:us|uk|international)?\s*passport(?:\s*(?:#|id|number|no\.?))?)\s*(?:is|was|saya|ku|Anda|kamu|[:=\-~])*\s*))/i.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffix = raw.endsWith("</passport>") ? "</passport>" : (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+          return `${prefix}[REDACTED_PASSPORT]${suffix}`;
+        }
       },
       // 14. BPJS Kesehatan & Ketenagakerjaan (11-13 digits)
       {
@@ -519,21 +576,31 @@ class HeuristicsRedactor {
         regex: /\b((?:(?:nomor\s+)?sim(?:\s+[a-c])?)\s*[:=\-]?\s*)(\d{12})\b/gi,
         replacement: "$1[REDACTED_SIM]"
       },
-      // 15b. International Driver's License
+      // 15b. International Driver's License (US State, UK, Global, JSON/XML)
       {
         id: "DRIVER_LICENSE",
         name: "Driver License",
         category: "GOV_ID",
-        regex: /\b((?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,4}[- ]?[A-Z0-9]{4,10}|[0-9]{6,16})\b/gi,
-        replacement: "$1[REDACTED_DRIVER_LICENSE]"
+        regex: /(?:<driver_license>([^<]+)<\/driver_license>|["']?(?:driver_license|drivers_license|driver_licence|driving_licence|dl)["']?\s*[:=]\s*["']?([A-Z0-9.-]{6,25})["']?|\b((?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,6}[- .]?[A-Z0-9]{3,10}(?:[- .][A-Z0-9]{1,8})*|[0-9]{6,18})\b)/gi,
+        replacement: (raw) => {
+          const m = /^([^A-Z0-9<"']*(?:<driver_license>|["']?(?:driver_license|drivers_license|driver_licence|driving_licence|dl)["']?\s*[:=]\s*["']?|(?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*))/i.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffix = raw.endsWith("</driver_license>") ? "</driver_license>" : (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+          return `${prefix}[REDACTED_DRIVER_LICENSE]${suffix}`;
+        }
       },
       // 15c. International National Identity Card / Citizen ID
       {
         id: "NATIONAL_ID_CARD",
         name: "National Identity Card",
         category: "GOV_ID",
-        regex: /\b((?:(?:national|citizen|resident|identity|id)\s+(?:card|number|no\.?|id|#))\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,4}[- ]?[A-Z0-9]{5,12})\b/gi,
-        replacement: "$1[REDACTED_NATIONAL_ID]"
+        regex: /(?:<national_id>([^<]+)<\/national_id>|["']?(?:national_id|national_identity|citizen_id|resident_id|identity_card|verificationProcess|verification_process|id_number)["']?\s*[:=]\s*["']?([A-Z0-9]{5,20})["']?|\b((?:(?:national|citizen|resident|identity|id)\s+(?:card|number|no\.?|id|#))\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,4}[- ]?[A-Z0-9]{5,12})\b)/gi,
+        replacement: (raw) => {
+          const m = /^([^A-Z0-9<"']*(?:<national_id>|["']?(?:national_id|national_identity|citizen_id|resident_id|identity_card|verificationProcess|verification_process|id_number)["']?\s*[:=]\s*["']?|(?:(?:national|citizen|resident|identity|id)\s+(?:card|number|no\.?|id|#))\s*(?:is|was|[:=\-~])*\s*))/i.exec(raw);
+          const prefix = m ? m[1] : "";
+          const suffix = raw.endsWith("</national_id>") ? "</national_id>" : (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
+          return `${prefix}[REDACTED_NATIONAL_ID]${suffix}`;
+        }
       },
       // 16. Academic & Student Identification (NIM, NPM, NRP, Student ID)
       {
@@ -1086,20 +1153,34 @@ class HeuristicsRedactor {
           continue;
         }
         // Purely numeric matches inside a URL or DOI are identifiers (doi.org/10.1128/..., /posts/123...)
-        if (/^[\d\s.\-\/]+$/.test(raw) && /(?:https?:\/\/|doi\.org\/|www\.)\S*$/i.test(text.substring(Math.max(0, match.index - 200), match.index))) {
+        if (/^[\d\s.\-\/]+$/.test(raw) && /(?:https?:\/\/|doi\.org\/|www\.)[^\s"\'<>]*$/i.test(text.substring(Math.max(0, match.index - 200), match.index))) {
           continue;
         }
 
         let repl;
         if (typeof pattern.replacement === "function") {
-          repl = pattern.replacement(raw, match.index, text);
+          repl = pattern.replacement(raw, match.index, text, match);
         } else if (typeof pattern.replacement === "string" && pattern.replacement.includes("$")) {
           repl = raw.replace(new RegExp(pattern.regex.source, pattern.regex.flags), pattern.replacement);
         } else {
           repl = pattern.replacement;
         }
 
-        let secretToken = (match.length > 2 && match[2]) ? match[2] : raw;
+        let secretToken;
+        if (typeof pattern.extractToken === "function") {
+          secretToken = pattern.extractToken(match, raw);
+        } else if (match.length > 2 && match[2]) {
+          secretToken = match[2];
+        } else {
+          let lastG = null;
+          for (let g = match.length - 1; g >= 1; g--) {
+            if (match[g] !== undefined) {
+              lastG = match[g];
+              break;
+            }
+          }
+          secretToken = lastG || raw;
+        }
         if (pattern.id === "CARD_SECURITY_CODE" && typeof secretToken === "string") {
           secretToken = secretToken.replace(/\D/g, "");
         }

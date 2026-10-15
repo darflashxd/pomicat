@@ -14,12 +14,19 @@ import json
 import time
 import hashlib
 import secrets
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 PORT = 8787
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIEWER_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "viewer"))
 STORAGE_FILE = os.path.join(BASE_DIR, "storage.json")
+STORAGE_LOCK = threading.Lock()
+
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 
 def load_storage():
@@ -34,8 +41,10 @@ def load_storage():
 
 def save_storage(data):
     try:
-        with open(STORAGE_FILE, "w", encoding="utf-8") as f:
+        tmp_file = STORAGE_FILE + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
+        os.replace(tmp_file, STORAGE_FILE)
     except Exception as e:
         print("[-] Error saving storage:", e)
 
@@ -48,6 +57,8 @@ ALLOWED_ORIGINS = {
     "https://chat.openai.com",
     "https://claude.ai",
     "https://chat.deepseek.com",
+    "http://localhost:8787",
+    "http://127.0.0.1:8787",
 }
 
 # Same limits as the Cloudflare worker: 512 KB per share, per-IP requests per minute
@@ -134,23 +145,24 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
                 # Never overwrite an existing share, expired or not
                 now_ts = time.time()
-                if share_id in STORAGE:
-                    self._send_cors(409)
-                    self.wfile.write(json.dumps({"error": "Share ID already exists"}).encode())
-                    return
+                with STORAGE_LOCK:
+                    if share_id in STORAGE:
+                        self._send_cors(409)
+                        self.wfile.write(json.dumps({"error": "Share ID already exists"}).encode())
+                        return
 
-                is_burn = bool(burn_on_read) or ttl == "burn"
-                ttl_sec = 86400 if ttl == "burn" else int(ttl)
-                revoke_token = secrets.token_hex(32)
+                    is_burn = bool(burn_on_read) or ttl == "burn"
+                    ttl_sec = 86400 if ttl == "burn" else int(ttl)
+                    revoke_token = secrets.token_hex(32)
 
-                STORAGE[share_id] = {
-                    "ciphertext": ciphertext,
-                    "revoke_hash": hashlib.sha256(revoke_token.encode()).hexdigest(),
-                    "is_burn": is_burn,
-                    "expires_at": now_ts + ttl_sec,
-                    "view_count": 0
-                }
-                save_storage(STORAGE)
+                    STORAGE[share_id] = {
+                        "ciphertext": ciphertext,
+                        "revoke_hash": hashlib.sha256(revoke_token.encode()).hexdigest(),
+                        "is_burn": is_burn,
+                        "expires_at": now_ts + ttl_sec,
+                        "view_count": 0
+                    }
+                    save_storage(STORAGE)
 
                 self._send_cors(201)
                 self.wfile.write(json.dumps({
@@ -187,14 +199,15 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 token = json.loads(self.rfile.read(length) or b"{}").get("token", "")
             except Exception:
                 token = ""
-            item = STORAGE.get(share_id)
-            token_hash = hashlib.sha256(str(token).encode()).hexdigest()
-            if not token or not item or not secrets.compare_digest(item.get("revoke_hash", ""), token_hash):
-                self._send_cors(404)
-                self.wfile.write(json.dumps({"error": "Not found or invalid token"}).encode())
-                return
-            del STORAGE[share_id]
-            save_storage(STORAGE)
+            with STORAGE_LOCK:
+                item = STORAGE.get(share_id)
+                token_hash = hashlib.sha256(str(token).encode()).hexdigest()
+                if not token or not item or not secrets.compare_digest(item.get("revoke_hash", ""), token_hash):
+                    self._send_cors(404)
+                    self.wfile.write(json.dumps({"error": "Not found or invalid token"}).encode())
+                    return
+                del STORAGE[share_id]
+                save_storage(STORAGE)
             print(f"[!] REVOKE: Shredded payload for ID: {share_id}")
             self._send_cors(200)
             self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
@@ -243,28 +256,29 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Too many requests, try again in a minute"}).encode())
                 return
             share_id = clean_path.replace("/api/share/", "").strip()
-            item = STORAGE.get(share_id)
+            with STORAGE_LOCK:
+                item = STORAGE.get(share_id)
 
-            if not item or time.time() > item["expires_at"]:
-                if share_id in STORAGE:
+                if not item or time.time() > item["expires_at"]:
+                    if share_id in STORAGE:
+                        del STORAGE[share_id]
+                        save_storage(STORAGE)
+                    self._send_cors(404)
+                    self.wfile.write(json.dumps({"error": "Expired, shredded, or not found"}).encode())
+                    return
+
+                response_data = {
+                    "ciphertext": item["ciphertext"],
+                    "isBurn": item.get("is_burn", False)
+                }
+
+                if item.get("is_burn", False):
                     del STORAGE[share_id]
                     save_storage(STORAGE)
-                self._send_cors(404)
-                self.wfile.write(json.dumps({"error": "Expired, shredded, or not found"}).encode())
-                return
-
-            response_data = {
-                "ciphertext": item["ciphertext"],
-                "isBurn": item.get("is_burn", False)
-            }
-
-            if item.get("is_burn", False):
-                del STORAGE[share_id]
-                save_storage(STORAGE)
-                print(f"[-] Atomic Burn: Shredded single-read payload for ID: {share_id}")
-            else:
-                item["view_count"] = item.get("view_count", 0) + 1
-                save_storage(STORAGE)
+                    print(f"[-] Atomic Burn: Shredded single-read payload for ID: {share_id}")
+                else:
+                    item["view_count"] = item.get("view_count", 0) + 1
+                    save_storage(STORAGE)
 
             self._send_cors(200)
             self.wfile.write(json.dumps(response_data).encode())
@@ -321,7 +335,7 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
 def run():
     host = os.environ.get("SAFESHARE_HOST", "127.0.0.1")
-    server = HTTPServer((host, PORT), SafeShareHandler)
+    server = ThreadedHTTPServer((host, PORT), SafeShareHandler)
     print(f"================================================================")
     print(f"[*] SafeShare-AI Integrated Server Active on {host}:{PORT}")
     print(f"[*] Web Viewer: http://{host}:{PORT}")

@@ -12,13 +12,83 @@
 class SafeShareLocalCompute {
   constructor() {
     this.operatorPrecedence = {
-      "+": 1,
-      "-": 1,
-      "*": 2,
-      "/": 2,
-      "%": 2,
-      "^": 3
+      "||": 1,
+      "&&": 2,
+      "==": 3,
+      "!=": 3,
+      "<": 4,
+      "<=": 4,
+      ">": 4,
+      ">=": 4,
+      "+": 5,
+      "-": 5,
+      "*": 6,
+      "/": 6,
+      "%": 6,
+      "^": 7,
+      "u-": 8,
+      "u+": 8,
+      "!": 8
     };
+    // Fixed-point scaling factor (10^4 = 4 decimal places precision for currency & interest rates)
+    // ponytail: fixed-point scaled arithmetic eliminates IEEE-754 precision side-channels; upgrade to BigInt if > 2^53.
+    this.SCALE = 10000;
+
+    this.functions = {
+      IF: (args) => {
+        if (args.length !== 3) throw new Error("IF() requires 3 arguments");
+        return args[0] !== 0 ? args[1] : args[2];
+      },
+      MIN: (args) => {
+        if (args.length < 1) throw new Error("MIN() requires at least 1 argument");
+        return Math.min(...args);
+      },
+      MAX: (args) => {
+        if (args.length < 1) throw new Error("MAX() requires at least 1 argument");
+        return Math.max(...args);
+      },
+      ROUND: (args) => {
+        if (args.length < 1) throw new Error("ROUND() requires at least 1 argument");
+        const dec = args.length >= 2 ? Math.max(0, Math.min(10, Math.trunc(args[1]))) : 0;
+        const factor = Math.pow(10, dec);
+        return Math.round((args[0] + Number.EPSILON) * factor) / factor;
+      },
+      FLOOR: (args) => (args.length > 0 ? Math.floor(args[0]) : NaN),
+      CEIL: (args) => (args.length > 0 ? Math.ceil(args[0]) : NaN),
+      ABS: (args) => (args.length > 0 ? Math.abs(args[0]) : NaN)
+    };
+  }
+
+  /**
+   * Fixed-point decimal arithmetic helper for exact operations.
+   * Eliminates floating-point rounding leakage and IEEE-754 side-channel variance.
+   */
+  fixedOp(op, a, b = 0) {
+    switch (op) {
+      case "||": return (a !== 0 || b !== 0) ? 1 : 0;
+      case "&&": return (a !== 0 && b !== 0) ? 1 : 0;
+      case "==": return Math.abs(a - b) < 1e-9 ? 1 : 0;
+      case "!=": return Math.abs(a - b) >= 1e-9 ? 1 : 0;
+      case "<":  return a < b ? 1 : 0;
+      case "<=": return a <= b ? 1 : 0;
+      case ">":  return a > b ? 1 : 0;
+      case ">=": return a >= b ? 1 : 0;
+      case "+":  return Math.round((a + b) * this.SCALE) / this.SCALE;
+      case "-":  return Math.round((a - b) * this.SCALE) / this.SCALE;
+      case "*":  return Math.round((a * b) * this.SCALE) / this.SCALE;
+      case "/":
+        if (Math.abs(b) < 1e-12) throw new Error("Division by zero in symbolic expression.");
+        return Math.round((a / b) * this.SCALE) / this.SCALE;
+      case "%":
+        if (Math.abs(b) < 1e-12) throw new Error("Modulo by zero in symbolic expression.");
+        return Math.round((a % b) * this.SCALE) / this.SCALE;
+      case "^":  return Math.round(Math.pow(a, b) * this.SCALE) / this.SCALE;
+      case "!":  return a === 0 ? 1 : 0;
+      case "u-": return -a;
+      case "u+": return +a;
+      default:
+        throw new Error(`Unsupported operator '${op}'.`);
+    }
   }
 
   /**
@@ -30,6 +100,8 @@ class SafeShareLocalCompute {
   preNormalizeHtmlSymbols(html) {
     if (!html || typeof html !== "string") return "";
     let s = html;
+    // 0. Remove <escape> and </escape> guardrail tags from OpenAI/Anthropic
+    s = s.replace(/<\/?escape>/gi, "");
     // 1. Browser HTML element tags created by browser DOM parser: <s19></s19>, <s19>, <S19></S19>
     s = s.replace(/<s(\d+)>(?:<\/s\1>)?/gi, "<S$1>");
     s = s.replace(/<s(\d+)\s*\/>/gi, "<S$1>");
@@ -39,7 +111,35 @@ class SafeShareLocalCompute {
     s = s.replace(/\\langle\s*s(\d+)\s*\\rangle/gi, "<S$1>");
     // 4. Unicode angle brackets: ⟨S19⟩, ⟨s19⟩
     s = s.replace(/⟨\s*s(\d+)\s*⟩/gi, "<S$1>");
-    // 5. Implicit multiplication for factors before parens containing symbols: 0.25( -> 0.25 * (, 6( -> 6 * (, 24×0.25 -> 24 * 0.25
+    // 5. Strip LaTeX text wrappers: \text{<S1>}, \mathrm{<S1>}, \textbf{...}, \mathit{...}
+    for (let pass = 0; pass < 2; pass++) {
+      s = s.replace(/\\(?:text|textbf|mathrm|mathit|mathsf|operatorname)\s*\{([^{}]*?(?:<\s*S\d+|\[?\s*S\d+|\bS\d+)[^{}]*?)\}/gi, "$1");
+    }
+    // 6. Canonicalize Semantic-Role Symbols (VAL1_GAJI, S1_GAJI_POKOK, S1\_GAJI\_POKOK, <S1:GAJI>, [S1_GAJI]) to <S1>
+    // Note: bare S1/s2 words without underscore or brackets are protected (e.g. "program S1", "favicon s2")
+    s = s.replace(
+      /(?:<\s*(?:S|VAL)(\d+)(?::[A-Za-z0-9_\\]+)?\s*>|\[\s*(?:S|VAL)(\d+)(?:[:_][A-Za-z0-9_\\]+)?\s*\]|\bS(\d+)(?:\\?_[A-Za-z0-9_\\]+)+\b|\bVAL(\d+)(?:\\?_[A-Za-z0-9_\\]+)?\b)/gi,
+      (_m, g1, g2, g3, g4) => `<S${g1 || g2 || g3 || g4}>`
+    );
+
+    // 6b. Context-Guarded Canonicalization for bare S\d+ in mathematical & table contexts
+    // Unwrap \boxed{...} wrappers in LaTeX
+    s = s.replace(/\\boxed\s*\{([^{}]+)\}/gi, "$1");
+    // In LaTeX blocks \[ ... \] or \( ... \) or $$ ... $$, bare uppercase S\d+ is a symbolic variable
+    s = s.replace(/(\\\[|\\\(|\$\$)([\s\S]*?)(\\\]|\\\)|\$\$)/gi, (m, open, inner, close) => {
+      return open + inner.replace(/(?<![<\w])S(\d+)(?![>\w])/g, "<S$1>") + close;
+    });
+    // Inside backticks or <code> if not dev code (no ://, no method dot call, no semicolons)
+    s = s.replace(/(`|<code>)([\s\S]*?)(`|<\/code>)/gi, (m, open, inner, close) => {
+      if (/(?::\/\/|[a-zA-Z0-9_]\.[a-zA-Z_]|[{};])/.test(inner)) return m;
+      return open + inner.replace(/(?<![<\w])S(\d+)(?![>\w])/g, "<S$1>") + close;
+    });
+    // In math operators, numbers, or currency context: 0.20 * S1, S2 + S3, (S1 - S2), Rp S1
+    s = s.replace(/(?<=(?:\d+(?:\.\d+)?%?|[+\-*^×÷·(]|\\times|\\cdot|\\div|\b(?:Rp\.?|IDR|USD|EUR|GBP|\$)\s*`?|(?<!\/)\/(?!\/))\s*)(?<![<\w])S(\d+)(?![>\w])/g, "<S$1>");
+    s = s.replace(/(?<![<\w])S(\d+)(?![>\w])(?=\s*(?:[-+*^×÷·)]|\\times|\\cdot|\\div|(?<!\/)\/(?!\/)))/g, "<S$1>");
+    // 7. Unescape LaTeX underscore: \_ -> _
+    s = s.replace(/\\_/g, "_");
+    // 8. Implicit multiplication for factors before parens containing symbols: 0.25( -> 0.25 * (, 6( -> 6 * (, 24×0.25 -> 24 * 0.25
     s = s.replace(/(\d+(?:\.\d+)?%?)\s*[×·*]?\s*\(\s*(?=[^()]*<S\d+>)/gi, "$1 * (");
     s = s.replace(/(\d+(?:\.\d+)?%?)\s*[×·]\s*(\d+(?:\.\d+)?)/gi, "$1 * $2");
     return s;
@@ -52,15 +152,29 @@ class SafeShareLocalCompute {
    */
   cleanMathString(expr) {
     if (!expr || typeof expr !== "string") return "";
-    let s = this.preNormalizeHtmlSymbols(expr);
+    let s = expr;
+    // Unwrap LaTeX display/inline delimiters and \boxed{...} wrappers
+    s = s.replace(/\\boxed\s*\{([^{}]+)\}/gi, "$1");
+    s = s.replace(/\\\[|\\\]|\\\(|\\\)/g, "");
+    s = this.preNormalizeHtmlSymbols(s);
+    // Strip LaTeX text formatting commands
+    s = s.replace(/\\(?:text|textbf|mathrm|mathit|mathsf|operatorname)\s*\{([^{}]+)\}/gi, "$1");
     // Normalize LaTeX fractions \frac{a}{b} -> ((a) / (b))
     s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gi, "(($1) / ($2))");
     // Normalize LaTeX parens & operators
     s = s.replace(/\\left\(/gi, "(").replace(/\\right\)/gi, ")");
-    s = s.replace(/\\cdot|\\times/gi, "*");
+    s = s.replace(/\\times\b|\\cdot\b/gi, "*");
+    s = s.replace(/\\div\b/gi, "/");
+    s = s.replace(/\\le\b|\\leq\b/gi, "<=");
+    s = s.replace(/\\ge\b|\\geq\b/gi, ">=");
+    s = s.replace(/\\ne\b|\\neq\b/gi, "!=");
     // Normalize Unicode math operators
     s = s.replace(/[−–—]/g, "-");
-    s = s.replace(/[×·]/g, "*");
+    s = s.replace(/[×·✕⋅]/g, "*");
+    s = s.replace(/÷/g, "/");
+    s = s.replace(/≤/g, "<=");
+    s = s.replace(/≥/g, ">=");
+    s = s.replace(/≠/g, "!=");
     // Insert multiplication for juxtaposition e.g. 0.15( -> 0.15 * (
     s = s.replace(/(\d+(?:\.\d+)?)\s*\(/g, "$1 * (");
     s = s.replace(/(\d+(?:\.\d+)?)\s*(<[A-Za-z0-9_]+>)/g, "$1 * $2");
@@ -68,8 +182,8 @@ class SafeShareLocalCompute {
   }
 
   /**
-   * Tokenizes a mathematical expression string containing numbers, operators, parentheses, and variables.
-   * @param {string} expr - e.g. "12 * 0.30 * <S1>" or "(S1 * 1.15) - 500000"
+   * Tokenizes a mathematical expression string containing numbers, operators, parentheses, functions, and variables.
+   * @param {string} expr - e.g. "12 * 0.30 * <S1>" or "IF(<S1> > 20000000, <S1> * 0.25, <S1> * 0.15)"
    * @returns {Array<{type: string, value: string|number}>}
    */
   tokenize(expr) {
@@ -86,56 +200,48 @@ class SafeShareLocalCompute {
         continue;
       }
 
-      // Check for symbolic variable e.g. <S1>, <S2>, S1, S2
-      if (ch === "<") {
-        const closeIdx = clean.indexOf(">", i);
-        if (closeIdx !== -1) {
-          const varName = clean.substring(i, closeIdx + 1);
-          tokens.push({ type: "VAR", value: varName });
-          i = closeIdx + 1;
-          continue;
-        }
-      }
-
-      if (/[A-Za-z]/.test(ch)) {
-        let varName = "";
-        while (i < clean.length && /[A-Za-z0-9_]/.test(clean[i])) {
-          varName += clean[i];
-          i++;
-        }
-        tokens.push({ type: "VAR", value: varName });
+      // 1. Symbolic variable e.g. <S1>, <S2>
+      if (ch === "<" && /^<S\d+>/i.test(clean.slice(i))) {
+        const match = clean.slice(i).match(/^<(S\d+)>/i);
+        tokens.push({ type: "VAR", value: `<${match[1].toUpperCase()}>` });
+        i += match[0].length;
         continue;
       }
 
-      // Check for numeric literal (int, float, or percentage e.g. 15% -> 0.15)
-      if (/[0-9.]/.test(ch)) {
-        let numStr = "";
-        while (i < clean.length && /[0-9.]/.test(clean[i])) {
-          numStr += clean[i];
-          i++;
-        }
-        if (i < clean.length && clean[i] === "%") {
-          tokens.push({ type: "NUM", value: parseFloat(numStr) / 100 });
-          i++;
-        } else {
-          tokens.push({ type: "NUM", value: parseFloat(numStr) });
-        }
+      // 2. Relational & Boolean 2-character operators (<=, >=, ==, !=, &&, ||)
+      const two = clean.slice(i, i + 2);
+      if (["<=", ">=", "==", "!=", "&&", "||"].includes(two)) {
+        tokens.push({ type: "OP", value: two });
+        i += 2;
         continue;
       }
 
-      // Check for operators and parentheses
-      if ("+-*/%^()".includes(ch)) {
-        // Handle unary minus
-        if (ch === "-") {
-          const prevToken = tokens[tokens.length - 1];
-          if (!prevToken || prevToken.type === "OP" || (prevToken.type === "PAREN" && prevToken.value === "(")) {
-            // Unary minus: treat as 0 - x
-            tokens.push({ type: "NUM", value: 0 });
-          }
-        }
+      // 3. Comma
+      if (ch === ",") {
+        tokens.push({ type: "COMMA", value: "," });
+        i++;
+        continue;
+      }
 
-        if (ch === "(" || ch === ")") {
-          tokens.push({ type: "PAREN", value: ch });
+      // 4. Parentheses
+      if (ch === "(" || ch === ")") {
+        tokens.push({ type: "PAREN", value: ch });
+        i++;
+        continue;
+      }
+
+      // 5. Single-character operators (+, -, *, /, %, ^, <, >, !)
+      if ("+-*/%^<>!".includes(ch)) {
+        const prev = tokens[tokens.length - 1];
+        const isUnary =
+          ch === "!" ||
+          ((ch === "-" || ch === "+") &&
+            (!prev ||
+              prev.type === "OP" ||
+              (prev.type === "PAREN" && prev.value === "(") ||
+              prev.type === "COMMA"));
+        if (isUnary) {
+          tokens.push({ type: "OP", value: ch === "-" ? "u-" : ch === "+" ? "u+" : "!" });
         } else {
           tokens.push({ type: "OP", value: ch });
         }
@@ -143,7 +249,33 @@ class SafeShareLocalCompute {
         continue;
       }
 
-      // Skip unknown character
+      // 6. Numeric literal (int, float, percentage)
+      if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(clean[i + 1] || ""))) {
+        const match = clean.slice(i).match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?(%?)/i);
+        if (match) {
+          let val = parseFloat(match[0]);
+          if (match[1] === "%") val /= 100;
+          tokens.push({ type: "NUM", value: val });
+          i += match[0].length;
+          continue;
+        }
+      }
+
+      // 7. Functions & Identifiers
+      if (/[A-Za-z_]/.test(ch)) {
+        const match = clean.slice(i).match(/^[A-Za-z_][A-Za-z0-9_]*/)[0];
+        const upper = match.toUpperCase();
+        if (this.functions[upper]) {
+          tokens.push({ type: "FN", value: upper });
+        } else if (/^S\d+$/i.test(upper)) {
+          tokens.push({ type: "VAR", value: `<${upper}>` });
+        } else {
+          tokens.push({ type: "VAR", value: match });
+        }
+        i += match.length;
+        continue;
+      }
+
       i++;
     }
 
@@ -159,27 +291,46 @@ class SafeShareLocalCompute {
     const outputQueue = [];
     const operatorStack = [];
 
-    for (const token of tokens) {
+    for (let idx = 0; idx < tokens.length; idx++) {
+      const token = tokens[idx];
+      const prev = idx > 0 ? tokens[idx - 1] : null;
+
       if (token.type === "NUM" || token.type === "VAR") {
         outputQueue.push(token);
-      } else if (token.type === "OP") {
-        const op1 = token.value;
+      } else if (token.type === "FN") {
+        operatorStack.push(token);
+      } else if (token.type === "PAREN" && token.value === "(") {
+        operatorStack.push({
+          type: "PAREN",
+          value: "(",
+          isFn: prev && prev.type === "FN",
+          argCount: 1
+        });
+      } else if (token.type === "COMMA") {
         while (
           operatorStack.length > 0 &&
-          operatorStack[operatorStack.length - 1].type === "OP"
+          !(operatorStack[operatorStack.length - 1].type === "PAREN" && operatorStack[operatorStack.length - 1].value === "(")
         ) {
-          const op2 = operatorStack[operatorStack.length - 1].value;
-          const p1 = this.operatorPrecedence[op1] || 0;
-          const p2 = this.operatorPrecedence[op2] || 0;
+          outputQueue.push(operatorStack.pop());
+        }
+        if (operatorStack.length > 0) {
+          operatorStack[operatorStack.length - 1].argCount++;
+        }
+      } else if (token.type === "OP") {
+        const op1 = token.value;
+        const p1 = this.operatorPrecedence[op1] || 0;
+        const assoc1 = (op1 === "^" || op1 === "u-" || op1 === "u+" || op1 === "!") ? "R" : "L";
 
-          if ((op1 !== "^" && p1 <= p2) || (op1 === "^" && p1 < p2)) {
+        while (operatorStack.length > 0) {
+          const top = operatorStack[operatorStack.length - 1];
+          if (top.type !== "OP") break;
+          const p2 = this.operatorPrecedence[top.value] || 0;
+          if ((assoc1 === "L" && p1 <= p2) || (assoc1 === "R" && p1 < p2)) {
             outputQueue.push(operatorStack.pop());
           } else {
             break;
           }
         }
-        operatorStack.push(token);
-      } else if (token.type === "PAREN" && token.value === "(") {
         operatorStack.push(token);
       } else if (token.type === "PAREN" && token.value === ")") {
         while (
@@ -189,13 +340,21 @@ class SafeShareLocalCompute {
           outputQueue.push(operatorStack.pop());
         }
         if (operatorStack.length > 0) {
-          operatorStack.pop(); // Pop the "("
+          const lparen = operatorStack.pop();
+          if (lparen.isFn && operatorStack.length > 0 && operatorStack[operatorStack.length - 1].type === "FN") {
+            const fnTok = operatorStack.pop();
+            fnTok.arity = (prev && prev.type === "PAREN" && prev.value === "(") ? 0 : lparen.argCount;
+            outputQueue.push(fnTok);
+          }
         }
       }
     }
 
     while (operatorStack.length > 0) {
-      outputQueue.push(operatorStack.pop());
+      const top = operatorStack.pop();
+      if (top.type !== "PAREN") {
+        outputQueue.push(top);
+      }
     }
 
     return outputQueue;
@@ -222,26 +381,24 @@ class SafeShareLocalCompute {
         }
         stack.push(Number(val));
       } else if (token.type === "OP") {
-        if (stack.length < 2) {
-          throw new Error(`Insufficient operands for operator '${token.value}'.`);
+        const isUnary = (token.value === "!" || token.value === "u-" || token.value === "u+");
+        if (isUnary) {
+          if (stack.length < 1) throw new Error(`Missing operand for operator '${token.value}'.`);
+          const a = stack.pop();
+          stack.push(this.fixedOp(token.value, a, 0));
+        } else {
+          if (stack.length < 2) throw new Error(`Insufficient operands for operator '${token.value}'.`);
+          const b = stack.pop();
+          const a = stack.pop();
+          stack.push(this.fixedOp(token.value, a, b));
         }
-        const b = stack.pop();
-        const a = stack.pop();
-
-        let res = 0;
-        switch (token.value) {
-          case "+": res = a + b; break;
-          case "-": res = a - b; break;
-          case "*": res = a * b; break;
-          case "/":
-            if (b === 0) throw new Error("Division by zero in symbolic expression.");
-            res = a / b;
-            break;
-          case "%": res = a % b; break;
-          case "^": res = Math.pow(a, b); break;
-          default: throw new Error(`Unsupported operator '${token.value}'.`);
-        }
-        stack.push(res);
+      } else if (token.type === "FN") {
+        const arity = token.arity || 0;
+        if (stack.length < arity) throw new Error(`Insufficient arguments for function '${token.value}'.`);
+        const args = stack.splice(stack.length - arity, arity);
+        const fn = this.functions[token.value];
+        if (!fn) throw new Error(`Unsupported function '${token.value}'.`);
+        stack.push(fn(args));
       }
     }
 
@@ -251,7 +408,7 @@ class SafeShareLocalCompute {
 
     const rawResult = stack[0];
     // Epsilon precision stabilization (avoids 10799999.999999998 artifacts)
-    return Math.abs(rawResult - Math.round(rawResult)) < 1e-5 ? Math.round(rawResult) : Number(rawResult.toFixed(4));
+    return Math.abs(rawResult - Math.round(rawResult)) < 1e-4 ? Math.round(rawResult) : Number(rawResult.toFixed(4));
   }
 
   /**
@@ -305,6 +462,18 @@ class SafeShareLocalCompute {
     if (currency === "GBP" || currency === "£") {
       return `£${rounded.toLocaleString("en-GB", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
     }
+    if (currency === "SGD" || currency === "S$") {
+      return `S$${rounded.toLocaleString("en-SG", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
+    }
+    if (currency === "AUD" || currency === "A$") {
+      return `A$${rounded.toLocaleString("en-AU", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
+    }
+    if (currency === "CAD" || currency === "C$") {
+      return `C$${rounded.toLocaleString("en-CA", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
+    }
+    if (currency === "CHF") {
+      return `CHF ${rounded.toLocaleString("de-CH", { minimumFractionDigits: rounded % 1 === 0 ? 0 : 2 })}`;
+    }
     return `$${rounded.toLocaleString("en-US")}`;
   }
 
@@ -343,30 +512,71 @@ class SafeShareLocalCompute {
 
     let hydratedText = this.preNormalizeHtmlSymbols(text);
 
-    // Helper to prevent modifying inside existing spans, pre/code blocks, or HTML tag attributes
+    // Helper to prevent modifying inside existing spans, pre blocks, or HTML tag attributes
+    // ponytail: inline <code> allowed if containing algebraic expressions; add AST syntax filter if false positives emerge
     const replaceOutsideSpans = (content, regex, replacer) => {
       const outerRx = new RegExp(
-        `(<span[^>]*class="[^"]*(?:ss-local-compute|ss-katex-hydrated)[^"]*"[\\s\\S]*?<\\/span>)|(<(?:pre|code)[^>]*>[\\s\\S]*?<\\/(?:pre|code)>)|(<(?![\\/]?[sS]\\d+>)[^>]+>)|(${regex.source})`,
+        `(<span[^>]*class="[^"]*(?:ss-local-compute|ss-katex-hydrated)[^"]*"[\\s\\S]*?<\\/span>)|(<pre[^>]*>[\\s\\S]*?<\\/pre>)|(<(?![\\/]?[sS]\\d+>)[^>]+>)|(${regex.source})`,
         regex.flags
       );
-      return content.replace(outerRx, (match, span, codeBlock, htmlTag, target, ...args) => {
-        if (span || codeBlock || htmlTag) return match;
+      return content.replace(outerRx, (match, span, preBlock, htmlTag, target, ...args) => {
+        if (span || preBlock || htmlTag) return match;
         return replacer(target, ...args);
       });
     };
 
+    // Phase 0a: Explicit [[EXPR: ...]] or {{EXPR: ...}} blocks (if LLM enveloped expression)
+    hydratedText = hydratedText.replace(/(?:\{\{|\u005B\u005B|\[\[)\s*EXPR\s*:\s*([\s\S]*?)(?:\}\}|\u005D\u005D|\]\])/gi, (fullMatch, rawInner) => {
+      try {
+        const inner = this.cleanMathString(rawInner);
+        const val = this.compute(inner, symbolTable);
+        let itemCurrency = defaultCurrency;
+        for (const [k, obj] of Object.entries(vault)) {
+          const bare = k.replace(/[<>]/g, "");
+          if ((rawInner.includes(k) || rawInner.includes(bare) || inner.includes(k)) && obj.currency) {
+            itemCurrency = obj.currency;
+            break;
+          }
+        }
+        const formatted = this.formatValue(val, itemCurrency, inner);
+        evaluations.push({ expr: rawInner.trim(), val, formatted });
+        if (htmlBadges) {
+          return `<span class="ss-local-compute" data-expr="${encodeURIComponent(rawInner.trim())}" title="Locally Computed from ${escapeAttr(rawInner.trim())}">${formatted}</span>`;
+        }
+        return formatted;
+      } catch (_) {
+        return fullMatch;
+      }
+    });
+
+    // Phase 0b: Balanced piecewise function calls (IF, MIN, MAX, ROUND, etc.)
+    hydratedText = this.replaceBalancedFunctions(hydratedText, vault, symbolTable, defaultCurrency, htmlBadges, evaluations, escapeAttr);
+
     // Phase 1: Process LaTeX display and inline math blocks \[ ... \], $$ ... $$, \( ... \), $ ... $
     const latexBlockRx = /(\\\[|\$\$|\\\(|\$)([\s\S]*?)(\\\]|\$\$|\\\)|\$)/g;
-    hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, inner, closeTag) => {
+    hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, rawInner, closeTag) => {
+      const inner = this.preNormalizeHtmlSymbols(rawInner);
       if (!/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(inner)) return fullMatch;
-      const eq = inner.match(/^([\s\S]*?=\s*)([\s\S]+)$/);
-      if (eq) {
-        const leftSide = eq[1];
-        const rightSide = eq[2].trim();
+
+      // Handle equations (with '=' but not '==', '<=', '>=', '!=')
+      const eqParts = inner.split(/(?<![<>!=])=(?!=)/);
+      if (eqParts.length > 1) {
+        const leftSide = eqParts.slice(0, -1).join("=").trim() + " = ";
+        const rightSide = eqParts[eqParts.length - 1].trim();
+        const hasSymbolsInPrefix = eqParts.slice(0, -1).some(p => /<S\d+>/i.test(p));
+
         try {
-          const val = this.compute(rightSide, symbolTable);
-          const formatted = this.formatValue(val, defaultCurrency, rightSide).replace("%", "\\%");
+          const cleanRight = this.cleanMathString(rightSide);
+          const val = this.compute(cleanRight, symbolTable);
+          const formatted = this.formatValue(val, defaultCurrency, cleanRight).replace("%", "\\%");
           evaluations.push({ expr: rightSide, val, formatted });
+
+          // If leftSide contains derivation with symbols (e.g. "<S1> + 0.15 * <S1> = "),
+          // collapse entire equation to the calculated value.
+          if (hasSymbolsInPrefix) {
+            return formatted;
+          }
+          // If leftSide is descriptive label (e.g. "\text{ESOP after SAFE} = "), keep label
           return `${openTag}${leftSide}${formatted}${closeTag}`;
         } catch (_) {
           return fullMatch;
@@ -377,7 +587,7 @@ class SafeShareLocalCompute {
           const val = this.compute(cleanExpr, symbolTable);
           const formatted = this.formatValue(val, defaultCurrency, cleanExpr).replace("%", "\\%");
           evaluations.push({ expr: inner.trim(), val, formatted });
-          return `${openTag}${formatted}${closeTag}`;
+          return formatted;
         } catch (_) {
           return fullMatch;
         }
@@ -385,8 +595,18 @@ class SafeShareLocalCompute {
       return fullMatch;
     });
 
-    // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and parentheses)
-    const multiTermRx = /(?:\(\s*)?(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)(?:\s*\))?(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    // Phase 1b: Resolving Chained Equations in Plain Text / Tables e.g. "A + B = C * D"
+    // If both sides of '=' contain secret symbols (<S\d+>), collapse to rightmost expression!
+    const plainChainRx = /((?:[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*(?:\s*[\+\-\*\/\^]\s*[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*)*))\s*(?<![<>!=])=(?!=)\s*((?:[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*(?:\s*[\+\-\*\/\^]\s*[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*)+))/gi;
+    hydratedText = hydratedText.replace(plainChainRx, (full, leftExpr, rightExpr) => {
+      if (/<S\d+>/i.test(leftExpr) && /<S\d+>/i.test(rightExpr)) {
+        return rightExpr;
+      }
+      return full;
+    });
+
+    // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and nested parentheses)
+    const multiTermRx = /(?:\(\s*)*(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)(?:\s*\))*(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
@@ -476,11 +696,79 @@ class SafeShareLocalCompute {
       return `${formatted}${suffix}`;
     });
 
+    // Deduplicate adjacent currency prefixes e.g. Rp `Rp ...` or Rp <code><span...>Rp ...
+    hydratedText = hydratedText
+      .replace(/\b(Rp\.?|IDR|USD|EUR|GBP|\$)\s*`\s*\1\s*/gi, "`$1 ")
+      .replace(/\b(Rp\.?|IDR|USD|EUR|GBP|\$)\s*(?:<code>|<span[^>]*>)?\s*\1\s*/gi, "$1 ")
+      .replace(/\b(Rp\.?|IDR|USD|EUR|GBP|\$)\s+\1\b/gi, "$1 ");
+
     return {
       hydratedText,
       computedCount: evaluations.length,
       evaluations
     };
+  }
+
+  /**
+   * Helper to evaluate balanced nested function calls IF(...), MIN(...), MAX(...), ROUND(...)
+   */
+  replaceBalancedFunctions(text, vault, symbolTable, defaultCurrency, htmlBadges, evaluations, escapeAttr) {
+    const fnRx = /\b(IF|MIN|MAX|ROUND|FLOOR|CEIL|ABS)\s*\(/gi;
+    let result = "";
+    let lastIndex = 0;
+    let match;
+
+    while ((match = fnRx.exec(text)) !== null) {
+      const startIdx = match.index;
+      const openParenIdx = fnRx.lastIndex - 1;
+
+      let depth = 0;
+      let endIdx = -1;
+      for (let i = openParenIdx; i < text.length; i++) {
+        if (text[i] === "(") depth++;
+        else if (text[i] === ")") {
+          depth--;
+          if (depth === 0) {
+            endIdx = i + 1;
+            break;
+          }
+        }
+      }
+
+      if (endIdx !== -1) {
+        const fullCall = text.slice(startIdx, endIdx);
+        const hasSymbol = Object.keys(vault).some(k => {
+          const bare = k.replace(/[<>]/g, "");
+          return fullCall.includes(k) || fullCall.includes(bare);
+        });
+
+        if (hasSymbol) {
+          try {
+            const val = this.compute(fullCall, symbolTable);
+            let itemCurrency = defaultCurrency;
+            for (const [k, obj] of Object.entries(vault)) {
+              if (fullCall.includes(k) && obj.currency) {
+                itemCurrency = obj.currency;
+                break;
+              }
+            }
+            const formatted = this.formatValue(val, itemCurrency, fullCall);
+            evaluations.push({ expr: fullCall, val, formatted });
+            const replacement = htmlBadges
+              ? `<span class="ss-local-compute" data-expr="${encodeURIComponent(fullCall)}" title="Locally Computed from ${escapeAttr(fullCall)}">${formatted}</span>`
+              : formatted;
+
+            result += text.slice(lastIndex, startIdx) + replacement;
+            lastIndex = endIdx;
+            fnRx.lastIndex = endIdx;
+            continue;
+          } catch (_) {}
+        }
+      }
+    }
+
+    result += text.slice(lastIndex);
+    return result;
   }
 }
 
