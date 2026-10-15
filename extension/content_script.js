@@ -39,12 +39,14 @@
   }
 
   const shieldIdScanner = typeof HeuristicsRedactor !== "undefined" ? new HeuristicsRedactor() : null;
+  const spanArbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
   let directNerPort = null;
   const pendingNerRequests = new Map();
+  let requestIdCounter = 0;
 
   async function getDirectOffscreenPort() {
     if (directNerPort) return directNerPort;
-    const api = typeof browser !== "undefined" ? browser : chrome;
+    const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
     if (!api || !api.runtime || !api.runtime.connect) return null;
 
     try {
@@ -64,6 +66,29 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function requestOffscreenNer(text) {
+    return new Promise(async (resolve) => {
+      try {
+        const port = await getDirectOffscreenPort();
+        if (!port) return resolve([]);
+        const requestId = `ner_${Date.now()}_${++requestIdCounter}`;
+        const timer = setTimeout(() => {
+          pendingNerRequests.delete(requestId);
+          resolve([]);
+        }, 400);
+
+        pendingNerRequests.set(requestId, (spans) => {
+          clearTimeout(timer);
+          resolve(spans || []);
+        });
+
+        port.postMessage({ requestId, text });
+      } catch (_) {
+        resolve([]);
+      }
+    });
   }
 
   /**
@@ -92,6 +117,61 @@
       count += (rewritten.symbols || []).length || 1;
     }
     return { isTransformed: out !== text, sanitizedPrompt: out, count };
+  }
+
+  /**
+   * Hybrid Dual-Gate Rewrite: runs Gate 1 heuristics + Gate 2 ONNX NER via offscreen document.
+   */
+  async function shieldRewriteAsync(text, { dryRun = false } = {}) {
+    const syncRes = shieldRewrite(text, { dryRun });
+    if (getShieldMode() !== "all" || dryRun) {
+      return syncRes;
+    }
+
+    try {
+      const nerSpans = await requestOffscreenNer(syncRes.sanitizedPrompt);
+      if (!nerSpans || !nerSpans.length) {
+        return syncRes;
+      }
+
+      let out = syncRes.sanitizedPrompt;
+      let addedCount = 0;
+
+      const validNerSpans = nerSpans.filter((s) =>
+        ["GIVEN_NAME", "SURNAME", "STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(s.label)
+      );
+
+      if (validNerSpans.length && spanArbiter) {
+        const protectedSpans = spanArbiter.extractProtectedSpans(out);
+        const arbitrated = spanArbiter.arbitrate({
+          text: out,
+          tier0Allow: protectedSpans,
+          tier1Det: [],
+          tier2Ner: validNerSpans
+        });
+
+        const sortedSpans = (arbitrated.resolvedSpans || []).sort((a, b) => b.start - a.start);
+        for (const span of sortedSpans) {
+          if (span.tier === 2 && span.start < span.end && span.end <= out.length) {
+            let tag = "[REDACTED_NAME]";
+            if (["STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(span.label)) {
+              tag = "[REDACTED_LOCATION]";
+            }
+            out = out.slice(0, span.start) + tag + out.slice(span.end);
+            addedCount++;
+          }
+        }
+      }
+
+      return {
+        isTransformed: syncRes.isTransformed || addedCount > 0,
+        sanitizedPrompt: out,
+        count: syncRes.count + addedCount
+      };
+    } catch (err) {
+      console.warn("[SafeShare-AI] Gate 2 NER pass fallback:", err);
+      return syncRes;
+    }
   }
 
   function initSafeShareButton() {
@@ -373,29 +453,36 @@
     if (submitGuardInstalled) return;
     submitGuardInstalled = true;
 
-    const guard = (e, resend) => {
+    const guard = async (e, resend) => {
       if (resubmitting || !isPreInferenceEnabled() || !symbolicRewriter) return;
       const inputEl = findPromptInputElement();
       if (!inputEl) return;
-      let rewritten;
-      try {
-        const text = getInputText(inputEl);
-        if (!text || !text.trim()) return;
-        rewritten = shieldRewrite(text);
-      } catch (err) {
-        console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
-        return;
-      }
-      if (!rewritten.isTransformed) return;
+      const text = getInputText(inputEl);
+      if (!text || !text.trim()) return;
+
+      const syncCheck = shieldRewrite(text, { dryRun: true });
+      if (!syncCheck.isTransformed && getShieldMode() !== "all") return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
-      setInputText(inputEl, rewritten.sanitizedPrompt);
-      console.log("[SafeShare-AI] Protected before sending:", rewritten.count, "item(s)");
+
+      let rewritten;
+      try {
+        rewritten = await shieldRewriteAsync(text);
+      } catch (err) {
+        console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
+        rewritten = { isTransformed: false, sanitizedPrompt: text, count: 0 };
+      }
+
+      if (rewritten && rewritten.isTransformed) {
+        setInputText(inputEl, rewritten.sanitizedPrompt);
+        console.log("[SafeShare-AI] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
+      }
+
       setTimeout(() => {
         resubmitting = true;
-        try { resend(inputEl); } finally { setTimeout(() => (resubmitting = false), 300); }
-      }, 120);
+        try { resend(inputEl); } finally { setTimeout(() => (resubmitting = false), 350); }
+      }, rewritten && rewritten.isTransformed ? 120 : 10);
     };
 
     window.addEventListener("keydown", (e) => {
