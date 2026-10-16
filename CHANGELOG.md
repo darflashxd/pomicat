@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased (after 2.3.1)
+
+### Fixed (P0)
+- Shared chats keep the user's own messages (they were dropped, so the inversion defence didn't
+  know what to hide).
+- Look-alike characters (`аlice@example.com` with a Cyrillic `а`) no longer slip through when the
+  share is built; every turn is scanned once more right before encryption.
+- npm package ships `policy.js` and `crypto.js`; `tests/package.test.js` installs the tarball.
+- Proxy redacts OpenAI Responses and Anthropic Messages too, and refuses (403) any other request
+  with a body instead of forwarding it unredacted.
+- Before sending, only the writer's own names and places are replaced (`[NAME_1]`, `[PLACE_1]`);
+  IDs use numbered placeholders and show the real values on your screen only.
+- Password rule no longer takes prose ("regularly", "bukan"); new OTP rule.
+- Extension runs only on the chat sites, the official relay and localhost; `models/` no longer
+  visible to websites; the Continue bridge only accepts the share page.
+- Burn-after-reading links open only after a click, so link scanners can't use up the view.
+- Local relay returns 500 (not 201) when it can't save a share.
+
+### Security
+- Share links open inside the extension when it's installed: the relay's page is stopped before
+  it runs and the extension's own copy decrypts the chat. The viewer moved to `extension/viewer/`.
+- Hosted share page sends a Content-Security-Policy; `dist/SHA256SUMS` lists the zips and the page
+  files.
+- Values restored on screen sit in a closed shadow root; the amounts vault moved from the page's
+  `sessionStorage` to the extension's `storage.session`.
+
+### New
+- `invert` recovers hidden dates from weekday / "the day after the 14th" clues; SafeShare hides
+  those clues next to a hidden date, and landmarks/distances next to a hidden address.
+- `invert` warns when one message combines several identifying details ("the only female
+  cardiologist at a 50-bed hospital in Blitar").
+- Extension icon; the chip says when the local name model wasn't ready in time.
+
+### Changed
+- NER scores are softmax probabilities, so the arbiter's thresholds apply.
+- One before-sending setting (`safeshare_shield_mode`) for the chip and the share dialog.
+- Claims narrowed: "derivable through the supported arithmetic", what 0% FP and F1 0.85 measure;
+  `RESULTS_SOTA.md` in English.
+
 ## 2.3.1 (2026-10-16)
 
 ### Fixed

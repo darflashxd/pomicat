@@ -6,18 +6,21 @@ What's next, with details and file references: **[ROADMAP.md](ROADMAP.md)**.
 blackhat.com was behind a bot check, so confirm on the official page). Notification 1 Dec 2026,
 conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 
-> **Status 2026-10-16:** the CLI demo works, but the extension's share path leaks (user messages
-> dropped, homoglyph bypass) and the npm package can't load. Don't call the extension or npm
-> package production-ready until the P0 list below is closed.
+> **Status 2026-10-16 (evening):** all P0 fixes are in and the suite passes (31 files). Before
+> calling the extension production-ready: check it on real ChatGPT / Claude pages (user turns in
+> shares, homoglyph text) and open a share link with the extension installed (it should reopen
+> inside the extension).
 
-## P0 — fix first (details in ROADMAP.md)
-- [ ] P0.1 User messages dropped when a chat is read for sharing (`content_script.js:702`)
-- [ ] P0.2 Homoglyph text re-exposed when the share result is built (`modal.js:536`)
-- [ ] P0.3 npm package missing `policy.js` and `crypto.js`
-- [ ] P0.4 Proxy forwards non-`/chat/completions` requests unredacted
-- [ ] P0.5 Before-sending replaces every name/place (not only the writer's), unnumbered
-- [ ] P0.6 Restore lost fixes from `backup-local`: password rule, OTP rule, on-screen values
-- [ ] P0.7 Extension on every `*.workers.dev`; `models/*` exposed to all sites; scanners burn links
+## P0 — fixed (details in ROADMAP.md)
+- [x] P0.1 User messages dropped when a chat is read for sharing
+- [x] P0.2 Homoglyph text re-exposed when the share result is built
+- [x] P0.3 npm package missing `policy.js` and `crypto.js`
+- [x] P0.4 Proxy forwards non-`/chat/completions` requests unredacted
+- [x] P0.5 Before-sending replaces every name/place (not only the writer's), unnumbered
+- [x] P0.6 Restore lost fixes from `backup-local`: password rule, OTP rule, on-screen values
+- [x] P0.7 Extension on every `*.workers.dev`; `models/*` exposed to all sites; scanners burn links
+- [ ] Browser check on ChatGPT and Claude: both roles in a share, homoglyph email hidden · `you`
+- [ ] Open a relay link with the extension installed: it reopens as `chrome-extension://…/viewer/` · `you`
 
 ## Done
 - [x] False claims removed (Tier 2 = contextual rules, no "zero-knowledge" / "100%", handles gone, platform list matches manifest)
@@ -38,7 +41,14 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
       (`tools/eval/RESULTS_SOTA.md`), `docs/RELATED_WORK.md`
 - [x] `extension/manifest.json` is the Chrome manifest again (re-applied in `12a9874`)
 
+## Also done (2026-10-16)
+- [x] P1: one shield setting, softmax NER scores, NER-not-ready notice, local relay save errors, CHF test, MODELS_SETUP
+- [x] Claims narrowed; `RESULTS_SOTA.md` in English
+- [x] Share links decrypt inside the extension; CSP on the hosted page; `dist/SHA256SUMS`; vault in `storage.session`; extension icon
+- [x] Inference: dates (attack + defence), across turns, combinations (warning), landmarks near addresses
+
 ## Left for you
+- [ ] Friend: redeploy the relay after this (viewer moved to `extension/viewer/`, `wrangler.toml` updated; CSP headers)
 - [ ] Friend: exact Hugging Face link + licence + training data of the MiniLM model (answered "Hugging Face"; details still needed)
 - [ ] Friend: answer ROADMAP "From the co-developer" questions 2–4 (user-message filter, probability vs raw scores, Firefox)
 - [x] Git workflow agreed with friend (no `reset --hard` over others' work; pull/rebase before push)
