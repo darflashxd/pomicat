@@ -291,7 +291,8 @@ Incremental runway=<s18></s18> / <s19></s19> months`;
   assert.strictEqual(localCompute.formatValue(50000, "SGD"), "S$50,000");
   assert.strictEqual(localCompute.formatValue(75000, "AUD"), "A$75,000");
   assert.strictEqual(localCompute.formatValue(92000, "CAD"), "C$92,000");
-  assert.strictEqual(localCompute.formatValue(120000, "CHF"), "CHF 120'000");
+  // The Swiss group separator is ' or ’ depending on the ICU version bundled with Node/the browser
+  assert.match(localCompute.formatValue(120000, "CHF"), /^CHF 120['’]000$/);
   console.log("  [✓] Test 15 Passed: Fixed-point arithmetic and SGD/AUD/CAD/CHF currency formatting verified!");
 
   // --- TEST 16: DEPENDENCY-DISTANCE BINDING THRESHOLD (<= 12 TOKENS) ---

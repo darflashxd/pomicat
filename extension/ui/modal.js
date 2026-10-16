@@ -979,9 +979,13 @@ class SafeShareModal {
     // Pre-Inference Shield Toggle Event
     const preInferToggle = backdrop.querySelector("#safeshare-pre-inference-toggle");
     if (preInferToggle) {
-      preInferToggle.checked = localStorage.getItem("safeshare_pre_inference") !== "false";
+      // Same setting as the chip under the chat box (content_script.js getShieldMode)
+      const mode = localStorage.getItem("safeshare_shield_mode") ||
+        (localStorage.getItem("safeshare_pre_inference") === "false" ? "off" : "all");
+      preInferToggle.checked = mode !== "off";
       preInferToggle.addEventListener("change", (e) => {
-        localStorage.setItem("safeshare_pre_inference", e.target.checked ? "true" : "false");
+        localStorage.setItem("safeshare_shield_mode", e.target.checked ? "all" : "off");
+        localStorage.removeItem("safeshare_pre_inference");
         // Dispatch custom event for content_script to update shield state immediately
         window.dispatchEvent(new CustomEvent("safeshare:shield_toggle", { detail: { active: e.target.checked } }));
       });

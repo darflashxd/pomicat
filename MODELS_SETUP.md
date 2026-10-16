@@ -9,9 +9,13 @@ The extension runs a local token-classification model in-page via `offscreen.js`
   (`GIVEN_NAME`, `SURNAME`, `EMAIL`, `PHONE`, `STREET_NAME`, `CITY`, … — see
   `training/model_output/minilm_q4/config.json`).
 * Vocabulary pruned to 19,730 tokens → `model_q4.onnx` is **14.01 MB**.
-* Only name/address labels reach the share flow; each span passes
-  `extension/engine/span_arbiter.js` (Tier-0 technical veto + per-label
-  confidence thresholds + technical-density bypass).
+* Where it runs: **only before sending, in Chrome** (the offscreen page is Chrome-only; Firefox
+  and a model that doesn't answer within 400 ms fall back to the rules, and the chip says so).
+  The share dialog does not use it; names there come from the contextual rules.
+* Only name/address labels are used, and only the writer's own ("my wife Rina", "saya tinggal di
+  Bandung", same rule as the CLI's `--presidio`); they become `[NAME_1]` / `[PLACE_1]`. Each span
+  first passes `extension/engine/span_arbiter.js` (Tier-0 technical veto + per-label confidence
+  thresholds on the softmax probability + technical-density bypass).
 * Measured: token F1 **0.85** on ai4privacy EN 2000
   (`tools/eval/RESULTS_SOTA.md`). CLI `redact` does not use this model;
   use `--presidio` there for general name detection.

@@ -113,6 +113,11 @@ function extractSpans(text, enc, logits) {
         maxIdx = c;
       }
     }
+    // Softmax probability of the winning label: span_arbiter's thresholds (0.30-0.45) are
+    // probabilities, and raw logits would pass them almost always
+    let expSum = 0;
+    for (let c = 0; c < numLabels; c++) expSum += Math.exp(logits[i * numLabels + c] - maxVal);
+    const prob = 1 / expSum;
     const rawTag = id2label[String(maxIdx)];
     if (!rawTag || rawTag === "O") {
       if (currentSpan) {
@@ -136,11 +141,11 @@ function extractSpans(text, enc, logits) {
         label: labelType,
         start: tokenSpan.start,
         end: tokenSpan.end,
-        score: maxVal
+        score: prob
       };
     } else if (prefix === "I-" && currentSpan && currentSpan.label === labelType) {
       currentSpan.end = Math.max(currentSpan.end, tokenSpan.end);
-      currentSpan.score = Math.max(currentSpan.score, maxVal);
+      currentSpan.score = Math.max(currentSpan.score, prob);
     } else {
       if (currentSpan) {
         currentSpan.text = text.slice(currentSpan.start, currentSpan.end);
@@ -150,7 +155,7 @@ function extractSpans(text, enc, logits) {
         label: labelType,
         start: tokenSpan.start,
         end: tokenSpan.end,
-        score: maxVal
+        score: prob
       };
     }
   }
