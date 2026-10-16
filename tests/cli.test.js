@@ -103,3 +103,16 @@ console.log("cli: password/OTP checks passed");
   assert(!PERSONAL_BEFORE.LOCATION.test("the history of "));
 }
 console.log("cli: personal name/place checks passed");
+
+// AI provider keys and bearer tokens (found testing on ChatGPT)
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  for (const key of ["gsk_AbCdEf1234567890AbCdEf1234567890AbCdEf1234567890AB", "r8_AbCdEf1234567890AbCdEf1234567890AbCd",
+    "xai-AbCdEf1234567890AbCdEf1234567890AbCdEf1234567890AbCdEf12345678AbCdEf12345678"]) {
+    assert(!s(`my key ${key}`).includes(key.slice(-10)), key);
+  }
+  assert.strictEqual(s("Authorization: Bearer abcDEF123456ghiJKL789012mnoPQR345678"), "Authorization: Bearer [REDACTED_TOKEN]");
+  assert.strictEqual(s("The bearer of this letter is welcome."), "The bearer of this letter is welcome.");
+}
+console.log("cli: api key checks passed");

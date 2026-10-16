@@ -32,6 +32,7 @@
 - `invert` warns when one message combines several identifying details ("the only female
   cardiologist at a 50-bed hospital in Blitar").
 - Extension icon; the chip says when the local name model wasn't ready in time.
+- Groq (`gsk_`), xAI (`xai-`) and Replicate (`r8_`) keys, and `Bearer` tokens in pasted headers.
 
 ### Changed
 - NER scores are softmax probabilities, so the arbiter's thresholds apply.

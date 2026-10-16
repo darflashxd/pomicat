@@ -300,6 +300,22 @@ class HeuristicsRedactor {
         regex: /\bhf_[A-Za-z0-9]{34,40}\b/g,
         replacement: "hf_dummyPlaceholderHuggingFaceToken000"
       },
+      // 5a-3b. Other AI provider keys: Groq (gsk_), xAI (xai-), Replicate (r8_)
+      {
+        id: "AI_PROVIDER_KEY",
+        name: "AI Provider API Key (Groq / xAI / Replicate)",
+        category: "CREDENTIALS",
+        regex: /\b(?:gsk_[A-Za-z0-9]{40,60}|xai-[A-Za-z0-9]{60,90}|r8_[A-Za-z0-9]{30,40})\b/g,
+        replacement: "[REDACTED_API_KEY]"
+      },
+      // 5a-3c. Bearer tokens in pasted headers / curl commands: "Authorization: Bearer <token>"
+      {
+        id: "BEARER_TOKEN",
+        name: "Bearer Token",
+        category: "CREDENTIALS",
+        regex: /(\bBearer\s+)([A-Za-z0-9\-._~+/]{20,}=*)/g,
+        replacement: "$1[REDACTED_TOKEN]"
+      },
       // 5a-4. NPM Automation / Publish Access Token
       {
         id: "NPM_TOKEN",
