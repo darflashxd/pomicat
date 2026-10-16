@@ -176,27 +176,39 @@ Cloudflare, an account thief, any self-hoster) can change it to send the key and
 
 ### Attack list for the README (reference)
 
-| # | Who | Attack | Status |
-|---|---|---|---|
-| 1.1 | Host / Cloudflare / account thief | Modified share page steals key + chat | Open until in-extension decryption |
-| 1.2 | Host | Logs IPs, times, sizes | Documented |
-| 1.3 | Host | Keeps a burn-after-read copy | Stays encrypted |
-| 1.4 | Host | Alters a share | Not possible (AES-GCM) |
-| 2.2 | HTTPS interception | Rewrites the share page | Open until in-extension decryption |
-| 2.4 | Look-alike relay | Fake share page | Domain + store listing + in-extension decryption |
-| 3.1 | Anyone with the link | Reads the share | By design; expiry, burn, revoke |
-| 3.2 | Link scanners | Burn links early | P0.7 |
-| 3.3 | Recipient | Screenshot / copy | Out of scope (deterrence only) |
-| 3.4 | Scrapers | Guess share IDs | Not possible (122-bit IDs + rate limits) |
-| 4.1 | Any `*.workers.dev` site | Fingerprint + Continue prompt bait | P0.7 |
-| 4.2 | Chat site's own scripts | Read typed text / restored values | Reduce with shadow DOM; state limit |
-| 4.6 | Any website | Detect the extension via `models/*` | P0.7 |
-| 4.7 | Homoglyph input | Bypass redaction in the share output | P0.2 |
-| 5.1 | Modified zip | Malicious extension reads all chats | Store listings + checksums |
-| 5.2/5.3 | Account takeover | Malicious code / share page | 2FA, project account |
+| # | Who | Attack | Possible today? | Fix / status |
+|---|---|---|---|---|
+| 1.1 | Host / Cloudflare / account thief | Modified share page steals key + chat | **Yes** | In-extension decryption (§1) |
+| 1.2 | Host | Logs IPs, times, sizes, share IDs, user agents, who opens which link | Yes | Document; self-hosting for those who care |
+| 1.3 | Host | Withholds or deletes shares, keeps a burn-after-read copy | Yes | Can't prevent; the copy stays encrypted |
+| 1.4 | Host | Alters a share | No (AES-GCM, ID bound inside) | — |
+| 1.5 | A malicious relay passed around ("use my relay") | Reads every link made through it (via 1.1) | Yes | Relay setting warns on non-official relays; in-extension decryption |
+| 2.1 | Network eavesdropper (café Wi-Fi, ISP) | Reads traffic | No (HTTPS, ciphertext only) | — |
+| 2.2 | HTTPS interception (company proxy, antivirus web shield, malware root cert) | Rewrites the share page | **Yes** | In-extension decryption |
+| 2.3 | Anyone on the network | Uses a local `http://` relay exposed beyond 127.0.0.1 | Only if exposed | Keep localhost-only default; warn in DEPLOY/README |
+| 2.4 | Look-alike relay domain | Fake share page | Yes | Official domain, store listing, in-extension decryption |
+| 3.1 | Anyone with the link (forwarded, history, sync, screenshots) | Reads the share | By design | Expiry, burn-after-read, revoke |
+| 3.2 | Link scanners (Safe Links, Defender, Teams/Slack previews) | Burn links before the recipient | Likely | "Click to open" (P0.7) |
+| 3.3 | Recipient | Screenshot / copy / photo | Yes | Out of scope; anti-copy is deterrence only |
+| 3.4 | Scrapers | Guess share IDs | No (122-bit IDs + rate limits) | — |
+| 3.5 | Reader doing arithmetic / inference | Recover hidden values from the shared chat | Blocked for amounts and birth years | Dates, combinations of details, across turns, locations (§2) |
+| 4.1 | Any `*.workers.dev` / `*.pages.dev` site | Fingerprint + Continue prompt-injection bait | **Yes** | P0.7 |
+| 4.2 | Chat site's own scripts (analytics, session replay) | Read typed text and values restored on screen | Yes | Closed shadow DOM; state the limit |
+| 4.3 | Chat site's own scripts | Read the amounts vault in page `sessionStorage` | Yes | Move to `storage.session` (§1) |
+| 4.4 | A website | Imitates the extension's chip/buttons to mislead users | Possible, low impact | — |
+| 4.5 | Another extension with "read all sites" | Reads everything on the page | Yes | Out of scope; state it |
+| 4.6 | Any website | Detects the extension via `models/*` | **Yes** | P0.7 |
+| 4.7 | Look-alike (homoglyph) characters | Bypass redaction in the share output | **Yes** | P0.2 |
+| 5.1 | Whoever hands out a modified zip | Malicious extension reads all chats | **Yes** (biggest single risk) | Store listings + SHA-256 checksums |
+| 5.2 | GitHub account / repo takeover | Pushes malicious code | Possible | 2FA, protected `main`, signed commits |
+| 5.3 | Cloudflare account takeover | Replaces relay and share page | Possible | 2FA, project account, in-extension decryption |
+| 5.4 | Malicious dependency | Code in a package we install | Low (zero npm deps in extension/CLI; bundled ONNX runtime) | Keep zero deps; pin the bundled runtime version |
+| 5.5 | Deploy / eval tooling (`npx wrangler`, pip) | Compromised build tool | Low (build time only) | Pin versions |
+| 5.6 | A malicious fork published as "SafeShare" | Users install the wrong one | Possible | Official store listings and domain |
 
-Out of scope: malware on the user's machine, other extensions reading all pages, what the vendor
-already received, physical access.
+Out of scope: malware or a compromised browser on the user's machine, other extensions reading
+all pages, what the AI vendor already received before SafeShare was installed, physical access
+to an unlocked device.
 
 ---
 
@@ -272,8 +284,32 @@ of tools*, not a vulnerability or CVE.
 
 ## Blocked on someone else
 
-1. **Friend:** where the MiniLM model comes from (source, training data, licence); agree the
-   git workflow; Cloudflare deploy.
-2. **You:** API key(s) for InversionBench and training labels; cloud accounts for §4; store
-   developer accounts.
-3. **Friends:** labelling, and TESTING.md on their machines.
+### From the co-developer (friend)
+1. **MiniLM provenance:** base model and where it came from (Hugging Face repo or own training),
+   training data and split, licence of the weights and data, how the vocabulary was pruned to
+   19,730 tokens, and confirmation that the ai4privacy rows used for the 0.848 score were not in
+   its training data.
+2. **Intent behind `content_script.js:702`:** why user bubbles were added to the input/UI filter
+   (e.g. to stop hydration on user messages?), so the P0.1 fix keeps that purpose.
+3. **Runtime vs benchmark:** what the `span_arbiter` thresholds were calibrated on (softmax
+   probabilities or raw logits), and whether the extension's tokenizer was checked against the
+   Hugging Face one.
+4. **Firefox:** intended behaviour of the NER step without offscreen documents.
+5. **Git workflow:** no `reset --hard` over others' work; pull/rebase before push; who merges the
+   two commits still on `backup-local`; `extension/manifest.json` is now the Chrome manifest.
+6. **Cloudflare:** deploy with DEPLOY.md (incl. `ALTER TABLE`); move the official relay to a
+   project account with 2FA and both of you as members; optional domain.
+7. **Repo binaries:** Git LFS or release assets for the 28 MB model + WASM and tokenizer files.
+8. **Submission:** co-presenter or not, bio, availability both conference days.
+
+### From you
+1. API key(s) (OpenAI, Anthropic or Gemini; one is enough to start) for InversionBench and the
+   training labels.
+2. **Decision:** OK to test third-party redaction tools with fictional data and report findings
+   (§4)? Yes / no.
+3. Cloud accounts (Google / AWS / Azure free tiers) for §4; store developer accounts (§1).
+4. Presenter bios, demo video, submission.
+
+### From friends (testers / labellers)
+1. Label `tools/eval/data/label_sheet.csv` with `LABELLING.md` (2 people per sheet).
+2. Run `TESTING.md` on their own machines once P0 is fixed.
