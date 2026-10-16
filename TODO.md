@@ -39,8 +39,9 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 - [x] `extension/manifest.json` is the Chrome manifest again (re-applied in `12a9874`)
 
 ## Left for you
-- [ ] Ask friend: MiniLM model source, training data, licence (ROADMAP P1)
-- [ ] Agree a git workflow with friend so local commits aren't lost (`backup-local` still holds 2 commits)
+- [ ] Friend: exact Hugging Face link + licence + training data of the MiniLM model (answered "Hugging Face"; details still needed)
+- [ ] Friend: answer ROADMAP "From the co-developer" questions 2–4 (user-message filter, probability vs raw scores, Firefox)
+- [x] Git workflow agreed with friend (no `reset --hard` over others' work; pull/rebase before push)
 - [ ] `git push` once P0 is in
 - [ ] Friend deploys with `DEPLOY.md` (incl. `ALTER TABLE`)
 - [ ] TESTING.md on ChatGPT, Claude, DeepSeek; friends test the zip

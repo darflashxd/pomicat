@@ -285,18 +285,46 @@ of tools*, not a vulnerability or CVE.
 ## Blocked on someone else
 
 ### From the co-developer (friend)
-1. **MiniLM provenance:** base model and where it came from (Hugging Face repo or own training),
-   training data and split, licence of the weights and data, how the vocabulary was pruned to
-   19,730 tokens, and confirmation that the ai4privacy rows used for the 0.848 score were not in
-   its training data.
-2. **Intent behind `content_script.js:702`:** why user bubbles were added to the input/UI filter
-   (e.g. to stop hydration on user messages?), so the P0.1 fix keeps that purpose.
-3. **Runtime vs benchmark:** what the `span_arbiter` thresholds were calibrated on (softmax
-   probabilities or raw logits), and whether the extension's tokenizer was checked against the
-   Hugging Face one.
-4. **Firefox:** intended behaviour of the NER step without offscreen documents.
-5. **Git workflow:** no `reset --hard` over others' work; pull/rebase before push; who merges the
-   two commits still on `backup-local`; `extension/manifest.json` is now the Chrome manifest.
+
+Answers so far (2026-10-16): **1 = from Hugging Face** (details still needed) · **2–4 =
+explained below, awaiting answers** · **5 = agreed**.
+
+1. **MiniLM provenance** — *answer: downloaded from Hugging Face.* Still needed:
+   - [ ] the exact model link (`huggingface.co/<owner>/<model>`) and the licence on its page
+   - [ ] what it was trained on (its model card says), and whether that includes ai4privacy:
+         if yes, our 0.848 on ai4privacy is measured on data like its training data, and the
+         README/abstract must say so instead of "beats Presidio"
+   - [ ] whether it was changed after download (vocabulary pruned to 19,730 tokens, 4-bit
+         quantised): which script did it, so others can reproduce it
+   - [ ] add all of this to `MODELS_SETUP.md` and credit the original authors
+2. **Why user messages are in the input-box filter** (`content_script.js:702`) — *open.*
+   The filter was meant to skip the chat input box and SafeShare's own buttons. It now also
+   skips every **user message bubble**. Side effect: when a chat is read for sharing, only the
+   AI's replies are kept, so shared chats lose the questions and the user's own amounts (P0.1).
+   - [ ] Was skipping user bubbles on purpose (e.g. to stop the number display from rewriting
+         your own messages, or to avoid reading the half-typed draft)? If so, we keep that
+         purpose but apply it only where it's needed, not to sharing.
+3. **Model scores: probability vs raw score** — *open.*
+   The model outputs a raw score per word ("logit", any number, e.g. -3.2 or 7.5). The
+   benchmark converts these to probabilities between 0 and 1 (softmax) before comparing with
+   thresholds like `0.35`. The extension (`offscreen.js` → `span_arbiter.js`) compares the
+   **raw** scores with the same thresholds. A raw score of 0.4 can mean ~20% or ~60% depending
+   on the other scores, so the extension may hide more or less than the benchmark says. The
+   extension also splits words into tokens with its own code instead of the original tokenizer.
+   - [ ] Were the thresholds tuned on probabilities or raw scores?
+   - [ ] Was the extension's tokenizer compared with the original on the same text?
+   Fix either way: apply softmax in `offscreen.js`, check tokenizer output matches, and measure
+   the extension's real path (P1).
+4. **Firefox** — *open.*
+   The model runs in an "offscreen document", a hidden page that only Chrome has. Firefox has
+   no offscreen documents (`background.js:13-16` returns early), so on Firefox the model never
+   runs and before-sending protection uses rules only, without any notice.
+   - [ ] Intended: Firefox = rules only (then the UI should say so), or run the model in
+         Firefox's background page (possible, needs testing)?
+5. **Git workflow** — *agreed:* no `reset --hard` over others' work; pull/rebase before push;
+   `extension/manifest.json` is the Chrome manifest. The two commits on `backup-local`
+   (password/OTP/on-screen values, and this roadmap's first version) get merged by hand into
+   `main` as part of P0.6.
 6. **Cloudflare:** deploy with DEPLOY.md (incl. `ALTER TABLE`); move the official relay to a
    project account with 2FA and both of you as members; optional domain.
 7. **Repo binaries:** Git LFS or release assets for the 28 MB model + WASM and tokenizer files.
