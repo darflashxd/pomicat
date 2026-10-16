@@ -155,14 +155,19 @@ Input is plain text with `User:` / `Assistant:` lines, or a JSON array of `{role
 const { redactTurns, invert } = require("safeshare-ai"); // after npm install <path-to-repo>
 ```
 
-### Proxy for OpenAI-compatible APIs
+### Proxy for LLM APIs
 
 ```bash
 node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
 # then point your SDK at http://127.0.0.1:8788/v1
 ```
 
-Every chat message is redacted before it leaves your machine. Responses are not restored.
+The proxy redacts message text for OpenAI Chat Completions (`/chat/completions`), OpenAI
+Responses (`/responses`: `input`, `instructions`) and Anthropic Messages (`/messages`:
+`messages`, `system`). Requests without a body (e.g. `GET /v1/models`) pass through. Any other
+request with a body (embeddings, legacy completions, files, ...) is refused with a 403 rather
+than forwarded unredacted. Only text parts are redacted (not images or files), and responses
+are not restored.
 
 ### Who will read it, and how to show amounts
 

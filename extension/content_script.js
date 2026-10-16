@@ -695,19 +695,33 @@
    * Identifies whether an element is inside the prompt composer, textarea, UI header/footer, or disclaimer.
    * Such elements must NEVER be extracted as chat conversation turns.
    */
-  function isPromptInputOrUIElement(el) {
+  /**
+   * Not part of the conversation: the composer (input box / form), SafeShare's own UI,
+   * invisible nodes and the "can make mistakes" disclaimer. Used when READING the chat for
+   * sharing: user and assistant messages must both pass.
+   */
+  function isComposerOrSafeShareUI(el) {
     if (!el) return true;
     if (!isVisibleElement(el)) return true;
-    // Strictly exclude the user prompt composer input, form, user bubbles, and SafeShare UI
-    if (el.closest("form, #prompt-textarea, fieldset, textarea, [contenteditable='true'], [data-message-author-role='user'], [data-testid='user-message'], .chat-message-user, [data-user-message-bubble='true'], #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
+    if (el.closest("form, #prompt-textarea, fieldset, textarea, [contenteditable='true'], #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
       return true;
     }
-    // Exclude disclaimer text (e.g. ChatGPT can make mistakes...)
     const txt = (el.innerText || el.textContent || "").trim();
     if (/^(?:ChatGPT can make mistakes|Free Research Preview|By messaging ChatGPT|Claude may make mistakes|DeepSeek can make mistakes)/i.test(txt)) {
       return true;
     }
     return false;
+  }
+
+  const USER_BUBBLE_SELECTOR = "[data-message-author-role='user'], [data-testid='user-message'], .chat-message-user, [data-user-message-bubble='true']";
+
+  /**
+   * Composer/UI OR a user message bubble. Used by the on-screen number display, which must never
+   * rewrite the user's own messages (React re-renders them; see PASS 2 above). Do NOT use this to
+   * read the chat for sharing: it would drop every user turn.
+   */
+  function isPromptInputOrUIElement(el) {
+    return isComposerOrSafeShareUI(el) || Boolean(el.closest(USER_BUBBLE_SELECTOR));
   }
 
   /**
@@ -775,7 +789,7 @@
     // data attributes; class names are hashed and change between releases.
     const bubbles = Array.from(container.querySelectorAll(
       "[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']"
-    )).filter(el => !isPromptInputOrUIElement(el));
+    )).filter(el => !isComposerOrSafeShareUI(el));
     if (bubbles.length > 0) {
       // A reply can be split over several markdown blocks: join blocks of the same turn
       let lastKey = null;
@@ -797,7 +811,7 @@
     const roleDivs = container.querySelectorAll("[data-message-author-role]");
     // Outermost only: a message element can contain another element with the same attribute
     const validRoleDivs = Array.from(roleDivs).filter(el =>
-      !isPromptInputOrUIElement(el) && !(el.parentElement && el.parentElement.closest("[data-message-author-role]")));
+      !isComposerOrSafeShareUI(el) && !(el.parentElement && el.parentElement.closest("[data-message-author-role]")));
     if (validRoleDivs.length > 0) {
       validRoleDivs.forEach((el) => {
         const role = el.getAttribute("data-message-author-role");
@@ -811,7 +825,7 @@
 
     // Strategy 1: ChatGPT conversation-turn pattern (both article and div tags)
     const chatGptTurns = container.querySelectorAll("[data-testid^='conversation-turn']");
-    const validTurns = Array.from(chatGptTurns).filter(el => !isPromptInputOrUIElement(el));
+    const validTurns = Array.from(chatGptTurns).filter(el => !isComposerOrSafeShareUI(el));
     if (validTurns.length > 0) {
       validTurns.forEach((turnEl) => {
         const isAssistant = turnEl.querySelector("[data-message-author-role='assistant'], div.markdown, [data-testid*='assistant']") !== null;
@@ -833,7 +847,7 @@
     const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
     if (claudeUserNodes.length > 0 || claudeAsstNodes.length > 0) {
       const allClaude = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
-      Array.from(allClaude).filter(el => !isPromptInputOrUIElement(el)).forEach((el) => {
+      Array.from(allClaude).filter(el => !isComposerOrSafeShareUI(el)).forEach((el) => {
         const isUser = el.getAttribute("data-testid") === "user-message" || (el.className && el.className.includes("user-message"));
         const textContent = getCleanNodeContent(el);
         if (textContent) {
@@ -848,7 +862,7 @@
 
     // Strategy 3: DeepSeek & generic markdown message turns
     const deepseekNodes = container.querySelectorAll("div.ds-markdown, div[class*='ds-markdown'], .chat-message, div[class*='message-bubble']");
-    const validDeepseek = Array.from(deepseekNodes).filter(el => !isPromptInputOrUIElement(el));
+    const validDeepseek = Array.from(deepseekNodes).filter(el => !isComposerOrSafeShareUI(el));
     if (validDeepseek.length > 0) {
       validDeepseek.forEach((el) => {
         const isAsst = /assistant|ai|bot|markdown/i.test(el.className) || el.querySelector("[class*='assistant'], [class*='bot']") !== null;

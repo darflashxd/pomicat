@@ -526,7 +526,10 @@ class SafeShareModal {
       const turn = this.currentTurns[tIdx];
       origTextDisplay += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
 
-      let turnText = turn.content;
+      // Detections were found on the homoglyph-normalised text (heuristics.scan normalises
+      // look-alike letters), so rebuild from the same normalised text: replacing on the original
+      // would miss "аlice@example.com" with a Cyrillic "а" and leak it into the share.
+      let turnText = this.heuristics.normalizeHomoglyphs(turn.content);
       const hDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
       for (const det of hDets) {
         const secretVal = det.secretToken || det.raw;
@@ -750,6 +753,33 @@ class SafeShareModal {
     if (statContextualEl) statContextualEl.innerText = 0;
   }
 
+  /**
+   * Last check before encrypting: scan the exact text that will be shared for hard identifiers
+   * (keys, IDs, cards, contacts) and redact any the user did not deliberately untick. Catches
+   * anything an earlier step missed (e.g. a rebuild that drifted from the detected text).
+   */
+  finalSafetyScan(turns) {
+    const kept = new Set(
+      this.candidates
+        .filter(c => !this.activeCategories.has(c.category) || !c.enabled)
+        .flatMap(c => [c.raw, c.fullRaw])
+        .filter(Boolean)
+        .map(v => this.heuristics.normalizeHomoglyphs(v).toLowerCase())
+    );
+    return turns.map(t => {
+      const text = this.heuristics.normalizeHomoglyphs(t.content);
+      const scan = this.heuristics.scan(text);
+      let out = text;
+      for (const det of [...scan.detections].sort((a, b) => b.index - a.index)) {
+        const raw = det.raw.toLowerCase();
+        const secret = (det.secretToken || "").toLowerCase();
+        if (kept.has(raw) || (secret && kept.has(secret))) continue;
+        out = out.slice(0, det.index) + det.replacement + out.slice(det.index + det.length);
+      }
+      return { ...t, content: out };
+    });
+  }
+
   escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -963,7 +993,7 @@ class SafeShareModal {
       try {
         const ttl = document.getElementById("safeshare-ttl").value;
         const payload = {
-          turns: this.sanitizedTurns,
+          turns: this.finalSafetyScan(this.sanitizedTurns),
           timestamp: new Date().toISOString(),
           ttl: ttl
         };

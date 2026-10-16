@@ -37,6 +37,38 @@ upstream.listen(0, "127.0.0.1", async () => {
     assert(!sent.includes("jane@personal.dev"), sent);
     assert(!sent.includes("sk-proj-ab12"), sent);
     assert(sent.includes("You are helpful."), sent);
+
+    const base = `http://127.0.0.1:${proxy.address().port}`;
+    const post = (path, body) => fetch(base + path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    });
+
+    // Responses API: input string, input items and instructions are all redacted.
+    const r1 = await (await post("/v1/responses", {
+      instructions: "Reply to jane@personal.dev",
+      input: [{ role: "user", content: [{ type: "input_text", text: "NIK 3201012304950001" }] }]
+    })).json();
+    assert(!JSON.stringify(r1.got).includes("jane@personal.dev"), JSON.stringify(r1.got));
+    assert(!JSON.stringify(r1.got).includes("3201012304950001"), JSON.stringify(r1.got));
+    const r2 = await (await post("/v1/responses", { input: "email jane@personal.dev" })).json();
+    assert(!r2.got.input.includes("jane@personal.dev"), r2.got.input);
+
+    // Anthropic Messages: messages and system are redacted.
+    const r3 = await (await post("/v1/messages", {
+      system: "User is jane@personal.dev", messages: [{ role: "user", content: "NIK 3201012304950001" }]
+    })).json();
+    assert(!JSON.stringify(r3.got).includes("jane@personal.dev"), JSON.stringify(r3.got));
+    assert(!JSON.stringify(r3.got).includes("3201012304950001"), JSON.stringify(r3.got));
+
+    // Unknown endpoint with a body: refused, never forwarded.
+    let hits = 0;
+    upstream.on("request", () => hits++);
+    const r4 = await post("/v1/embeddings", { input: "jane@personal.dev" });
+    assert.strictEqual(r4.status, 403);
+    const r5 = await fetch(base + "/v1/chat/completions", { method: "POST", body: "not json" });
+    assert.strictEqual(r5.status, 400);
+    assert.strictEqual(hits, 0, "refused requests must not reach upstream");
+
     console.log("proxy: all checks passed");
   } finally {
     proxy.close();

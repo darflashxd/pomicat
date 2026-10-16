@@ -10,7 +10,9 @@
     "bin/",
     "extension/engine/heuristics.js",
     "extension/engine/contextual.js",
-    "extension/engine/pseudonymizer.js"
+    "extension/engine/pseudonymizer.js",
+    "extension/engine/policy.js",
+    "extension/engine/crypto.js"
   ],
   "engines": {
     "node": ">=18"
