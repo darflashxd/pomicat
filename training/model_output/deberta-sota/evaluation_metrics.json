@@ -1,0 +1,14 @@
+{
+  "test": {
+    "eval_loss": 0.4721437990665436,
+    "eval_precision": 0.7658568049881745,
+    "eval_recall": 0.8015301530153015,
+    "eval_f1": 0.7832875206157228,
+    "eval_accuracy": 0.9668298315636218,
+    "eval_runtime": 5.1383,
+    "eval_samples_per_second": 1945.599,
+    "eval_steps_per_second": 30.555,
+    "epoch": 3.0
+  },
+  "base": "training/model_zoo/deberta-v3-xsmall"
+}

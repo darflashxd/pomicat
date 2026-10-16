@@ -38,8 +38,9 @@ and handles Indonesian and English formats.
 
 ## Limits we will state
 
-Detection is rule-based (an optional Presidio step adds general name detection in the CLI).
-Anyone holding the full link can read the share. The viewer's anti-copy features are deterrence
+Detection is rule-based in the CLI plus a local MiniLM Q4 NER model in the extension
+(see RELATED_WORK.md for prior art: PDF deredaction, LLM attribute inference, log
+redaction). Anyone holding the full link can read the share. The viewer's anti-copy features are deterrence
 only. Deciding whether a name or number belongs to the user is the open problem.
 
 Full evaluation: tools/eval/RESULTS.md.

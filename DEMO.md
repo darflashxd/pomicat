@@ -5,7 +5,7 @@ Everything below runs on the laptop. No wifi, no real chat site, no real persona
 ## Before the session
 
 ```bash
-npm test                          # 22/22 should pass
+npm test                          # 28/28 should pass
 python relay/server_local.py      # leave running: relay + viewer on http://127.0.0.1:8787
 ```
 
@@ -91,9 +91,11 @@ don't pretend otherwise. What we control is what's in the text and how long the 
 
 ## If someone asks
 
-- **"Does it use AI?"** No. Detection is rules plus the inversion solver. We trained a
-  DistilBERT model and it scored F1 0.64, so it isn't shipped (`MODELS_SETUP.md`).
-- **"How accurate is it?"** Alone it's weak on names (no NER). With `--presidio` it matches
+- **"Does it use AI?"** The CLI is rules plus the inversion solver (we also trained a
+  DistilBERT model, F1 0.64, not shipped). The browser extension additionally runs a
+  local MiniLM Q4 NER model in-page for names and addresses (`MODELS_SETUP.md`,
+  `tools/eval/RESULTS_SOTA.md`).
+- **"How accurate is it?"** The CLI alone is weak on names (no NER). With `--presidio` it matches
   Presidio on ai4privacy (0.78 vs 0.79) and still blocks the inversion attack. But redacting
   every name rewrites 71% of real chats, so the default only redacts names tied to the user
   (`tools/eval/RESULTS.md`).

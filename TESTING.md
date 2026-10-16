@@ -3,7 +3,7 @@
 Everything here runs on your laptop. Tick each box; if a step fails, note the site, the step,
 and what you saw (a screenshot of the browser console helps).
 
-Automated tests cover the engine, relay, CLI and proxy: `npm test` should print `24/24 passed`.
+Automated tests cover the engine, relay, CLI and proxy: `npm test` should print `28/28 passed`.
 This list covers what needs a real browser and your logged-in chat accounts.
 
 ## 0. Setup (once, ~5 min)

@@ -95,24 +95,28 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
 | SafeShare + Presidio, `names: all` + dates | 0.78 | 71% | no |
 | Presidio alone | 0.79 | – | yes |
 
-- **Alone, SafeShare is not a general PII detector.** It has no named-entity recognition. With
-  `--presidio` it uses Presidio for names, places, phones and IDs, and with every name and date
-  turned on it matches Presidio (0.78 vs 0.79) while also blocking the inversion attack.
+- **Alone, SafeShare CLI is not a general PII detector.** It is rule-based and has no
+  named-entity recognition; the browser extension adds a local MiniLM Q4 NER model
+  (14 MB, runs in-page) for names and addresses, arbitrated against technical spans.
+  With `--presidio` the CLI uses Presidio for names, places, phones and IDs, and with
+  every name and date turned on it matches Presidio (0.78 vs 0.79) while also blocking
+  the inversion attack. The extension's MiniLM alone scores token F1 0.85 on ai4privacy
+  (`tools/eval/RESULTS_SOTA.md`).
 - **Benchmarks and real chats disagree about names.** ai4privacy labels every name as PII; real
   chats are full of names that aren't the user's (celebrities, story characters, authors). Turning
   all names on touches 71% of real conversations. The default, `names: personal`, only redacts a
   name or place tied to the user ("my wife Rina", "I live in Bandung") and touches 8.8%.
 - Deciding whether a name or number belongs to the user is the part that needs a trained
-  model; the rules here are the stopgap.
-- The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
-  measurement.
+  model; the `names: personal` rules are the stopgap.
 - The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
   measurement.
 
 ## Limits
 
-- Detection is rule-based. Phrasing the rules don't cover will be missed. A DistilBERT model
-  was trained and scored F1 0.64 on held-out data, so it isn't shipped ([MODELS_SETUP.md](MODELS_SETUP.md)).
+- Detection is rule-based plus a local NER model in the extension (MiniLM Q4; see
+  [MODELS_SETUP.md](MODELS_SETUP.md)). Phrasing the rules don't cover will be missed; the
+  NER covers names/addresses but not dates. A DistilBERT classifier was also trained as an
+  experiment and scored F1 0.64 on held-out data, so it isn't shipped.
 - Social-media handles in casual phrasing ("follow me at @name") are not caught.
 - Anyone holding the full link can read the share. The viewer's anti-copy features (glyph
   scrambling, zero-width watermark, DevTools check) are deterrence only: a screenshot defeats them.

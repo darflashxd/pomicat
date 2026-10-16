@@ -73,9 +73,14 @@ Thumbs.db
 data/train.json
 data/val.json
 data/test.json
+data/cli_hardneg_eval.json
+data/cli_hardneg_gold.jsonl
 data/benchmarks/
 # Extension builds go to GitHub Releases, not git
 *.zip
 *.xpi
 .venv-*/
 tools/eval/data/
+# SOTA benchmark: model zoo + raw results (regenerate with tools/sota/fetch_models.py)
+training/model_zoo/
+tools/sota/results_raw/

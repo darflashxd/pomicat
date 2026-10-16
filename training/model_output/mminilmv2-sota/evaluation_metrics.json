@@ -1,0 +1,14 @@
+{
+  "test": {
+    "eval_loss": 0.31784942746162415,
+    "eval_precision": 0.6338184118949699,
+    "eval_recall": 0.9016651665166516,
+    "eval_f1": 0.7443804569942412,
+    "eval_accuracy": 0.9476495031281084,
+    "eval_runtime": 2.8364,
+    "eval_samples_per_second": 3524.524,
+    "eval_steps_per_second": 55.352,
+    "epoch": 3.0
+  },
+  "base": "training/model_zoo/mminilmv2-l6"
+}

@@ -1,0 +1,14 @@
+{
+  "test": {
+    "eval_loss": 0.32285451889038086,
+    "eval_precision": 0.5383499838865614,
+    "eval_recall": 0.7518001800180018,
+    "eval_f1": 0.6274178403755868,
+    "eval_accuracy": 0.9483952027412907,
+    "eval_runtime": 3.5309,
+    "eval_samples_per_second": 2831.326,
+    "eval_steps_per_second": 44.465,
+    "epoch": 3.0
+  },
+  "base": "training/model_zoo/electra-small"
+}
