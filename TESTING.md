@@ -22,7 +22,14 @@ This list covers what needs a real browser and your logged-in chat accounts.
    (Back to Cloudflare later: `chrome.storage.local.remove("safeshare_relay")`.)
 4. Open ChatGPT (also Claude, DeepSeek later) and **refresh the tab**.
 
-After any code change: click the reload ↻ on the SafeShare card, then refresh the chat tabs.
+After any code change: click the reload ↻ on the SafeShare card, then **close and reopen** the
+chat tabs (an old copy keeps running in a tab that was open during the reload). Check the page
+console (F12): it should say `[SafeShare-AI] Extension content script active (v2.4.0).` If you see
+`[REDACTED_NIK]` instead of `[NIK_1]` in a sent message, the tab is still running old code.
+
+Quick check without ChatGPT: `python -m http.server 8790 --bind 127.0.0.1` in the repo, open
+`http://127.0.0.1:8790/tests/fixtures/fake_chat.html` in an Incognito window (the page loads the
+current scripts itself; no name model there), type into the box and click Send.
 
 Where to look when something is off: the chat page's console (F12) shows `[SafeShare-AI]` lines;
 the name model's console is under the SafeShare card → **Inspect views: offscreen.html**.

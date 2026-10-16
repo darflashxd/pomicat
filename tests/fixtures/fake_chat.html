@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>fake chat</title>
+<link rel="stylesheet" href="../../extension/ui/modal.css">
+<body style="background:#111;color:#eee;font-family:sans-serif">
+<main><div id="thread">
+<div data-message-author-role="user"><div class="whitespace-pre-wrap" id="sent"></div></div>
+<div data-message-author-role="assistant"><div class="markdown" id="answer"></div></div>
+</div>
+<div><form id="f"><div id="prompt-textarea" contenteditable="true" style="border:1px solid #555;min-height:40px"></div>
+<button data-testid="send-button" type="button" id="send">Send</button></form></div></main>
+<script>
+document.getElementById("send").addEventListener("click", () => {
+  const box = document.getElementById("prompt-textarea");
+  document.getElementById("sent").textContent = box.innerText;
+  window.__sent = box.innerText; box.innerText = "";
+});
+</script>
+<script src="../../extension/engine/span_arbiter.js"></script>
+<script src="../../extension/engine/heuristics.js"></script>
+<script src="../../extension/engine/contextual.js"></script>
+<script src="../../extension/engine/pseudonymizer.js"></script>
+<script src="../../extension/engine/policy.js"></script>
+<script src="../../extension/engine/crypto.js"></script>
+<script src="../../extension/engine/symbolic_vault.js"></script>
+<script src="../../extension/engine/symbolic_rewriter.js"></script>
+<script src="../../extension/engine/local_compute.js"></script>
+<script src="../../extension/ui/modal.js"></script>
+<script src="../../extension/content_script.js"></script>

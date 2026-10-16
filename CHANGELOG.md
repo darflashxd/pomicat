@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (after 2.3.1)
+## 2.4.0 (2026-10-16)
 
 ### Fixed (P0)
 - Shared chats keep the user's own messages (they were dropped, so the inversion defence didn't

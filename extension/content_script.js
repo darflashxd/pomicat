@@ -6,7 +6,10 @@
  */
 
 (function () {
-  console.log("[SafeShare-AI] Extension content script active.");
+  // The version tells you whether the tab runs the extension you just reloaded
+  const runtimeApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+  const loadedVersion = runtimeApi && runtimeApi.runtime && runtimeApi.runtime.getManifest ? runtimeApi.runtime.getManifest().version : "dev";
+  console.log(`[SafeShare-AI] Extension content script active (v${loadedVersion}).`);
 
   // Ephemeral engines initialized in content script context
   const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault() : null;
