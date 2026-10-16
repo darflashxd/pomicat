@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.1 (2026-10-16)
+
+### Fixed
+- Tier-0 veto for CLI ports, SQL numerics and private IPs: NER no longer flags
+  `--port 5432`, `id = 123` or `192.168.x.x` (CLI FP-rate 38% → 0% on 5,000 code lines).
+- Git-hash veto now requires a letter, so card/ID digit runs reach the NER
+  (hybrid ai4privacy F1 0.816 → 0.834).
+- Bare birth dates hide when a personal marker is nearby ("My birthday is May 5
+  1998"); plain meeting dates pass through.
+- Relay: D1 required (KV fallback removed), undocumented `/api/chat` gateway
+  removed, CLI `--ttl` validated (300..604800).
+
+### Changed
+- Docs describe the shipped MiniLM Q4 honestly; added `docs/RELATED_WORK.md`
+  and `tools/eval/RESULTS_SOTA.md`.
+
 ## Unreleased
 
 ### New
