@@ -146,13 +146,19 @@
     // Number placeholders in reading order ([PHONE_1] is the first phone), then replace from the
     // end so earlier offsets stay valid
     const edits = [...scan.detections].sort((a, b) => a.index - b.index).map((det) => {
-      // Rules like "password <value>" keep their lead-in words; only the value is replaced
+      // Keep what the rule keeps around the value ("password ", "curl -u ", the closing quote in
+      // PASSWORD='…'): only the part the rule changed becomes the placeholder
       const rep = typeof det.replacement === "string" ? det.replacement : "";
-      const tagAt = rep.lastIndexOf("[");
-      const lead = tagAt > 0 ? rep.slice(0, tagAt) : "";
-      const keepLead = lead && det.raw.startsWith(lead);
-      const value = keepLead ? det.raw.slice(lead.length) : det.raw;
-      return { det, text: (keepLead ? lead : "") + (dryRun ? "[ID]" : placeholderFor(value, idLabel(det))) };
+      let pre = 0;
+      while (pre < det.raw.length && pre < rep.length && det.raw[pre] === rep[pre]) pre++;
+      let suf = 0;
+      while (suf < det.raw.length - pre && suf < rep.length - pre &&
+        det.raw[det.raw.length - 1 - suf] === rep[rep.length - 1 - suf]) suf++;
+      const lead = det.raw.slice(0, pre);
+      const tail = det.raw.slice(det.raw.length - suf);
+      const value = det.raw.slice(pre, det.raw.length - suf) || det.raw;
+      const kept = value === det.raw ? ["", ""] : [lead, tail];
+      return { det, text: kept[0] + (dryRun ? "[ID]" : placeholderFor(value, idLabel(det))) + kept[1] };
     });
     for (const { det, text: replacement } of edits.reverse()) {
       out = out.slice(0, det.index) + replacement + out.slice(det.index + det.length);

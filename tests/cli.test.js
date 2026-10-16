@@ -116,3 +116,22 @@ console.log("cli: personal name/place checks passed");
   assert.strictEqual(s("The bearer of this letter is welcome."), "The bearer of this letter is welcome.");
 }
 console.log("cli: api key checks passed");
+
+// Secrets in a pasted bash history (found testing on ChatGPT)
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  const history = [
+    "mysql -u root -pMyR00tPass -e \"show databases;\"",
+    "docker run -e API_TOKEN=tok_FAKE8f7e6d5c4b3a app:latest",
+    "sshpass -p 'Ssh!Pass2026' ssh deploy@203.0.113.15",
+    "git clone https://oauth2:glpat-FAKEabc123def456ghi7@gitlab.example.com/team/repo.git",
+    "psql postgres://app:Sup3rSecret@db.internal:5432/app"
+  ].join("\n");
+  const out = s(history);
+  for (const secret of ["MyR00tPass", "tok_FAKE8f7e6d5c4b3a", "Ssh!Pass2026", "glpat-FAKE", "Sup3rSecret"]) assert(!out.includes(secret), out);
+  assert(out.includes("mysql -u root -p[REDACTED_PASSWORD]"), out);
+  assert(out.includes("@gitlab.example.com/team/repo.git"), "host kept: " + out);
+  assert.strictEqual(s("mysql -u root -p -e \"show databases;\""), "mysql -u root -p -e \"show databases;\"", "-p alone prompts, nothing to hide");
+}
+console.log("cli: bash history checks passed");

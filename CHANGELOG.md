@@ -33,6 +33,9 @@
   cardiologist at a 50-bed hospital in Blitar").
 - Extension icon; the chip says when the local name model wasn't ready in time.
 - Groq (`gsk_`), xAI (`xai-`) and Replicate (`r8_`) keys, and `Bearer` tokens in pasted headers.
+- Command-line passwords (`mysql -pX`, `--password=X`, `sshpass -p X`), any `*TOKEN=` variable, and
+  `https://user:token@host` URLs (the token was mistaken for an email). Before sending, only the
+  secret itself becomes a placeholder: `curl -u [CLI_BASIC_AUTH_1]` keeps `curl -u`.
 
 ### Changed
 - NER scores are softmax probabilities, so the arbiter's thresholds apply.
