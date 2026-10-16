@@ -79,6 +79,19 @@
       const continuationPrompt = SafeShareExtensionBridge.buildContinuationPrompt(turns, options);
       const targetUrl = PLATFORM_URLS[platform] || "https://chatgpt.com";
 
+      // This page running inside the extension: ask the background worker directly
+      const extApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+      if (extApi && extApi.runtime && extApi.runtime.id && typeof window !== "undefined" &&
+          /^(?:chrome|moz)-extension:$/.test(window.location.protocol)) {
+        extApi.runtime.sendMessage({ action: "OPEN_CHAT_WITH_PROMPT", platform, prompt: continuationPrompt });
+        return {
+          success: true,
+          mode: "extension_page",
+          continuationPrompt: continuationPrompt,
+          message: `Opening ${platform} with the conversation pasted in.`
+        };
+      }
+
       const hasExt = await this.pingExtension(200);
       if (hasExt) {
         const targetOrigin = window.location.origin;

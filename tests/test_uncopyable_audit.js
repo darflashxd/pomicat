@@ -12,10 +12,10 @@
  */
 
 const assert = require("assert");
-const SafeShareSteganography = require("../viewer/engine/steganography.js");
-const SafeShareFontScrambler = require("../viewer/engine/font_scrambler.js");
-const SafeShareTamperGuard = require("../viewer/engine/tamper_guard.js");
-const SafeShareExtensionBridge = require("../viewer/engine/extension_bridge.js");
+const SafeShareSteganography = require("../extension/viewer/engine/steganography.js");
+const SafeShareFontScrambler = require("../extension/viewer/engine/font_scrambler.js");
+const SafeShareTamperGuard = require("../extension/viewer/engine/tamper_guard.js");
+const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_bridge.js");
 
 async function runUncopyableEnclaveAudit() {
   console.log("================================================================================");

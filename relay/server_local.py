@@ -20,9 +20,11 @@ from socketserver import ThreadingMixIn
 
 PORT = int(os.environ.get("SAFESHARE_PORT", "8787"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-VIEWER_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "viewer"))
+VIEWER_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "extension", "viewer"))
 STORAGE_FILE = os.environ.get("SAFESHARE_STORAGE") or os.path.join(BASE_DIR, "storage.json")
 STORAGE_LOCK = threading.Lock()
+VIEWER_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+              "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -96,6 +98,9 @@ class SafeShareHandler(BaseHTTPRequestHandler):
         self.send_header("X-Robots-Tag", "noindex, noarchive, nofollow")
         self.send_header("Cache-Control", "no-store, private")
         self.send_header("Content-Type", content_type)
+        if content_type == "text/html":
+            self.send_header("Content-Security-Policy", VIEWER_CSP)  # same policy as relay/worker.js
+            self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
 
     def do_OPTIONS(self):

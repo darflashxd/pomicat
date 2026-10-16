@@ -121,6 +121,15 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
   NER covers names/addresses but not dates. A DistilBERT classifier was also trained as an
   experiment and scored F1 0.64 on held-out data, so it isn't shipped.
 - Social-media handles in casual phrasing ("follow me at @name") are not caught.
+- The chat site sees what you type before you press send: protection before sending rewrites the
+  message on send, but the site's own scripts (analytics, session replay) can read the text box
+  while you type. Values shown again on your screen are kept from the site's scripts for IDs,
+  names and places (closed shadow DOM), but restored amounts are ordinary page text. Other
+  extensions that can read all sites can read everything too.
+- Share links open inside the extension when it's installed, so the relay can't change the page
+  that holds the key. Without the extension, the relay's page decrypts the chat, and you trust
+  whoever runs the relay not to change it (`dist/SHA256SUMS` lists the page's files for
+  comparison).
 - Anyone holding the full link can read the share. The viewer's anti-copy features (glyph
   scrambling, zero-width watermark, DevTools check) are deterrence only: a screenshot defeats them.
 - Not covered yet: text inside images, cookies in pasted HAR files, combinations of
@@ -245,7 +254,7 @@ python tools/make_demo_gif.py              # docs/demo.gif (start relay/server_l
 ```
 bin/        CLI, library entry point, proxy
 extension/  browser extension (engine/, ui/)
-viewer/     share-link viewer page
+extension/viewer/  share-link page (served by the relay, and opened inside the extension)
 relay/      Cloudflare Worker, D1 schema, local Python relay
 examples/   synthetic chats for the demo
 tests/      regression tests

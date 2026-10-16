@@ -63,7 +63,7 @@ and lists these bindings:
 | `DB` | the D1 database with the encrypted shares |
 | `UPLOAD_LIMITER` | max 10 new shares per minute per IP address |
 | `READ_LIMITER` | max 60 link opens per minute per IP address |
-| `ASSETS` | the share-link page (`viewer/`) |
+| `ASSETS` | the share-link page (`extension/viewer/`) |
 | cron `17 3 * * *` | deletes expired shares once a day |
 
 Shares are limited to 512 KB, which is plenty for a chat but useless for hosting files.

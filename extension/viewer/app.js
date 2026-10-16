@@ -16,6 +16,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const extensionBridge = typeof SafeShareExtensionBridge !== "undefined" ? new SafeShareExtensionBridge() : null;
   // Extract ID from URL params or pathname
   const params = new URLSearchParams(window.location.search);
+  // Opened inside the extension (extension/viewer_redirect.js): this page comes from the
+  // extension, not the relay, so a dishonest relay can't change it. Only the relay's API is used.
+  const inExtension = /^(?:chrome|moz)-extension:$/.test(window.location.protocol);
+  if (inExtension) window.SAFESHARE_RELAY_URL = params.get("relay") || "";
+  const lockMeta = document.querySelector("#crawler-lock-screen .lock-meta");
+  if (lockMeta) {
+    lockMeta.innerText = inExtension
+      ? "Opened inside the SafeShare extension: decrypted by the extension's own copy of this page."
+      : "Decrypted by this page, served by the relay. With the SafeShare extension installed, links open inside the extension instead.";
+  }
   let shareId = params.get("id");
   if (!shareId) {
     const segments = window.location.pathname.split("/").filter(Boolean);

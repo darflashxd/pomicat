@@ -13,7 +13,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const SafeShareSteganography = require("../viewer/engine/steganography.js");
+const SafeShareSteganography = require("../extension/viewer/engine/steganography.js");
 
 function parseArgs() {
   const args = process.argv.slice(2);

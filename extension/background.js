@@ -15,6 +15,10 @@ try {
     webExtApi.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" });
   }
 } catch (_) {}
+// Wake this worker when the browser starts, so the access level above is set before a chat
+// page's content script reads session storage.
+webExtApi.runtime.onStartup.addListener(() => {});
+webExtApi.runtime.onInstalled.addListener(() => {});
 
 let creatingOffscreenPromise = null;
 
@@ -99,6 +103,24 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // "Continue in ChatGPT/Claude/DeepSeek" from a share page: open the chat site and leave the
   // prompt for the content script there to paste once the input box exists.
+  // A share link was opened on the relay: show it in the extension's own copy of the viewer
+  // (see viewer_redirect.js), so the relay's page never runs with the key.
+  if (request.action === "OPEN_SHARE_IN_EXTENSION") {
+    const relay = sender.url ? new URL(sender.url).origin : "";
+    const relayOk = /^(?:https:\/\/safeshare-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/.test(relay);
+    const id = typeof request.id === "string" && /^[0-9a-f-]{36}$/i.test(request.id) ? request.id : "";
+    if (!sender.tab || !relayOk || typeof request.hash !== "string" || !request.hash.startsWith("#")) {
+      sendResponse({ success: false });
+      return false;
+    }
+    const url = webExtApi.runtime.getURL("viewer/index.html") +
+      `?relay=${encodeURIComponent(relay)}${id ? `&id=${id}` : ""}${request.hash}`;
+    Promise.resolve(webExtApi.tabs.update(sender.tab.id, { url }))
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (request.action === "OPEN_CHAT_WITH_PROMPT") {
     const urls = { ChatGPT: "https://chatgpt.com/", Claude: "https://claude.ai/new", DeepSeek: "https://chat.deepseek.com/" };
     const url = urls[request.platform];

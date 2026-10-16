@@ -17,10 +17,10 @@ const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ContextualClassifier = require("../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
 const SafeShareCrypto = require("../extension/engine/crypto.js");
-const SafeShareSteganography = require("../viewer/engine/steganography.js");
-const SafeShareFontScrambler = require("../viewer/engine/font_scrambler.js");
-const SafeShareTamperGuard = require("../viewer/engine/tamper_guard.js");
-const SafeShareExtensionBridge = require("../viewer/engine/extension_bridge.js");
+const SafeShareSteganography = require("../extension/viewer/engine/steganography.js");
+const SafeShareFontScrambler = require("../extension/viewer/engine/font_scrambler.js");
+const SafeShareTamperGuard = require("../extension/viewer/engine/tamper_guard.js");
+const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_bridge.js");
 
 const CLOUDFLARE_EDGE = "https://safeshare-relay.bleedguard.workers.dev";
 

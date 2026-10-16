@@ -24,6 +24,17 @@
   "content_scripts": [
     {
       "matches": [
+        "https://safeshare-relay.bleedguard.workers.dev/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "viewer_redirect.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://claude.ai/*",
@@ -64,5 +75,8 @@
   },
   "action": {
     "default_title": "SafeShare-AI Privacy Guard"
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://safeshare-relay.bleedguard.workers.dev http://localhost:* http://127.0.0.1:*; object-src 'none';"
   }
 }

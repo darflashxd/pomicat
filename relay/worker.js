@@ -10,6 +10,9 @@
  */
 
 // Pages allowed to call the API cross-origin (content-script fallback upload).
+const VIEWER_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+  "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
 // The viewer is same-origin and the extension background worker is not subject to CORS.
 const ALLOWED_ORIGINS = new Set([
   "https://chatgpt.com",
@@ -278,6 +281,12 @@ export default {
         headers.set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
         headers.set("Pragma", "no-cache");
         headers.set("Expires", "0");
+        // The page holds the decryption key: no third-party scripts, no sending data anywhere
+        // but this relay, no framing. (Doesn't stop a dishonest host, who controls this header too;
+        // the extension opens links in its own copy of the page for that, see viewer_redirect.js.)
+        headers.set("Content-Security-Policy", VIEWER_CSP);
+        headers.set("Referrer-Policy", "no-referrer");
+        headers.set("X-Content-Type-Options", "nosniff");
         return new Response(assetRes.body, {
           status: assetRes.status,
           statusText: assetRes.statusText,
@@ -288,15 +297,10 @@ export default {
       // If path contains a dot and starts with /s/ or /v/, rewrite to clean asset path
       if (url.pathname.includes(".")) {
         let assetPath = url.pathname;
+        // The page uses relative paths: /v/style.css, /v/engine/x.js (and /v/<id>/style.css)
         for (const prefix of ["/s/", "/v/"]) {
           if (assetPath.startsWith(prefix)) {
-            const stripped = assetPath.slice(prefix.length);
-            const parts = stripped.split("/");
-            if (parts.length > 1) {
-              assetPath = "/" + parts.slice(1).join("/");
-            } else {
-              assetPath = "/" + stripped;
-            }
+            assetPath = "/" + assetPath.slice(prefix.length).replace(/^[0-9a-f-]{36}\//i, "");
             break;
           }
         }

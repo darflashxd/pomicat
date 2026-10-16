@@ -1,0 +1,2 @@
+# The share page is hashed in dist/SHA256SUMS: same bytes on every OS
+extension/viewer/** text eol=lf

@@ -1,7 +1,7 @@
 /**
  * SafeShare-AI — Ephemeral Symbolic Secret Vault
  * Securely holds mapping between symbolic variables (<S1>, <S2>) and their
- * actual secret parameters in local browser RAM / sessionStorage.
+ * actual secret parameters in local browser RAM / the extension's session storage.
  * 
  * Guarantees:
  * 1. Zero network exposure: Secrets never leave client device.
@@ -9,12 +9,37 @@
  * 3. Multi-turn consistency: Re-uses the same symbol ID for the same raw secret across turns.
  */
 
+/**
+ * Where the vault persists. In the extension: storage.session, private to the extension (the chat
+ * site's own scripts can read the page's sessionStorage, so that isn't used there) and cleared
+ * when the browser closes. Elsewhere (tests, Node): sessionStorage if there is one.
+ * storage.session is async, so reads come from a cache filled once at start.
+ */
+function vaultStore(onReady) {
+  const ext = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+  const area = ext && ext.storage && ext.storage.session;
+  if (!area) return typeof sessionStorage !== "undefined" ? sessionStorage : null;
+  const cache = new Map();
+  Promise.resolve(area.get(null)).then((all) => {
+    for (const [k, v] of Object.entries(all || {})) if (typeof v === "string") cache.set(k, v);
+    onReady();
+  }).catch(() => {});
+  return {
+    getItem: (k) => (cache.has(k) ? cache.get(k) : null),
+    setItem: (k, v) => { cache.set(k, v); Promise.resolve(area.set({ [k]: v })).catch(() => {}); },
+    removeItem: (k) => { cache.delete(k); Promise.resolve(area.remove(k)).catch(() => {}); }
+  };
+}
+
 class SafeShareSymbolicVault {
   constructor(storagePrefix = "safeshare_vault_") {
     this.storagePrefix = storagePrefix;
     this.inMemoryVault = new Map();
     this.counter = 1;
     this.activeChatId = null;
+    this.store = vaultStore(() => {
+      if (this.inMemoryVault.size === 0) this.loadFromSession(this.activeChatId);
+    });
     this.loadFromSession();
   }
 
@@ -23,12 +48,12 @@ class SafeShareSymbolicVault {
    */
   loadFromSession(chatId = null) {
     this.activeChatId = chatId;
-    if (typeof sessionStorage === "undefined") return;
+    if (!this.store) return;
     try {
       this.inMemoryVault.clear();
       this.counter = 1;
       const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
-      const data = sessionStorage.getItem(key);
+      const data = this.store.getItem(key);
       if (data) {
         const parsed = JSON.parse(data);
         for (const [k, v] of Object.entries(parsed)) {
@@ -47,7 +72,7 @@ class SafeShareSymbolicVault {
    */
   saveToSession(chatId = null) {
     if (chatId) this.activeChatId = chatId;
-    if (typeof sessionStorage === "undefined") return;
+    if (!this.store) return;
     try {
       const obj = {};
       for (const [k, v] of this.inMemoryVault.entries()) {
@@ -55,7 +80,7 @@ class SafeShareSymbolicVault {
       }
       const serialized = JSON.stringify(obj);
       const key = this.activeChatId ? `${this.storagePrefix}data_${this.activeChatId}` : `${this.storagePrefix}data_new`;
-      sessionStorage.setItem(key, serialized);
+      this.store.setItem(key, serialized);
     } catch (_) {}
   }
 
@@ -135,18 +160,18 @@ class SafeShareSymbolicVault {
   }
 
   /**
-   * Completely purges the vault in memory and in sessionStorage.
+   * Completely purges the vault in memory and in storage.
    */
   clear(chatId = null) {
     this.inMemoryVault.clear();
     this.counter = 1;
     const targetId = chatId || this.activeChatId;
     this.activeChatId = null;
-    if (typeof sessionStorage !== "undefined") {
+    if (this.store) {
       try {
         const key = targetId ? `${this.storagePrefix}data_${targetId}` : `${this.storagePrefix}data_new`;
-        sessionStorage.removeItem(key);
-        sessionStorage.removeItem(`${this.storagePrefix}data`);
+        this.store.removeItem(key);
+        this.store.removeItem(`${this.storagePrefix}data`);
       } catch (_) {}
     }
   }

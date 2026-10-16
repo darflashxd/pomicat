@@ -3,7 +3,10 @@
 Builds dist/SafeShare-<version>-chrome.zip and dist/SafeShare-<version>-firefox.zip from
 extension/. Chrome uses manifest.json (so "Load unpacked" on extension/ works directly);
 Firefox gets manifest.firefox.json as its manifest.json.
+Also writes dist/SHA256SUMS (zips + the share page files the relay serves), so people can check a
+zip before installing it and compare the relay's page with the release.
 """
+import hashlib
 import json
 import os
 import zipfile
@@ -32,3 +35,19 @@ for target, manifest in MANIFESTS.items():
         for path, rel in files():
             z.write(path, rel)
     print(f"{out} ({os.path.getsize(out) // 1024} KB)")
+
+
+def sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+sums = [(sha256(os.path.join(DIST, f"SafeShare-{version}-{t}.zip")), f"SafeShare-{version}-{t}.zip") for t in MANIFESTS]
+viewer = os.path.join(EXT, "viewer")
+for base, _, names in os.walk(viewer):
+    for name in sorted(names):
+        path = os.path.join(base, name)
+        sums.append((sha256(path), "viewer/" + os.path.relpath(path, viewer).replace(os.sep, "/")))
+with open(os.path.join(DIST, "SHA256SUMS"), "w", encoding="utf-8", newline="\n") as f:
+    f.writelines(f"{h}  {name}\n" for h, name in sums)
+print(os.path.join(DIST, "SHA256SUMS"))

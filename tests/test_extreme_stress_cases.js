@@ -27,8 +27,8 @@ globalThis.sessionStorage ??= { getItem: (k) => _store.get(k) ?? null, setItem: 
 const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ContextualClassifier = require("../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
-const SafeShareTamperGuard = require("../viewer/engine/tamper_guard.js");
-const SafeShareSteganography = require("../viewer/engine/steganography.js");
+const SafeShareTamperGuard = require("../extension/viewer/engine/tamper_guard.js");
+const SafeShareSteganography = require("../extension/viewer/engine/steganography.js");
 
 function runExtremeStressAudit() {
   console.log("================================================================================");

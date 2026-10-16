@@ -1,6 +1,6 @@
 // Run: node tests/continuation.test.js
 const assert = require("assert");
-const Bridge = require("../viewer/engine/extension_bridge.js");
+const Bridge = require("../extension/viewer/engine/extension_bridge.js");
 
 const build = Bridge.buildContinuationPrompt;
 

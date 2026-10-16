@@ -14,8 +14,8 @@ const assert = require("assert");
 const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
 const SafeShareCryptoExt = require("../extension/engine/crypto.js");
-const SafeShareCryptoViewer = require("../viewer/crypto.js");
-const SafeShareExtensionBridge = require("../viewer/engine/extension_bridge.js");
+const SafeShareCryptoViewer = require("../extension/viewer/crypto.js");
+const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_bridge.js");
 
 async function runDeepHardeningSuite() {
   console.log("================================================================================");
