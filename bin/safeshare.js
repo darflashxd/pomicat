@@ -21,7 +21,7 @@ const path = require("path");
 const HeuristicsRedactor = require("../extension/engine/heuristics.js");
 const ContextualClassifier = require("../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
-const { invert, inferBirthYears, bucket, formatRange, generalizeNumbers } = require("../extension/engine/policy.js");
+const { invert, inferBirthYears, inferDates, quasiIdentifiers, bucket, formatRange, generalizeNumbers } = require("../extension/engine/policy.js");
 
 // ---------------------------------------------------------------------------
 // Policy: presets, custom rules, allowlist
@@ -286,7 +286,13 @@ async function share(turns, { relay, ttl, burn }) {
 
 function parseTurns(input) {
   const trimmed = input.trim();
-  if (trimmed.startsWith("[")) return JSON.parse(trimmed);
+  // A JSON array of turns; plain text can start with "[" too ("[REDACTED_DATE] is ...")
+  if (trimmed.startsWith("[")) {
+    try {
+      const turns = JSON.parse(trimmed);
+      if (Array.isArray(turns)) return turns;
+    } catch (_) {}
+  }
   const turns = [];
   for (const line of trimmed.split(/\r?\n/)) {
     const m = /^(user|assistant)\s*:\s*(.*)$/i.exec(line);
@@ -362,13 +368,23 @@ function main(argv) {
     return redact(parseTurns(input), opts.policy).then((t) => share(t, opts)).catch(fail);
   }
 
-  const text = input.trim().startsWith("[") ? JSON.parse(input).map((t) => t.content).join("\n") : input;
+  const turns = parseTurns(input);
+  const text = turns.map((t) => t.content).join("\n");
+  // Details that together may point at one person: a warning, not a recovered value
+  const quasi = turns.map((t, i) => ({ turn: i + 1, ...quasiIdentifiers(t.content) }))
+    .filter((q, i) => turns[i].role === "user" && q.risky);
+  for (const q of opts.json ? [] : quasi) {
+    console.log(`Warning: message ${q.turn} combines ${q.kinds.join(", ")}${q.unique ? ' and "the only"' : ""}; ` +
+      "together these may point at one person. Consider making one of them vaguer.");
+  }
   const found = invert(text);
   // Birth years only matter when the text actually hides a birth date
   const hidesBirthDate = /\[[^\]]*(?:DOB|BIRTH)[^\]]*\]|<DATE_TIME>/i.test(text);
   const births = hidesBirthDate ? inferBirthYears(text) : [];
-  if (opts.json) return console.log(JSON.stringify({ amounts: found, birthYears: births }, null, 2));
-  if (!found.length && !births.length) return console.log("No hidden values recovered.");
+  // A date counts as recovered when the clues leave a handful of possibilities in two years
+  const dates = inferDates(text).filter((d) => d.candidates.length && d.candidates.length <= 14);
+  if (opts.json) return console.log(JSON.stringify({ amounts: found, birthYears: births, dates, combinations: quasi }, null, 2));
+  if (!found.length && !births.length && !dates.length) return console.log("No hidden values recovered.");
   found.forEach((f, i) => {
     const label = i === 0 ? "Most likely hidden value" : "Alternative";
     console.log(`${label}: ${formatMoney(f.value, f.currency)} (agreed by ${f.support} visible numbers)`);
@@ -379,9 +395,13 @@ function main(argv) {
     console.log(`Hidden birth date, but the birth year is ${b.year}${births[1] && births[1].support === b.support ? ` or ${births[1].year}` : ""} (from ${b.support} statement${b.support > 1 ? "s" : ""}):`);
     for (const d of b.derivations) console.log(`    age ${d}`);
   }
+  for (const d of dates) {
+    console.log(`Hidden date ${d.placeholder} is one of ${d.candidates.length} date${d.candidates.length > 1 ? "s" : ""}: ${d.candidates.join(", ")}`);
+    for (const c of d.clues) console.log(`    ${c}`);
+  }
   process.exitCode = 2; // non-zero so CI can fail on a leaky redaction
 }
 
-module.exports = { redact, redactTurns, invert, presidioHits, buildEngines, PRESETS, bucket, formatRange };
+module.exports = { redact, redactTurns, invert, inferDates, presidioHits, buildEngines, PRESETS, bucket, formatRange };
 
 if (require.main === module) main(process.argv.slice(2));

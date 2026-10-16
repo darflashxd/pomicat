@@ -3,6 +3,8 @@
  *  - invert(): the inversion attack. Finds a hidden value that several visible numbers agree on.
  *  - inferBirthYears(): the same idea for dates. A hidden birth date comes back from "I am 28"
  *    plus the current year, or "in 2020 at 22".
+ *  - inferDates(): a hidden date comes back from the clues around it ("is a Tuesday, the day
+ *    after the 14th"): the dates within a year either side that fit all of them.
  *  - generalizeNumbers(): replaces the user's own amounts with ranges ("Rp 2–5 juta") and keeps
  *    them only if invert() can't recover the originals.
  */
@@ -15,7 +17,45 @@
     root.SafeSharePolicy = factory(ConsistentPseudonymizer);
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function (Pseudonymizer) {
-  const { AdversaryOracleSolver, AGE_PATTERNS } = Pseudonymizer;
+  const { AdversaryOracleSolver, AGE_PATTERNS, hiddenDateClues } = Pseudonymizer;
+
+  const WEEKDAY_NAME = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  /**
+   * Dates a hidden date could be, from the weekday / offset / day-number clues near it.
+   * Only hidden dates with at least two clues, or a day number with a month, are reported.
+   * Result: [{ placeholder, candidates: ["2026-10-15", ...], clues: [string] }]
+   */
+  function inferDates(text, { now = new Date() } = {}) {
+    const out = [];
+    for (const h of hiddenDateClues(text)) {
+      const weekday = h.clues.find((c) => c.kind === "weekday");
+      const offset = h.clues.find((c) => c.kind === "offset");
+      const anchor = h.clues.find((c) => c.kind === "anchor");
+      const strong = [weekday, offset, anchor].filter(Boolean).length >= 2 || (anchor && anchor.month !== null);
+      if (!strong) continue;
+      const shift = offset ? offset.days : 0;
+      const candidates = [];
+      const day0 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      for (let k = -366; k <= 366; k++) {
+        const d = new Date(day0 + k * 86400000);
+        if (weekday && d.getUTCDay() !== weekday.dow) continue;
+        if (anchor) {
+          // The visible day number is the anchor; the hidden date is anchor + offset
+          const a = new Date(d.getTime() - shift * 86400000);
+          if (a.getUTCDate() !== anchor.day || (anchor.month !== null && a.getUTCMonth() !== anchor.month)) continue;
+        }
+        candidates.push(d.toISOString().slice(0, 10));
+      }
+      const clues = [
+        weekday && `weekday ${WEEKDAY_NAME[weekday.dow]}`,
+        offset && `${Math.abs(shift)} day${Math.abs(shift) === 1 ? "" : "s"} ${shift < 0 ? "before" : "after"} the visible date`,
+        anchor && `visible date: day ${anchor.day}${anchor.month !== null ? ` of month ${anchor.month + 1}` : ""}`
+      ].filter(Boolean);
+      out.push({ placeholder: h.placeholder, candidates, clues });
+    }
+    return out;
+  }
 
   /**
    * Birth years implied by stated ages. Each statement gives two candidates (birthday passed or
@@ -49,6 +89,28 @@
       .sort((a, b) => b.support - a.support || b.year - a.year)
       .slice(0, 2);
   }
+  /**
+   * Combinations of details that together point at one person ("the only female cardiologist at
+   * a 50-bed hospital in Blitar"), in the spirit of k-anonymity (Sweeney, 2002): each detail is
+   * harmless, the combination may match very few people.
+   * ponytail: counts kinds of detail and "the only"; it doesn't estimate how many people match.
+   * That needs population tables (BPS for Indonesia) per profession, region and gender.
+   * Result: { kinds: [string], unique: boolean, risky: boolean }
+   */
+  const QUASI_IDENTIFIERS = {
+    gender: /\b(?:female|male|woman|man|wanita|perempuan|pria|laki-laki)\b/i,
+    profession: /\b(?:\w+ologist|\w+iatrist|doctor|surgeon|nurse|midwife|teacher|lecturer|professor|lawyer|judge|engineer|pilot|pharmacist|dentist|dokter|perawat|bidan|guru|dosen|pengacara|hakim|apoteker|insinyur)\b/i,
+    workplace: /\b\d+[- ](?:bed|employee|staff|person|student|orang|karyawan|tempat tidur|murid|siswa)s?\b|\b(?:hospital|clinic|school|university|rumah sakit|klinik|puskesmas|sekolah|kampus)\b/i,
+    place: /\b(?:in|at|from|di|dari)\s+(?!the\b)[A-Z][a-z]{2,}/,
+    age: /\b(?:in (?:my|her|his) (?:early |late )?\d0s|\d{2}[- ]year[- ]old|usia \d0-an|umur \d{2})\b/i
+  };
+  const UNIQUE = /\b(?:the only|only one|the first|the sole|satu-satunya|hanya satu)\b/i;
+  function quasiIdentifiers(text) {
+    const kinds = Object.keys(QUASI_IDENTIFIERS).filter((k) => QUASI_IDENTIFIERS[k].test(text));
+    const unique = UNIQUE.test(text);
+    return { kinds, unique, risky: (unique && kinds.length >= 2) || kinds.length >= 4 };
+  }
+
   // Range generalization: "Rp 3.000.000" -> "Rp 2–5 juta"
 
   // 1-2-5 buckets: wide enough that the exact value can't be read back.
@@ -174,5 +236,5 @@
       .slice(0, limit);
   }
 
-  return { invert, inferBirthYears, bucket, formatRange, currencyOf, generalizeNumbers };
+  return { invert, inferBirthYears, inferDates, quasiIdentifiers, bucket, formatRange, currencyOf, generalizeNumbers };
 });

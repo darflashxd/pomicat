@@ -46,6 +46,66 @@ const AGE_PATTERNS = {
   atAge: /\b(?:in|tahun)\s+((?:19|20)\d{2})\s*,?\s+(?:at|when i was|pada usia|di usia|umur)\s+(?:age\s+)?(\d{1,2})\b/i
 };
 
+// Clues that pin down a hidden date, shared by the defence (below) and the attack
+// (policy.js inferDates): "[REDACTED_DATE] is a Tuesday, the day after my birthday on the 14th"
+// leaves only a couple of possible dates in a year.
+// ponytail: clues are searched within DATE_CLUE_WINDOW characters of the hidden date, not by
+// sentence structure; a clue about another date in that window is hidden too (safe side).
+const DATE_CLUE_WINDOW = 120;
+const HIDDEN_DATE = /\[(?:REDACTED_)?(?:DOB|DATE)(?:_\d+)?\]|<DATE_TIME>/g;
+const WEEKDAY_NUM = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+  minggu: 0, senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, "jum'at": 5, sabtu: 6 };
+const MONTH_NUM = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, mei: 4, jun: 5, jul: 6, aug: 7, agu: 7, sep: 8, oct: 9, okt: 9, nov: 10, dec: 11, des: 11 };
+const MONTH_WORD = "(?:jan(?:uary|uari)?|feb(?:ruary|ruari)?|mar(?:ch|et)?|apr(?:il)?|may|mei|jun(?:e|i)?|jul(?:y|i)?|aug(?:ust)?|agu(?:stus)?|sep(?:tember)?|oct(?:ober)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?|des(?:ember)?)";
+const NUM_WORD = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, se: 1 };
+
+/** Weekdays, day offsets and visible day numbers in a piece of text: [{ kind, index, length, ... }] */
+function dateClues(text) {
+  const clues = [];
+  const add = (re, fn) => { for (const m of text.matchAll(re)) clues.push({ index: m.index, length: m[0].length, ...fn(m) }); };
+  add(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|senin|selasa|rabu|kamis|jum'?at|sabtu|(?<=hari\s)minggu)\b/gi,
+    (m) => ({ kind: "weekday", dow: WEEKDAY_NUM[m[1].toLowerCase().replace("jum'at", "jumat")] }));
+  add(/\b(?:(?:the\s+)?(a|one|two|three|four|five|six|seven|ten|\d{1,2})?\s*(day|week)s?\s+(after|before|later|earlier)|(se|\d{1,2})\s*(hari|minggu)\s+(setelah|sesudah|sebelum|kemudian)|(besoknya|keesokan\s+harinya))\b/gi,
+    (m) => {
+      if (m[7]) return { kind: "offset", days: 1 };
+      const n = m[1] || m[4] ? (NUM_WORD[(m[1] || m[4]).toLowerCase()] || +(m[1] || m[4])) : 1;
+      const unit = /week|minggu/i.test(m[2] || m[5]) ? 7 : 1;
+      const before = /before|earlier|sebelum/i.test(m[3] || m[6]);
+      return { kind: "offset", days: (before ? -1 : 1) * n * unit };
+    });
+  add(new RegExp(`\\b(?:the\\s+(\\d{1,2})(?:st|nd|rd|th)\\b|tanggal\\s+(\\d{1,2})\\b|(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_WORD})\\b|(${MONTH_WORD})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)(?!\\s*,?\\s*(?:19|20)\\d{2})`, "gi"),
+    (m) => {
+      const day = +(m[1] || m[2] || m[3] || m[6]);
+      const mon = m[4] || m[5];
+      return { kind: "anchor", day, month: mon ? MONTH_NUM[mon.toLowerCase().slice(0, 3)] : null };
+    });
+  return clues.filter((c) => c.kind !== "anchor" || (c.day >= 1 && c.day <= 31));
+}
+
+/** Clues (found by cluesIn) within DATE_CLUE_WINDOW characters of each hidden placeholder. */
+function cluesNear(text, hidden, cluesIn) {
+  const out = [];
+  for (const m of text.matchAll(hidden)) {
+    const from = Math.max(0, m.index - DATE_CLUE_WINDOW);
+    const near = cluesIn(text.slice(from, m.index + m[0].length + DATE_CLUE_WINDOW))
+      .map((c) => ({ ...c, index: c.index + from }))
+      .filter((c) => c.index + c.length <= m.index || c.index >= m.index + m[0].length);
+    out.push({ placeholder: m[0], index: m.index, clues: near });
+  }
+  return out;
+}
+const hiddenDateClues = (text) => cluesNear(text, HIDDEN_DATE, dateClues);
+
+// A hidden address comes back from landmarks and distances next to it ("5 minutes from Masjid
+// Raya", "behind the Indomaret on Jl. Merdeka"). There is no attack in invert() for these (it
+// would need a map); the defence hides them. Each phrase runs to the next comma/full stop.
+const HIDDEN_PLACE = /\[(?:REDACTED_)?(?:ADDRESS|LOCATION|PLACE)(?:_\d+)?\]/g;
+function placeClues(text) {
+  const re = /\b(?:\d+\s*(?:min(?:ute)?s?|menit|km|kilomet(?:er|re)s?|meters?|blocks?)\s+(?:walk(?:ing)?\s+|drive\s+|jalan\s+kaki\s+)?(?:away\s+)?(?:from|to|dari|ke)|next\s+to|near|across\s+from|opposite|behind|in\s+front\s+of|around\s+the\s+corner\s+from|dekat|di\s+samping|di\s+sebelah|di\s+belakang|di\s+depan|seberang)\s+[^,.;!?\n]{2,60}/gi;
+  return [...text.matchAll(re)].map((m) => ({ kind: "landmark", index: m.index, length: m[0].length }));
+}
+const hiddenPlaceClues = (text) => cluesNear(text, HIDDEN_PLACE, placeClues);
+
 // 1 -> A, 26 -> Z, 27 -> AA (spreadsheet style), so name labels never run into symbols
 function letterLabel(n) {
   let s = "";
@@ -1318,6 +1378,21 @@ class ConsistentPseudonymizer {
       }
     }
 
+    // A hidden date comes back from the clues around it ("is a Tuesday, the day after the 14th"):
+    // hide weekdays, offsets and day numbers next to every hidden date.
+    // Same for a hidden address: landmarks and distances next to it.
+    const DATE_CLUE_TAG = { weekday: "[REDACTED_WEEKDAY]", offset: "[REDACTED_OFFSET]", anchor: "[REDACTED_DAY]", landmark: "[REDACTED_LANDMARK]" };
+    for (const t of updatedTurns) {
+      const spans = [...hiddenDateClues(t.content), ...hiddenPlaceClues(t.content)]
+        .flatMap((h) => h.clues).sort((a, b) => b.index - a.index);
+      let limit = Infinity;
+      for (const c of spans) {
+        if (c.index + c.length > limit) continue; // overlaps one already replaced
+        t.content = t.content.slice(0, c.index) + DATE_CLUE_TAG[c.kind] + t.content.slice(c.index + c.length);
+        limit = c.index;
+      }
+    }
+
     return {
       anonymizedTurns: updatedTurns,
       mappings: Array.from(this.entityMap.entries()).map(([k, v]) => {
@@ -1345,6 +1420,7 @@ ConsistentPseudonymizer.AdversaryOracleSolver = AdversaryOracleSolver;
 ConsistentPseudonymizer.PERSONAL_BEFORE = PERSONAL_BEFORE;
 ConsistentPseudonymizer.looksLikeName = looksLikeName;
 ConsistentPseudonymizer.AGE_PATTERNS = AGE_PATTERNS;
+ConsistentPseudonymizer.hiddenDateClues = hiddenDateClues;
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = ConsistentPseudonymizer;
