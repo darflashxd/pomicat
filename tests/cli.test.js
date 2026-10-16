@@ -47,11 +47,26 @@ const clean = [
   "See https://doi.org/10.1128/4111111111111111 for the method.",
   "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700');",
   "Give sodium bicarbonate; the elf moved with swift movement.",
-  "Treatment is decided on a case-by-case basis."
+  "Treatment is decided on a case-by-case basis.",
+  "ping 10.1.2.60 and ssh deploy@192.168.1.20",
+  "docker run -d -p 5432:5432 --name db",
+  "server { listen 80; } and PORT=8080",
+  "SELECT id, email FROM users WHERE id = 123 LIMIT 100;",
+  "meeting on 2026-01-05 at noon, load average is 5.0 per core."
 ];
 for (const c of clean) {
   const out = redactTurns([{ role: "user", content: "I'm Rina. Help me." }, { role: "assistant", content: c }])[1].content;
   assert.strictEqual(out, c, "over-redacted: " + out);
 }
+
+// Bare birth dates hide only with a personal marker nearby
+let dob = redactTurns([{ role: "user", content: "My birthday is May 5 1998" }])[0].content;
+assert(dob.includes("[REDACTED_DOB]"), dob);
+dob = redactTurns([{ role: "user", content: "ulang tahun saya 5 Mei 1998" }])[0].content;
+assert(dob.includes("[REDACTED_DOB]"), dob);
+
+// Private IPs pass through; public IPs still go
+let ipt = redactTurns([{ role: "user", content: "ping 10.0.0.5 then 203.0.113.7" }])[0].content;
+assert(ipt.includes("10.0.0.5") && ipt.includes("[REDACTED_IP]"), ipt);
 
 console.log("cli: all checks passed");

@@ -253,6 +253,9 @@ class HeuristicsRedactor {
           if (val === "127.0.0.1" || val === "0.0.0.0" || val === "255.255.255.255") return false;
           // Preserve public DNS providers (Cloudflare, Google, Quad9, OpenDNS)
           if (/^(?:1\.1\.1\.1|1\.0\.0\.1|8\.8\.8\.8|8\.8\.4\.4|9\.9\.9\.9|208\.67\.222\.222|208\.67\.220\.220)$/.test(val)) return false;
+          // Preserve non-routable addresses (RFC 1918 private + link-local): they identify
+          // a LAN, not a person. Public IPs are still redacted. See also Tier-0 PRIVATE_IP.
+          if (/^(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|169\.254\.)/.test(val)) return false;
           if (text) {
             // Exclude CIDR network masks like /24, /16, /8, /32
             const after = text.substring(index + raw.length, index + raw.length + 4);
@@ -752,6 +755,21 @@ class HeuristicsRedactor {
         category: "PROFILE",
         regex: /\b((?:(?:date\s+of\s+birth|dob|born\s+on|birth\s*date|tanggal\s+lahir|tgl\s+lahir|lahir(?:\s+tanggal|\s+pada)?)\s*(?:is|\s*[:=\-~])?\s*))(\d{4}[-/.]\d{2}[-/.]\d{2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4}|(?:(?:\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember))|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))\s+\d{1,2}(?:th|st|nd|rd)?)),?\s+\d{4})\b/gi,
         replacement: "$1[REDACTED_DOB]"
+      },
+      // 16q-2. Bare birth dates: date formats WITHOUT an explicit keyword only count when a
+      // personal birth marker sits nearby ("My birthday is May 5 1998", "ulang tahun saya 5 Mei 1998").
+      // Plain "meeting on 2026-01-05" is left alone.
+      {
+        id: "ID_DOB_BARE",
+        name: "Date of Birth (bare, contextual)",
+        category: "PROFILE",
+        regex: /\b(\d{4}[-/.]\d{2}[-/.]\d{2}|\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)\d{2}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))\s+\d{1,2}(?:th|st|nd|rd)?,?\s+\d{4})\b/gi,
+        validator: (raw, index, text) => {
+          if (!text) return false;
+          const window = text.substring(Math.max(0, index - 60), index + raw.length + 20);
+          return /(?:\bbirth(?:day|date)?\b|\bborn\b|\bdob\b|\blahir\b|ulang\stahun|kelahiran|tanggal\slahir)/i.test(window);
+        },
+        replacement: "[REDACTED_DOB]"
       },
       // 16r. Mother's Maiden Name (Knowledge-Based Authentication Question)
       {

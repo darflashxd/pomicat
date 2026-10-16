@@ -84,8 +84,10 @@ class PrioritySpanArbiter {
       { label: "SEM_VER", regex: /\bv?\d+\.\d+\.\d+(?:-[a-zA-Z0-9_.]+)?\b/g },
 
       // 5. Model Names, Benchmarks, Git Hashes, Hex Offsets
+      // GIT_HASH must contain a letter: pure-digit runs (cards, bank accounts, NIK)
+      // belong to Tier-1, not to NER veto. Real hashes virtually always mix letters in.
       { label: "MODEL_TAG", regex: /\b(?:claude|gpt|gemini|llama|mistral|bert|distilbert)-[a-zA-Z0-9._-]+\b/gi },
-      { label: "GIT_HASH", regex: /\b[0-9a-f]{7,40}\b/g },
+      { label: "GIT_HASH", regex: /\b(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/g },
       { label: "HEX_ADDR", regex: /\b0x[0-9a-fA-F]{4,16}\b/g },
 
       // 6. SQL Query Keywords & Database Syntax
@@ -95,7 +97,19 @@ class PrioritySpanArbiter {
       { label: "CLI_FLAG", regex: /(?<=\s|^)(?:--[a-zA-Z0-9_-]{2,30}|-[a-zA-Z0-9])(?=[\s=]|$)/g },
 
       // 8. File Paths (Unix & Windows)
-      { label: "FILE_PATH", regex: /(?:(?:\/[a-zA-Z0-9._-]+){2,}|\b[A-Z]:\\[a-zA-Z0-9._\-\\]+)/g }
+      { label: "FILE_PATH", regex: /(?:(?:\/[a-zA-Z0-9._-]+){2,}|\b[A-Z]:\\[a-zA-Z0-9._\-\\]+)/g },
+
+      // 9. Bare ports in CLI/network context (never PII: `-p 5432`, `:5432`, `listen 80`, `PORT=8080`)
+      // NOTE: hyphen-led flags need a lookbehind, not \b (no word boundary before `-`);
+      // and `--port` needs optional hyphens consumed after that boundary.
+      { label: "BARE_PORT", regex: /(?::\d{2,5}\b|(?:(?<=[\s-])|^)-{0,2}(?:p\b|port|listen|dport)\s+\d{2,5}\b|\bPORT\s*=\s*\d{2,5}\b)/gi },
+
+      // 10. SQL numerics (`WHERE id = 123`, `LIMIT 100`, `VALUES (..., 42)`).
+      // Plain `salary = 5000` has no SQL keyword nearby and is NOT vetoed.
+      { label: "SQL_NUMERIC", regex: /(?:\bWHERE\b[^;\n]*?=\s*\d+|\bVALUES\b[^;\n]*?\(?\s*\d+|\bLIMIT\s+\d+|\bid\s*=\s*\d+)/gi },
+
+      // 11. Non-routable IPs (RFC 1918 + link-local). Mirrors the Tier-1 IPV4_ADDRESS validator.
+      { label: "PRIVATE_IP", regex: /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|169\.254\.\d{1,3}\.\d{1,3})\b/g }
     ];
 
     for (const pat of patterns) {
