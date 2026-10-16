@@ -1,43 +1,68 @@
-# SOTA NER Benchmark — Final Matrix (2026-10-16)
+# NER model comparison (2026-10-16)
 
-Gold identik untuk semua baris: ai4privacy EN 2000 (`tools/eval/data/ai4privacy_en.jsonl`,
-seed 1337) + CLI hardneg 5000 (`data/cli_hardneg_gold.jsonl`). Metrik: `tools/eval/score.py`.
-Bahasa Inggris diutamakan (target BlackHat internasional).
+Same gold data for every row: ai4privacy EN 2000 (`tools/eval/data/ai4privacy_en.jsonl`,
+seed 1337) and the CLI hard-negative set of 5000 (`data/cli_hardneg_gold.jsonl`). Scored with
+`tools/eval/score.py`. English first, since the Black Hat audience is international.
+
+**What these numbers are not.** They measure each model on these two datasets. They are not the
+extension's behaviour in a chat: before sending, the extension keeps only names/places tied to the
+writer (so far fewer hits than "MiniLM + arbiter" here), and the share dialog doesn't use the model
+at all. See "Four different numbers" below.
 
 ## ai4privacy EN 2000 (value recall / token F1)
 
-| Model | Recall | F1 | Catatan |
+| Model | Recall | F1 | Notes |
 |---|---|---|---|
-| MiniLM Q4 produksi (35 label PII) | **0.808** | **0.848** | mengalahkan Presidio 0.79; gap DATE/TIME (ditutup Tier-1 ID_DOB_BARE, P2) |
-| MiniLM Q4 + arbiter Tier-0 (perilaku Gate-2 extension) | 0.797 | 0.834 | setelah fix GIT_HASH-harus-huruf: CARD 0→0.975, SSN→0.806 |
-| MiniLM Q4 + arbiter Tier-0 (perilaku Gate-2 extension) | 0.759 | 0.816 | threshold+veto pangkas CARD/SSN (tugas Tier-1) |
-| Tier-1 rules + Gate-2 (UNION) | **0.811** | — | recall gabungan; best-of-both per label |
-| GLiNER-bi-small zero-shot | 0.678 | 0.743 | tanpa latih; label generik |
-| DeBERTa-xsmall fine-tune sintetis | 0.366 | 0.458 | sintetik F1 0.783 → transfer gagal |
-| mMiniLMv2 fine-tune sintetis | 0.341 | 0.423 | sintetik F1 0.744 → transfer gagal ringan |
-| SafeShare rules saja | 0.167 | 0.339 | hanya EMAIL/SSN/CARD |
-| Electra fine-tune sintetis | 0.115 | 0.169 | sintetik F1 0.627 → transfer gagal total |
+| MiniLM Q4, shipped (35 PII labels) | **0.808** | **0.848** | Above Presidio (0.79); weak on DATE/TIME (covered by the Tier-1 ID_DOB_BARE rule) |
+| MiniLM Q4 + Tier-0 arbiter (after the GIT_HASH-must-have-a-letter fix) | 0.797 | 0.834 | CARD 0 → 0.975, SSN → 0.806 |
+| MiniLM Q4 + Tier-0 arbiter (before that fix) | 0.759 | 0.816 | Thresholds + veto removed CARD/SSN (left to Tier-1) |
+| Tier-1 rules + MiniLM (union) | **0.811** | — | Combined recall, best of both per label |
+| GLiNER-bi-small, zero-shot | 0.678 | 0.743 | No training; generic labels |
+| DeBERTa-xsmall, fine-tuned on synthetic data | 0.366 | 0.458 | Synthetic F1 0.783; didn't transfer |
+| mMiniLMv2, fine-tuned on synthetic data | 0.341 | 0.423 | Synthetic F1 0.744; didn't transfer |
+| SafeShare rules only | 0.167 | 0.339 | EMAIL / SSN / CARD only |
+| Electra, fine-tuned on synthetic data | 0.115 | 0.169 | Synthetic F1 0.627; didn't transfer at all |
 
-## CLI hardneg 5000 (FP-rate, target <2%)
+The arbiter rows were measured with raw-logit scores. `extension/offscreen.js` now passes softmax
+probabilities to the arbiter's thresholds (as they were meant to be), so these two rows need
+re-measuring.
 
-| Model | FP-rate |
+## CLI hard-negative set, 5000 (false-positive rate, target < 2%)
+
+Only on this set: technical text (logs, code, configs) with no personal data. It is not a
+false-positive rate on real chats; for that see the WildChat numbers in `RESULTS.md`.
+
+| Model | FP rate |
 |---|---|
-| Electra / mMiniLM / DeBERTa fine-tune (+hardneg) | **0.00%** |
-| Hybrid MiniLM+arbiter (final) | **0.00%** (13.08% → 1.10% → 0.00% via Tier-0 BARE_PORT/SQL/PRIVATE_IP) |
-| SafeShare rules (final) | **0.00%** (7.58% → 0.00% via pengecualian IP privat) |
-| SafeShare rules | 7.58% (sisa: IP privat 10.x/192.168.x) |
-| Hybrid MiniLM+arbiter | 13.08% (sisa: bare port, SQL id, IP privat) |
-| MiniLM mentah | 38.34% |
+| Electra / mMiniLM / DeBERTa fine-tuned (+ hard negatives) | **0.00%** |
+| MiniLM + arbiter (final) | **0.00%** (13.08% → 1.10% → 0.00% with Tier-0 BARE_PORT / SQL / PRIVATE_IP) |
+| SafeShare rules (final) | **0.00%** (7.58% → 0.00% by excluding private IPs) |
+| SafeShare rules (before) | 7.58% (left: private IPs 10.x / 192.168.x) |
+| MiniLM + arbiter (before) | 13.08% (left: bare ports, SQL ids, private IPs) |
+| MiniLM raw | 38.34% |
 
-## Latensi CPU proxy @128 token (ordering, bukan vonis WASM)
+## CPU latency at 128 tokens (relative order only; WASM in the browser differs)
 
-MiniLM 50ms · electra 63ms · mobilebert 166ms · mMiniLMv2 181ms · albert 244ms · deberta 1322ms (eager; ONNX/WASM beda jauh).
+MiniLM 50 ms · electra 63 ms · mobilebert 166 ms · mMiniLMv2 181 ms · albert 244 ms · deberta 1322 ms (eager PyTorch).
 
-## Keputusan
+## Decisions
 
-1. **MiniLM produksi TETAP.** Tak ada kandidat mengalahkannya di PII Inggris real. Fine-tune sintetis-only terbukti tidak mentransfer (pelajaran utama, dilaporkan jujur).
-2. **Cerita BlackHat yang didukung angka:** MiniLM 0.848 + arbiter menekan FP 38%→13% + Tier-1 menutup kartu/SSN (union 0.793) + inversion defense (0 recovered). GLiNER sebagai pembanding zero-shot yang kuat (0.743).
-3. **Follow-up (bukan blocker Arsenal):** FP-CLI 13%→<2% via perluasan pola Tier-0/Tier-1 (bare port, SQL numerik, IP privat); DATE/TIME via DATE_TIME recognizer; uji multilingual bila perlu.
-4. Go/no-go ganti `extension/models/`: **NO-GO** — tidak ada pemenang. Zoo 2.55GB boleh dihapus kecuali untuk reproduksibilitas.
+1. **Keep the shipped MiniLM.** No candidate beat it on real English PII. Fine-tuning on
+   synthetic data alone did not transfer; that is the main lesson, reported as is.
+2. Supported by these numbers: MiniLM F1 0.848; the arbiter cut CLI false positives from 38% to
+   0% on the hard-negative set; Tier-1 rules cover cards/SSNs; the inversion defense leaves no
+   salary recoverable (`RESULTS.md`). GLiNER is a strong zero-shot comparison (0.743).
+3. Follow-ups (not Arsenal blockers): DATE/TIME through a date recognizer; multilingual tests.
+4. Replace `extension/models/`? **No**: there is no better model. The 2.55 GB model zoo can be
+   deleted except for reproducibility.
 
-Reproduksi: `tools/sota/RUNLOG.md` + script di `tools/sota/`.
+## Four different numbers
+
+| Number | What it measures | Where |
+|---|---|---|
+| Raw model | MiniLM alone on ai4privacy (F1 0.848) | this file |
+| Simulated hybrid | MiniLM + arbiter + Tier-1 offline on ai4privacy (0.834 / union 0.811 recall) | this file |
+| Before sending | Extension in Chrome: rules + MiniLM, writer-tied names/places only | not measured yet (ROADMAP §3) |
+| Share path | Share dialog: rules + contextual names, no MiniLM | CLI numbers in `RESULTS.md` are the closest |
+
+Reproduce: `tools/sota/RUNLOG.md` and the scripts in `tools/sota/`.

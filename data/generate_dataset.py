@@ -1,6 +1,5 @@
 """
 SafeShare-AI — Comprehensive Contextual Privacy Dataset Generator V4 (SafeShare-PrivacyBench 100k)
-Engineered for Black Hat Asia 2027 Arsenal & Academic Peer-Reviewed Security Benchmarks.
 
 Key Innovations:
 1. Probabilistic Context-Free Grammar (PCFG): 300+ combinatorial syntactic patterns.

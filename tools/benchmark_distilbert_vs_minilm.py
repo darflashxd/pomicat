@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-SafeShare-AI — Peer-Reviewed Comparative Benchmark: DistilBERT vs MiniLM Q4 vs SafeShare Hybrid
-Target: Black Hat Asia 2027 (Briefings & Arsenal) / USENIX Security
+SafeShare-AI — Comparative Benchmark: DistilBERT vs MiniLM Q4 vs SafeShare Hybrid
 
 Evaluates 3 Candidates:
   1. Candidate A: DistilBERT FP32 (514.01 MB) - Baseline Transformer
@@ -52,7 +51,7 @@ DEV_SAMPLES = [
 
 def run_benchmark():
     print("=" * 85)
-    print("  SAFESHARE-AI: PEER-REVIEWED COMPARATIVE BENCHMARK (BLACK HAT ASIA 2027)")
+    print("  SAFESHARE-AI: COMPARATIVE BENCHMARK (BLACK HAT ASIA 2027)")
     print("  Candidate A: DistilBERT FP32 (514 MB) vs Candidate B: MiniLM Q4 (14 MB) vs Candidate C: SafeShare Hybrid")
     print("=" * 85)
 
@@ -257,7 +256,7 @@ def run_benchmark():
 
     # Print Formal Black Hat Comparative Table
     print("\n" + "=" * 95)
-    print("                 PEER-REVIEWED COMPARATIVE BENCHMARK MATRIX (EMPIRICAL DATA)")
+    print("                 COMPARATIVE BENCHMARK MATRIX (EMPIRICAL DATA)")
     print("=" * 95)
     print(f"{'Evaluation Metric':<32} | {'Candidate A: DistilBERT':<24} | {'Candidate B: MiniLM Q4':<22} | {'Candidate C: SafeShare Hybrid'}")
     print("-" * 95)
@@ -280,7 +279,7 @@ def run_benchmark():
     print(f"       - {np.percentile(db_latencies, 50):.2f} ms latency is ~{np.percentile(db_latencies, 50) / np.percentile(ss_latencies, 50):.1f}x slower than SafeShare.")
     print("       - High false positive rate ruins developer code and terminal prompts.")
     print("    2. MiniLM-L6-H384 Q4 ONNX is vastly superior in resource efficiency (14.01 MB, ~2 ms).")
-    print("    3. SafeShare-AI Hybrid Engine delivers the optimal peer-reviewed defense:")
+    print("    3. SafeShare-AI Hybrid Engine scores best in this benchmark:")
     print(f"       - Highest recall ({ss_recall:.2f}%) via deterministic + neural synthesis.")
     print(f"       - Absolute 0.00% False Positive on technical/developer tokens via PrioritySpanArbiter.")
     print("       - Only architecture providing provable immunity against Algebraic Side-Channel Attacks (ASCA).")

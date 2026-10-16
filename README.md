@@ -55,7 +55,7 @@ almost never shared their own finances, and nothing leaked in the few that did
 |---|---|---|
 | Pattern rules | Regex plus checksums: Indonesian NIK/NPWP/BPJS, cards (Luhn), IBAN, API keys, DB URIs, JWTs, seed phrases, shell prompts and home paths, 20+ national IDs | `extension/engine/heuristics.js` |
 | Contextual rules | Separates "my salary" / "gaji saya" from "the average salary" / "rata-rata gaji". Rule-based, no ML model. | `extension/engine/contextual.js` |
-| Inversion defense | Normalises numbers across formats (`10,8 juta`, `10.8M`, `Rp 10.800.000`), then removes every visible number that can be derived from a redacted one. Ratios such as 30% are kept, because on their own they reveal nothing. | `extension/engine/pseudonymizer.js` |
+| Inversion defense | Normalises numbers across formats (`10,8 juta`, `10.8M`, `Rp 10.800.000`), then removes visible numbers derivable from a redacted one through the supported arithmetic (ratios, per-period amounts, projections, sums and differences). Ratios such as 30% are kept, because on their own they reveal nothing. | `extension/engine/pseudonymizer.js` |
 
 Redacted values become consistent placeholders (`[REDACTED_FINANCIAL_1]`) across the whole
 conversation, so the chat still reads naturally.
@@ -67,7 +67,7 @@ conversation, so the chat still reads naturally.
 | Search engines and crawlers (Google dorking) | Index any share page they find a link to | The server and the page only hold ciphertext; the key is in the `#` part of the link, which browsers never send. `noindex` headers on every response. |
 | Scrapers guessing links | Try share IDs in bulk | IDs are random UUIDs (122 bits), and reads are rate-limited per IP. |
 | Anyone who gets the full link (forwarded, pasted in a public channel) | Read the shared chat | Redaction before sharing, so there is little to read; burn after one view, expiry, and revoke limit how long it's readable. |
-| A reader doing arithmetic on the shared chat | Recover a redacted amount from the numbers around it | The inversion defense removes every derivable figure; `invert` checks it. |
+| A reader doing arithmetic on the shared chat | Recover a redacted amount from the numbers around it | The inversion defense removes figures derivable through the supported arithmetic; `invert` checks the result. |
 | The relay operator (Cloudflare, or whoever deploys it) | See ciphertext, IP addresses, timing, sizes | Can't read content. Metadata is visible. |
 | The AI vendor | See whatever you send it | Before-sending protection replaces IDs and amounts (`<S1>`) while you chat; names are still sent. |
 
@@ -101,7 +101,10 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
   With `--presidio` the CLI uses Presidio for names, places, phones and IDs, and with
   every name and date turned on it matches Presidio (0.78 vs 0.79) while also blocking
   the inversion attack. The extension's MiniLM alone scores token F1 0.85 on ai4privacy
-  (`tools/eval/RESULTS_SOTA.md`).
+  (`tools/eval/RESULTS_SOTA.md`). That is the raw model on a benchmark: in a chat the extension
+  uses it only before sending (Chrome) and only for the writer's own names and places, and the
+  share dialog doesn't use it. The "0% false positives" there is on a technical hard-negative set
+  only, not real chats.
 - **Benchmarks and real chats disagree about names.** ai4privacy labels every name as PII; real
   chats are full of names that aren't the user's (celebrities, story characters, authors). Turning
   all names on touches 71% of real conversations. The default, `names: personal`, only redacts a

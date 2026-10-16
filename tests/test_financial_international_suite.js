@@ -4,7 +4,6 @@
  * corporate ledgers, GAAP accounting parentheses, multi-turn algebraic inversions, and
  * macroeconomic zero-false-positive controls.
  *
- * Benchmark: Black Hat Asia 2027 Arsenal / USENIX PETS
  */
 
 const assert = require("assert");

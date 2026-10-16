@@ -11,7 +11,8 @@ mask it. SafeShare shows why that is not enough for AI chats. The assistant's an
 figures derived from what the user said (savings, yearly totals, ages, dates), and these give the
 hidden value back. `safeshare invert` takes a chat redacted by any tool and recovers hidden
 amounts by finding the one number several visible figures agree on, and hidden birth years from
-stated ages. SafeShare's redactor removes the secret together with everything derivable from it,
+stated ages. SafeShare's redactor removes the secret together with the figures derivable from it (ratios,
+per-period amounts, projections, sums and differences),
 can show amounts as ranges so the chat stays useful, and shares the result as an end-to-end
 encrypted link that expires or burns after one read. It runs as a browser extension for ChatGPT,
 Claude and DeepSeek (with protection before sending, too), a CLI and an OpenAI-compatible proxy,

@@ -7,7 +7,6 @@
  * 4. Unexpected Edge Cases: Markdown table row splitting, inline code comments,
  *    multi-turn inferential deduction attacks, and CTF/Assembly Zero-False-Positive controls.
  *
- * Benchmark: Black Hat Asia 2027 Arsenal & USENIX Security
  */
 
 const assert = require("assert");

@@ -7,7 +7,6 @@
  *   - Utility Degradation Rate (UDR)
  *   - Latency per Turn
  * 
- * Standard: Black Hat Asia 2027 Arsenal & USENIX Security
  */
 
 const assert = require("assert");

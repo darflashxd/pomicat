@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-SafeShare-AI — Weaponized Algebraic Side-Channel Attack (ASCA) Proof of Concept
-Target Venues: Black Hat Asia 2027 (Briefings & Arsenal) / USENIX Security
+SafeShare-AI — Inversion attack proof of concept
 
 Empirical demonstration of Algebraic Inversion Attack on LLM prompts:
 Demonstrates that naive string masking (Microsoft Presidio / Enterprise DLP)
@@ -197,8 +196,7 @@ class AdaptiveAttacker:
 
 def run_asca_benchmark():
     print("=" * 80)
-    print("  SAFESHARE-AI: WEAPONIZED ALGEBRAIC SIDE-CHANNEL ATTACK (ASCA) PROOF OF CONCEPT")
-    print("  Target Venues: Black Hat Asia 2027 (Briefings & Arsenal) / USENIX Security")
+    print("  SAFESHARE-AI: INVERSION ATTACK PROOF OF CONCEPT")
     print("=" * 80)
 
     presidio = PresidioBaselineDLP()

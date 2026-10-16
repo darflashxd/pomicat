@@ -15,7 +15,7 @@
  *   - Mean Processing Latency per Conversation (ms).
  *   - Client RAM Footprint (MB).
  * 
- * Target Venues: Black Hat Asia 2027 Arsenal & USENIX Security / PETS
+ * Target Venues: Black Hat Asia 2027 Arsenal
  */
 
 const fs = require("fs");
@@ -135,7 +135,7 @@ class Engine3SafeShareAI {
 async function runComparativeBenchmark() {
   console.log("================================================================================");
   console.log("  SAFESHARE-AI: 3-ENGINE COMPARATIVE SECURITY & UTILITY BENCHMARK AUDIT");
-  console.log("  Target Venues: Black Hat Asia 2027 Arsenal & USENIX Security / PETS");
+  console.log("  Target Venues: Black Hat Asia 2027 Arsenal");
   console.log("================================================================================");
 
   // Load Benchmark Corpora
@@ -335,7 +335,7 @@ function generateMarkdownReport(scenarioCount, metrics) {
 
   const mdContent = `# SafeShare-AI: Empirical 3-Engine Comparative Benchmark Report
 
-**Target Venues:** Black Hat Asia 2027 Arsenal & Academic Peer-Reviewed Publications (USENIX Security / PETS)  
+**Target Venues:** Black Hat Asia 2027 Arsenal  
 **Evaluated Scenarios:** ${scenarioCount} Multi-Domain Adversarial & Real-World Scenarios  
 **Date:** October 2026  
 **Hardware Environment:** Intel i7-14650HX / NVIDIA RTX 4060 / Node.js Engine Runtime  

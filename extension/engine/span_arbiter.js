@@ -7,7 +7,6 @@
  *   Tier 1 (Deterministic PII): Luhn CC, SSN, NINO, SIN, NRIC, IBAN, Email, E.164 Phone
  *   Tier 2 (Open-Domain NER): MiniLM Q4 Transformer (Names, Streets, Cities)
  *
- * Standard: Black Hat Asia 2027 & USENIX Security
  */
 
 class PrioritySpanArbiter {

@@ -35,7 +35,6 @@ def load_json(filepath: str):
 def run_two_profile_benchmark():
     print("=" * 85)
     print("  SAFESHARE-AI: TWO-PROFILE INTERNATIONAL BENCHMARK ABLATION EVALUATOR")
-    print("  Standards: Black Hat Asia 2027 (Briefings & Arsenal) / USENIX Security")
     print("=" * 85)
 
     # 1. Load MiniLM Q4 ONNX Model
