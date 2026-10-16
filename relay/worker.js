@@ -127,31 +127,28 @@ export default {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
-        // Store into Cloudflare D1 Database if bound
-        if (env.DB) {
-          try {
-            // Plain INSERT: the PRIMARY KEY rejects any attempt to overwrite an existing share.
-            await env.DB.prepare(
-              "INSERT INTO shares (id, ciphertext, created_at, expires_at, burn_on_read, view_count, revoke_hash) VALUES (?, ?, ?, ?, ?, 0, ?)"
-            )
-              .bind(id, ciphertext, now, expiresAt, burnFlag, revokeHash)
-              .run();
-          } catch (e) {
-            if (/UNIQUE|constraint/i.test(e.message)) return conflict();
-            throw e;
-          }
-
-          // Lazy background cleanup of expired records
-          if (ctx && ctx.waitUntil) ctx.waitUntil(purgeExpired(env));
-        } else if (env.SAFESHARE_KV) {
-          const existing = await env.SAFESHARE_KV.get(id);
-          if (existing) return conflict();
-          // Fallback to KV if configured
-          // ponytail: KV get-then-put is not atomic; D1 is the supported backend.
-          await env.SAFESHARE_KV.put(id, JSON.stringify({ ciphertext, created_at: now, burn_on_read: burnFlag, revoke_hash: revokeHash }), {
-            expirationTtl: ttlSec
+        // Store into Cloudflare D1 Database (required binding; no KV fallback:
+        // KV get-then-put is not atomic, so overwrite races were possible).
+        if (!env.DB) {
+          return new Response(JSON.stringify({ error: "Relay not configured (missing DB binding)" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
+        try {
+          // Plain INSERT: the PRIMARY KEY rejects any attempt to overwrite an existing share.
+          await env.DB.prepare(
+            "INSERT INTO shares (id, ciphertext, created_at, expires_at, burn_on_read, view_count, revoke_hash) VALUES (?, ?, ?, ?, ?, 0, ?)"
+          )
+            .bind(id, ciphertext, now, expiresAt, burnFlag, revokeHash)
+            .run();
+        } catch (e) {
+          if (/UNIQUE|constraint/i.test(e.message)) return conflict();
+          throw e;
+        }
+
+        // Lazy background cleanup of expired records
+        if (ctx && ctx.waitUntil) ctx.waitUntil(purgeExpired(env));
 
         return new Response(
           JSON.stringify({
@@ -191,17 +188,9 @@ export default {
         const tokenHash = await sha256Hex(token);
 
         let deleted = false;
-        if (env.DB) {
-          const res = await env.DB.prepare("DELETE FROM shares WHERE id = ? AND revoke_hash = ?")
-            .bind(shareId, tokenHash).run();
-          deleted = (res.meta?.changes || 0) > 0;
-        } else if (env.SAFESHARE_KV) {
-          const raw = await env.SAFESHARE_KV.get(shareId);
-          if (raw && JSON.parse(raw).revoke_hash === tokenHash) {
-            await env.SAFESHARE_KV.delete(shareId);
-            deleted = true;
-          }
-        }
+        const res = await env.DB.prepare("DELETE FROM shares WHERE id = ? AND revoke_hash = ?")
+          .bind(shareId, tokenHash).run();
+        deleted = (res.meta?.changes || 0) > 0;
         // Same response for "wrong token" and "not found" so the endpoint can't probe IDs.
         if (!deleted) return json({ error: "Not found or invalid token" }, 404);
         return json({ status: "revoked", id: shareId }, 200);
@@ -221,7 +210,7 @@ export default {
         let isExpired = false;
         let wasBurned = false;
 
-        if (env.DB) {
+        {
           const row = await env.DB.prepare(
             "SELECT ciphertext, expires_at, burn_on_read FROM shares WHERE id = ?"
           )
@@ -255,18 +244,6 @@ export default {
               if (ctx && ctx.waitUntil) {
                 ctx.waitUntil(env.DB.prepare("UPDATE shares SET view_count = view_count + 1 WHERE id = ?").bind(shareId).run());
               }
-            }
-          }
-        } else if (env.SAFESHARE_KV) {
-          const raw = await env.SAFESHARE_KV.get(shareId);
-          if (!raw) {
-            isExpired = true;
-          } else {
-            const item = JSON.parse(raw);
-            ciphertext = item.ciphertext;
-            if (item.burn_on_read === 1) {
-              wasBurned = true;
-              await env.SAFESHARE_KV.delete(shareId);
             }
           }
         }

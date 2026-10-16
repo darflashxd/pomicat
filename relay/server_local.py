@@ -175,23 +175,6 @@ class SafeShareHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_cors(400)
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
-        elif self.path == "/api/chat":
-            length = int(self.headers.get("Content-Length", 0))
-            if length > 512 * 1024:
-                self._send_cors(413)
-                self.wfile.write(json.dumps({"error": "Payload exceeds maximum allowed size"}).encode())
-                return
-
-            raw_body = self.rfile.read(length).decode("utf-8")
-            try:
-                data = json.loads(raw_body)
-                messages = data.get("messages", [])
-                ai_reply = self._call_ai_gateway(messages)
-                self._send_cors(200)
-                self.wfile.write(json.dumps({"role": "assistant", "content": ai_reply}).encode())
-            except Exception as e:
-                self._send_cors(500)
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
         elif self.path.startswith("/api/revoke/"):
             share_id = self.path.replace("/api/revoke/", "").strip()
             length = int(self.headers.get("Content-Length", 0))
@@ -213,31 +196,6 @@ class SafeShareHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
         else:
             self._send_cors(404)
-
-    def _call_ai_gateway(self, messages):
-        try:
-            import urllib.request
-            gateway_url = os.environ.get("NINEROUTER_URL", "http://localhost:20128/v1/chat/completions")
-            api_key = os.environ.get("NINEROUTER_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
-            headers = {
-                "Content-Type": "application/json"
-            }
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-
-            payload = {
-                "model": os.environ.get("SAFESHARE_LLM_MODEL", "ag/gemini-3.8-flash-low"),
-                "messages": messages,
-                "stream": False
-            }
-            req = urllib.request.Request(gateway_url, data=json.dumps(payload).encode("utf-8"), headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
-                return res_json["choices"][0]["message"]["content"]
-        except Exception as e:
-            print("[-] AI gateway error:", e)
-            last_msg = messages[-1]["content"] if messages else "lanjutan"
-            return f"Melanjutkan diskusi dari percakapan sebelumnya:\n\nMengenai '{last_msg}': data telah dianalisis. Silakan ajukan pertanyaan lebih lanjut atau gunakan tombol 'Lanjutkan di ChatGPT / Claude' untuk melanjutkan di antarmuka resmi."
 
     def do_GET(self):
         global STORAGE

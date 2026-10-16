@@ -334,6 +334,11 @@ function main(argv) {
 
   if (cmd === "proxy") return require("./proxy.js").start(opts);
 
+  if (!Number.isFinite(opts.ttl) || opts.ttl < 300 || opts.ttl > 604800) {
+    console.error(`Invalid --ttl "${opts.ttl}": must be 300..604800 seconds (5 min..7 days).`);
+    process.exit(1);
+  }
+
   if (!["redact", "invert", "share"].includes(cmd)) {
     console.error(
       "Usage:\n" +
