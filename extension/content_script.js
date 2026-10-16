@@ -1066,6 +1066,9 @@
     runHydrationPass();
   });
 
+  // Share viewer origins (official relay, local relay); keep in sync with the manifest matches
+  const VIEWER_ORIGINS = /^(?:https:\/\/safeshare-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/;
+
   // Extension bridge listener: responds to Web Viewer continuation requests
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
@@ -1074,6 +1077,9 @@
       const respOrigin = (window && window.location && window.location.origin) ? window.location.origin : "*";
       window.postMessage({ source: "SAFESHARE_EXTENSION_PONG" }, respOrigin);
     } else if (event.data.source === "SAFESHARE_FORWARD_TO_AI") {
+      // Only the share viewer may hand over a continuation prompt; any other page that posts this
+      // (including the chat sites' own scripts) is ignored.
+      if (!VIEWER_ORIGINS.test(location.origin)) return;
       const promptText = event.data.prompt;
       if (!promptText) return;
       const inputEl = findPromptInputElement();

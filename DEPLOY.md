@@ -90,9 +90,18 @@ relayBaseUrl = "https://safeshare-relay.<your-subdomain>.workers.dev",
 viewerBaseUrl = "https://safeshare-relay.<your-subdomain>.workers.dev"
 ```
 
+The extension only runs on, and only talks to, the relay it knows (so no other `workers.dev` site
+can talk to it). Replace `safeshare-relay.bleedguard.workers.dev` with your host in the same three
+places too:
+
+- `extension/manifest.json` and `extension/manifest.firefox.json`: `host_permissions` and
+  `content_scripts.matches`
+- `extension/content_script.js`: `VIEWER_ORIGINS`
+
 Then rebuild the extension zips with `python tools/build_extension.py`.
 
-For a quick test without rebuilding, override it in the extension: on `chrome://extensions`, click
+For a quick test without rebuilding (upload only; the Continue button on the share page needs the
+changes above), override it in the extension: on `chrome://extensions`, click
 **service worker** under SafeShare and run
 `chrome.storage.local.set({ safeshare_relay: "https://safeshare-relay.<your-subdomain>.workers.dev" })`.
 

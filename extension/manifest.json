@@ -13,8 +13,7 @@
     "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://chat.deepseek.com/*",
-    "https://*.workers.dev/*",
-    "https://*.pages.dev/*",
+    "https://safeshare-relay.bleedguard.workers.dev/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
@@ -28,8 +27,7 @@
         "https://chat.openai.com/*",
         "https://claude.ai/*",
         "https://chat.deepseek.com/*",
-        "https://*.workers.dev/*",
-        "https://*.pages.dev/*",
+        "https://safeshare-relay.bleedguard.workers.dev/*",
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
@@ -55,16 +53,6 @@
   "action": {
     "default_title": "SafeShare-AI Privacy Guard"
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "models/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ],
   "content_security_policy": {
     "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; object-src 'none';"
   }

@@ -18,10 +18,10 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
-PORT = 8787
+PORT = int(os.environ.get("SAFESHARE_PORT", "8787"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIEWER_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "viewer"))
-STORAGE_FILE = os.path.join(BASE_DIR, "storage.json")
+STORAGE_FILE = os.environ.get("SAFESHARE_STORAGE") or os.path.join(BASE_DIR, "storage.json")
 STORAGE_LOCK = threading.Lock()
 
 
@@ -40,12 +40,18 @@ def load_storage():
 
 
 def save_storage(data):
+    """Raises on failure: a share that wasn't saved must not be reported as stored."""
+    tmp_file = STORAGE_FILE + ".tmp"
+    with open(tmp_file, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp_file, STORAGE_FILE)
+
+
+def save_or_log(data):
+    """For reads: the in-memory copy is already correct, so log and carry on."""
     try:
-        tmp_file = STORAGE_FILE + ".tmp"
-        with open(tmp_file, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        os.replace(tmp_file, STORAGE_FILE)
-    except Exception as e:
+        save_storage(data)
+    except OSError as e:
         print("[-] Error saving storage:", e)
 
 
@@ -162,7 +168,13 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                         "expires_at": now_ts + ttl_sec,
                         "view_count": 0
                     }
-                    save_storage(STORAGE)
+                    try:
+                        save_storage(STORAGE)
+                    except OSError as e:
+                        del STORAGE[share_id]
+                        self._send_cors(500)
+                        self.wfile.write(json.dumps({"error": f"Could not save the share: {e}"}).encode())
+                        return
 
                 self._send_cors(201)
                 self.wfile.write(json.dumps({
@@ -190,7 +202,13 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "Not found or invalid token"}).encode())
                     return
                 del STORAGE[share_id]
-                save_storage(STORAGE)
+                try:
+                    save_storage(STORAGE)
+                except OSError as e:
+                    # Gone from memory, but still on disk: it would come back after a restart
+                    self._send_cors(500)
+                    self.wfile.write(json.dumps({"error": f"Revoked until restart only; could not save: {e}"}).encode())
+                    return
             print(f"[!] REVOKE: Shredded payload for ID: {share_id}")
             self._send_cors(200)
             self.wfile.write(json.dumps({"status": "revoked", "id": share_id}).encode())
@@ -220,7 +238,7 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 if not item or time.time() > item["expires_at"]:
                     if share_id in STORAGE:
                         del STORAGE[share_id]
-                        save_storage(STORAGE)
+                        save_or_log(STORAGE)
                     self._send_cors(404)
                     self.wfile.write(json.dumps({"error": "Expired, shredded, or not found"}).encode())
                     return
@@ -232,11 +250,11 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
                 if item.get("is_burn", False):
                     del STORAGE[share_id]
-                    save_storage(STORAGE)
+                    save_or_log(STORAGE)
                     print(f"[-] Atomic Burn: Shredded single-read payload for ID: {share_id}")
                 else:
                     item["view_count"] = item.get("view_count", 0) + 1
-                    save_storage(STORAGE)
+                    save_or_log(STORAGE)
 
             self._send_cors(200)
             self.wfile.write(json.dumps(response_data).encode())

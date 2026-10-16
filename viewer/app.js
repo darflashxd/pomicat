@@ -108,6 +108,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    // Link scanners (chat previews, mail security, antivirus) open links without a person; for a
+    // burn-after-reading link that would use up the one view. Fetch only after a real click.
+    await new Promise((resolve) => {
+      lockScreen.style.display = "block";
+      lockScreen.querySelector("p").innerText = "This conversation is end-to-end encrypted. Opening it may use up its only view.";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn-platform";
+      btn.style.marginTop = "16px";
+      btn.textContent = "Open conversation";
+      btn.addEventListener("click", (e) => {
+        if (!e.isTrusted) return;
+        btn.remove();
+        lockScreen.style.display = "none";
+        resolve();
+      });
+      lockScreen.appendChild(btn);
+    });
+
     try {
       const relayHost = window.SAFESHARE_RELAY_URL || window.location.origin;
       const res = await fetch(`${relayHost}/api/share/${shareId}`);
