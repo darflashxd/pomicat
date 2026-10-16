@@ -1329,7 +1329,20 @@ class ConsistentPseudonymizer {
   }
 }
 
+// A name or place is the writer's own only when it comes right after words that tie it to them
+// ("my wife Rina", "I live in Bandung", "teman saya Budi"). Used by the CLI's Presidio pass and the
+// extension's before-sending NER pass.
+const RELATION = "wife|husband|son|daughter|kid|child|mom|mum|mother|dad|father|parent|sister|brother|sibling|cousin|aunt|uncle|grandma|grandpa|grandmother|grandfather|friend|best friend|boss|colleague|coworker|co-worker|manager|supervisor|teacher|neighbou?r|landlord|tenant|doctor|therapist|partner|girlfriend|boyfriend|fianc[eé]e?|ex|roommate|lawyer|client|student";
+const RELATION_ID = "istri|suami|anak|ibu|ayah|bapak|kakak|adik|teman|sahabat|bos|atasan|pacar|tetangga|dokter|guru";
+const PERSONAL_BEFORE = {
+  PERSON: new RegExp(
+    `(?:\\b(?:my|our)\\s+(?:\\w+\\s+)?(?:${RELATION})|\\bmy name is|\\bi'?m|\\bi am|\\bcall me|\\bthis is|` +
+    `\\bnama\\s+(?:saya|ku|aku|gue)|\\b(?:${RELATION_ID})\\s+(?:saya|ku|aku|gue|gw|kami))\\s*,?\\s*(?:named\\s+|called\\s+|is\\s+|bernama\\s+|namanya\\s+)?$`, "i"),
+  LOCATION: /(?:\b(?:i|we)\s+(?:live|lived|am living|are living|stay|work|grew up|moved|was born|were born)\s+(?:in|at|to|near)|\b(?:i'?m|i am|we're|we are)\s+(?:[\w'-]+\s+){0,4}(?:from|based in|located in)|\bmy (?:home|address|apartment|house|office|school|hometown) is (?:in|at)?|\b(?:tinggal|kerja|bekerja|lahir|kuliah|sekolah)\s+di|\bsaya dari|\baku dari)\s*$/i
+};
+
 ConsistentPseudonymizer.AdversaryOracleSolver = AdversaryOracleSolver;
+ConsistentPseudonymizer.PERSONAL_BEFORE = PERSONAL_BEFORE;
 ConsistentPseudonymizer.looksLikeName = looksLikeName;
 ConsistentPseudonymizer.AGE_PATTERNS = AGE_PATTERNS;
 

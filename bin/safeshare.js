@@ -184,15 +184,8 @@ const NAME_PARTICLES = /^(?:van|von|de|der|den|du|del|della|da|di|la|le|bin|bint
 // names: "personal" (default) keeps a name/place only when the user's own sentence ties it to
 // them ("my wife Rina", "I live in Bandung", "teman saya Budi"). Celebrities, story characters
 // and places in essays pass through. names: "all" redacts every name Presidio finds.
-// The name or place must come right after words that tie it to the user.
-const RELATION = "wife|husband|son|daughter|kid|child|mom|mum|mother|dad|father|parent|sister|brother|sibling|cousin|aunt|uncle|grandma|grandpa|grandmother|grandfather|friend|best friend|boss|colleague|coworker|co-worker|manager|supervisor|teacher|neighbou?r|landlord|tenant|doctor|therapist|partner|girlfriend|boyfriend|fianc[eé]e?|ex|roommate|lawyer|client|student";
-const RELATION_ID = "istri|suami|anak|ibu|ayah|bapak|kakak|adik|teman|sahabat|bos|atasan|pacar|tetangga|dokter|guru";
-const PERSONAL_BEFORE = {
-  PERSON: new RegExp(
-    `(?:\\b(?:my|our)\\s+(?:\\w+\\s+)?(?:${RELATION})|\\bmy name is|\\bi'?m|\\bi am|\\bcall me|\\bthis is|` +
-    `\\bnama\\s+(?:saya|ku|aku|gue)|\\b(?:${RELATION_ID})\\s+(?:saya|ku|aku|gue|gw|kami))\\s*,?\\s*(?:named\\s+|called\\s+|is\\s+|bernama\\s+|namanya\\s+)?$`, "i"),
-  LOCATION: /(?:\b(?:i|we)\s+(?:live|lived|am living|are living|stay|work|grew up|moved|was born|were born)\s+(?:in|at|to|near)|\b(?:i'?m|i am|we're|we are)\s+(?:[\w'-]+\s+){0,4}(?:from|based in|located in)|\bmy (?:home|address|apartment|house|office|school|hometown) is (?:in|at)?|\b(?:tinggal|kerja|bekerja|lahir|kuliah|sekolah)\s+di|\bsaya dari|\baku dari)\s*$/i
-};
+// The name or place must come right after words that tie it to the user (shared with the extension).
+const { PERSONAL_BEFORE } = ConsistentPseudonymizer;
 // Presidio's ID recognizers (driver licence, bank number, ...) fire on short codes; ask for some confidence.
 const PRESIDIO_MIN_SCORE = { US_DRIVER_LICENSE: 0.3, US_BANK_NUMBER: 0.3, US_ITIN: 0.3, US_PASSPORT: 0.3 };
 

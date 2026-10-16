@@ -467,12 +467,23 @@ class HeuristicsRedactor {
         regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
         replacement: "$1[REDACTED_SECRET]"
       },
+      // One-time codes: "OTP 482913", "kode verifikasi: 4821", "verification code is 773190"
+      {
+        id: "OTP_CODE",
+        name: "One-Time Password / Verification Code",
+        category: "CREDENTIALS",
+        regex: /\b((?:OTP|one[- ]time\s+(?:password|passcode|code)|verification\s+code|security\s+code|2FA\s+code|auth(?:entication)?\s+code|kode\s+(?:OTP|verifikasi|keamanan|akses|token))\s*(?:(?:is|adalah|kamu|saya|aku|nya)\s+)?[:=]?\s*)(\d{4,8})\b/gi,
+        replacement: "$1[REDACTED_OTP]"
+      },
       // 10f. Conversational Natural Language Password / Kata Sandi (Indonesian & English, JSON/XML, Logs)
+      // Free-text form: at most 3 words between "password" and the value, and the value must look
+      // like a password: introduced by "is"/"adalah"/":"/"=", or containing a digit or symbol and
+      // not a hyphenated word ("m-banking") or an existing [PLACEHOLDER].
       {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass)["']?\s*[:=]\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya))*\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))([^\s\r\n'"]{5,40})(?=\s|$|[)\]}>,;]))/gi,
+        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass)["']?\s*[:=]\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya)){0,3}\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))((?:(?<=(?:\bis|\badalah|\byaitu|\bialah|[:=])\s{1,3})|(?![a-z]+(?:-[a-z]+)+\b)(?=[^\s'"\[\]]*(?:\d|[^\w\s'"\[\]])))[^\s\r\n'"\[\]]{5,40})(?=\s|$|[)\]}>,;]))/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));

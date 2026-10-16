@@ -8,6 +8,14 @@ console.log("[SafeShare-AI] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
+// Let the content script keep the shield's placeholder -> original map in session storage:
+// private to the extension (the chat site's own scripts can't read it), cleared on browser exit.
+try {
+  if (webExtApi.storage && webExtApi.storage.session && webExtApi.storage.session.setAccessLevel) {
+    webExtApi.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" });
+  }
+} catch (_) {}
+
 let creatingOffscreenPromise = null;
 
 async function getOrCreateOffscreenDocument() {

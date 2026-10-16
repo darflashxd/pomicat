@@ -1044,3 +1044,11 @@
   color: #71717a;
   padding: 6px 6px 2px;
 }
+
+/* Identifiers shown again on your screen only (the AI received a placeholder) */
+.ss-local-compute.ss-id-restored {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
+  cursor: help;
+}

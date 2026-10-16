@@ -70,3 +70,35 @@ let ipt = redactTurns([{ role: "user", content: "ping 10.0.0.5 then 203.0.113.7"
 assert(ipt.includes("10.0.0.5") && ipt.includes("[REDACTED_IP]"), ipt);
 
 console.log("cli: all checks passed");
+
+// Password and OTP rules (found testing on ChatGPT with an Indonesian form)
+{
+  const H = require("../extension/engine/heuristics.js");
+  const h = new H();
+  const s = (t) => h.scan(t).sanitizedText;
+  assert.strictEqual(s("terus password m-banking aku [REDACTED_PASSWORD]"), "terus password m-banking aku [REDACTED_PASSWORD]", "existing placeholder untouched");
+  assert(!s("ke form pendaftaran biasa. OTP dan password m-banking bukan data yang boleh dimasukkan ke form biasa.").includes("[REDACTED_PASSWORD]"), "prose is not a password");
+  assert(s("password m-banking aku Sup3rRahasia9 kesimpen").includes("aku [REDACTED_PASSWORD] kesimpen"));
+  assert(s("My Password is hunter").endsWith("[REDACTED_PASSWORD]"));
+  assert.strictEqual(s("Tadi dapet OTP 482913 dari bank"), "Tadi dapet OTP [REDACTED_OTP] dari bank");
+  assert.strictEqual(s("kode pos 40115"), "kode pos 40115");
+}
+console.log("cli: password/OTP checks passed");
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  assert(!s("I change my password regularly").includes("[REDACTED"), "prose word after 'password'");
+  assert(s('{"password": "hunter22"}').includes("[REDACTED_PASSWORD]"), "JSON form still caught");
+}
+
+// Before-sending NER keeps only the writer's own names/places (rules shared with --presidio)
+{
+  const { PERSONAL_BEFORE } = require("../extension/engine/pseudonymizer.js");
+  assert(PERSONAL_BEFORE.PERSON.test("tell me about my wife "));
+  assert(PERSONAL_BEFORE.PERSON.test("kemarin teman saya "));
+  assert(!PERSONAL_BEFORE.PERSON.test("write an essay about "));
+  assert(PERSONAL_BEFORE.LOCATION.test("I live in "));
+  assert(PERSONAL_BEFORE.LOCATION.test("saya tinggal di "));
+  assert(!PERSONAL_BEFORE.LOCATION.test("the history of "));
+}
+console.log("cli: personal name/place checks passed");

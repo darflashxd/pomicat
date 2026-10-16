@@ -716,6 +716,9 @@ class SafeShareModal {
         summaryTitleEl.innerText = `Protected · All ${totalDetectedCount} sensitive items masked`;
       } else if (activeProtectedCount > 0) {
         summaryTitleEl.innerText = `Custom Protected · ${activeProtectedCount} of ${totalDetectedCount} items masked`;
+      } else if (totalDetectedCount === 0) {
+        // Nothing detected: either nothing sensitive, or it was already replaced before sending
+        summaryTitleEl.innerText = `Nothing new to hide · placeholders are kept as they are`;
       } else {
         summaryTitleEl.innerText = `All Unmasked · Original content shared`;
       }

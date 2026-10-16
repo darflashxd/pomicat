@@ -40,6 +40,8 @@
 
   const shieldIdScanner = typeof HeuristicsRedactor !== "undefined" ? new HeuristicsRedactor() : null;
   const spanArbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
+  // "Is this name/place the writer's own?" rules, shared with the CLI (engine/pseudonymizer.js)
+  const personalBefore = ConsistentPseudonymizer.PERSONAL_BEFORE;
   let directNerPort = null;
   const pendingNerRequests = new Map();
   let requestIdCounter = 0;
@@ -56,7 +58,7 @@
         const resolver = pendingNerRequests.get(res.requestId);
         if (resolver) {
           pendingNerRequests.delete(res.requestId);
-          resolver(res.ok ? res.spans : []);
+          resolver(res.ok ? res.spans : null);
         }
       });
       directNerPort.onDisconnect.addListener(() => {
@@ -72,38 +74,100 @@
     return new Promise(async (resolve) => {
       try {
         const port = await getDirectOffscreenPort();
-        if (!port) return resolve([]);
+        if (!port) return resolve(null);
         const requestId = `ner_${Date.now()}_${++requestIdCounter}`;
         const timer = setTimeout(() => {
           pendingNerRequests.delete(requestId);
-          resolve([]);
+          resolve(null);
         }, 400);
 
         pendingNerRequests.set(requestId, (spans) => {
           clearTimeout(timer);
-          resolve(spans || []);
+          resolve(spans);
         });
 
         port.postMessage({ requestId, text });
       } catch (_) {
-        resolve([]);
+        resolve(null);
       }
     });
   }
 
   /**
-   * What the shield would send: in "all" mode, hard identifiers are replaced first (same rules as
-   * sharing), then amounts become <S1>. Returns { isTransformed, sanitizedPrompt, count }.
+   * Originals of the identifiers the shield replaced, so they can be shown again on this screen
+   * only. Numbered per kind ([PHONE_1], [PHONE_2]) so two phones stay distinguishable; the same
+   * value always gets the same placeholder. Kept in the extension's private session storage
+   * (not the page's), which the chat site's scripts can't read, and cleared when the browser closes.
+   */
+  const idMap = { byValue: new Map(), byPlaceholder: new Map(), counters: {} };
+  const extApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+  const idStore = extApi && extApi.storage && extApi.storage.session ? extApi.storage.session : null;
+  if (idStore) {
+    Promise.resolve(idStore.get("safeshare_idmap")).then((res) => {
+      for (const [ph, value] of (res && res.safeshare_idmap) || []) rememberId(ph, value);
+    }).catch(() => {});
+  }
+  function rememberId(placeholder, value) {
+    idMap.byPlaceholder.set(placeholder, value);
+    idMap.byValue.set(value, placeholder);
+    const m = /^\[([A-Z_]+)_(\d+)\]$/.exec(placeholder);
+    if (m) idMap.counters[m[1]] = Math.max(idMap.counters[m[1]] || 0, Number(m[2]));
+  }
+  function placeholderFor(value, label) {
+    if (idMap.byValue.has(value)) return idMap.byValue.get(value);
+    const n = (idMap.counters[label] || 0) + 1;
+    const ph = `[${label}_${n}]`;
+    rememberId(ph, value);
+    if (idStore) Promise.resolve(idStore.set({ safeshare_idmap: [...idMap.byPlaceholder] })).catch(() => {});
+    return ph;
+  }
+
+  // Readable placeholder names; anything else uses the rule's own tag ([REDACTED_X] -> X)
+  const ID_LABELS = {
+    ID_NIK: "NIK", ID_NPWP: "NPWP", PHONE: "PHONE", EMAIL: "EMAIL", CREDIT_CARD: "CARD",
+    CONVERSATIONAL_PASSWORD: "PASSWORD", OTP_CODE: "OTP", ADDRESS_ID: "ADDRESS",
+    ENGLISH_PHYSICAL_ADDRESS: "ADDRESS", IBAN_ACCOUNT: "ACCOUNT", OPENAI_KEY: "API_KEY",
+    ANTHROPIC_KEY: "API_KEY", GOOGLE_API_KEY: "API_KEY", GITHUB_TOKEN: "TOKEN", AWS_KEY: "API_KEY"
+  };
+  function idLabel(det) {
+    if (ID_LABELS[det.type]) return ID_LABELS[det.type];
+    const tag = /\[REDACTED_([A-Z_]+)\]/.exec(typeof det.replacement === "string" ? det.replacement : "");
+    return tag ? tag[1] : String(det.type).replace(/[^A-Z_]/gi, "").toUpperCase();
+  }
+
+  /** Replaces hard identifiers with numbered placeholders, keeping words like "password ... aku". */
+  function replaceIds(text, { dryRun }) {
+    const scan = shieldIdScanner.scan(text);
+    if (!scan.detections.length) return { out: text, count: 0 };
+    let out = shieldIdScanner.normalizeHomoglyphs(text); // detection offsets refer to this text
+    // Number placeholders in reading order ([PHONE_1] is the first phone), then replace from the
+    // end so earlier offsets stay valid
+    const edits = [...scan.detections].sort((a, b) => a.index - b.index).map((det) => {
+      // Rules like "password <value>" keep their lead-in words; only the value is replaced
+      const rep = typeof det.replacement === "string" ? det.replacement : "";
+      const tagAt = rep.lastIndexOf("[");
+      const lead = tagAt > 0 ? rep.slice(0, tagAt) : "";
+      const keepLead = lead && det.raw.startsWith(lead);
+      const value = keepLead ? det.raw.slice(lead.length) : det.raw;
+      return { det, text: (keepLead ? lead : "") + (dryRun ? "[ID]" : placeholderFor(value, idLabel(det))) };
+    });
+    for (const { det, text: replacement } of edits.reverse()) {
+      out = out.slice(0, det.index) + replacement + out.slice(det.index + det.length);
+    }
+    return { out, count: scan.detections.length };
+  }
+
+  /**
+   * What the shield would send: in "all" mode, hard identifiers become numbered placeholders,
+   * then amounts become <S1>. Returns { isTransformed, sanitizedPrompt, count }.
    */
   function shieldRewrite(text, { dryRun = false } = {}) {
     let out = text;
     let count = 0;
     if (getShieldMode() === "all" && shieldIdScanner) {
-      const scan = shieldIdScanner.scan(text);
-      if (scan.detections.length) {
-        out = scan.sanitizedText;
-        count += scan.detections.length;
-      }
+      const ids = replaceIds(text, { dryRun });
+      out = ids.out;
+      count += ids.count;
     }
     // Dry run (chip preview while typing): analyze() does not store values in the vault
     if (dryRun) {
@@ -130,7 +194,9 @@
 
     try {
       const nerSpans = await requestOffscreenNer(syncRes.sanitizedPrompt);
-      if (!nerSpans || !nerSpans.length) {
+      // Fail open, but say so: the message is still sent with IDs and amounts hidden
+      if (nerSpans === null) return { ...syncRes, nerUnavailable: true };
+      if (!nerSpans.length) {
         return syncRes;
       }
 
@@ -150,16 +216,22 @@
           tier2Ner: validNerSpans
         });
 
-        const sortedSpans = (arbitrated.resolvedSpans || []).sort((a, b) => b.start - a.start);
-        for (const span of sortedSpans) {
-          if (span.tier === 2 && span.start < span.end && span.end <= out.length) {
-            let tag = "[REDACTED_NAME]";
-            if (["STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(span.label)) {
-              tag = "[REDACTED_LOCATION]";
-            }
-            out = out.slice(0, span.start) + tag + out.slice(span.end);
-            addedCount++;
-          }
+        // Join neighbouring pieces of one name/place ("Rina" + "Wijaya"), then keep only the
+        // writer's own ("my wife Rina Wijaya", "saya tinggal di Bandung"). Celebrities, story
+        // characters and places in essays go through unchanged.
+        const kindOf = (s) => (["GIVEN_NAME", "SURNAME"].includes(s.label) ? "PERSON" : "LOCATION");
+        const merged = [];
+        for (const s of (arbitrated.resolvedSpans || []).filter((s) => s.tier === 2 && s.start < s.end && s.end <= out.length)
+          .sort((a, b) => a.start - b.start)) {
+          const prev = merged[merged.length - 1];
+          if (prev && prev.kind === kindOf(s) && /^[\s,]*$/.test(out.slice(prev.end, s.start))) prev.end = Math.max(prev.end, s.end);
+          else merged.push({ start: s.start, end: s.end, kind: kindOf(s) });
+        }
+        const personal = merged.filter((s) => personalBefore[s.kind].test(out.slice(Math.max(0, s.start - 60), s.start)));
+        const named = personal.map((s) => ({ ...s, ph: placeholderFor(out.slice(s.start, s.end), s.kind === "PERSON" ? "NAME" : "PLACE") }));
+        for (const s of named.reverse()) {
+          out = out.slice(0, s.start) + s.ph + out.slice(s.end);
+          addedCount++;
         }
       }
 
@@ -170,7 +242,7 @@
       };
     } catch (err) {
       console.warn("[SafeShare-AI] Gate 2 NER pass fallback:", err);
-      return syncRes;
+      return { ...syncRes, nerUnavailable: true };
     }
   }
 
@@ -411,7 +483,8 @@
     }
     const note = document.createElement("div");
     note.className = "shield-menu-note";
-    note.textContent = "Names and places are removed when you share.";
+    note.textContent = "IDs + amounts also replaces your own names and places (\"my wife Rina\") " +
+      "when the local model is ready (Chrome). Sharing always removes them.";
     menu.appendChild(note);
     anchor.parentElement.appendChild(menu);
     setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
@@ -478,6 +551,13 @@
         setInputText(inputEl, rewritten.sanitizedPrompt);
         console.log("[SafeShare-AI] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
       }
+      if (rewritten && rewritten.nerUnavailable) {
+        const indicator = document.getElementById("safeshare-shield-indicator");
+        if (indicator) {
+          indicator.textContent = "🛡️ Sent without the name/place check (local model not ready)";
+          setTimeout(() => updateShieldIndicator(findPromptInputElement() || inputEl), 6000);
+        }
+      }
 
       setTimeout(() => {
         resubmitting = true;
@@ -533,6 +613,49 @@
     }
   }
 
+  const MESSAGE_SELECTOR = "[data-markdown-text-style='assistant-message'], [data-message-author-role='assistant'], " +
+    ".font-claude-message, .font-claude-response, div.ds-markdown";
+
+  /**
+   * Shows the shield's numbered placeholders ([NIK_1], [NAME_2]) as the real values, on this
+   * screen only. Each value sits in a closed shadow root (the chat site's scripts can't read it
+   * through the DOM) on a span carrying the placeholder in data-expr, so reading the chat for
+   * sharing (getCleanNodeContent) puts the placeholder back.
+   */
+  function restoreIdsOnScreen() {
+    if (!idMap.byPlaceholder.size) return;
+    const pattern = /\[([A-Z_]+)_(\d+)\]/g;
+    for (const root of document.querySelectorAll(MESSAGE_SELECTOR)) {
+      if (isPromptInputOrUIElement(root)) continue;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.nodeValue.includes("[") && !n.parentElement.closest(".ss-local-compute, [data-expr]")
+          ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT)
+      });
+      const nodes = [];
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+      for (const node of nodes) {
+        const text = node.nodeValue;
+        if (![...text.matchAll(pattern)].some((m) => idMap.byPlaceholder.has(m[0]))) continue;
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        for (const m of text.matchAll(pattern)) {
+          const value = idMap.byPlaceholder.get(m[0]);
+          if (value === undefined) continue;
+          frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          const span = document.createElement("span");
+          span.className = "ss-local-compute ss-id-restored";
+          span.dataset.expr = encodeURIComponent(m[0]);
+          span.title = `Only on your screen. The AI received ${m[0]}.`;
+          span.attachShadow({ mode: "closed" }).textContent = value;
+          frag.appendChild(span);
+          last = m.index + m[0].length;
+        }
+        frag.appendChild(document.createTextNode(text.slice(last)));
+        node.replaceWith(frag);
+      }
+    }
+  }
+
   /**
    * Performs an active hydration pass over all visible assistant message nodes.
    * If shield is disabled, reverts any existing local compute spans back to original expressions.
@@ -557,6 +680,8 @@
       });
       return;
     }
+
+    restoreIdsOnScreen();
 
     if (symbolicVault.size() === 0) return;
     const vaultData = symbolicVault.getAll();
