@@ -113,8 +113,8 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
       only 8 labels. F1 0.848 (raw model) and 0.834 (simulated hybrid) are not the extension's F1.
       Fix the scoring (softmax before thresholds), test the runtime tokenizer against the HF one,
       and measure the real path. · `me` 🔎
-      Softmax done (`offscreen.js`); tokenizer comparison and a measurement of the real path
-      still to do (needs the model running in a browser).
+      Softmax and tokenizer done (see co-developer question 3); a measurement of the real path
+      and an id-for-id check against the HF tokenizer still to do.
 - [ ] **Where does the MiniLM model come from?** No source, training data or licence documented.
       Its labels resemble ai4privacy's; if it was trained on ai4privacy, "0.85 on ai4privacy,
       beats Presidio" is tested on its own training distribution. Document origin + licence and
@@ -298,8 +298,9 @@ of tools*, not a vulnerability or CVE.
 
 ### From the co-developer (friend)
 
-Answers so far (2026-10-16): **1 = from Hugging Face** (details still needed) · **2–4 =
-explained below, awaiting answers** · **5 = agreed**.
+Answers so far (2026-10-16): **1 = from Hugging Face** (details still needed) · **2 = user
+messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiting answer** ·
+**5 = agreed**.
 
 1. **MiniLM provenance** — *answer: downloaded from Hugging Face.* Still needed:
    - [ ] the exact model link (`huggingface.co/<owner>/<model>`) and the licence on its page
@@ -309,22 +310,33 @@ explained below, awaiting answers** · **5 = agreed**.
    - [ ] whether it was changed after download (vocabulary pruned to 19,730 tokens, 4-bit
          quantised): which script did it, so others can reproduce it
    - [ ] add all of this to `MODELS_SETUP.md` and credit the original authors
-2. **Why user messages are in the input-box filter** (`content_script.js:702`) — *open.*
+2. **Why user messages are in the input-box filter** (`content_script.js:702`) — *answer: user
+   messages are supposed to be in shares.* Fixed in `f484f89` (sharing reads both roles; the
+   on-screen number display still skips your own bubbles).
    The filter was meant to skip the chat input box and SafeShare's own buttons. It now also
    skips every **user message bubble**. Side effect: when a chat is read for sharing, only the
    AI's replies are kept, so shared chats lose the questions and the user's own amounts (P0.1).
-   - [ ] Was skipping user bubbles on purpose (e.g. to stop the number display from rewriting
+   - [x] Was skipping user bubbles on purpose (e.g. to stop the number display from rewriting
          your own messages, or to avoid reading the half-typed draft)? If so, we keep that
          purpose but apply it only where it's needed, not to sharing.
-3. **Model scores: probability vs raw score** — *open.*
+3. **Model scores: probability vs raw score** — *answer: do the fix. Done.*
    The model outputs a raw score per word ("logit", any number, e.g. -3.2 or 7.5). The
    benchmark converts these to probabilities between 0 and 1 (softmax) before comparing with
    thresholds like `0.35`. The extension (`offscreen.js` → `span_arbiter.js`) compares the
    **raw** scores with the same thresholds. A raw score of 0.4 can mean ~20% or ~60% depending
    on the other scores, so the extension may hide more or less than the benchmark says. The
    extension also splits words into tokens with its own code instead of the original tokenizer.
-   - [ ] Were the thresholds tuned on probabilities or raw scores?
-   - [ ] Was the extension's tokenizer compared with the original on the same text?
+   - [x] Scores: softmax probabilities in `offscreen.js` (`2ce96b4`), as the benchmark used.
+   - [x] Tokenizer: `extension/engine/wordpiece.js` now follows the original uncased
+         BertTokenizer (the vocab has no capitals and no accented entries, so: lowercase, strip
+         accents, split punctuation incl. `_` and CJK, drop zero-width characters, >100-char
+         words = [UNK]). The old code broke "José" into "Jos" + "é" and dropped `_`. Checked with
+         the shipped model in onnxruntime: names, streets, cities found.
+   - [x] Long messages: overlapping 128-piece windows; before, everything after ~126 pieces was
+         never checked.
+   - [ ] Byte-for-byte comparison with the HF tokenizer's ids: needs
+         `training/model_output/minilm_q4/tokenizer.json` (only on the co-developer's machine).
+   - [ ] Re-measure the arbiter rows in `RESULTS_SOTA.md` with these fixes.
    Fix either way: apply softmax in `offscreen.js`, check tokenizer output matches, and measure
    the extension's real path (P1).
 4. **Firefox** — *open.*

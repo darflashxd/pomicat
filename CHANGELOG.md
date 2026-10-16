@@ -35,6 +35,9 @@
 
 ### Changed
 - NER scores are softmax probabilities, so the arbiter's thresholds apply.
+- NER tokenizer (`engine/wordpiece.js`) matches the model's original uncased BERT tokenizer
+  (accents, `_`, CJK, zero-width characters), and long messages are checked in overlapping
+  windows instead of stopping after ~126 pieces.
 - One before-sending setting (`safeshare_shield_mode`) for the chip and the share dialog.
 - Claims narrowed: "derivable through the supported arithmetic", what 0% FP and F1 0.85 measure;
   `RESULTS_SOTA.md` in English.

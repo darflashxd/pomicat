@@ -6,6 +6,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const offscreen = require("../extension/offscreen.js");
+const { basicTokenize, wordPieces, encode } = require("../extension/engine/wordpiece.js");
 
 function testOffscreenTokenizer() {
   console.log("================================================================================");
@@ -14,9 +15,9 @@ function testOffscreenTokenizer() {
 
   // 1. Basic Tokenizer
   const sample = "Billing address: Sara Schwarz, 28245 Puruntie 82 Apt. 595";
-  const words = offscreen.basicTokenize(sample);
+  const words = basicTokenize(sample);
   assert(words.length > 5, "Should tokenize basic alphanumeric words and punctuation");
-  assert.strictEqual(words[0].text, "Billing");
+  assert.strictEqual(words[0].text, "billing"); // uncased model: lowercased like BertTokenizer
   assert.strictEqual(words[0].start, 0);
   assert.strictEqual(words[0].end, 7);
 
@@ -32,6 +33,30 @@ function testOffscreenTokenizer() {
   assert.strictEqual(merged[0].start, 10);
   assert.strictEqual(merged[0].end, 20);
   assert.strictEqual(merged[1].label, "CITY");
+
+  // 3. Same rules as the Hugging Face BertTokenizer (uncased) the model was benchmarked with
+  const t = (x) => basicTokenize(x).map((w) => w.text);
+  assert.deepStrictEqual(t("José Müller"), ["jose", "muller"], "accents stripped, word kept whole");
+  assert.deepStrictEqual(t("user_name=a$b"), ["user", "_", "name", "=", "a", "$", "b"], "underscore and symbols are punctuation");
+  assert.deepStrictEqual(t("東京 Tower"), ["東", "京", "tower"], "CJK characters split");
+  assert.deepStrictEqual(t("a\u200bb"), ["ab"], "zero-width (format) characters dropped");
+  const mu = basicTokenize("Hi José!");
+  assert.deepStrictEqual(mu.map((w) => "Hi José!".slice(w.start, w.end)), ["Hi", "José", "!"], "offsets point into the original text");
+
+  // 4. With the shipped vocabulary
+  const vocab = new Map();
+  fs.readFileSync(path.join(__dirname, "../extension/models/vocab.txt"), "utf8").split(/\r?\n/).forEach((w, i) => w && vocab.set(w, i));
+  assert.deepStrictEqual(wordPieces("john", vocab), [BigInt(vocab.get("john"))]);
+  assert.deepStrictEqual(wordPieces("x".repeat(101), vocab), [1n], "over 100 characters -> [UNK]");
+  assert.strictEqual(wordPieces("jose", vocab)[0] !== 1n || wordPieces("jose", vocab).length > 1, true, "accent-stripped name tokenizes");
+
+  // 5. Long text: several overlapping windows of at most 128 ids, the last word still covered
+  const long = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ") + " Rina";
+  const wins = encode(long, vocab);
+  assert(wins.length > 1, "long text is split into windows");
+  assert(wins.every((w) => w.inputIds.length <= 128 && w.inputIds[0] === 2n && w.inputIds[w.inputIds.length - 1] === 3n));
+  assert(wins[wins.length - 1].tokenSpans.some((s) => long.slice(s.start, s.end) === "Rina"), "text past 128 pieces is checked");
+  assert.strictEqual(encode("Hello Rina", vocab).length, 1);
 
   console.log("  [✓] All offscreen tokenizer and span merge tests passed!");
 }

@@ -15,87 +15,8 @@ let id2label = null;
 let vocab = null;
 let loadingPromise = null;
 
-function basicTokenize(text) {
-  const tokens = [];
-  const regex = /[a-zA-Z0-9]+|[^\s\w]/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    tokens.push({
-      text: match[0],
-      start: match.index,
-      end: match.index + match[0].length
-    });
-  }
-  return tokens;
-}
-
-function wordPieceTokenize(words, maxLen = 128) {
-  const inputIds = [2n]; // [CLS]
-  const tokenSpans = [{ start: 0, end: 0, text: "[CLS]" }];
-
-  for (const word of words) {
-    if (inputIds.length >= maxLen - 1) break;
-    const lower = word.text.toLowerCase();
-    if (vocab.has(lower)) {
-      inputIds.push(BigInt(vocab.get(lower)));
-      tokenSpans.push(word);
-      continue;
-    }
-
-    let isBad = false;
-    let start = 0;
-    const subTokens = [];
-
-    while (start < lower.length) {
-      let end = lower.length;
-      let curSub = null;
-      let curId = null;
-
-      while (start < end) {
-        let substr = lower.slice(start, end);
-        if (start > 0) substr = "##" + substr;
-        if (vocab.has(substr)) {
-          curSub = substr;
-          curId = vocab.get(substr);
-          break;
-        }
-        end--;
-      }
-
-      if (curSub === null) {
-        isBad = true;
-        break;
-      }
-
-      subTokens.push({ id: BigInt(curId), text: curSub });
-      start = end;
-    }
-
-    if (isBad || subTokens.length === 0) {
-      inputIds.push(1n); // [UNK]
-      tokenSpans.push(word);
-    } else {
-      for (const st of subTokens) {
-        if (inputIds.length >= maxLen - 1) break;
-        inputIds.push(st.id);
-        tokenSpans.push({ start: word.start, end: word.end, text: st.text });
-      }
-    }
-  }
-
-  inputIds.push(3n); // [SEP]
-  tokenSpans.push({ start: 0, end: 0, text: "[SEP]" });
-
-  const mask = new BigInt64Array(inputIds.length).fill(1n);
-  const typeIds = new BigInt64Array(inputIds.length).fill(0n);
-
-  return {
-    inputIds: new BigInt64Array(inputIds),
-    attentionMask: mask,
-    tokenTypeIds: typeIds,
-    tokenSpans
-  };
-}
+// Tokenizer: engine/wordpiece.js (loaded before this file by offscreen.html)
+const { encode } = typeof SafeShareWordPiece !== "undefined" ? SafeShareWordPiece : require("./engine/wordpiece.js");
 
 function extractSpans(text, enc, logits) {
   const numLabels = 35;
@@ -216,23 +137,24 @@ async function loadModel() {
   }
 }
 
-// ponytail: single-sequence maxLen=128 truncation without sliding window stride. Add stride when multi-paragraph legal documents need Gate 2 ML NER.
 async function runInference(text) {
   if (!text || typeof text !== "string" || !text.trim()) {
     return [];
   }
   await (loadingPromise || (loadingPromise = loadModel()));
-  const words = basicTokenize(text);
-  if (!words.length) return [];
-  const enc = wordPieceTokenize(words);
-  const feeds = {
-    input_ids: new ort.Tensor("int64", enc.inputIds, [1, enc.inputIds.length]),
-    attention_mask: new ort.Tensor("int64", enc.attentionMask, [1, enc.attentionMask.length]),
-    token_type_ids: new ort.Tensor("int64", enc.tokenTypeIds, [1, enc.tokenTypeIds.length])
-  };
-  const results = await session.run(feeds);
-  const rawSpans = extractSpans(text, enc, results.logits.data);
-  const merged = mergeSpans(rawSpans);
+  const spans = [];
+  for (const enc of encode(text, vocab)) {
+    if (enc.inputIds.length <= 2) continue;
+    const feeds = {
+      input_ids: new ort.Tensor("int64", enc.inputIds, [1, enc.inputIds.length]),
+      attention_mask: new ort.Tensor("int64", enc.attentionMask, [1, enc.attentionMask.length]),
+      token_type_ids: new ort.Tensor("int64", enc.tokenTypeIds, [1, enc.tokenTypeIds.length])
+    };
+    const results = await session.run(feeds);
+    spans.push(...extractSpans(text, enc, results.logits.data));
+  }
+  // Windows overlap: the same span can come twice; mergeSpans joins overlapping same-label spans
+  const merged = mergeSpans(spans.sort((a, b) => a.start - b.start));
   for (const s of merged) {
     s.text = text.slice(s.start, s.end);
   }
@@ -305,8 +227,6 @@ if (webExtApi && webExtApi.runtime && webExtApi.runtime.onMessage) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    basicTokenize,
-    wordPieceTokenize,
     extractSpans,
     mergeSpans,
     loadModel,
