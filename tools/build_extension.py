@@ -1,7 +1,8 @@
 """Usage: python tools/build_extension.py
 
 Builds dist/SafeShare-<version>-chrome.zip and dist/SafeShare-<version>-firefox.zip from
-extension/. Chrome gets manifest.chrome.json as its manifest.json; Firefox uses manifest.json.
+extension/. Chrome uses manifest.json (so "Load unpacked" on extension/ works directly);
+Firefox gets manifest.firefox.json as its manifest.json.
 """
 import json
 import os
@@ -10,7 +11,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT = os.path.join(ROOT, "extension")
 DIST = os.path.join(ROOT, "dist")
-MANIFESTS = {"chrome": "manifest.chrome.json", "firefox": "manifest.json"}
+MANIFESTS = {"chrome": "manifest.json", "firefox": "manifest.firefox.json"}
 
 
 def files():

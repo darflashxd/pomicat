@@ -130,12 +130,11 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
 Download the zip from [Releases](https://github.com/darflashxd/safeshare/releases), or use
 the `extension/` folder directly.
 
-- **Chrome / Edge / Brave:** copy `extension/manifest.chrome.json` over `extension/manifest.json`
-  (the default manifest is the Firefox one), open `chrome://extensions`, turn on Developer mode,
-  click "Load unpacked" and choose the `extension/` folder. The Chrome release zip already has
-  the right manifest.
-- **Firefox:** open `about:debugging#/runtime/this-firefox`, click "Load Temporary Add-on" and
-  choose `extension/manifest.json`.
+- **Chrome / Edge / Brave:** open `chrome://extensions`, turn on Developer mode, click
+  "Load unpacked" and choose the `extension/` folder (or an unzipped Chrome release zip).
+- **Firefox:** use the Firefox release zip (it has Firefox's manifest). Unzip it, open
+  `about:debugging#/runtime/this-firefox`, click "Load Temporary Add-on" and choose its
+  `manifest.json`. The `extension/` folder itself is set up for Chrome.
 
 Open chatgpt.com, claude.ai or chat.deepseek.com and click the SafeShare button to review the
 redactions and create a link.
