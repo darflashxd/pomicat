@@ -1,82 +1,162 @@
-# Manual test checklist
+# Manual test checklist (Chrome)
 
-Everything here runs on your laptop. Tick each box; if a step fails, note the site, the step,
-and what you saw (a screenshot of the browser console helps).
+Everything runs on your laptop with fake data. Tick each box; if something fails, note the site,
+the test number and what you saw (a screenshot helps).
 
-Automated tests cover the engine, relay, CLI and proxy: `npm test` should print `28/28 passed`.
+Automated tests cover the engine, relay, CLI and proxy: `npm test` should end with `31/31 passed`.
 This list covers what needs a real browser and your logged-in chat accounts.
 
 ## 0. Setup (once, ~5 min)
 
-1. Build the extension: `python tools/build_extension.py`
-2. Start the local relay (keep it running): `python relay/server_local.py`
-3. Chrome: open `chrome://extensions`, turn on **Developer mode**, **Load unpacked**, and pick a
-   folder where you unzipped `dist/SafeShare-<version>-chrome.zip`.
-4. Point the extension at your local relay instead of Cloudflare. On `chrome://extensions`, under
-   SafeShare click **service worker**, and in that console run:
+1. Start the local relay and leave the window open:
+   ```bash
+   python relay/server_local.py
+   ```
+2. Chrome → `chrome://extensions` → turn on **Developer mode** (top right) → **Load unpacked** →
+   pick the `extension` folder of this repo (not a zip, not the repo root).
+3. Point the extension at the local relay: on the SafeShare card click **service worker**, and in
+   the console that opens run:
    ```js
    chrome.storage.local.set({ safeshare_relay: "http://127.0.0.1:8787" })
    ```
-   To go back to Cloudflare later: `chrome.storage.local.remove("safeshare_relay")`
+   (Back to Cloudflare later: `chrome.storage.local.remove("safeshare_relay")`.)
+4. Open ChatGPT (also Claude, DeepSeek later) and **refresh the tab**.
 
-## 1. Reading the chat (do on each site: ChatGPT, Claude, DeepSeek)
+After any code change: click the reload ↻ on the SafeShare card, then refresh the chat tabs.
 
-Paste this as your message in a new chat (it's fake data):
+Where to look when something is off: the chat page's console (F12) shows `[SafeShare-AI]` lines;
+the name model's console is under the SafeShare card → **Inspect views: offscreen.html**.
 
-> Hi, I'm Rina Kusuma and I live in Bandung. My wife Sarah and I want to plan our savings. My
-> salary is $5,000 a month and my NIK is 3201012304950001. If we save 20%, how much per month and
-> per year?
+## 1. Protection before sending (ChatGPT, then Claude and DeepSeek)
 
-- [ ] Before sending, the chip above the input says "🛡️ 2 items will be protected" (salary + NIK); click it to see the three modes
-- [ ] After sending, your message in the chat shows `<S1>` and `[REDACTED_NIK]`, and the answer shows real computed numbers on your screen
-- [ ] After the answer arrives, the SafeShare button appears on the page
-- [ ] Clicking it opens the dialog, and **both** your message and the answer are in "Original"
-- [ ] The right side hides Rina, Sarah, the salary, the NIK, and the assistant's $1,000 / $4,000 / $12,000
+Use a **new chat** for each prompt. The chip above the input box shows what will happen; click it
+to pick a mode. Keep **Protect IDs + amounts** unless the test says otherwise.
+
+**1a. Personal details**
+
+> Hi, I am Rina Kusuma and I live in Bandung. My wife Sarah and I want to plan our savings. My
+> salary is $5,000 a month and my NIK is 3201012304950001. If we save 20%, how much per month
+> and per year?
+
+- [ ] While typing, the chip says "🛡️ 2 items will be protected" (salary + NIK)
+- [ ] Your sent message reads roughly: "Hi, I am [NAME_1] and I live in [PLACE_1]. My wife
+      [NAME_2] … salary is <S1> a month and my NIK is [NIK_1] …", followed by a
+      "[PRIVACY PROTOCOL: Treat <S1> as an exact fixed parameter…]" note (that's what the AI received)
+- [ ] If the names are still there and the chip briefly says "Sent without the name/place check
+      (local model not ready)": the model was loading. Send another prompt and check again; note
+      it if it keeps happening
+- [ ] In the answer, `[NIK_1]` / `[NAME_1]` show the real values in blue with a dashed underline;
+      hovering says "Only on your screen. The AI received [NIK_1]."
+- [ ] Amounts in the answer show real computed numbers on your screen (e.g. $1,000 / $12,000)
+
+**1b. Fiction is left alone**
+
+> Write a short story about Geralt travelling to Novigrad.
+
+- [ ] Sent exactly as typed (no [NAME_…] / [PLACE_…])
+
+**1c. Passwords and OTP**
+
+> Password m-banking aku Sup3rRahasia9 kesimpen di notes. Tadi dapet OTP 482913 dari bank.
+
+- [ ] Sent as "Password m-banking aku [PASSWORD_1] kesimpen di notes. Tadi dapet OTP [OTP_1] dari bank."
+
+> I change my password regularly. Is that enough?
+
+- [ ] Sent exactly as typed (prose is not a password)
+
+**1d. Look-alike characters** (copy this exactly: the first `а` in the email is Cyrillic)
+
+> Mail me at аlice@example.com or call +62 812 3456 7890.
+
+- [ ] Sent as "Mail me at [EMAIL_1] or call [PHONE_1]."
+
+**1e. A name late in a long message** (the model used to stop reading after ~100 words)
+
+> Paste any ~200-word paragraph first (e.g. a news article), then add: "Also, my friend Sarah
+> Connor needs advice."
+
+- [ ] "Sarah Connor" is sent as [NAME_…]
+
+**1f. Modes**
+
+- [ ] Chip → **Protect amounts only**, send 1a again: NIK and names go through, the salary is <S1>
+- [ ] Chip → **Off**: sent exactly as typed
+- [ ] Open the SafeShare share dialog: its before-sending toggle matches the chip (off/on), and
+      switching it changes the chip too
+
+## 2. Sharing a chat
+
+Sharing is tested on a chat that still has real values in it, so set the chip to **Off**, open a
+new chat, send prompt 1a, wait for the answer, then click the **SafeShare** button.
+
+- [ ] The dialog's "Original" side shows **both** your message and the answer, in order
+- [ ] The redacted side hides Rina, Sarah, Bandung, the salary, the NIK, and the answer's derived
+      amounts ($1,000 / $4,000 / $12,000 or whatever it computed)
 - [ ] "20%" is still visible (ratios are kept on purpose)
-
-## 2. The share dialog options
-
-- [ ] **Amounts → Show as range**: the salary becomes "$5k–$10k"; $1,000 / $4,000 / $12,000 stay hidden
+- [ ] **Amounts → Show as range**: the salary becomes a band like "$5k–$10k"; derived amounts stay hidden
 - [ ] **Reader → Someone I trust**: names and amounts come back; the NIK stays hidden
-- [ ] Set it back to **Anyone with the link** / **Remove**, close and reopen: your last choice is remembered
 - [ ] **Customize Items** → untick one item: it reappears in the preview
+
+Look-alike email in a share: chip **Off**, new chat, send 1d, click SafeShare:
+
+- [ ] The email is hidden on the redacted side
+
+A chat that was protected before sending (any chat from section 1 with the chip on):
+
+- [ ] The dialog title says "Nothing new to hide · placeholders are kept as they are" (or hides
+      only new things); the placeholders stay placeholders
 
 ## 3. The link
 
-- [ ] Pick **Expires after: Burn after 1 view** (or 24 hours), click **Create Private Link**
-- [ ] The link starts with `http://127.0.0.1:8787/v/` and the relay window prints `Stored encrypted payload`
-- [ ] Open it in a **private window**: the chat shows exactly the redacted version
-- [ ] Burn mode: reload, and the link says expired / not found
-- [ ] 24-hour mode: create another link, click **Revoke** in the dialog, reload the link: gone
+Back in the 1a share dialog (chip-Off chat), choose **Expires after: 24 hours** → **Create Private Link**.
 
-## 4. Continue in a new chat (the fixed feature)
+- [ ] The link starts with `http://127.0.0.1:8787/v/`, and the relay window prints `Stored encrypted payload`
+- [ ] Open it in a **normal** tab: the address changes to `chrome-extension://…/viewer/index.html?relay=…`
+      and the card says "Opened inside the SafeShare extension…"
+- [ ] Click **Open conversation**: the chat shows exactly the redacted version
+- [ ] Open the same link in an **Incognito** window (extension off there): it stays on
+      `127.0.0.1:8787`, says "Decrypted by this page, served by the relay…", and works after the click
+- [ ] Before clicking **Open conversation**, nothing was fetched (relay window prints no `Retrieved`)
+- [ ] In the dialog click **Revoke**, reload the link: gone
 
-Open a fresh (non-burn) link in a **normal** window (where the extension is installed):
+Burn-after-reading: make a new link with **Burn after 1 view**.
+
+- [ ] First open + click: the chat shows. Reload: "Link Expired or Shredded"
+
+## 4. Continue in a new chat
+
+Make a fresh 24-hour link and open it in a normal tab (inside the extension), click **Open conversation**.
 
 - [ ] Click **ChatGPT**: a new ChatGPT tab opens and, within a few seconds, the input box is filled
 - [ ] The pasted text starts with "Continue an earlier conversation…" and contains placeholders, not real values
 - [ ] Repeat with **Claude** and **DeepSeek**
-- [ ] Send it: the model continues without asking for or guessing the hidden values
 
-In a window **without** the extension, clicking a platform copies the prompt and opens the site;
-paste it manually.
-
-## 5. Firefox (optional)
-
-`about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json` inside the
-unzipped `dist/SafeShare-<version>-firefox.zip`. Repeat sections 1 and 3.
-
-## 6. Agents / API (optional, needs an OpenAI-compatible API key)
+## 5. Attacks from the command line (optional, no browser)
 
 ```bash
-node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
+echo "[REDACTED_DATE] is a Tuesday, the day after my birthday on the 14th." | node bin/safeshare.js invert
 ```
+- [ ] Lists 3 possible dates (the hidden date is recovered to a handful of days)
 
-Point any OpenAI SDK at `http://127.0.0.1:8788/v1` and send a message containing the fake NIK and
-key from section 1. In the proxy's upstream request (or the model's reply) the values are
-placeholders. The reply is not mapped back to the real values yet.
+```bash
+echo "I am the only female cardiologist at a 50-bed hospital in Blitar." | node bin/safeshare.js invert
+```
+- [ ] Prints a warning that the details together may point at one person
+
+```bash
+node bin/safeshare.js redact examples/chat_original.txt | node bin/safeshare.js invert
+```
+- [ ] "No hidden values recovered."
+
+## 6. Firefox (optional)
+
+`about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json` inside the
+unzipped `dist/SafeShare-<version>-firefox.zip` (build it with `python tools/build_extension.py`).
+Repeat 1a and section 3. Expected difference: no name model in Firefox, so names in 1a are sent
+as typed and the chip says "Sent without the name/place check".
 
 ## Report back
 
-For anything unticked: which site, which step, what happened. The page structure of the chat
-sites changes often, so section 1 is the most likely to need a fix.
+For anything unticked: which site, which test, what happened. The chat sites change their page
+structure often, so sections 1 and 2 are the most likely to need a fix.

@@ -88,6 +88,7 @@ console.log("cli: password/OTP checks passed");
   const H = require("../extension/engine/heuristics.js");
   const s = (t) => new H().scan(t).sanitizedText;
   assert(!s("I change my password regularly").includes("[REDACTED"), "prose word after 'password'");
+  assert(!s("I change my password regularly. Is that enough?").includes("[REDACTED"), "full stop is not a password symbol");
   assert(s('{"password": "hunter22"}').includes("[REDACTED_PASSWORD]"), "JSON form still caught");
 }
 
