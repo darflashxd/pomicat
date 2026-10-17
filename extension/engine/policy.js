@@ -145,7 +145,7 @@
    * Replaces each of the user's own amounts with a range. Derived figures stay removed. If the
    * inversion attack can still recover any original amount, the ranges are dropped again.
    */
-  function generalizeNumbers(turns, pseudonymizer, userAmounts) {
+  function generalizeNumbers(turns, pseudonymizer, userAmounts, rangeLabels = null) {
     const secrets = [];
     let out = turns.map((t) => ({ ...t }));
     for (const [key, placeholder] of pseudonymizer.entityMap) {
@@ -156,7 +156,8 @@
       secrets.push(v);
       if (!userAmounts.has(raw)) continue;
       const label = formatRange(...bucket(v), currencyOf(raw));
-      out = out.map((t) => ({ ...t, content: t.content.split(placeholder).join(label) }));
+      if (rangeLabels) rangeLabels.set(placeholder, label);
+      else out = out.map((t) => ({ ...t, content: t.content.split(placeholder).join(label) }));
     }
     const leaked = invert(out.map((t) => t.content).join("\n")).some((f) =>
       secrets.some((s) => Math.abs(f.value - s) / s <= 0.015)

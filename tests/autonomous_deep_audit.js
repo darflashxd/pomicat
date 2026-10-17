@@ -25,6 +25,10 @@ const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_b
 const CLOUDFLARE_EDGE = "https://safeshare-relay.bleedguard.workers.dev";
 
 async function runAutonomousDeepAudit() {
+  if (process.env.SAFESHARE_OFFLINE_TESTS === "1") {
+    console.log("autonomous_deep_audit: skipped live Cloudflare edge phases in offline suite");
+    return;
+  }
   console.log("================================================================================");
   console.log("          SAFESHARE-AI: AUTONOMOUS DEEP COMPREHENSIVE SECURITY AUDIT");
   console.log("================================================================================");

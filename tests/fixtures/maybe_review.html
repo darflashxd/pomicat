@@ -47,6 +47,8 @@
   assert(confirmations === 1 && !modal.publishing, "cancel confirmation does not publish");
   window.confirm = realConfirm;
   document.getElementById("btn-reset-default").click();
+  window.preview = preview;
+  window.modal = modal;
   assert(!preview().some(t => t.content.includes("OddSecret42")), "reset protects all suggestions");
   assert(preview()[0].content.includes("${ABC123}"), "variable placeholder stays intact");
   assert(same(preview(), modal.sanitizedTurns), "DOM preview equals public turns");
@@ -100,6 +102,26 @@
   } finally { console.error = logError; }
   assert(!modal.publishing && !document.getElementById("btn-encrypt-publish").disabled &&
     !document.querySelector("#safeshare-maybe-items input").disabled, "failure unlocks real review controls");
+  modal.removeExisting();
+  modal.open([{ role: "user", content: "The private figure is USD 8,765." }, { role: "assistant", content: "20% is USD 1,753; over twelve months USD 21,036." }]);
+  modal.addCustomSelection("USD 8,765");
+  assert(SafeSharePolicy.invert(modal.sanitizedTurns.map(t => t.content).join("\n")).length === 0, "manual amount triggers derived leak suppression");
+  modal.removeExisting();
+  modal.open([{ role: "user", content: "access_token: QuasarLamp782" }]);
+  assert(modal.maybeCandidates.length > 0);
+  modal.activeCategories.delete("CREDENTIALS");
+  modal.rebuildViews();
+  assert(modal.sanitizedTurns[0].content.includes("QuasarLamp782"), "disabled category reveals suggestions");
+  modal.removeExisting();
+  modal.open([{ role: "user", content: "Blue Harbor is confidential." }]);
+  modal.addCustomSelection("Blue");
+  modal.addCustomSelection("Blue Harbor");
+  assert(modal.sanitizedTurns[0].content.includes("[REDACTED_CUSTOM_2]"), "wider custom selection hides whole phrase");
+  assert(!modal.sanitizedTurns[0].content.includes("Harbor"), "partial custom selection avoided");
+  modal.removeExisting();
+  modal.open([{ role: "user", content: "Codename: Ａｕｒｏｒａ" }]);
+  modal.addCustomSelection("Ａｕｒｏｒａ");
+  assert(modal.sanitizedTurns[0].content.includes("[REDACTED_CUSTOM_1]"), "fullwidth custom selection normalized");
   modal.removeExisting();
   document.getElementById("result").textContent = "PASS: badges, reset, overlaps, numeric credentials, exclusions, focus, cancellation, control lock, failure recovery, DOM/payload equality, cleanup. No real uploads.";
 })().catch(error => {

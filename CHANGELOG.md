@@ -2,6 +2,15 @@
 
 ## Unreleased — experimental share review
 
+- Proxy redacts structured tool outputs: OpenAI Responses string/block tool calls and
+  Anthropic `tool_result` blocks; JSON arguments decoded and verified. Unsupported tool/multimodal
+  structures refused (400) instead of leaking raw text.
+- International decimal currencies: shared parser retains decimal places alongside grouping and
+  currency symbols ($5,000.50, EUR 3.200,50). Range mode applies the correct magnitude.
+- Share review fixes: distinct range click targets when amounts share a bucket, stable candidate
+  identities when local model results arrive, and manual amount redactions trigger derived-leak
+  suppression in the assistant turn.
+
 - Local MiniLM inference now runs in Firefox's background page as well as Chrome's offscreen
   document; shared request client validates text and reports failure/timeout. Absolute WASM asset
   paths fix Firefox module resolution. Real Firefox/Chromium extension smoke harnesses added.

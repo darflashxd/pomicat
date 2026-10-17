@@ -113,6 +113,39 @@ function letterLabel(n) {
   return s;
 }
 
+// Shared by equivalence classes and solver tokens; never join separate amounts/ranges.
+function parseFinancialAmount(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return 0;
+  const clean = raw.trim().toLowerCase();
+  if (clean.includes("half a mil") && !/\d/.test(clean)) return 500000;
+  const match = /\d(?:[\d.,'’ \u00a0\u202f]*\d)?/.exec(clean);
+  if (!match) return 0;
+  const before = clean.slice(0, match.index);
+  const after = clean.slice(match.index + match[0].length);
+  if (/\d/.test(before + after)) return 0;
+  const number = match[0].replace(/[\u00a0\u202f]/g, " ").replace(/’/g, "'");
+  let integer = number;
+  let fraction = "";
+  // ponytail: locale-free 1,234 / 1.234 mean thousands (also with units); 0.123 is
+  // fractional. Add an explicit locale option if three-decimal amounts need disambiguation.
+  if (/[.,]/.test(number) && !/^[1-9]\d{0,2}([.,])\d{3}(?:\1\d{3})*$/.test(number)) {
+    const i = Math.max(number.lastIndexOf("."), number.lastIndexOf(","));
+    integer = number.slice(0, i);
+    fraction = number.slice(i + 1);
+    if (integer.includes(number[i]) || !/^\d+$/.test(fraction)) return 0;
+  }
+  if (!/^\d+$/.test(integer) && !/^[1-9]\d{0,2}([.,' ])\d{3}(?:\1\d{3})*$/.test(integer)) return 0;
+  const unit = /^\s*(miliar|milyar|billions?|ember|crores?|juta|jt|jeti|jetong|millions?|lakhs?|lpa|rb|ribu|thousands?|racks|bands|[bmk])(?![a-z])/i.exec(after);
+  const u = unit ? unit[1] : "";
+  const scale = /^(?:miliar|milyar|billion|ember|b$)/.test(u) ? 1e9 :
+    /^crore/.test(u) ? 1e7 : /^(?:juta|jt|jeti|jetong|million|m$)/.test(u) ? 1e6 :
+    /^(?:lakh|lpa)/.test(u) ? 1e5 : u ? 1e3 : 1;
+  const negative = /[-−]\s*(?:(?:rp\.?|idr|\$|usd|€|eur|£|gbp|chf|sgd)\s*)?$/.test(before) ||
+    (before.lastIndexOf("(") > before.lastIndexOf(")") && after.includes(")"));
+  const value = Number(integer.replace(/[.,' ]/g, "") + (fraction ? "." + fraction : "")) * scale;
+  return Number.isFinite(value) ? (negative ? -value : value) : 0;
+}
+
 class AdversaryOracleSolver {
   constructor(tolerance = 0.015) {
     this.tolerance = tolerance;
@@ -165,7 +198,7 @@ class AdversaryOracleSolver {
     }
 
     // Regex matching whole numerical tokens with currency, units, decimals, and %
-    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:k|m|million|billion|juta|jt))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+)*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
+    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|[mb])(?!\w))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
     const nonFinUnits = /^\s*(?:(?:additional|more|extra|fewer|less)\s+)?(?:months?|years?|days?|hours?|weeks?|quarters?|percentage\s+points?|basis\s+points?|bps|points?|pts?|shares?|tokens?|users?|employees?|engineers?|customers?|plates?|guests?|items?|copies|cells|copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar)\b/i;
     const tokens = [];
     let m;
@@ -220,35 +253,8 @@ class AdversaryOracleSolver {
       const cleanLower = raw.toLowerCase();
       const isRatio = cleanLower.endsWith("%");
 
-      let val = 0;
-      if (cleanLower.includes("half a mil")) {
-        val = 500000;
-      } else if (isRatio) {
-        val = parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) / 100;
-      } else if (/(?:miliar|billion|\bb\b|ember|b$)/i.test(cleanLower)) {
-        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e9);
-      } else if (/(?:crores?)/i.test(cleanLower)) {
-        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e7);
-      } else if (/(?:juta|jt|jeti|jetong|million|\bm\b|m$)/i.test(cleanLower)) {
-        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e6);
-      } else if (/(?:lakhs?|lpa)/i.test(cleanLower)) {
-        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e5);
-      } else if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(cleanLower)) {
-        val = Math.round(parseFloat(cleanLower.replace(/[^\d.,]/g, "").replace(",", ".")) * 1e3);
-      } else {
-        // Strip currency prefix first: "Rp 900.000" used to parse as NaN and slip past the solver.
-        const num = cleanLower.replace(/[^\d.,]/g, "");
-        if (/^\d{1,3}(?:[.,]\d{3})+$/.test(num)) {
-          // Grouped thousands in either locale: 900.000, 10.800.000, 1,500
-          val = parseInt(num.replace(/[.,]/g, ""), 10);
-        } else if (/[.,]\d{3}[.,]\d{1,2}$/.test(num)) {
-          // Mixed separators: the last one is the decimal point (1.234,56 / 1,234.56)
-          const i = Math.max(num.lastIndexOf("."), num.lastIndexOf(","));
-          val = parseFloat(num.slice(0, i).replace(/[.,]/g, "") + "." + num.slice(i + 1));
-        } else {
-          val = parseFloat(num.replace(",", ".")) || 0;
-        }
-      }
+      // Solver compares magnitudes, including accounting negatives; parser retains signs.
+      const val = Math.abs(parseFinancialAmount(raw)) / (isRatio ? 100 : 1);
 
       if (val > 0) {
         tokens.push({
@@ -493,54 +499,9 @@ class ConsistentPseudonymizer {
     this.entityMap = new Map(map || []);
   }
 
-  /**
-   * Robustly parses formatted, casual, or abbreviated currency strings into base integer.
-   * Handles: Rp 28.500.000, 28,5 juta, 15jt, 90k, $150,000, 2.5 miliar.
-   */
+  /** Parse one formatted amount into base units, retaining fractions and accounting signs. */
   parseFinancialValue(raw) {
-    if (!raw || typeof raw !== "string") return 0;
-    const clean = raw.trim().toLowerCase();
-
-    if (clean.includes("half a mil")) return 500000;
-
-    // Billions (miliar, milyar, billion, b, ember)
-    if (/(?:miliar|milyar|billion|\bb\b|ember|b$)/i.test(clean)) {
-      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-      const val = parseFloat(numPart);
-      if (!isNaN(val)) return Math.round(val * 1e9);
-    }
-
-    // Crores (crore, crores)
-    if (/(?:crores?)/i.test(clean)) {
-      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-      const val = parseFloat(numPart);
-      if (!isNaN(val)) return Math.round(val * 1e7);
-    }
-
-    // Millions (juta, jt, jeti, jetong, million, m)
-    if (/(?:juta|jt|jeti|jetong|million|\bm\b|m$)/i.test(clean)) {
-      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-      const val = parseFloat(numPart);
-      if (!isNaN(val)) return Math.round(val * 1e6);
-    }
-
-    // Lakhs / LPA (lakh, lakhs, lpa)
-    if (/(?:lakhs?|lpa)/i.test(clean)) {
-      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-      const val = parseFloat(numPart);
-      if (!isNaN(val)) return Math.round(val * 1e5);
-    }
-
-    // Thousands (k, rb, ribu, thousand, racks, bands)
-    if (/(?:k|rb|ribu|thousand|racks|bands|k$)/i.test(clean)) {
-      const numPart = clean.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-      const val = parseFloat(numPart);
-      if (!isNaN(val)) return Math.round(val * 1e3);
-    }
-
-    // Standard integers with dots or commas (e.g. 28.500.000 or 150,000)
-    const digitsOnly = clean.replace(/\D/g, "");
-    return parseInt(digitsOnly, 10) || 0;
+    return parseFinancialAmount(raw);
   }
 
   /**
@@ -641,12 +602,12 @@ class ConsistentPseudonymizer {
       const num = this.parseFinancialValue(raw);
       if (num && !isNaN(num) && num >= 1000) {
         const idFormatted = num.toLocaleString("id-ID").replace(/\./g, "\\.");
-        const enFormatted = num.toLocaleString("en-US").replace(/,/g, ",");
+        const enFormatted = num.toLocaleString("en-US").replace(/\./g, "\\.");
 
         // 1. Currency prefix + formatted number or plain number
         variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${idFormatted}(?![\\w.,])`);
         variants.push(`(?<![\\w.,$€£¥])(?:Rp\\s*|IDR\\s*|\\$\\s*|USD\\s*)?${enFormatted}(?![\\w.,])`);
-        variants.push(`(?<![\\w.,])${num}(?![\\w.,])`);
+        variants.push(`(?<![\\w.,])${String(num).replace(/\./g, "\\.")}(?![\\w.,])`);
 
         // 1b. Thousands abbreviations (e.g. 145k, 340k, 18k, 25k, $340K)
         if (num >= 1e3 && num < 1e9) {

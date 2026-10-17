@@ -13,6 +13,7 @@
     const candidates = new Map();
     const normalized = turns.map(({ role, content }) => ({ role, content: heuristics.normalizeHomoglyphs(content) }));
     const excludedByTurn = normalized.map(t => [...t.content.matchAll(placeholders)].map(m => [m.index, m.index + m[0].length]));
+    const occurrencesByTurn = normalized.map(t => [...t.content.matchAll(/\$\{[^}\n]*\}|\$[A-Za-z_][\w]*/g)].map(m => [m.index, m.index + m[0].length]));
     normalized.forEach((turn, turnIndex) => {
       const text = turn.content;
       const excluded = excludedByTurn[turnIndex];
@@ -50,7 +51,7 @@
     });
     return [...candidates.values()].map((c, i) => {
       const occurrences = normalized.flatMap((t, turnIndex) => [...t.content.matchAll(literal(c.raw))]
-        .filter(m => !excludedByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
+        .filter(m => !occurrencesByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
         .map((m) => ({ turnIndex, start: m.index, end: m.index + c.raw.length })));
       return { ...c, id: `maybe_${i + 1}`, replacement: `[REDACTED_POSSIBLE_SECRET_${i + 1}]`, occurrences };
     }).filter(c => c.occurrences.length);

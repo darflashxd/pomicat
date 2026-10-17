@@ -185,7 +185,7 @@ node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
 ```
 
 The proxy redacts message text for OpenAI Chat Completions (`/chat/completions`), OpenAI
-Responses (`/responses`: `input`, `instructions`) and Anthropic Messages (`/messages`:
+Responses (`/responses`: `input`, `instructions`, and tool outputs) and Anthropic Messages (`/messages`:
 `messages`, `system`). Requests without a body (e.g. `GET /v1/models`) pass through. Any other
 request with a body (embeddings, legacy completions, files, ...) is refused with a 403 rather
 than forwarded unredacted. Only text parts are redacted (not images or files), and responses

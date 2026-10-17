@@ -38,10 +38,23 @@
     assert(!preview().querySelector('[data-cand-id="c_tag"]'), "no orphan buttons");
   }
   modal.removeExisting();
+  modal.open([
+    { role: "user", content: "My salary is $3,200 and my rent is $2,500 a month." },
+    { role: "assistant", content: "Your rent of $2,500 leaves a balance." }
+  ]);
+  const rentCandidate = modal.candidates.find(c => c.raw === "$2,500");
+  assert(rentCandidate);
+  const badges = [...preview().querySelectorAll(".ss-badge")];
+  const rentBadge = badges.find(b => b.getAttribute("data-cand-id") === rentCandidate.id);
+  assert(rentBadge, "distinct rent badge exists");
+  rentBadge.click();
+  const unmasked = modal.sanitizedTurns.map(t => t.content).join("\n");
+  assert(unmasked.includes("$2,500") && !unmasked.includes("$3,200"), "clicking rent reveals only rent");
+  modal.removeExisting();
   modal.open([{role:"user", content:"Previously hidden [REDACTED_FINANCIAL_9]"}]);
   assert(preview().querySelector(".ss-placeholder"), "unknown original gets an honest inert label");
   assert(!preview().querySelector(".ss-badge"), "unknown original is not a fake button");
   modal.removeExisting();
-  document.getElementById("result").textContent = "PASS: KaTeX once, headings/tables, range badge, IDR clicks, no orphan buttons. No uploads.";
+  document.getElementById("result").textContent = "PASS: KaTeX once, headings/tables, range badge, distinct rent/salary clicks, IDR clicks, no orphan buttons. No uploads.";
 })().catch(e => { document.getElementById("result").textContent = "FAIL: " + e.message; console.error(e); });
 </script>

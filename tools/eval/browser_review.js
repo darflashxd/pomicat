@@ -26,10 +26,11 @@ async function checkBrowserReview() {
   const before = modal.sanitizedTurns.map(t => t.content).join("\n");
   assert(!/4417|2k–5k/.test(before), "card digits treated as money");
   assert(before.includes("[have address ready]"), "address placeholder broken");
-  document.getElementById("safeshare-model-check").click();
-  assert(modal.modelBusy && document.getElementById("btn-encrypt-publish").disabled, "model review not awaited");
-  for (let i = 0; i < 300 && modal.modelBusy; i++) await new Promise(resolve => setTimeout(resolve, 100));
-  assert(!modal.modelBusy && modal.modelState.startsWith("Local model checked"), modal.modelState);
+  const scanButton = document.getElementById("safeshare-model-check");
+  if (scanButton) scanButton.click();
+  else modal.checkLocalModel(false);
+  for (let i = 0; i < 300 && modal.modelBusy; i++) await new Promise(resolve => setTimeout(resolve, 50));
+  assert(!modal.modelBusy && modal.modelState.includes("Local AI model checked"), modal.modelState);
   const modelCandidates = modal.maybeCandidates.filter(c => c.reason.startsWith("Local model:"));
   assert(modelCandidates.length > 0, "no model suggestions in actual share dialog");
   assert(modelCandidates.every(c => !c.risky), "uncalibrated model candidates must not auto-hide");

@@ -479,7 +479,7 @@ class HeuristicsRedactor {
         id: "ENV_CONFIG_SECRET",
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
+        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)(?!\$\{[^}\n]+\}|\$[A-Za-z_]\w*)([^\s\r\n'"]{8,120})/gi,
         replacement: "$1[REDACTED_SECRET]"
       },
       // 10d-2. Passwords on the command line: mysql -pSECRET / --password=SECRET, sshpass -p SECRET
@@ -528,7 +528,11 @@ class HeuristicsRedactor {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
           const line = text.substring(lineStart, index).toLowerCase();
-          return !/\b(?:def|function|class|import|const|let|var)\s+$/.test(line);
+          if (/\b(?:def|function|class|import|const|let|var)\s+$/.test(line)) return false;
+          const valueMatch = /^(?:[\s\S]*?(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?)([^"'\r\n]+?)(?:["']|[.,;!?]?\s*$)/i.exec(raw);
+          const candidateValue = valueMatch ? valueMatch[1].trim() : raw.trim();
+          if (/^(?:required|unchanged|confidential|valid|invalid|correct|incorrect|hidden|redacted|missing|secret|protected|secure|insecure|plaintext|temporary|optional|needed|set|reset)$/i.test(candidateValue)) return false;
+          return true;
         },
         extractToken: (match, raw) => {
           if (match[1]) return match[1];

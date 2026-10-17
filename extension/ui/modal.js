@@ -23,6 +23,9 @@ class SafeShareModal {
     this.maybe = typeof SafeShareMaybe !== "undefined" ? SafeShareMaybe : require("../engine/maybe.js");
     this.transcript = typeof SafeShareTranscript !== "undefined" ? SafeShareTranscript : require("../engine/transcript.js");
     this.maybeChoices = new Map();
+    this.maybeIdentities = new Map();
+    this.modelRun = null;
+    this.autoScanTimer = null;
     this.maybeCandidates = [];
     this.customSelections = new Map();
     this.customCounter = 0;
@@ -130,7 +133,7 @@ class SafeShareModal {
     const backdrop = document.createElement("div");
     backdrop.id = "safeshare-modal-backdrop";
     backdrop.innerHTML = `
-      <div id="safeshare-modal-card">
+      <div id="safeshare-modal-card" role="dialog" aria-modal="true" aria-labelledby="safeshare-modal-title">
         <div class="safeshare-header">
           <div class="safeshare-brand">
             <div class="safeshare-logo">
@@ -139,7 +142,7 @@ class SafeShareModal {
               </svg>
             </div>
             <div>
-              <div class="safeshare-title">Share Privately</div>
+              <div class="safeshare-title" id="safeshare-modal-title">Share Privately</div>
               <div class="safeshare-version-tag">End-to-end encrypted</div>
             </div>
           </div>
@@ -246,6 +249,10 @@ class SafeShareModal {
           <details id="safeshare-maybe-review" open>
             <summary>Maybe sensitive — review before sharing</summary>
             <p>These are unverified suggestions, not a guarantee that every secret was found. Checked values are hidden in every occurrence.</p>
+            <div class="maybe-model-bar">
+              <button type="button" id="safeshare-model-check">Check names and other PII with local model</button>
+              <span id="safeshare-model-status" role="status" aria-live="polite"></span>
+            </div>
             <div id="safeshare-maybe-items"></div>
           </details>
 
@@ -318,12 +325,18 @@ class SafeShareModal {
 
     // Automatically trigger local AI model check in background if extension runtime is present
     if (typeof browser !== "undefined" || (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage)) {
-      setTimeout(() => this.checkLocalModel(true), 50);
+      this.autoScanTimer = setTimeout(() => this.checkLocalModel(true), 50);
     }
   }
 
   removeExisting() {
     this.reviewGeneration++;
+    clearTimeout(this.autoScanTimer);
+    this.modelRun = null;
+    this.modelBusy = false;
+    this.maybeIdentities.clear();
+    this.customSelections.clear();
+    if (this.selectionCleanup) this.selectionCleanup();
     const existing = document.getElementById("safeshare-modal-backdrop");
     if (existing) existing.remove();
     this.maybeChoices.clear();
@@ -381,6 +394,8 @@ class SafeShareModal {
   }
 
   syncMaybeCandidates() {
+    const current = new Set(this.maybeCandidates.map(m => m.id));
+    this.candidates = this.candidates.filter(c => !c.id.startsWith("maybe_") || current.has(c.id));
     for (const m of this.maybeCandidates) {
       let mCat = "CREDENTIALS";
       if (m.reason.includes("Local model: PERSON") || m.reason.includes("Local model: GIVEN_NAME") || m.reason.includes("Local model: SURNAME") || m.reason.includes("Local model: LOCATION") || m.reason.includes("Local model: CITY") || m.reason.includes("Local model: STREET")) {
@@ -388,8 +403,9 @@ class SafeShareModal {
       } else if (!m.risky && (m.reason.includes("Random") || m.reason.includes("Entropy"))) {
         mCat = "SYSTEM";
       }
-      const isEnabled = this.maybeChoices.get(m.raw) ?? m.risky;
-      let cand = this.candidates.find(c => c.id === m.id || c.raw.toLowerCase() === m.raw.toLowerCase());
+      m.category = mCat;
+      const isEnabled = this.activeCategories.has(mCat) && (this.maybeChoices.get(m.raw) ?? m.risky);
+      let cand = this.candidates.find(c => c.id === m.id && c.raw === m.raw);
       if (!cand) {
         this.candidates.push({
           id: m.id,
@@ -418,7 +434,7 @@ class SafeShareModal {
 
   addCustomSelection(selectedText) {
     if (!selectedText || typeof selectedText !== "string") return;
-    const clean = selectedText.trim();
+    const clean = this.heuristics.normalizeHomoglyphs(selectedText).trim();
     if (clean.length < 2) return;
     if (/^\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]$/.test(clean)) return;
 
@@ -745,6 +761,9 @@ class SafeShareModal {
 
     // 2. Filter active contextual entities based on user toggles (none for a trusted reader)
     const trusted = this.profile === "trusted";
+    const manualAmounts = this.candidates.filter(c => c.category === "CUSTOM" && c.enabled && this.activeCategories.has("CUSTOM") &&
+      /(?:[$€£₹¥]|\b(?:USD|EUR|GBP|IDR|Rp|CHF|SGD|AUD|CAD|INR)\b)/i.test(c.raw) && this.pseudonymizer.parseFinancialValue(c.raw) > 0)
+      .map(c => ({ raw: c.raw, category: "SENSITIVE_FINANCIAL", turnIndex: 0 }));
     const activeContextual = trusted ? [] : (this.rawContextualEntities || []).filter(e => {
       const cleanE = e.raw.replace(/[.,;:]+$/, "").trim();
       const eVal = this.pseudonymizer.parseFinancialValue(cleanE);
@@ -783,7 +802,7 @@ class SafeShareModal {
 
     const { anonymizedTurns } = this.pseudonymizer.anonymizeConversation(
       activeIntermediateTurns,
-      activeContextual,
+      [...activeContextual, ...manualAmounts],
       activeHeuristics,
       {
         masterEntityMap: this.masterEntityMap,
@@ -795,12 +814,13 @@ class SafeShareModal {
     );
 
     this.sanitizedTurns = anonymizedTurns;
+    this.rangeLabels = new Map();
     if (this.numbersMode === "range" && !trusted) {
       // Only amounts the user stated become ranges; the assistant's derived figures stay removed
       const userAmounts = new Set(activeContextual
         .filter(e => e.category === "SENSITIVE_FINANCIAL" && this.currentTurns[e.turnIndex]?.role === "user")
         .map(e => e.raw.trim().toLowerCase()));
-      this.sanitizedTurns = SafeSharePolicy.generalizeNumbers(anonymizedTurns, this.pseudonymizer, userAmounts);
+      this.sanitizedTurns = SafeSharePolicy.generalizeNumbers(anonymizedTurns, this.pseudonymizer, userAmounts, this.rangeLabels);
     }
     // Review the final safety scan, not an earlier text that changes during publication.
     this.previewLeaks = this.sanitizedTurns.map(t => t.solverLeaks || []);
@@ -808,20 +828,38 @@ class SafeShareModal {
     const modelSpans = this.reviewBaseTurns.flatMap((t, turnIndex) => (this.modelReview.get(t.content) || []).map(s => ({ ...s, turnIndex })));
     this.maybeCandidates = this.maybe.scan(this.reviewBaseTurns, modelSpans).filter(m => !this.candidates.some(c =>
       !c.id.startsWith("maybe_") && [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
-    this.sanitizedTurns = this.maybe.apply(this.reviewBaseTurns, this.maybeCandidates, this.maybeChoices);
+    this.maybeCandidates = this.maybeCandidates.map(m => {
+      if (!this.maybeIdentities.has(m.raw)) this.maybeIdentities.set(m.raw, this.maybeIdentities.size + 1);
+      const identity = this.maybeIdentities.get(m.raw);
+      return { ...m, id: `maybe_${identity}`, replacement: `[REDACTED_POSSIBLE_SECRET_${identity}]` };
+    });
     this.syncMaybeCandidates();
+    const effectiveChoices = new Map(this.maybeCandidates.map(m => [m.raw,
+      this.activeCategories.has(m.category) && (this.maybeChoices.get(m.raw) ?? m.risky)]));
+    this.sanitizedTurns = this.maybe.apply(this.reviewBaseTurns, this.maybeCandidates, effectiveChoices);
 
-    // Apply custom user-selected redactions across all turns
-    for (const cand of this.candidates.filter(c => c.category === "CUSTOM" && c.enabled)) {
-      const escapedRaw = this.escapeRegExp(cand.raw);
-      const isWordBoundaryStart = /^\w/.test(cand.raw) ? "(?<![\\w])" : "";
-      const isWordBoundaryEnd = /\w$/.test(cand.raw) ? "(?![\\w])" : "";
-      const reg = new RegExp(`${isWordBoundaryStart}${escapedRaw}${isWordBoundaryEnd}`, "gi");
-      this.sanitizedTurns = this.sanitizedTurns.map(turn => ({
-        role: turn.role,
-        content: turn.content.replace(reg, cand.tag)
-      }));
-    }
+    // Replace selected intervals together, so a short selection cannot defeat a longer one.
+    const custom = this.candidates.filter(c => c.category === "CUSTOM" && c.enabled && this.activeCategories.has("CUSTOM"));
+    this.sanitizedTurns = this.sanitizedTurns.map(({ role, content }) => {
+      const spans = custom.flatMap(c => [...content.matchAll(new RegExp(
+        `(?<![\\p{L}\\p{N}_])${this.escapeRegExp(c.raw)}(?![\\p{L}\\p{N}_])`, "giu"))]
+        .map(m => ({ start: m.index, end: m.index + m[0].length, replacement: c.tag })))
+        .sort((a, b) => a.start - b.start || b.end - a.end);
+      const merged = [];
+      for (const span of spans) {
+        const previous = merged[merged.length - 1];
+        if (previous && span.start < previous.end) previous.end = Math.max(previous.end, span.end);
+        else merged.push({ ...span });
+      }
+      for (const span of merged.reverse()) content = content.slice(0, span.start) + span.replacement + content.slice(span.end);
+      return { role, content };
+    });
+    // Preserve entity tags privately for badge rendering; public text receives only the range.
+    const badgeTurns = this.sanitizedTurns.map(t => ({ ...t }));
+    this.sanitizedTurns = this.sanitizedTurns.map(({ role, content }) => {
+      for (const [tag, range] of this.rangeLabels) content = content.split(tag).join(range);
+      return { role, content };
+    });
 
     // Helper to replace text without penetrating existing <span ...>...</span> badges
     const replaceOutsideSpans = (html, regex, replacer) => {
@@ -836,7 +874,7 @@ class SafeShareModal {
       const turn = this.sanitizedTurns[tIdx];
       sanitizedTextPlain += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
 
-      let htmlContent = this.escapeHtml(turn.content);
+      let htmlContent = this.escapeHtml(badgeTurns[tIdx].content);
 
       // A. Wrap unmasked items (if user toggled protection off)
       const unmaskedCandidates = this.candidates
@@ -852,17 +890,7 @@ class SafeShareModal {
         htmlContent = replaceOutsideSpans(htmlContent, regRaw, (m) => `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" data-tag="${cand.tag}" title="Click to re-redact">${m}<span class="ss-badge-icon">👁️</span></span>`);
       }
 
-      // Ranges retain the amount's click target instead of becoming inert plain text.
-      if (this.numbersMode === "range" && !trusted) {
-        for (const candidate of this.candidates.filter(c => c.isAmount && c.enabled && this.activeCategories.has(c.category))) {
-          const value = this.pseudonymizer.parseFinancialValue(candidate.raw);
-          if (!(value >= 10)) continue;
-          if (!this.currentTurns.some((t, i) => t.role === "user" && (this.cachedTurnDetections[i]?.cDetections || []).some(e => e.raw.trim().toLowerCase() === candidate.raw.toLowerCase()))) continue;
-          const range = SafeSharePolicy.formatRange(...SafeSharePolicy.bucket(value), SafeSharePolicy.currencyOf(candidate.raw));
-          htmlContent = replaceOutsideSpans(htmlContent, new RegExp(this.escapeRegExp(this.escapeHtml(range)), "g"), m =>
-            `<span class="ss-badge ss-badge-redacted" data-cand-id="${candidate.id}" data-tag="${candidate.tag}" title="Click to show exact amount">${m}</span>`);
-        }
-      }
+      // Range text is rendered from its original entity tag below, never matched by label.
 
       // B. Single-pass regex replacing all redacted tags outside existing spans
       const turnDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
@@ -901,7 +929,10 @@ class SafeShareModal {
         if (!cand || cand.raw === tag) return `<span class="ss-placeholder" title="Original value unavailable; cannot unmask">${tag}</span>`;
         const candId = cand.id;
         const rawText = (cand && cand.raw !== cand.tag) ? this.escapeHtml(cand.raw) : tag;
-        return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" data-tag="${tag}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
+        const range = this.rangeLabels.get(tag);
+        const display = range ? this.escapeHtml(range) : tag;
+        const title = range ? "Click to show exact amount" : `Click to unmask (Original: ${rawText})`;
+        return `<span class="ss-badge ss-badge-redacted" role="button" tabindex="0" data-cand-id="${candId}" data-tag="${tag}" title="${title}">${display}<span class="ss-badge-icon">✕</span></span>`;
       });
 
       sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${this.escapeHtml(turn.role.toUpperCase())}]:</div><div class="turn-body">${this.transcript.renderEscaped(htmlContent)}</div></div>`;
@@ -916,6 +947,11 @@ class SafeShareModal {
       diffSanEl.innerHTML = sanitizedHtmlDisplay;
       // Attach click events on inline badges
       diffSanEl.querySelectorAll(".ss-badge").forEach(badge => {
+        badge.setAttribute("role", "button");
+        badge.setAttribute("tabindex", "0");
+        badge.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); badge.click(); }
+        });
         badge.addEventListener("click", (e) => {
           if (this.publishing) return;
           e.stopPropagation();
@@ -1052,7 +1088,7 @@ class SafeShareModal {
     list.appendChild(toolbar);
 
     for (const candidate of this.maybeCandidates) {
-      const isRedacted = this.maybeChoices.get(candidate.raw) ?? candidate.risky;
+      const isRedacted = this.activeCategories.has(candidate.category) && (this.maybeChoices.get(candidate.raw) ?? candidate.risky);
 
       const label = document.createElement("label");
       label.className = "maybe-item-card" + (isRedacted ? " is-redacted" : "");
@@ -1165,13 +1201,13 @@ class SafeShareModal {
           // If category currently has active protections, turn it off completely
           this.activeCategories.delete(key);
           this.candidates.forEach(c => {
-            if (c.category === key) c.enabled = false;
+            if (c.category === key) this.setCandidateEnabled(c, false);
           });
         } else {
           // Turn category on and enable all items in it
           this.activeCategories.add(key);
           this.candidates.forEach(c => {
-            if (c.category === key) c.enabled = true;
+            if (c.category === key) this.setCandidateEnabled(c, true);
           });
         }
         this.savePreferences();
@@ -1282,15 +1318,15 @@ class SafeShareModal {
   }
 
   async checkLocalModel(background = false) {
-    if (this.publishing || this.modelBusy) return;
+    if (this.publishing || this.modelBusy || !this.currentTurns.length) return;
+    const run = {};
+    this.modelRun = run;
     this.modelBusy = true;
     const generation = this.reviewGeneration;
     const button = document.getElementById("safeshare-model-check");
     const publish = document.getElementById("btn-encrypt-publish");
-    if (!background) {
-      if (button) button.disabled = true;
-      if (publish) publish.disabled = true;
-    }
+    if (button) button.disabled = true;
+    if (publish) publish.disabled = true;
     if (button) button.textContent = "⏳ Scanning with local model…";
     this.modelState = "Scanning names & PII with local AI model…";
     this.renderMaybeItems();
@@ -1317,10 +1353,13 @@ class SafeShareModal {
         if (button) button.textContent = "Check names and other PII with local model";
       }
     } finally {
-      this.modelBusy = false;
-      if (button) button.disabled = false;
-      if (publish) publish.disabled = false;
-      if (generation === this.reviewGeneration && this.currentTurns.length) this.rebuildViews();
+      if (this.modelRun === run) {
+        this.modelBusy = false;
+        this.modelRun = null;
+        if (button) button.disabled = false;
+        if (publish) publish.disabled = false;
+        if (generation === this.reviewGeneration && this.currentTurns.length) this.rebuildViews();
+      }
     }
   }
 
@@ -1597,16 +1636,21 @@ class SafeShareModal {
       diffArea.addEventListener("keyup", () => setTimeout(handleSelection, 20));
     }
 
+    const onSelectionChange = () => {
+      if (typeof window === "undefined" || !window.getSelection) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        if (floatingBtn) floatingBtn.style.display = "none";
+      }
+    };
     if (typeof document !== "undefined" && document.addEventListener) {
-      document.addEventListener("selectionchange", () => {
-        if (typeof window !== "undefined" && window.getSelection) {
-          const sel = window.getSelection();
-          if (!sel || sel.isCollapsed) {
-            if (floatingBtn) floatingBtn.style.display = "none";
-          }
-        }
-      });
+      document.addEventListener("selectionchange", onSelectionChange);
     }
+    this.selectionCleanup = () => {
+      if (typeof document !== "undefined" && document.removeEventListener) {
+        document.removeEventListener("selectionchange", onSelectionChange);
+      }
+    };
 
     if (floatingBtn && floatingBtn.addEventListener) {
       floatingBtn.addEventListener("mousedown", (e) => {
