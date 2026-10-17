@@ -348,10 +348,12 @@
 
     // Contenteditable (ChatGPT / Claude ProseMirror / Lexical)
     el.focus();
+    let ok = false;
     if (typeof document.execCommand === "function") {
       document.execCommand("selectAll", false, null);
-      document.execCommand("insertText", false, newText);
-    } else {
+      ok = document.execCommand("insertText", false, newText);
+    }
+    if (!ok) {
       el.innerText = newText;
       el.dispatchEvent(new Event("input", { bubbles: true }));
     }
@@ -477,6 +479,7 @@
     "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button, form button[type='submit']";
   let submitGuardInstalled = false;
   let resubmitting = false;
+  let isRewriting = false;
 
   /**
    * Holds a send until the rewrite is in place. Listens on window in the capture phase, so it runs
@@ -489,7 +492,13 @@
     submitGuardInstalled = true;
 
     const guard = async (e, resend) => {
-      if (resubmitting || !isPreInferenceEnabled() || !symbolicRewriter) return;
+      if (resubmitting) return;
+      if (isRewriting) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (!isPreInferenceEnabled() || !symbolicRewriter) return;
       const inputEl = findPromptInputElement();
       if (!inputEl) return;
       const text = getInputText(inputEl);
@@ -500,6 +509,7 @@
 
       e.preventDefault();
       e.stopImmediatePropagation();
+      isRewriting = true;
 
       let rewritten;
       try {
@@ -507,6 +517,8 @@
       } catch (err) {
         console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
         rewritten = { isTransformed: false, sanitizedPrompt: text, count: 0 };
+      } finally {
+        isRewriting = false;
       }
 
       if (rewritten && rewritten.isTransformed) {
@@ -993,6 +1005,10 @@
       // Truly different chat session: close modal and load secrets for this session (or clear)
       const existing = document.getElementById("safeshare-modal-backdrop");
       if (existing) existing.remove();
+
+      idMap.byValue.clear();
+      idMap.byPlaceholder.clear();
+      idMap.counters = {};
 
       if (symbolicVault) {
         if (newId) {

@@ -477,6 +477,18 @@ class SafeShareLocalCompute {
     return `$${rounded.toLocaleString("en-US")}`;
   }
 
+  detectCurrencyFromVault(expr, vault, fallback = "USD") {
+    if (!expr || !vault) return fallback;
+    const clean = String(expr).toLowerCase();
+    for (const [k, obj] of Object.entries(vault)) {
+      const bare = k.replace(/[<>]/g, "").toLowerCase();
+      if ((clean.includes(k.toLowerCase()) || clean.includes(bare)) && obj.currency) {
+        return obj.currency;
+      }
+    }
+    return fallback;
+  }
+
   /**
    * Scans text from an LLM response, evaluates any symbolic formulas involving <S1>, <S2>, etc.,
    * and replaces them with formatted locally computed values.
@@ -530,14 +542,7 @@ class SafeShareLocalCompute {
       try {
         const inner = this.cleanMathString(rawInner);
         const val = this.compute(inner, symbolTable);
-        let itemCurrency = defaultCurrency;
-        for (const [k, obj] of Object.entries(vault)) {
-          const bare = k.replace(/[<>]/g, "");
-          if ((rawInner.includes(k) || rawInner.includes(bare) || inner.includes(k)) && obj.currency) {
-            itemCurrency = obj.currency;
-            break;
-          }
-        }
+        const itemCurrency = this.detectCurrencyFromVault(rawInner, vault, defaultCurrency);
         const formatted = this.formatValue(val, itemCurrency, inner);
         evaluations.push({ expr: rawInner.trim(), val, formatted });
         if (htmlBadges) {
@@ -568,7 +573,8 @@ class SafeShareLocalCompute {
         try {
           const cleanRight = this.cleanMathString(rightSide);
           const val = this.compute(cleanRight, symbolTable);
-          const formatted = this.formatValue(val, defaultCurrency, cleanRight).replace("%", "\\%");
+          const itemCurrency = this.detectCurrencyFromVault(inner, vault, defaultCurrency);
+          const formatted = this.formatValue(val, itemCurrency, cleanRight).replace("%", "\\%");
           evaluations.push({ expr: rightSide, val, formatted });
 
           // If leftSide contains derivation with symbols (e.g. "<S1> + 0.15 * <S1> = "),
@@ -585,7 +591,8 @@ class SafeShareLocalCompute {
         try {
           const cleanExpr = this.cleanMathString(inner);
           const val = this.compute(cleanExpr, symbolTable);
-          const formatted = this.formatValue(val, defaultCurrency, cleanExpr).replace("%", "\\%");
+          const itemCurrency = this.detectCurrencyFromVault(inner, vault, defaultCurrency);
+          const formatted = this.formatValue(val, itemCurrency, cleanExpr).replace("%", "\\%");
           evaluations.push({ expr: inner.trim(), val, formatted });
           return formatted;
         } catch (_) {
@@ -636,14 +643,7 @@ class SafeShareLocalCompute {
       const afterSnippet = hydratedText.substring(offset + fullMatch.length, limitIdx2);
       try {
         const val = this.compute(mathExpr, symbolTable);
-        // Find currency of involved variables if any
-        let itemCurrency = defaultCurrency;
-        for (const [k, obj] of Object.entries(vault)) {
-          if (mathExpr.includes(k) && obj.currency) {
-            itemCurrency = obj.currency;
-            break;
-          }
-        }
+        const itemCurrency = this.detectCurrencyFromVault(mathExpr, vault, defaultCurrency);
         const formatted = this.formatValue(val, itemCurrency, mathExpr, afterSnippet);
         evaluations.push({ expr: mathExpr.trim(), val, formatted });
 
@@ -745,13 +745,7 @@ class SafeShareLocalCompute {
         if (hasSymbol) {
           try {
             const val = this.compute(fullCall, symbolTable);
-            let itemCurrency = defaultCurrency;
-            for (const [k, obj] of Object.entries(vault)) {
-              if (fullCall.includes(k) && obj.currency) {
-                itemCurrency = obj.currency;
-                break;
-              }
-            }
+            const itemCurrency = this.detectCurrencyFromVault(fullCall, vault, defaultCurrency);
             const formatted = this.formatValue(val, itemCurrency, fullCall);
             evaluations.push({ expr: fullCall, val, formatted });
             const replacement = htmlBadges
