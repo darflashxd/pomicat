@@ -164,3 +164,19 @@ const Modal = require("../extension/ui/modal.js");
   assert.equal(trusted.publishing, false, "failed publish unlocks review");
   console.log("maybe: detection, choices, normalization, preview/payload equality and cleanup passed");
 })().catch(err => { console.error(err); process.exitCode = 1; });
+
+// Context score: on top of the detectors, ranks the list and pre-ticks strong candidates
+{
+  const Maybe = require("../extension/engine/maybe.js");
+  const top = (content) => Maybe.scan([{ role: "user", content }])[0];
+  const plain = top("Keep Z8kL2mN7pQ4rS9tU6vW3xY for later");
+  const keyed = top("my api key: Z8kL2mN7pQ4rS9tU6vW3xYa (rotated)");
+  assert(plain.score < 0.75 && !plain.risky, "random string alone: shown, not pre-ticked");
+  assert(keyed.score >= 0.75 && keyed.risky, "random string after a credential word: pre-ticked");
+  assert(keyed.why.includes("credential word just before it"));
+  assert(top("example key sample_ab12CD34ef56GH78ij90 here").score < keyed.score, "example wording lowers the score");
+  assert.strictEqual(Maybe.scan([{ role: "user", content: "PGPASSWORD='[PASSWORD_1]' psql" }]).length, 0, "numbered placeholders skipped");
+  const list = Maybe.scan([{ role: "user", content: "x Q7wE2rT9yU4iO1pA6sD3fG8h and token: Z9mL4pR8tN2kV7bQ5sX3dF6wJ1hC0aE" }]);
+  assert(list[0].score >= list[1].score, "sorted by score");
+}
+console.log("maybe: context score checks passed");

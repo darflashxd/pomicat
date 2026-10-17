@@ -207,7 +207,8 @@ class HeuristicsRedactor {
         name: "Email Address",
         category: "PROFILE",
         regex: /\b[A-Za-z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*|\s*\(at\)\s*)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+|\s*\[dot\]\s*[A-Za-z0-9-]+|\s*\(dot\)\s*[A-Za-z0-9-]+)*(?:\.|\s*\[dot\]\s*|\s*\(dot\)\s*)(?:[A-Za-z]{2,12})\b/gi,
-        validator: (raw) => !raw.includes("@protected.local"),
+        // git@github.com:team/repo is the standard Git SSH address, not a person's email
+        validator: (raw) => !raw.includes("@protected.local") && !/^git@/i.test(raw),
         replacement: (match, index, context) => `[user_${Math.abs(this.hashString(match)) % 1000}@protected.local]`
       },
       // 4. Phone Numbers (ID, SG, UK, AU, IN, US, E.164 Global with Toll-Free Hotline Protection)
@@ -1064,7 +1065,28 @@ class HeuristicsRedactor {
         category: "SYSTEM",
         // Host must contain a letter: CSS "wght@400" or "pkg@1" are not user@host
         regex: /\b([a-zA-Z0-9._-]+)@([a-zA-Z0-9_-]*[a-zA-Z][a-zA-Z0-9_-]*)(?!\.[a-zA-Z]{2,})\b/g,
+        // Only in technical context; in prose "meet me@5pm", "me@home", "hello@world" are not logins.
+        // Counts as technical: a remote-login command before it on the same line (ssh, scp, git …),
+        // a path right after it (scp user@host:/path), or a host that looks like a machine name
+        // (localhost, web-01, db01).
+        validator: (raw, index, text) => {
+          if (!text) return true;
+          const host = raw.slice(raw.indexOf("@") + 1);
+          const lineStart = text.lastIndexOf("\n", index) + 1;
+          const before = text.slice(lineStart, index);
+          return /\b(?:ssh|scp|sftp|rsync|mosh|telnet|ftp|git|ansible|login|sudo|su|psql|mysql|kubectl|docker)\b/i.test(before) ||
+            text[index + raw.length] === ":" ||
+            /^(?:localhost|[a-z][a-z0-9]*(?:-[a-z0-9]+)*-?\d+[a-z0-9-]*)$/i.test(host);
+        },
         replacement: "[user]@[host]"
+      },
+      // 21b. Address at a big mail provider with the ".com" left off ("email me at john@gmail")
+      {
+        id: "EMAIL_NO_TLD",
+        name: "Email Address (provider without domain ending)",
+        category: "PROFILE",
+        regex: /\b[a-zA-Z0-9._%+-]+@(?:gmail|googlemail|yahoo|ymail|outlook|hotmail|live|icloud|proton(?:mail)?)\b(?!\.[a-zA-Z])/gi,
+        replacement: "[REDACTED_EMAIL]"
       },
       // 22. User Home Directory Paths (Linux / macOS / Windows)
       {

@@ -340,6 +340,7 @@ class SafeShareModal {
     const existing = document.getElementById("safeshare-modal-backdrop");
     if (existing) existing.remove();
     this.maybeChoices.clear();
+    this.maybeShowAll = false; // this.lastShare is kept: closing the dialog must not lose the revoke offer
     this.maybeCandidates = [];
     this.currentTurns = [];
     this.sanitizedTurns = [];
@@ -1079,6 +1080,9 @@ class SafeShareModal {
     btnNone.addEventListener("click", (e) => {
       if (this.publishing) return;
       if (e?.preventDefault) e.preventDefault();
+      // Likely credentials are pre-ticked for a reason: revealing them all at once needs a yes
+      const risky = this.maybeCandidates.filter(c => c.risky && (this.maybeChoices.get(c.raw) ?? true)).length;
+      if (risky && !window.confirm(`${risky} of these look like credentials. Show them to link readers anyway?`)) return;
       for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, false);
       this.rebuildViews();
     });
@@ -1087,7 +1091,11 @@ class SafeShareModal {
     toolbar.appendChild(btnNone);
     list.appendChild(toolbar);
 
-    for (const candidate of this.maybeCandidates) {
+    // Longest lists get ignored: show the 5 highest scores (plus anything pre-ticked), rest on request
+    const MAYBE_SHOWN = 5;
+    const visible = this.maybeShowAll ? this.maybeCandidates
+      : this.maybeCandidates.filter((c, i) => i < MAYBE_SHOWN || c.risky);
+    for (const candidate of visible) {
       const isRedacted = this.activeCategories.has(candidate.category) && (this.maybeChoices.get(candidate.raw) ?? candidate.risky);
 
       const label = document.createElement("label");
@@ -1123,7 +1131,9 @@ class SafeShareModal {
 
       const text = document.createElement("span");
       text.className = "maybe-item-text";
-      text.textContent = `${shown} — ${candidate.reason} (${candidate.occurrences.length} occurrence(s)). Context: ${snippet}`;
+      const score = typeof candidate.score === "number"
+        ? ` · score ${candidate.score.toFixed(2)}${candidate.why && candidate.why.length ? ` (${candidate.why.join(", ")})` : ""}` : "";
+      text.textContent = `${shown} — ${candidate.reason}${score} (${candidate.occurrences.length} occurrence(s)). Context: ${snippet}`;
 
       const actBtn = document.createElement("button");
       actBtn.type = "button";
@@ -1140,6 +1150,19 @@ class SafeShareModal {
       label.appendChild(text);
       label.appendChild(actBtn);
       list.appendChild(label);
+    }
+    if (visible.length < this.maybeCandidates.length || this.maybeShowAll) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.id = "btn-maybe-show-more";
+      more.className = "btn-drawer-action btn-maybe-bulk";
+      more.textContent = this.maybeShowAll ? "Show fewer" : `Show ${this.maybeCandidates.length - visible.length} more (lower scores)`;
+      more.addEventListener("click", (e) => {
+        if (e?.preventDefault) e.preventDefault();
+        this.maybeShowAll = !this.maybeShowAll;
+        this.renderMaybeItems();
+      });
+      list.appendChild(more);
     }
   }
 
@@ -1425,6 +1448,18 @@ class SafeShareModal {
       if (this.publishing || this.modelBusy) return;
       const riskyLeft = this.maybeCandidates.filter(c => c.risky && !(this.maybeChoices.get(c.raw) ?? c.risky)).length;
       if (riskyLeft && !window.confirm(`${riskyLeft} possible credential(s) remain visible to link readers and any AI they continue with. Create the link anyway?`)) return;
+      // Re-sharing after changing choices: the earlier link still shows the earlier version
+      if (this.lastShare && window.confirm("You already created a link from this chat. Revoke that earlier link? (Recommended if you hid something you had missed.)")) {
+        const { relayUrl: prevRelay, shareId: prevId, token: prevToken } = this.lastShare;
+        this.lastShare = null;
+        try {
+          const api = typeof browser !== "undefined" ? browser : chrome;
+          const res = await api.runtime.sendMessage({ action: "REVOKE_SHARE", relayUrl: prevRelay, shareId: prevId, token: prevToken });
+          if (!(res && res.success)) window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
+        } catch (_) {
+          window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
+        }
+      }
       // Snapshot only public fields; never share solverLeaks, original values or detector metadata.
       const turns = this.sanitizedTurns.map(({ role, content }) => ({ role, content }));
       const btn = backdrop.querySelector("#btn-encrypt-publish");
@@ -1550,6 +1585,7 @@ class SafeShareModal {
         // extension storage if users need to revoke after closing the dialog.
         const revokeBtn = document.getElementById("btn-revoke-url");
         if (revokeToken) {
+          this.lastShare = { relayUrl, shareId: encResult.shareId, token: revokeToken };
           revokeBtn.style.display = "";
           revokeBtn.onclick = async () => {
             const api = typeof browser !== "undefined" ? browser : chrome;
@@ -1560,6 +1596,7 @@ class SafeShareModal {
               token: revokeToken
             });
             revokeBtn.innerText = res && res.success ? "Revoked ✓" : "Revoke failed";
+            if (res && res.success) this.lastShare = null;
             revokeBtn.disabled = !!(res && res.success);
           };
         }

@@ -135,3 +135,16 @@ console.log("cli: api key checks passed");
   assert.strictEqual(s("mysql -u root -p -e \"show databases;\""), "mysql -u root -p -e \"show databases;\"", "-p alone prompts, nothing to hide");
 }
 console.log("cli: bash history checks passed");
+
+// "@" in prose is not an address; real addresses and logins still are
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  for (const t of ["meet me@5pm tomorrow", "oops typo hello@world. sorry", "me@home now", "see you @ 5pm", "ping @john",
+    "test@test", "git clone git@github.com:team/repo.git"]) assert.strictEqual(s(t), t, t);
+  assert.strictEqual(s("email me at john@gmail"), "email me at [REDACTED_EMAIL]");
+  assert(!s("my email is rina.kusuma@example.com").includes("rina"));
+  assert.strictEqual(s("ssh admin@bastion"), "ssh [user]@[host]");
+  assert.strictEqual(s("connect to deploy@web-01"), "connect to [user]@[host]");
+}
+console.log("cli: @ checks passed");
