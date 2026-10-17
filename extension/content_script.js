@@ -17,9 +17,9 @@
   const localCompute = typeof SafeShareLocalCompute !== "undefined" ? new SafeShareLocalCompute() : null;
 
   // Before-sending protection ("shield") mode, chosen from the chip above the chat input:
-  //   "all"     replace IDs, keys, cards, emails, phones, and turn amounts into <S1> (default)
+  //   "all"     replace IDs, keys, cards, emails, phones, and turn amounts into <S1>
   //   "amounts" only turn amounts into <S1>
-  //   "off"     send as typed
+  //   "off"     send as typed (default)
   const SHIELD_MODES = {
     all: "Protect IDs + amounts",
     amounts: "Protect amounts only",
@@ -29,9 +29,10 @@
     try {
       const m = localStorage.getItem("safeshare_shield_mode");
       if (SHIELD_MODES[m]) return m;
-      return localStorage.getItem("safeshare_pre_inference") === "false" ? "off" : "all"; // older setting
+      if (localStorage.getItem("safeshare_pre_inference") === "true") return "all";
+      return "off";
     } catch (_) {
-      return "all";
+      return "off";
     }
   }
   function setShieldMode(mode) {

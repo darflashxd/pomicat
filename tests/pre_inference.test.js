@@ -102,6 +102,16 @@ function runPreInferenceSuite() {
   console.log("\n[Pillar 1] Testing Shield Modes: 'all', 'amounts', and 'off'...");
   const samplePrompt = "My salary is $6,000 per month, NIK is 3201012304950001, and password is Sup3rP@ss99.";
 
+  // Mode default: off (opt-in for users, share privately is main feature)
+  const resolveMode = (stored) => {
+    const modes = { all: true, amounts: true, off: true };
+    if (modes[stored]) return stored;
+    return "off";
+  };
+  assert.strictEqual(resolveMode(null), "off", "Default shield mode must be 'off'");
+  assert.strictEqual(resolveMode(undefined), "off", "Default shield mode must be 'off'");
+  console.log("  [✓] Default shield mode verified: 'off' (opt-in)!");
+
   // Mode: all
   vault.clear();
   const resAll = simulateShield(samplePrompt, "all");

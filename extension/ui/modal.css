@@ -746,6 +746,11 @@
   opacity: 0.65;
 }
 
+#safeshare-shield-indicator.shield-disabled:hover {
+  opacity: 0.95;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .diff-box::-webkit-scrollbar {
   width: 6px;
   height: 6px;
