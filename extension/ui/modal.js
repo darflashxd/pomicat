@@ -356,6 +356,33 @@ class SafeShareModal {
     this.pseudonymizer.reset();
   }
 
+  setCandidateEnabled(cand, enabled) {
+    if (!cand) return;
+    cand.enabled = enabled;
+    if (enabled) {
+      this.activeCategories.add(cand.category);
+    }
+    if (cand.category === "CUSTOM") {
+      const meta = this.customSelections.get(cand.raw);
+      if (meta) meta.enabled = enabled;
+    }
+    if (cand.id.startsWith("maybe_") || this.maybeChoices.has(cand.raw)) {
+      this.maybeChoices.set(cand.raw, enabled);
+    }
+    const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
+    this.candidates.forEach(other => {
+      const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
+      const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
+      const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
+      if (isSameRaw || isSameFinVal) {
+        other.enabled = enabled;
+        if (other.id.startsWith("maybe_") || this.maybeChoices.has(other.raw)) {
+          this.maybeChoices.set(other.raw, enabled);
+        }
+      }
+    });
+  }
+
   syncCustomCandidates() {
     for (const [raw, meta] of this.customSelections.entries()) {
       let cand = this.candidates.find(c => c.category === "CUSTOM" && c.raw.toLowerCase() === raw.toLowerCase());
@@ -363,6 +390,42 @@ class SafeShareModal {
         this.candidates.push({ ...meta });
       } else {
         cand.enabled = meta.enabled;
+      }
+    }
+  }
+
+  syncMaybeCandidates() {
+    for (const m of this.maybeCandidates) {
+      let mCat = "CREDENTIALS";
+      if (m.reason.includes("Local model: PERSON") || m.reason.includes("Local model: GIVEN_NAME") || m.reason.includes("Local model: SURNAME") || m.reason.includes("Local model: LOCATION") || m.reason.includes("Local model: CITY") || m.reason.includes("Local model: STREET")) {
+        mCat = "PROFILE";
+      } else if (!m.risky && (m.reason.includes("Random") || m.reason.includes("Entropy"))) {
+        mCat = "SYSTEM";
+      }
+      const isEnabled = this.maybeChoices.get(m.raw) ?? m.risky;
+      let cand = this.candidates.find(c => c.id === m.id || c.raw.toLowerCase() === m.raw.toLowerCase());
+      if (!cand) {
+        this.candidates.push({
+          id: m.id,
+          role: "user",
+          turnIndex: m.occurrences && m.occurrences[0] ? m.occurrences[0].turnIndex : 0,
+          category: mCat,
+          categoryLabel: SS_CATEGORIES[mCat]?.label || "General",
+          ruleName: m.reason.includes("Local model") ? "Local AI Model" : (m.risky ? "Possible Credential" : "High Entropy Token"),
+          raw: m.raw,
+          fullRaw: m.raw,
+          tag: m.replacement,
+          replacement: m.replacement,
+          enabled: isEnabled,
+          isAmount: false,
+          isAlgebraic: false,
+          occurrences: m.occurrences ? m.occurrences.length : 1
+        });
+      } else {
+        cand.enabled = isEnabled;
+        cand.tag = m.replacement;
+        cand.replacement = m.replacement;
+        if (m.occurrences) cand.occurrences = m.occurrences.length;
       }
     }
   }
@@ -667,20 +730,6 @@ class SafeShareModal {
     let sanitizedTextPlain = "";
     let sanitizedHtmlDisplay = "";
 
-    // Tally candidate counts and active protected counts per category
-    const catStats = {};
-    for (const catKey of Object.keys(SS_CATEGORIES)) {
-      catStats[catKey] = { total: 0, active: 0 };
-    }
-    for (const c of this.candidates) {
-      if (catStats[c.category]) {
-        catStats[c.category].total++;
-        if (this.activeCategories.has(c.category) && c.enabled) {
-          catStats[c.category].active++;
-        }
-      }
-    }
-
     // 1. Prepare intermediate turns based on active candidate toggles
     const activeIntermediateTurns = [];
     for (let tIdx = 0; tIdx < this.currentTurns.length; tIdx++) {
@@ -772,8 +821,9 @@ class SafeShareModal {
     this.reviewBaseTurns = this.finalSafetyScan(this.sanitizedTurns).map(({ role, content }) => ({ role, content }));
     const modelSpans = this.reviewBaseTurns.flatMap((t, turnIndex) => (this.modelReview.get(t.content) || []).map(s => ({ ...s, turnIndex })));
     this.maybeCandidates = this.maybe.scan(this.reviewBaseTurns, modelSpans).filter(m => !this.candidates.some(c =>
-      [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
+      !c.id.startsWith("maybe_") && [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
     this.sanitizedTurns = this.maybe.apply(this.reviewBaseTurns, this.maybeCandidates, this.maybeChoices);
+    this.syncMaybeCandidates();
 
     // Apply custom user-selected redactions across all turns
     for (const cand of this.candidates.filter(c => c.category === "CUSTOM" && c.enabled)) {
@@ -833,12 +883,14 @@ class SafeShareModal {
       const turnLeaks = this.previewLeaks[tIdx] || [];
       let solverLeakIdx = 0;
 
-      htmlContent = replaceOutsideSpans(htmlContent, /\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
+      const ALL_REDACTED_TAGS_PATTERN = /\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED|LOCATION|NIK|NAME|DATE)_[A-Z0-9_]+\]|\[REDACTED_[A-Z0-9]+\]|\[user_\d+@protected\.local\]|sk-dummy[\w-]*|sk-ant-api03-dummy[\w-]*|AIzaSyDummy[\w-]*|hf_dummy[\w-]*|glpat-dummy[\w-]*|postgresql:\/\/postgres:placeholder_password[^\s"'>]*/g;
+
+      htmlContent = replaceOutsideSpans(htmlContent, ALL_REDACTED_TAGS_PATTERN, (tag) => {
         let cand = null;
         // 1. If this is a solver leak in an assistant turn, match in exact occurrence order
         if (solverLeakIdx < turnLeaks.length) {
           const leak = turnLeaks[solverLeakIdx];
-          if (leak && leak.replacement === tag) {
+          if (leak && (leak.replacement === tag || leak.tag === tag)) {
             solverLeakIdx++;
             cand = this.candidates.find(c => c.raw.toLowerCase() === leak.raw.toLowerCase());
           }
@@ -847,9 +899,18 @@ class SafeShareModal {
         if (!cand) {
           cand = this.candidates.find(c => (c.tag === tag || c.replacement === tag) && turnDets.some(d => (d.secretToken || d.raw).toLowerCase() === c.raw.toLowerCase()));
         }
-        // 3. Fallback to candidate matching tag
+        // 3. Fallback to candidate matching tag or replacement
         if (!cand) {
           cand = this.candidates.find(c => c.tag === tag || c.replacement === tag);
+        }
+        // 4. Fallback matching placeholder prefix (dummy keys, emails)
+        if (!cand) {
+          cand = this.candidates.find(c => (c.replacement && c.replacement.includes(tag)) || (c.tag && c.tag.includes(tag)));
+        }
+        // 5. Fallback for maybe candidates
+        if (!cand) {
+          const m = this.maybeCandidates.find(mc => mc.replacement === tag);
+          if (m) cand = this.candidates.find(c => c.id === m.id || c.raw.toLowerCase() === m.raw.toLowerCase());
         }
         if (!cand || cand.raw === tag) return `<span class="ss-placeholder" title="Original value unavailable; cannot unmask">${tag}</span>`;
         const candId = cand.id;
@@ -879,28 +940,28 @@ class SafeShareModal {
             cand = this.candidates.find(c => c.tag === badgeTag || c.replacement === badgeTag);
           }
           if (cand) {
-            const nextState = !cand.enabled;
-            cand.enabled = nextState;
-            if (cand.category === "CUSTOM") {
-              const meta = this.customSelections.get(cand.raw);
-              if (meta) meta.enabled = nextState;
-            }
-            const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
-            this.candidates.forEach(other => {
-              const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
-              const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
-              const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
-              if (isSameRaw || isSameFinVal) {
-                other.enabled = nextState;
-              }
-            });
+            this.setCandidateEnabled(cand, !cand.enabled);
             this.rebuildViews();
           }
         });
       });
     }
 
-    // 2. Update Category Filter Pills
+    // 2. Tally candidate counts and active protected counts per category
+    const catStats = {};
+    for (const catKey of Object.keys(SS_CATEGORIES)) {
+      catStats[catKey] = { total: 0, active: 0 };
+    }
+    for (const c of this.candidates) {
+      if (catStats[c.category]) {
+        catStats[c.category].total++;
+        if (this.activeCategories.has(c.category) && c.enabled) {
+          catStats[c.category].active++;
+        }
+      }
+    }
+
+    // 3. Update Category Filter Pills
     this.renderCategoryPills(catStats);
 
     // 3. Update Entity Inspector Drawer
