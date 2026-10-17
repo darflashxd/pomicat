@@ -2,6 +2,11 @@
 
 ## Unreleased — experimental share review
 
+- Sharer-only originals: creating a link saves which original sits behind each tag, encrypted with
+  that link's key, in extension storage (expires with the link, deleted on revoke). Opening your
+  own link inside the extension shows "Show my original values (only on this device)". Link
+  readers and the relay's page never can: they don't have the stored copy.
+
 - Maybe suggestions get a context score (source + entropy + credential word before it + shape,
   minus "example" wording), sorted, top 5 shown with "Show N more"; score >= 0.75 starts checked.
   Numbered placeholders from before sending are never suggested. "Keep All Unmasked" asks before

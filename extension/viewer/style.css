@@ -650,3 +650,13 @@ body {
   .platform-btn-group { width: 100%; justify-content: stretch; }
   .btn-platform { flex: 1; justify-content: center; padding: 7px 8px; font-size: 11px; }
 }
+
+/* The sharer's own original values, shown only in their extension (never to link readers) */
+mark.ss-own-original {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+#btn-own-originals { margin-left: auto; }

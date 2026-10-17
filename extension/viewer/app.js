@@ -212,7 +212,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     timestamp: Date.now()
   };
 
-  watermarkedTurns = decryptedData.turns.map(turn => {
+  // Renders the conversation; called again with the sharer's originals filled in (see below)
+  function renderTurns(sourceTurns) {
+  watermarkedTurns = sourceTurns.map(turn => {
     if (steganography) {
       const watermarkedContent = steganography.embed(turn.content, watermarkMeta, rawHash);
       return { role: turn.role, content: watermarkedContent };
@@ -251,11 +253,52 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const contentDiv = document.createElement("div");
       contentDiv.className = "bubble-content";
-      contentDiv.innerHTML = formatChatContent(turn.content);
+      // \uE000…\uE001 mark the sharer's own originals; the text inside is already HTML-escaped
+      contentDiv.innerHTML = formatChatContent(turn.content)
+        .replace(/\uE000([\s\S]*?)\uE001/g, '<mark class="ss-own-original" title="Your original value. Only on this device; link readers see the tag.">$1</mark>');
       bubble.appendChild(contentDiv);
 
       messagesContainer.appendChild(bubble);
     });
+  }
+  }
+  renderTurns(decryptedData.turns);
+
+  // The sharer's own originals. Saved by the share dialog encrypted with this link's key, in this
+  // extension's storage, so only the browser that created the link (and has the link) can show
+  // them. Readers, and the relay's own page, never can.
+  if (inExtension && shareId && rawHash && !rawHash.includes("k=")) {
+    try {
+      const api = typeof browser !== "undefined" ? browser : chrome;
+      const storageKey = `safeshare_own_${shareId}`;
+      const entry = (await api.storage.local.get(storageKey))[storageKey];
+      if (entry && entry.ct) {
+        const own = await cryptoEngine.decrypt(entry.ct, rawHash);
+        const withOriginals = decryptedData.turns.map((turn, i) => {
+          let content = turn.content;
+          for (const { s, e, o } of [...((own.turns || [])[i] || [])].sort((a, b) => b.s - a.s)) {
+            if (typeof o === "string" && s >= 0 && e <= content.length && s < e) {
+              content = content.slice(0, s) + "\uE000" + o + "\uE001" + content.slice(e);
+            }
+          }
+          return { role: turn.role, content };
+        });
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-platform";
+        btn.id = "btn-own-originals";
+        let showing = false;
+        btn.textContent = "Show my original values (only on this device)";
+        btn.addEventListener("click", () => {
+          showing = !showing;
+          renderTurns(showing ? withOriginals : decryptedData.turns);
+          btn.textContent = showing ? "Hide my original values" : "Show my original values (only on this device)";
+        });
+        (document.querySelector(".chat-header-meta") || messagesContainer.parentElement).appendChild(btn);
+      }
+    } catch (_) {
+      // Different browser, expired, or not the sharer: nothing to show
+    }
   }
 
   function formatChatContent(raw) {

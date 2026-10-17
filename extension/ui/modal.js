@@ -1171,6 +1171,61 @@ class SafeShareModal {
    * (keys, IDs, cards, contacts) and redact any the user did not deliberately untick. Catches
    * anything an earlier step missed (e.g. a rebuild that drifted from the detected text).
    */
+  /**
+   * For each shared turn, which original text sits behind each tag: [{ s, e, o }] (offsets in the
+   * shared text). Found by matching the text between tags against the original turn in order.
+   * ponytail: stops at the first stretch it can't match (e.g. a range "Rp 2–5 juta" or a fake
+   * example key replaced a value); later tags in that turn just stay tags.
+   */
+  ownOriginals(sharedTurns) {
+    const TAG = /\[(?:REDACTED_[A-Z0-9_]+|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_\d+|user_\d+@protected\.local|user|host|password|sandbox_path|User_[A-Z]+)\]|<S\d+>/g;
+    return sharedTurns.map((shared, i) => {
+      const source = this.currentTurns[i];
+      if (!source || source.role !== shared.role) return [];
+      const orig = this.heuristics.normalizeHomoglyphs(source.content);
+      const tags = [...shared.content.matchAll(TAG)];
+      const out = [];
+      let pos = 0;
+      let prevEnd = 0;
+      for (let k = 0; k < tags.length; k++) {
+        const before = shared.content.slice(prevEnd, tags[k].index);
+        const at = orig.indexOf(before, pos);
+        if (at < 0) break;
+        const start = at + before.length;
+        const tagEnd = tags[k].index + tags[k][0].length;
+        const after = shared.content.slice(tagEnd, k + 1 < tags.length ? tags[k + 1].index : undefined);
+        if (!after && k + 1 < tags.length) break; // two tags side by side: can't tell where one ends
+        const end = k + 1 < tags.length ? orig.indexOf(after, start) : orig.length - after.length;
+        if (end <= start || end - start > 300 || (k + 1 === tags.length && !orig.endsWith(after))) break;
+        out.push({ s: tags[k].index, e: tagEnd, o: orig.slice(start, end) });
+        pos = end;
+        prevEnd = tagEnd;
+      }
+      return out;
+    });
+  }
+
+  /** Saves the originals for this link, encrypted with the link's key, in extension storage. */
+  async saveOwnOriginals(encResult, sharedTurns) {
+    try {
+      const turns = this.ownOriginals(sharedTurns);
+      if (!turns.some(t => t.length)) return;
+      const api = typeof browser !== "undefined" ? browser : chrome;
+      const ct = await this.crypto.encryptWithKey({ expMs: encResult.expMs, turns }, encResult.key);
+      const all = await api.storage.local.get(null);
+      const expired = Object.keys(all).filter(k => k.startsWith("safeshare_own_") && !(all[k] && all[k].expMs > Date.now()));
+      if (expired.length) await api.storage.local.remove(expired);
+      await api.storage.local.set({ [`safeshare_own_${encResult.shareId}`]: { ct, expMs: encResult.expMs } });
+    } catch (_) {}
+  }
+
+  forgetOwnOriginals(shareId) {
+    try {
+      const api = typeof browser !== "undefined" ? browser : chrome;
+      Promise.resolve(api.storage.local.remove(`safeshare_own_${shareId}`)).catch(() => {});
+    } catch (_) {}
+  }
+
   finalSafetyScan(turns) {
     const kept = new Set(
       this.candidates
@@ -1452,6 +1507,7 @@ class SafeShareModal {
       if (this.lastShare && window.confirm("You already created a link from this chat. Revoke that earlier link? (Recommended if you hid something you had missed.)")) {
         const { relayUrl: prevRelay, shareId: prevId, token: prevToken } = this.lastShare;
         this.lastShare = null;
+        this.forgetOwnOriginals(prevId);
         try {
           const api = typeof browser !== "undefined" ? browser : chrome;
           const res = await api.runtime.sendMessage({ action: "REVOKE_SHARE", relayUrl: prevRelay, shareId: prevId, token: prevToken });
@@ -1586,6 +1642,8 @@ class SafeShareModal {
         const revokeBtn = document.getElementById("btn-revoke-url");
         if (revokeToken) {
           this.lastShare = { relayUrl, shareId: encResult.shareId, token: revokeToken };
+          // Only you, opening this link inside your extension, can show the originals again
+          await this.saveOwnOriginals(encResult, turns);
           revokeBtn.style.display = "";
           revokeBtn.onclick = async () => {
             const api = typeof browser !== "undefined" ? browser : chrome;
@@ -1596,7 +1654,7 @@ class SafeShareModal {
               token: revokeToken
             });
             revokeBtn.innerText = res && res.success ? "Revoked ✓" : "Revoke failed";
-            if (res && res.success) this.lastShare = null;
+            if (res && res.success) { this.lastShare = null; this.forgetOwnOriginals(encResult.shareId); }
             revokeBtn.disabled = !!(res && res.success);
           };
         }

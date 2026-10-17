@@ -48,7 +48,7 @@ class SafeShareCrypto {
         length: 256
       },
       false,
-      ["decrypt"]
+      ["encrypt", "decrypt"] // encrypt: the sharer's own copy of the originals (encryptWithKey)
     );
   }
 
@@ -103,6 +103,21 @@ class SafeShareCrypto {
       fullShareUrl,
       standaloneShareUrl
     };
+  }
+
+  /**
+   * Encrypts another object with an existing link key (same format as encrypt(), so decrypt()
+   * reads it). Used for the sharer's own copy of the originals, which only the link key opens.
+   */
+  async encryptWithKey(obj, keyB64Url) {
+    const key = await this.importKeyFromBase64Url(keyB64Url);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = this.pad(new TextEncoder().encode(JSON.stringify(obj)), 256);
+    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
+    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(encrypted), iv.length);
+    return this.bufferToBase64Url(combined.buffer);
   }
 
   /**
