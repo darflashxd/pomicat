@@ -13,6 +13,12 @@
 
   // Ephemeral engines initialized in content script context
   const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault() : null;
+  if (symbolicVault && typeof location !== "undefined") {
+    const initMatch = (location.href || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/);
+    if (initMatch && initMatch[1]) {
+      symbolicVault.loadFromSession(initMatch[1]);
+    }
+  }
   const symbolicRewriter = (typeof SafeShareSymbolicRewriter !== "undefined" && symbolicVault) ? new SafeShareSymbolicRewriter(symbolicVault) : null;
   const localCompute = typeof SafeShareLocalCompute !== "undefined" ? new SafeShareLocalCompute() : null;
 
@@ -675,11 +681,14 @@
     // PASS 1: Hydrate KaTeX LaTeX equations in-place across ChatGPT, Claude, and DeepSeek
     const katexNodes = document.querySelectorAll("span.katex, div.katex-display, div[class*='math']");
     katexNodes.forEach((kNode) => {
-      if (kNode.dataset.safeshareHydrated === "true") return;
+      if (kNode.dataset.safeshareHydrated === "true" && !isSymbolicMathContent(kNode.innerHTML)) return;
       if (isPromptInputOrUIElement(kNode)) return;
 
       const annot = kNode.querySelector ? (kNode.querySelector("annotation[encoding='application/x-tex']") || kNode.querySelector("annotation")) : null;
-      const tex = annot ? annot.textContent : "";
+      let tex = annot ? annot.textContent : (kNode.getAttribute("data-tex") || "");
+      if (!tex && isSymbolicMathContent(kNode.textContent || "")) {
+        tex = kNode.textContent || "";
+      }
       if (tex && isSymbolicMathContent(tex)) {
         const res = localCompute.hydrateText(tex, vaultData, true);
         if (res.computedCount > 0) {
@@ -696,15 +705,16 @@
     // STRICT RULE: Never query user message bubbles, prompt inputs, or code blocks (<pre>)
     // to prevent Virtual DOM collisions and self-hydration loops.
     const leafNodes = document.querySelectorAll(
-      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, " +
-      "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, " +
+      "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] div.math, " +
+      "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] div.markdown > div, [data-message-author-role='assistant'] .math-inline, [data-message-author-role='assistant'] .math-display, " +
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
-      ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th"
+      ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
+      "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer'])"
     );
 
     leafNodes.forEach((node) => {
-      if (node.dataset.safeshareHydrated === "true") return;
+      if (node.dataset.safeshareHydrated === "true" && !isSymbolicMathContent(node.innerHTML)) return;
       if (isPromptInputOrUIElement(node)) return;
       if (node.closest("pre, .ss-katex-hydrated, [data-message-author-role='user'], [data-testid='user-message']")) return;
       // Skip if leaf node contains an un-hydrated KaTeX span (Pass 1 handles KaTeX widgets)
@@ -750,7 +760,15 @@
     // Run hydration pass immediately on existing elements (e.g. after tab refresh or navigation)
     runHydrationPass();
 
+    let wasStreaming = false;
     const observer = new MutationObserver(() => {
+      const isStreamingNow = Boolean(document.querySelector("[data-testid='stop-button'], button[aria-label*='Stop'], [data-is-streaming='true'], .result-streaming, [aria-label*='Stop response']"));
+      if (wasStreaming && !isStreamingNow) {
+        // Active generation ended! Run an immediate sweep to catch trailing paragraphs/tables
+        setTimeout(() => runHydrationPass(), 120);
+      }
+      wasStreaming = isStreamingNow;
+
       if (hydrationDebounceTimer) clearTimeout(hydrationDebounceTimer);
       hydrationDebounceTimer = setTimeout(() => {
         runHydrationPass();

@@ -156,11 +156,16 @@ class SafeShareLocalCompute {
     // Unwrap LaTeX display/inline delimiters and \boxed{...} wrappers
     s = s.replace(/\\boxed\s*\{([^{}]+)\}/gi, "$1");
     s = s.replace(/\\\[|\\\]|\\\(|\\\)/g, "");
+    s = s.replace(/\\%/g, "%");
     s = this.preNormalizeHtmlSymbols(s);
     // Strip LaTeX text formatting commands
     s = s.replace(/\\(?:text|textbf|mathrm|mathit|mathsf|operatorname)\s*\{([^{}]+)\}/gi, "$1");
-    // Normalize LaTeX fractions \frac{a}{b} -> ((a) / (b))
-    s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gi, "(($1) / ($2))");
+    // Normalize LaTeX fractions \frac{a}{b} -> ((a) / (b)), handling nested fractions recursively
+    let prevFrac = "";
+    while (s !== prevFrac && /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/i.test(s)) {
+      prevFrac = s;
+      s = s.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gi, "(($1) / ($2))");
+    }
     // Normalize LaTeX parens & operators
     s = s.replace(/\\left\(/gi, "(").replace(/\\right\)/gi, ")");
     s = s.replace(/\\times\b|\\cdot\b/gi, "*");
@@ -168,6 +173,8 @@ class SafeShareLocalCompute {
     s = s.replace(/\\le\b|\\leq\b/gi, "<=");
     s = s.replace(/\\ge\b|\\geq\b/gi, ">=");
     s = s.replace(/\\ne\b|\\neq\b/gi, "!=");
+    // Normalize LaTeX exponents e.g. ^{5} -> ^(5)
+    s = s.replace(/\^\{([^{}]+)\}/g, "^($1)");
     // Normalize Unicode math operators
     s = s.replace(/[−–—]/g, "-");
     s = s.replace(/[×·✕⋅]/g, "*");
@@ -175,6 +182,8 @@ class SafeShareLocalCompute {
     s = s.replace(/≤/g, "<=");
     s = s.replace(/≥/g, ">=");
     s = s.replace(/≠/g, "!=");
+    // Normalize international decimal commas (e.g. 0,15 or 2,5%) into decimal points
+    s = s.replace(/(\b\d+),(\d+)(?=\s*[%*\/+\-^)<S]|$)/g, "$1.$2");
     // Insert multiplication for juxtaposition e.g. 0.15( -> 0.15 * (
     s = s.replace(/(\d+(?:\.\d+)?)\s*\(/g, "$1 * (");
     s = s.replace(/(\d+(?:\.\d+)?)\s*(<[A-Za-z0-9_]+>)/g, "$1 * $2");
@@ -433,19 +442,25 @@ class SafeShareLocalCompute {
    * @returns {string}
    */
   formatValue(val, currency = "USD", expr = "", afterSnippet = "") {
-    // 1. Percentage / Dimensionless Ratio check
-    const isRatioOrPercentage = /%|frac|ESOP|reduction|dilution|ownership|ratio/i.test(expr) || (val > 0 && val < 1 && !/months?|bulan|days?|hari|years?|tahun/i.test(afterSnippet));
-    if (isRatioOrPercentage) {
-      const pct = val * 100;
-      const roundedPct = Math.round(pct * 100) / 100;
-      return `${roundedPct}%`;
+    // 1. Unit duration check (e.g. runway months: <S1> / <S2> months or days)
+    const isDuration = /months?|bulan|days?|hari|years?|tahun|weeks?|minggu|jam|hours?/i.test(afterSnippet);
+    if (isDuration) {
+      const roundedDur = Math.abs(val - Math.round(val)) < 1e-4 ? Math.round(val) : Math.round(val * 100) / 100;
+      return `${roundedDur}`;
     }
 
-    // 2. Unit duration check (e.g. runway months: <S1> / <S2> months)
-    const isDuration = val < 500 && (/months?|bulan|days?|hari|years?|tahun/i.test(afterSnippet) || (expr.includes("/") && !/%|frac/i.test(expr)));
-    if (isDuration) {
-      const roundedDur = Math.round(val * 100) / 100;
-      return `${roundedDur}`;
+    // 2. Percentage / Dimensionless Ratio check
+    // STRICT RULE: Only format as percentage if the evaluated expression is dimensionally a ratio (<= 1)
+    // or explicitly calculating a rate/dilution/ESOP/ratio. Never turn addition/subtraction of currency into %!
+    const hasRatioKeywords = /ESOP|dilution|ownership|ratio|margin|rate\b/i.test(expr) || /ratio|ownership|dilution|persen|margin/i.test(afterSnippet);
+    const isCurrencyOverCurrency = /<S\d+>[^/]*\/[^/]*<S\d+>/i.test(expr);
+    const isPureRatio = val >= 0 && val <= 1 && (hasRatioKeywords || isCurrencyOverCurrency);
+    const isExplicitPercentageCalc = /%\s*$/.test(String(expr).trim()) && val >= 0 && val <= 100;
+
+    if (isPureRatio || isExplicitPercentageCalc) {
+      const pct = (isPureRatio && val <= 1) ? val * 100 : val;
+      const roundedPct = Math.round(pct * 100) / 100;
+      return `${roundedPct}%`;
     }
 
     // 3. Currency amount
@@ -557,8 +572,14 @@ class SafeShareLocalCompute {
     // Phase 0b: Balanced piecewise function calls (IF, MIN, MAX, ROUND, etc.)
     hydratedText = this.replaceBalancedFunctions(hydratedText, vault, symbolTable, defaultCurrency, htmlBadges, evaluations, escapeAttr);
 
+    // Phase 0.8: Direct TeX expressions (e.g. from KaTeX annotations or raw TeX strings lacking outer delimiters)
+    if (!/(\\\[|\$\$|\\\(|(?<!\w|\$)\$(?!\s|\d))/.test(hydratedText) && /\\(?:text|times|cdot|frac|left|right)\b/i.test(hydratedText) && /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(hydratedText)) {
+      hydratedText = `\\[ ${hydratedText} \\]`;
+    }
+
     // Phase 1: Process LaTeX display and inline math blocks \[ ... \], $$ ... $$, \( ... \), $ ... $
-    const latexBlockRx = /(\\\[|\$\$|\\\(|\$)([\s\S]*?)(\\\]|\$\$|\\\)|\$)/g;
+    // (Negative lookahead prevents matching plain currency amounts like $500 as math delimiters)
+    const latexBlockRx = /(\\\[|\$\$|\\\(|(?<!\w|\$)\$(?!\s|\d))([\s\S]*?)(\\\]|\$\$|\\\)|\$(?!\d))/g;
     hydratedText = hydratedText.replace(latexBlockRx, (fullMatch, openTag, rawInner, closeTag) => {
       const inner = this.preNormalizeHtmlSymbols(rawInner);
       if (!/<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>/i.test(inner)) return fullMatch;
@@ -566,24 +587,28 @@ class SafeShareLocalCompute {
       // Handle equations (with '=' but not '==', '<=', '>=', '!=')
       const eqParts = inner.split(/(?<![<>!=])=(?!=)/);
       if (eqParts.length > 1) {
-        const leftSide = eqParts.slice(0, -1).join("=").trim() + " = ";
-        const rightSide = eqParts[eqParts.length - 1].trim();
-        const hasSymbolsInPrefix = eqParts.slice(0, -1).some(p => /<S\d+>/i.test(p));
+        // Find the index of the first equation segment containing secret symbols
+        const symIdx = eqParts.findIndex(p => /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩/i.test(p));
+        const evalIdx = symIdx !== -1 ? symIdx : eqParts.length - 1;
+        const targetExpr = eqParts[evalIdx].trim();
+        const prefixParts = eqParts.slice(0, evalIdx).map(p => p.trim()).filter(Boolean);
+        const prefixLabel = prefixParts.length > 0 ? prefixParts.join(" = ") + " = " : "";
 
         try {
-          const cleanRight = this.cleanMathString(rightSide);
-          const val = this.compute(cleanRight, symbolTable);
+          const cleanExpr = this.cleanMathString(targetExpr);
+          const val = this.compute(cleanExpr, symbolTable);
           const itemCurrency = this.detectCurrencyFromVault(inner, vault, defaultCurrency);
-          const formatted = this.formatValue(val, itemCurrency, cleanRight).replace("%", "\\%");
-          evaluations.push({ expr: rightSide, val, formatted });
+          const formatted = this.formatValue(val, itemCurrency, cleanExpr).replace("%", "\\%");
+          evaluations.push({ expr: targetExpr, val, formatted });
 
-          // If leftSide contains derivation with symbols (e.g. "<S1> + 0.15 * <S1> = "),
-          // collapse entire equation to the calculated value.
-          if (hasSymbolsInPrefix) {
-            return formatted;
+          const badge = htmlBadges
+            ? `<span class="ss-local-compute" data-expr="${encodeURIComponent(cleanExpr)}" title="Locally Computed from ${escapeAttr(cleanExpr)}">${formatted}</span>`
+            : formatted;
+
+          if (!prefixLabel) {
+            return badge;
           }
-          // If leftSide is descriptive label (e.g. "\text{ESOP after SAFE} = "), keep label
-          return `${openTag}${leftSide}${formatted}${closeTag}`;
+          return `${openTag}${prefixLabel}${badge}${closeTag}`;
         } catch (_) {
           return fullMatch;
         }
@@ -594,6 +619,9 @@ class SafeShareLocalCompute {
           const itemCurrency = this.detectCurrencyFromVault(inner, vault, defaultCurrency);
           const formatted = this.formatValue(val, itemCurrency, cleanExpr).replace("%", "\\%");
           evaluations.push({ expr: inner.trim(), val, formatted });
+          if (htmlBadges) {
+            return `<span class="ss-local-compute" data-expr="${encodeURIComponent(cleanExpr)}" title="Locally Computed from ${escapeAttr(cleanExpr)}">${formatted}</span>`;
+          }
           return formatted;
         } catch (_) {
           return fullMatch;
@@ -602,18 +630,35 @@ class SafeShareLocalCompute {
       return fullMatch;
     });
 
-    // Phase 1b: Resolving Chained Equations in Plain Text / Tables e.g. "A + B = C * D"
-    // If both sides of '=' contain secret symbols (<S\d+>), collapse to rightmost expression!
-    const plainChainRx = /((?:[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*(?:\s*[\+\-\*\/\^]\s*[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*)*))\s*(?<![<>!=])=(?!=)\s*((?:[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*(?:\s*[\+\-\*\/\^]\s*[\(\s]*(?:<S\d+>|\d+(?:[.,]\d+)?%?)[\)\s]*)+))/gi;
-    hydratedText = hydratedText.replace(plainChainRx, (full, leftExpr, rightExpr) => {
-      if (/<S\d+>/i.test(leftExpr) && /<S\d+>/i.test(rightExpr)) {
-        return rightExpr;
+    // Phase 1b: Resolving Chained Equations in Plain Text / Tables e.g. "Label = Expr1 = Expr2 = ..."
+    // Collapses multi-step derivation chains into "Label = [Computed Value]"
+    hydratedText = hydratedText.replace(/^([^\n=]+?)=(?!=)([\s\S]+?)$/gm, (fullLine, prefix, rest) => {
+      if (!/<S\d+>/i.test(fullLine)) return fullLine;
+      const parts = fullLine.split(/(?<![<>!=])=(?!=)/);
+      if (parts.length > 2) {
+        const symIdx = parts.findIndex(p => /<S\d+>/i.test(p));
+        if (symIdx !== -1) {
+          try {
+            const cleanExpr = this.cleanMathString(parts[symIdx]);
+            const val = this.compute(cleanExpr, symbolTable);
+            const itemCurrency = this.detectCurrencyFromVault(fullLine, vault, defaultCurrency);
+            const formatted = this.formatValue(val, itemCurrency, cleanExpr);
+            evaluations.push({ expr: parts[symIdx].trim(), val, formatted });
+            const label = parts.slice(0, symIdx).join(" = ").trim();
+            const badge = htmlBadges
+              ? `<span class="ss-local-compute" data-expr="${encodeURIComponent(cleanExpr)}" title="Locally Computed from ${escapeAttr(cleanExpr)}">${formatted}</span>`
+              : formatted;
+            return (label ? `${label} = ` : "") + badge;
+          } catch (_) {
+            return fullLine;
+          }
+        }
       }
-      return full;
+      return fullLine;
     });
 
     // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and nested parentheses)
-    const multiTermRx = /(?:\(\s*)*(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)[ \t]*[-+*\/^%−–—×·][ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?)(?:\s*\))*(?:[ \t]*[-+*\/^%−–—×·][ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:\.\d+)?%?|[()]|\s+)+)*(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    const multiTermRx = /(?:\(\s*)*(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)(?:\s*\))*(?:[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?|[()]|\s+)+)*(?:\^\{[^{}]+\}|\^[0-9]+)?(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];
