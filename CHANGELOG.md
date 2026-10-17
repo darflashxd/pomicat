@@ -10,6 +10,12 @@
   login command, a host:path or a machine-like host. "john@gmail" without ".com" counts as an
   email; git@github.com does not.
 - Before-sending protection is off by default (opt-in from the chip).
+- "Keep debug details" in the chip menu: IPs, hostnames, user@host and paths are sent as typed so
+  the AI can debug; passwords, keys and tokens are still replaced. Public IPs are now hidden
+  otherwise (they weren't caught after "@" or before a full stop); private IPs stay.
+- Restore on your screen: one map per chat (switching chats no longer loses it, and [NAME_1] of
+  chat A is never shown in chat B); a console note explains any placeholder left as is.
+- The chip menu sits on the page body, so chat boxes that clip their content (DeepSeek) can't hide it.
 
 - Proxy redacts structured tool outputs: OpenAI Responses string/block tool calls and
   Anthropic `tool_result` blocks; JSON arguments decoded and verified. Unsupported tool/multimodal

@@ -148,3 +148,14 @@ console.log("cli: bash history checks passed");
   assert.strictEqual(s("connect to deploy@web-01"), "connect to [user]@[host]");
 }
 console.log("cli: @ checks passed");
+
+// Public IPs (System & Shell, so "debug details" can keep them); private ones and versions stay
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  assert.strictEqual(s("ssh deploy@203.0.113.15"), "ssh deploy@[REDACTED_IP]");
+  assert.strictEqual(s("my home IP is 36.72.150.11."), "my home IP is [REDACTED_IP].");
+  for (const t of ["psql -h 10.0.4.20 -U postgres", "version 1.2.3.4 released", "ip 192.168.1.1 router", "dns 1.1.1.1"]) assert.strictEqual(s(t), t, t);
+  assert.strictEqual(new H().scan("ssh deploy@203.0.113.15").detections[0].category, "SYSTEM");
+}
+console.log("cli: ip checks passed");

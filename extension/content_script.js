@@ -62,14 +62,32 @@
    * value always gets the same placeholder. Kept in the extension's private session storage
    * (not the page's), which the chat site's scripts can't read, and cleared when the browser closes.
    */
+  // One map per chat ([NAME_1] in chat A is not [NAME_1] in chat B), keyed by the chat's ID from
+  // the URL; a brand-new chat uses "new" until the site assigns its ID.
   const idMap = { byValue: new Map(), byPlaceholder: new Map(), counters: {} };
   const extApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
   const idStore = extApi && extApi.storage && extApi.storage.session ? extApi.storage.session : null;
-  if (idStore) {
-    Promise.resolve(idStore.get("safeshare_idmap")).then((res) => {
-      for (const [ph, value] of (res && res.safeshare_idmap) || []) rememberId(ph, value);
+  const chatIdOf = (url) => ((url || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/) || [])[1] || null;
+  let idMapKey = `safeshare_idmap_${chatIdOf(typeof location !== "undefined" ? location.href : "") || "new"}`;
+  function loadIdMap(chatId) {
+    idMap.byValue.clear();
+    idMap.byPlaceholder.clear();
+    idMap.counters = {};
+    idMapKey = `safeshare_idmap_${chatId || "new"}`;
+    for (const [ph, value] of idMapsSeen.get(idMapKey) || []) rememberId(ph, value);
+    if (!idStore) return;
+    const key = idMapKey;
+    Promise.resolve(idStore.get(key)).then((res) => {
+      if (key !== idMapKey) return; // switched chats meanwhile
+      for (const [ph, value] of (res && res[key]) || []) rememberId(ph, value);
     }).catch(() => {});
   }
+  const idMapsSeen = new Map(); // this tab's maps per chat, so switching back is instant
+  function saveIdMap() {
+    idMapsSeen.set(idMapKey, [...idMap.byPlaceholder]);
+    if (idStore) Promise.resolve(idStore.set({ [idMapKey]: [...idMap.byPlaceholder] })).catch(() => {});
+  }
+  loadIdMap(chatIdOf(typeof location !== "undefined" ? location.href : ""));
   function rememberId(placeholder, value) {
     idMap.byPlaceholder.set(placeholder, value);
     idMap.byValue.set(value, placeholder);
@@ -81,7 +99,7 @@
     const n = (idMap.counters[label] || 0) + 1;
     const ph = `[${label}_${n}]`;
     rememberId(ph, value);
-    if (idStore) Promise.resolve(idStore.set({ safeshare_idmap: [...idMap.byPlaceholder] })).catch(() => {});
+    saveIdMap();
     return ph;
   }
 
@@ -99,13 +117,19 @@
   }
 
   /** Replaces hard identifiers with numbered placeholders, keeping words like "password ... aku". */
+  // "Keep debug details": IPs, hostnames, user@host and paths (the System & Shell rules) are sent
+  // as typed so the AI can help debug. Passwords, keys and tokens are still replaced.
+  function keepDebugDetails() {
+    try { return localStorage.getItem("safeshare_debug_details") === "true"; } catch (_) { return false; }
+  }
   function replaceIds(text, { dryRun }) {
     const scan = shieldIdScanner.scan(text);
-    if (!scan.detections.length) return { out: text, count: 0 };
+    const detections = keepDebugDetails() ? scan.detections.filter((d) => d.category !== "SYSTEM") : scan.detections;
+    if (!detections.length) return { out: text, count: 0 };
     let out = shieldIdScanner.normalizeHomoglyphs(text); // detection offsets refer to this text
     // Number placeholders in reading order ([PHONE_1] is the first phone), then replace from the
     // end so earlier offsets stay valid
-    const edits = [...scan.detections].sort((a, b) => a.index - b.index).map((det) => {
+    const edits = [...detections].sort((a, b) => a.index - b.index).map((det) => {
       // Keep what the rule keeps around the value ("password ", "curl -u ", the closing quote in
       // PASSWORD='…'): only the part the rule changed becomes the placeholder
       const rep = typeof det.replacement === "string" ? det.replacement : "";
@@ -123,7 +147,7 @@
     for (const { det, text: replacement } of edits.reverse()) {
       out = out.slice(0, det.index) + replacement + out.slice(det.index + det.length);
     }
-    return { out, count: scan.detections.length };
+    return { out, count: detections.length };
   }
 
   /**
@@ -452,12 +476,33 @@
       });
       menu.appendChild(opt);
     }
+    const debug = document.createElement("label");
+    debug.className = "shield-menu-option";
+    const debugBox = document.createElement("input");
+    debugBox.type = "checkbox";
+    debugBox.checked = keepDebugDetails();
+    debugBox.style.marginRight = "6px";
+    debugBox.addEventListener("click", (e) => e.stopPropagation());
+    debugBox.addEventListener("change", () => {
+      try { localStorage.setItem("safeshare_debug_details", String(debugBox.checked)); } catch (_) {}
+      onChange();
+    });
+    debug.title = "IPs, hostnames, user@host and file paths are sent as typed. Passwords, keys and tokens are still replaced.";
+    debug.addEventListener("click", (e) => e.stopPropagation());
+    debug.append(debugBox, "Keep debug details (IPs, hosts, paths)");
+    menu.appendChild(debug);
     const note = document.createElement("div");
     note.className = "shield-menu-note";
     note.textContent = "IDs + amounts also replaces your own names and places (\"my wife Rina\") " +
       "when the local model is ready (Chrome). Sharing always removes them.";
     menu.appendChild(note);
-    anchor.parentElement.appendChild(menu);
+    // On the page body with a fixed position: chat boxes that clip their overflow (DeepSeek) would
+    // otherwise hide the menu and swallow its clicks. Opens above the chip, or below it if no room.
+    document.body.appendChild(menu);
+    const r = anchor.getBoundingClientRect();
+    Object.assign(menu.style, { position: "fixed", zIndex: "2147483647", right: `${Math.max(8, window.innerWidth - r.right)}px` });
+    if (menu.offsetHeight + 14 < r.top) menu.style.bottom = `${window.innerHeight - r.top + 6}px`;
+    else Object.assign(menu.style, { top: `${r.bottom + 6}px`, bottom: "auto" });
     setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
   }
 
@@ -603,9 +648,26 @@
    * through the DOM) on a span carrying the placeholder in data-expr, so reading the chat for
    * sharing (getCleanNodeContent) puts the placeholder back.
    */
+  // Logged once per placeholder when it can't be shown, so a failure on a real chat site can be
+  // diagnosed from the console. Never logs the value.
+  const restoreDiagnosed = new Set();
+  function diagnoseRestore() {
+    const roots = document.querySelectorAll(MESSAGE_SELECTOR);
+    for (const m of (document.body.innerText || "").matchAll(/\[([A-Z_]+)_(\d+)\]/g)) {
+      if (restoreDiagnosed.has(m[0]) || restoreDiagnosed.size > 20) continue;
+      restoreDiagnosed.add(m[0]);
+      const why = !idMap.byPlaceholder.has(m[0])
+        ? "not in this tab's map (sent from another tab, before a reload, or in another chat)"
+        : !roots.length ? "no assistant message found by MESSAGE_SELECTOR on this site"
+          : "only in your own message (shown as sent, by design) or outside the answer";
+      console.info(`[SafeShare-AI] ${m[0]} left as is: ${why}. Map size ${idMap.byPlaceholder.size}, answer roots ${roots.length}.`);
+    }
+  }
+
   function restoreIdsOnScreen() {
-    if (!idMap.byPlaceholder.size) return;
+    if (!idMap.byPlaceholder.size) return diagnoseRestore();
     const pattern = /\[([A-Z_]+)_(\d+)\]/g;
+    setTimeout(diagnoseRestore, 0);
     for (const root of document.querySelectorAll(MESSAGE_SELECTOR)) {
       if (isPromptInputOrUIElement(root)) continue;
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -821,7 +883,7 @@
   function isComposerOrSafeShareUI(el) {
     if (!el) return true;
     if (!isVisibleElement(el)) return true;
-    if (el.closest("form, #prompt-textarea, fieldset, textarea, [contenteditable='true'], #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-action-pill")) {
+    if (el.closest("form, #prompt-textarea, fieldset, textarea, [contenteditable='true'], #safeshare-modal-backdrop, #safeshare-shield-bar, #safeshare-shield-menu, #safeshare-action-pill")) {
       return true;
     }
     const txt = (el.innerText || el.textContent || "").trim();
@@ -1017,17 +1079,18 @@
     const isNewChatToSession = !oldId && !!newId;
     const isSameChat = oldId && newId && oldId === newId;
 
-    if (isNewChatToSession && newId && symbolicVault) {
+    if (isNewChatToSession && newId) {
       // Migrate secrets from "new" session to the newly assigned conversation ID
-      symbolicVault.saveToSession(newId);
+      if (symbolicVault) symbolicVault.saveToSession(newId);
+      idMapKey = `safeshare_idmap_${newId}`;
+      saveIdMap();
     } else if (!isSameChat) {
       // Truly different chat session: close modal and load secrets for this session (or clear)
       const existing = document.getElementById("safeshare-modal-backdrop");
       if (existing) existing.remove();
 
-      idMap.byValue.clear();
-      idMap.byPlaceholder.clear();
-      idMap.counters = {};
+      loadIdMap(newId);
+      restoreDiagnosed.clear();
 
       if (symbolicVault) {
         if (newId) {
