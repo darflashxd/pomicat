@@ -329,6 +329,11 @@ class SafeShareModal {
     document.body.appendChild(backdrop);
     this.bindEvents(backdrop);
     this.runPipeline();
+
+    // Automatically trigger local AI model check in background if extension runtime is present
+    if (typeof browser !== "undefined" || (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage)) {
+      setTimeout(() => this.checkLocalModel(true), 50);
+    }
   }
 
   removeExisting() {
@@ -1229,37 +1234,52 @@ class SafeShareModal {
     }
   }
 
-  bindEvents(backdrop) {
-    backdrop.querySelector("#safeshare-model-check")?.addEventListener("click", async () => {
-      if (this.publishing || this.modelBusy) return;
-      this.modelBusy = true;
-      const generation = this.reviewGeneration;
-      const button = backdrop.querySelector("#safeshare-model-check");
-      const publish = backdrop.querySelector("#btn-encrypt-publish");
-      button.disabled = publish.disabled = true;
-      this.modelState = "Loading/checking local model…";
-      this.renderMaybeItems();
-      const snapshot = this.reviewBaseTurns.map(t => ({ ...t }));
-      try {
-        const api = typeof SafeShareNer !== "undefined" ? SafeShareNer : require("../engine/ner_client.js");
-        const arbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
-        for (const turn of snapshot) {
-          if (this.modelReview.has(turn.content)) continue;
-          const result = await api.analyze(turn.content, 60000, true);
-          if (!result.success || !Array.isArray(result.spans)) throw new Error(result.error || "Invalid local model response");
-          const protectedSpans = arbiter ? arbiter.extractProtectedSpans(turn.content) : [];
-          const spans = result.spans.filter(s => !protectedSpans.some(p => s.start < p.end && s.end > p.start));
-          if (generation !== this.reviewGeneration || !this.currentTurns.length) return;
-          this.modelReview.set(turn.content, spans);
-        }
-        if (generation === this.reviewGeneration) this.modelState = "Local model checked — suggestions are unverified, not calibrated probabilities";
-      } catch (_) {
-        if (generation === this.reviewGeneration) this.modelState = "Local model unavailable or timed out — rules still work. Retry or review manually.";
-      } finally {
-        this.modelBusy = false;
-        button.disabled = publish.disabled = false;
-        if (generation === this.reviewGeneration && this.currentTurns.length) this.rebuildViews();
+  async checkLocalModel(background = false) {
+    if (this.publishing || this.modelBusy) return;
+    this.modelBusy = true;
+    const generation = this.reviewGeneration;
+    const button = document.getElementById("safeshare-model-check");
+    const publish = document.getElementById("btn-encrypt-publish");
+    if (!background) {
+      if (button) button.disabled = true;
+      if (publish) publish.disabled = true;
+    }
+    if (button) button.textContent = "⏳ Scanning with local model…";
+    this.modelState = "Scanning names & PII with local AI model…";
+    this.renderMaybeItems();
+    const snapshot = this.reviewBaseTurns.map(t => ({ ...t }));
+    try {
+      const api = typeof SafeShareNer !== "undefined" ? SafeShareNer : require("../engine/ner_client.js");
+      const arbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
+      for (const turn of snapshot) {
+        if (this.modelReview.has(turn.content)) continue;
+        const result = await api.analyze(turn.content, 60000, true);
+        if (!result.success || !Array.isArray(result.spans)) throw new Error(result.error || "Invalid local model response");
+        const protectedSpans = arbiter ? arbiter.extractProtectedSpans(turn.content) : [];
+        const spans = result.spans.filter(s => !protectedSpans.some(p => s.start < p.end && s.end > p.start));
+        if (generation !== this.reviewGeneration || !this.currentTurns.length) return;
+        this.modelReview.set(turn.content, spans);
       }
+      if (generation === this.reviewGeneration) {
+        this.modelState = "✓ Local AI model checked";
+        if (button) button.textContent = "✓ Local model checked (Click to re-scan)";
+      }
+    } catch (_) {
+      if (generation === this.reviewGeneration) {
+        this.modelState = "Rules active (local model skipped or unavailable)";
+        if (button) button.textContent = "Check names and other PII with local model";
+      }
+    } finally {
+      this.modelBusy = false;
+      if (button) button.disabled = false;
+      if (publish) publish.disabled = false;
+      if (generation === this.reviewGeneration && this.currentTurns.length) this.rebuildViews();
+    }
+  }
+
+  bindEvents(backdrop) {
+    backdrop.querySelector("#safeshare-model-check")?.addEventListener("click", () => {
+      this.checkLocalModel(false);
     });
     backdrop.querySelector("#safeshare-close-btn").addEventListener("click", () => this.removeExisting());
     backdrop.querySelector("#btn-cancel").addEventListener("click", () => this.removeExisting());

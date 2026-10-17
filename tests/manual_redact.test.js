@@ -130,5 +130,22 @@ const Modal = require("../extension/ui/modal.js");
   assert.equal(modal.maybeChoices.get(cand1.raw), false);
   assert.equal(modal.maybeChoices.get(cand2.raw), false);
 
-  console.log("manual redact: custom text selection, multi-turn masking, unmasking, and maybe bulk actions passed!");
+  // 5. Test checkLocalModel() updates modelState and populates maybeCandidates
+  global.SafeShareNer = {
+    analyze: async () => ({
+      success: true,
+      spans: [
+        { start: 0, end: 13, label: "PERSON", score: 0.85 }
+      ]
+    })
+  };
+  modal.currentTurns = [
+    { role: "user", content: "Hendra Wijaya will join the team." }
+  ];
+  modal.runPipeline();
+  await modal.checkLocalModel(false);
+  assert(modal.maybeCandidates.some(c => c.raw === "Hendra Wijaya"), "Local model candidate must appear in maybeCandidates");
+  assert.equal(modal.modelState, "✓ Local AI model checked");
+
+  console.log("manual redact: custom text selection, multi-turn masking, unmasking, maybe bulk actions, and checkLocalModel passed!");
 })();
