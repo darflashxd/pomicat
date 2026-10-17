@@ -247,8 +247,6 @@ class SafeShareModal {
             <summary>Maybe sensitive — review before sharing</summary>
             <p>These are unverified suggestions, not a guarantee that every secret was found. Checked values are hidden in every occurrence.</p>
             <div id="safeshare-maybe-items"></div>
-            <button type="button" id="safeshare-model-check">Check names and other PII with local model</button>
-            <p id="safeshare-model-status" role="status" aria-live="polite"></p>
           </details>
 
           <!-- Link Settings -->
@@ -266,18 +264,6 @@ class SafeShareModal {
               <option value="604800">7 Days</option>
               <option value="burn">Burn after 1 view</option>
             </select>
-          </div>
-
-          <!-- Pre-Inference Shield Setting -->
-          <div class="safeshare-options-row" style="margin-top: 10px;">
-            <div class="options-label">
-              <span style="font-size: 13px;">🛡️</span>
-              <span title="Rewrites raw secrets to symbolic variables before sending to AI, computing results locally in RAM">Pre-Inference Symbolic Shield:</span>
-            </div>
-            <label class="ss-switch" title="Toggle Pre-Inference Prompt Protection">
-              <input type="checkbox" id="safeshare-pre-inference-toggle">
-              <span class="ss-slider"></span>
-            </label>
           </div>
         </div>
 
@@ -1394,21 +1380,6 @@ class SafeShareModal {
       this.savePreferences();
       this.rebuildViews();
     });
-
-    // Pre-Inference Shield Toggle Event
-    const preInferToggle = backdrop.querySelector("#safeshare-pre-inference-toggle");
-    if (preInferToggle) {
-      // Same setting as the chip under the chat box (content_script.js getShieldMode)
-      const mode = localStorage.getItem("safeshare_shield_mode") ||
-        (localStorage.getItem("safeshare_pre_inference") === "false" ? "off" : "all");
-      preInferToggle.checked = mode !== "off";
-      preInferToggle.addEventListener("change", (e) => {
-        localStorage.setItem("safeshare_shield_mode", e.target.checked ? "all" : "off");
-        localStorage.removeItem("safeshare_pre_inference");
-        // Dispatch custom event for content_script to update shield state immediately
-        window.dispatchEvent(new CustomEvent("safeshare:shield_toggle", { detail: { active: e.target.checked } }));
-      });
-    }
 
     // Publish & Encrypt Event
     backdrop.querySelector("#btn-encrypt-publish").addEventListener("click", async () => {

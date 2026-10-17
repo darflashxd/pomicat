@@ -523,7 +523,7 @@ class HeuristicsRedactor {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass)["']?\s*[:=]\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya)){0,3}\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))((?:(?<=(?:\bis|\badalah|\byaitu|\bialah|[:=])\s{1,3})|(?![a-z]+(?:-[a-z]+)+\b)(?=[^\s'"\[\]]*(?:\d|[^\w\s'"\[\]](?=[^\s'"\[\]]))))[^\s\r\n'"\[\]]{5,40})(?=\s|$|[)\]}>,;]))/gi,
+        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:(?:(?:root|admin|database|db|wifi|temporary|temp|default|user)\s+)?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass))["']?\s*(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya)){0,3}\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))((?:(?<=(?:\bis|\badalah|\byaitu|\bialah|[:=])\s{1,3})|(?![a-z]+(?:-[a-z]+)+\b)(?=[^\s'"\[\]]*(?:\d|[^\w\s'"\[\]](?=[^\s'"\[\]]))))[^\s\r\n'"\[\]]{5,40})(?=\s|$|[)\]}>,;]))/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
@@ -548,7 +548,7 @@ class HeuristicsRedactor {
             return `${pfx}[REDACTED_PASSWORD]`;
           }
           if (match && match[3]) {
-            const m = /^([^"']*(?:["']?(?:password|passwd|passcode|kata_sandi)["']?\s*[:=]\s*["']?))/i.exec(raw);
+            const m = /^([\s\S]*?(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?)/i.exec(raw);
             const pfx = m ? m[1] : "";
             const suffix = (raw.endsWith('"') ? '"' : (raw.endsWith("'") ? "'" : ""));
             return `${pfx}[REDACTED_PASSWORD]${suffix}`;
