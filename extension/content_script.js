@@ -708,9 +708,13 @@
     if (!localCompute || !symbolicVault || typeof document === "undefined" || !document.body) return;
     const isEnabled = isPreInferenceEnabled();
 
+    // Values that were replaced before sending stay readable on your screen even after protection
+    // is switched off (the map only holds what was actually replaced)
+    restoreIdsOnScreen();
+
     // If shield is disabled: un-hydrate all local compute spans so user sees raw symbols
     if (!isEnabled) {
-      const hydratedSpans = document.querySelectorAll(".ss-local-compute, [data-expr]");
+      const hydratedSpans = document.querySelectorAll(".ss-local-compute:not(.ss-id-restored), [data-expr]:not(.ss-id-restored)");
       hydratedSpans.forEach(span => {
         const origExpr = span.getAttribute("data-expr");
         if (origExpr) {
@@ -723,8 +727,6 @@
       });
       return;
     }
-
-    restoreIdsOnScreen();
 
     if (symbolicVault.size() === 0) return;
     const vaultData = symbolicVault.getAll();
