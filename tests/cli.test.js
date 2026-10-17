@@ -160,3 +160,13 @@ console.log("cli: @ checks passed");
   assert.strictEqual(new H().scan("ssh deploy@203.0.113.15").detections[0].category, "SYSTEM");
 }
 console.log("cli: ip checks passed");
+
+// "I live in <city> … <number>" must not run across sentences (found on ChatGPT)
+{
+  const H = require("../extension/engine/heuristics.js");
+  const s = (t) => new H().scan(t).sanitizedText;
+  const out = s("I live in Bandung and work as a nurse. My husband Budi and I want help with our money. I was born on 14 March 1998.");
+  assert(out.includes("work as a nurse. My husband Budi"), out);
+  assert.strictEqual(s("I live in Hauptstrasse 12, Berlin"), "I live in [REDACTED_ADDRESS], Berlin");
+}
+console.log("cli: address boundary checks passed");

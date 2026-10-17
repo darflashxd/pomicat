@@ -802,7 +802,7 @@
       const closeParens = (rawText.match(/\)/g) || []).length;
       if (openParens !== closeParens) return;
 
-      const text = node.innerHTML;
+      const text = flattenStreamSpans(node);
       if (isSymbolicMathContent(text)) {
         const res = localCompute.hydrateText(text, vaultData, true);
         if (res.computedCount > 0) {
@@ -811,6 +811,19 @@
         }
       }
     });
+  }
+
+  /**
+   * ChatGPT (2026) streams each chunk of an answer into its own <span data-d-stream-inline>, so a
+   * formula like 0.25 * (<S1> + <S2>) is five separate spans and only the lone symbols would be
+   * computed. Returns the node's HTML with those wrapper spans merged back into plain text.
+   */
+  function flattenStreamSpans(node) {
+    if (!node.querySelector || !node.querySelector("span[data-d-stream-inline]")) return node.innerHTML;
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll("span[data-d-stream-inline]").forEach((span) => span.replaceWith(...span.childNodes));
+    copy.normalize();
+    return copy.innerHTML;
   }
 
   /**
