@@ -481,7 +481,8 @@
     const debugBox = document.createElement("input");
     debugBox.type = "checkbox";
     debugBox.checked = keepDebugDetails();
-    debugBox.style.marginRight = "6px";
+    // Chat sites reset checkbox styles (ChatGPT hides them); draw it explicitly
+    debugBox.style.cssText = "appearance: auto; -webkit-appearance: checkbox; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; opacity: 1; position: static;";
     debugBox.addEventListener("click", (e) => e.stopPropagation());
     debugBox.addEventListener("change", () => {
       try { localStorage.setItem("safeshare_debug_details", String(debugBox.checked)); } catch (_) {}
