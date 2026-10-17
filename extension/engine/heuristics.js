@@ -479,8 +479,25 @@ class HeuristicsRedactor {
         id: "ENV_CONFIG_SECRET",
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|AUTH_TOKEN|PRIVATE_KEY|API_KEY|BOT_TOKEN)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
+        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)([^\s\r\n'"]{8,120})/gi,
         replacement: "$1[REDACTED_SECRET]"
+      },
+      // 10d-2. Passwords on the command line: mysql -pSECRET / --password=SECRET, sshpass -p SECRET
+      // ("mysql -p" with nothing after it asks for the password, so it isn't matched)
+      {
+        id: "CLI_PASSWORD_FLAG",
+        name: "Password in a Command-Line Flag",
+        category: "CREDENTIALS",
+        regex: /(\b(?:(?:mysql|mysqldump|mysqladmin|mariadb)\b[^\n|;&]*?\s-p|sshpass\s+-p\s+|[^\s]*\s--password[= ]))('[^'\n]+'|"[^"\n]+"|[^\s'"]{4,})/g,
+        replacement: "$1[REDACTED_PASSWORD]"
+      },
+      // 10d-3. Credentials inside a URL: https://user:TOKEN@host (git clone, database URLs)
+      {
+        id: "URL_CREDENTIALS",
+        name: "Credentials in a URL",
+        category: "CREDENTIALS",
+        regex: /(\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)([^\s@/]{4,})(@[^\s/]+)/gi,
+        replacement: "$1[REDACTED_PASSWORD]$3"
       },
       // 10e. YAML Configuration Password & Secret Block
       {
