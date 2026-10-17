@@ -668,7 +668,8 @@ async function runBlackHatGlobalPIISuite() {
   ]);
   const algCand = modalJembras.candidates.find(c => c.isAlgebraic);
   recordCheck("VEC-UI-05", "De Jembras multi-year accumulation tags registered as algebraic candidates",
-    algCand !== undefined && algCand.id !== "c_tag" && algCand.tag === "[REDACTED_SAVINGS_ACCUMULATION]"
+    algCand !== undefined && algCand.id !== "c_tag" && /^\[REDACTED_DERIVED_\d+\]$/.test(algCand.tag) &&
+      modalJembras.sanitizedTurns.some(t => t.content.includes(algCand.tag))
   );
 
   // ---------------------------------------------------------------------------

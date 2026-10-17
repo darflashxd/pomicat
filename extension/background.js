@@ -40,8 +40,8 @@ async function getOrCreateOffscreenDocument() {
     justification: "Run client-side local MiniLM Q4 ONNX NER inference with zero network access."
   });
 
-  await creatingOffscreenPromise;
-  creatingOffscreenPromise = null;
+  try { await creatingOffscreenPromise; }
+  finally { creatingOffscreenPromise = null; }
   return true;
 }
 
@@ -53,15 +53,26 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "ENSURE_OFFSCREEN_READY" || request.type === "ENSURE_OFFSCREEN_READY") {
     getOrCreateOffscreenDocument()
-      .then(() => sendResponse({ ok: true }))
+      .then(created => sendResponse({ ok: created || typeof runInference === "function" }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 
-  if (request.action === "RUN_NER_INFERENCE") {
+  if (request.action === "RUN_NER_INFERENCE" && request.target !== "NER_RUNTIME") {
+    if (typeof request.text !== "string" || request.text.length > 512 * 1024) {
+      sendResponse({ success: false, state: "failed", error: "Invalid inference text (max 512 KB)" });
+      return false;
+    }
+    // Firefox has a DOM background page: run the same local WASM runtime there.
+    if (typeof runInference === "function") {
+      runInference(request.text, request.review === true).then(spans => sendResponse({ success: true, state: "ready", spans }))
+        .catch(err => sendResponse({ success: false, state: "failed", error: err.message }));
+      return true;
+    }
     getOrCreateOffscreenDocument()
-      .then(() => {
-        webExtApi.runtime.sendMessage(request, (res) => {
+      .then(created => {
+        if (!created) throw new Error("Local model runtime unavailable");
+        webExtApi.runtime.sendMessage({ ...request, target: "NER_RUNTIME" }, (res) => {
           if (typeof sendResponse === "function") sendResponse(res || { success: false });
         });
       })

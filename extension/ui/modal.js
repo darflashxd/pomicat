@@ -19,6 +19,16 @@ class SafeShareModal {
     this.contextual = new ContextualClassifier();
     this.pseudonymizer = new ConsistentPseudonymizer();
     this.crypto = new SafeShareCrypto();
+    this.maybe = typeof SafeShareMaybe !== "undefined" ? SafeShareMaybe : require("../engine/maybe.js");
+    this.transcript = typeof SafeShareTranscript !== "undefined" ? SafeShareTranscript : require("../engine/transcript.js");
+    this.maybeChoices = new Map();
+    this.maybeCandidates = [];
+    this.publishing = false;
+    this.hardEntities = new Map();
+    this.modelReview = new Map();
+    this.modelState = "Not checked — credential rules only";
+    this.modelBusy = false;
+    this.reviewGeneration = 0;
 
     this.currentTurns = [];
     this.candidates = [];
@@ -74,9 +84,43 @@ class SafeShareModal {
   /**
    * Initializes and opens the SafeShare modal with extracted conversation turns.
    */
+  financialLeakLabel(raw) {
+    const value = this.pseudonymizer.parseFinancialValue(raw);
+    let candidate = this.candidates.find(c => c.isAmount &&
+      !c.raw.startsWith("[") && this.pseudonymizer.parseFinancialValue(c.raw) === value);
+    if (!candidate) {
+      candidate = { id: `c_${this.candidates.length}`, raw, fullRaw: raw, role: "assistant", turnIndex: -1,
+        category: "FINANCIAL", categoryLabel: "Financial & Salary", ruleName: "Derived Math Calculation",
+        enabled: true, isAlgebraic: true, isAmount: true, occurrences: 1 };
+      this.candidates.push(candidate);
+    }
+    // One stable tag per value; shared BUDGET tags cannot identify a click target.
+    if (candidate.isAlgebraic || !candidate.tag) candidate.tag = `[REDACTED_DERIVED_${candidate.id.slice(2)}]`;
+    candidate.replacement = candidate.tag;
+    return candidate.tag;
+  }
+
+  hardLabel(det) {
+    const raw = this.heuristics.normalizeHomoglyphs(det.secretToken || det.raw).trim().toLowerCase();
+    const base = this.extractTag(det.replacement);
+    if (!/^\[REDACTED_/.test(base)) return null;
+    const family = /RECORD|ACCOUNT/.test(base) ? "ACCOUNT" : base.slice(10, -1);
+    let identity = raw;
+    if (family === "CARD_EXPIRY") {
+      const numeric = /^(\d{2})[/-](\d{2}|\d{4})$/.exec(raw);
+      const words = /^([a-z]+)\s+(20\d{2})$/.exec(raw);
+      const months = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
+      if (numeric) identity = `${numeric[1]}/${numeric[2].slice(-2)}`;
+      else if (words) identity = `${String(months.indexOf(words[1].slice(0, 3)) + 1).padStart(2, "0")}/${words[2].slice(-2)}`;
+    }
+    const key = `${family}::${identity}`;
+    if (!this.hardEntities.has(key)) this.hardEntities.set(key, `[REDACTED_${family}_${this.hardEntities.size + 1}]`);
+    return this.hardEntities.get(key);
+  }
+
   open(turns) {
-    this.currentTurns = turns;
     this.removeExisting();
+    this.currentTurns = turns.map(({ role, content }) => ({ role, content: this.transcript.normalize(content) }));
 
     const backdrop = document.createElement("div");
     backdrop.id = "safeshare-modal-backdrop";
@@ -185,13 +229,22 @@ class SafeShareModal {
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
-                  <span>Sanitized Output (Safe to Share)</span>
+                  <span>Share preview — review before publishing</span>
                 </div>
                 <span class="hint-badge">💡 Click any badge to toggle</span>
               </div>
               <div class="diff-box diff-box-interactive" id="diff-box-sanitized"></div>
+              <p class="ss-review-warning">Ranges are approximate, not exact equations. Revealing amounts can expose other hidden values through arithmetic. Review before sharing.</p>
             </div>
           </div>
+
+          <details id="safeshare-maybe-review" open>
+            <summary>Maybe sensitive — review before sharing</summary>
+            <p>These are unverified suggestions, not a guarantee that every secret was found. Checked values are hidden in every occurrence.</p>
+            <div id="safeshare-maybe-items"></div>
+            <button type="button" id="safeshare-model-check">Check names and other PII with local model</button>
+            <p id="safeshare-model-status" role="status" aria-live="polite"></p>
+          </details>
 
           <!-- Link Settings -->
           <div class="safeshare-options-row">
@@ -274,8 +327,23 @@ class SafeShareModal {
   }
 
   removeExisting() {
+    this.reviewGeneration++;
     const existing = document.getElementById("safeshare-modal-backdrop");
     if (existing) existing.remove();
+    this.maybeChoices.clear();
+    this.maybeCandidates = [];
+    this.currentTurns = [];
+    this.sanitizedTurns = [];
+    this.candidates = [];
+    this.cachedTurnDetections = [];
+    this.rawContextualEntities = [];
+    this.reviewBaseTurns = [];
+    this.masterEntityMap = null;
+    this.previewLeaks = [];
+    this.modelReview.clear();
+    this.hardEntities.clear();
+    this.modelState = "Not checked — credential rules only";
+    this.pseudonymizer.reset();
   }
 
   /**
@@ -283,6 +351,7 @@ class SafeShareModal {
    */
   runPipeline() {
     this.pseudonymizer.reset();
+    this.hardEntities.clear();
     this.candidates = [];
     this.cachedTurnDetections = [];
     this.rawContextualEntities = [];
@@ -293,7 +362,7 @@ class SafeShareModal {
     // 1. Scan Tier 1 (Heuristics)
     for (let turnIdx = 0; turnIdx < this.currentTurns.length; turnIdx++) {
       const turn = this.currentTurns[turnIdx];
-      const hResult = this.heuristics.scan(turn.content);
+      const hResult = this.heuristics.scan(turn.content, { labelDetection: det => this.hardLabel(det) });
 
       for (const det of hResult.detections) {
         let cat = det.category || "CREDENTIALS";
@@ -306,7 +375,7 @@ class SafeShareModal {
         const secretVal = det.secretToken || det.raw;
         const tag = this.extractTag(det.replacement);
 
-        const exists = this.candidates.some(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === det.raw.toLowerCase());
+        const exists = this.candidates.some(c => c.tag === tag || c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === det.raw.toLowerCase());
         if (!exists) {
           this.candidates.push({
             id: `c_${candIdCounter++}`,
@@ -339,6 +408,28 @@ class SafeShareModal {
         content: hResult.sanitizedText
       });
     }
+    // Related month-name echoes: only sweep the same known card expiration, not arbitrary dates.
+    const months = "January February March April May June July August September October November December".split(" ");
+    for (const [key, tag] of this.hardEntities) {
+      const match = /^CARD_EXPIRY::(\d{2})\/(\d{2})$/.exec(key);
+      if (!match) continue;
+      const month = months[+match[1] - 1];
+      if (!month) continue;
+      const rx = new RegExp(`\\b(?:${month}|${month.slice(0, 3)})\\s+20${match[2]}\\b`, "gi");
+      for (let i = 0; i < intermediateTurns.length; i++) {
+        // Card discussion must occur in the same paragraph; don't sweep dates throughout an essay.
+        intermediateTurns[i].content = intermediateTurns[i].content.split(/(\n\s*\n)/).map(part => {
+          if (!/card|expir|expiration|expiry|exp\b/i.test(part)) return part;
+          return part.replace(rx, (raw, offset) => {
+            const before = part.slice(Math.max(0, offset - 90), offset);
+            if (!/\b(?:card|expir\w*|exp)\b[^.!?\n]{0,70}$/i.test(before)) return raw;
+            const det = { type: "CARD_EXPIRY_WORDS", name: "Card Expiration (month name)", category: "FINANCIAL", raw, secretToken: raw, replacement: tag, tag };
+            this.cachedTurnDetections[i].hDetections.push(det);
+            return tag;
+          });
+        }).join("");
+      }
+    }
 
     // 2. Scan Tier 3 (Pseudonymizer & Algebraic Solver)
     const allHeuristics = (this.cachedTurnDetections || []).flatMap(t => t.hDetections);
@@ -363,7 +454,7 @@ class SafeShareModal {
         const cleanRaw = (m.original || "").replace(/[.,;:]+$/, "").trim();
         const existing = this.candidates.find(c =>
           c.raw.toLowerCase() === cleanRaw.toLowerCase() ||
-          (c.category === cat && this.pseudonymizer.parseFinancialValue(c.raw) === this.pseudonymizer.parseFinancialValue(cleanRaw) && this.pseudonymizer.parseFinancialValue(cleanRaw) > 0)
+          (c.isAmount && m.category === "SENSITIVE_FINANCIAL" && this.pseudonymizer.parseFinancialValue(c.raw) === this.pseudonymizer.parseFinancialValue(cleanRaw) && this.pseudonymizer.parseFinancialValue(cleanRaw) > 0)
         );
 
         if (!existing) {
@@ -380,7 +471,8 @@ class SafeShareModal {
             replacement: m.pseudonym,
             enabled: true,
             occurrences: 1,
-            isAlgebraic: false
+            isAlgebraic: false,
+            isAmount: m.category === "SENSITIVE_FINANCIAL"
           });
         } else {
           existing.occurrences = (existing.occurrences || 1) + 1;
@@ -422,7 +514,8 @@ class SafeShareModal {
             replacement: leak.replacement,
             enabled: true,
             occurrences: 1,
-            isAlgebraic: true
+            isAlgebraic: true,
+            isAmount: true
           });
         } else {
           existing.occurrences = (existing.occurrences || 1) + 1;
@@ -502,6 +595,7 @@ class SafeShareModal {
    * Reassembles the conversation based on user's active customization settings.
    */
   rebuildViews() {
+    if (this.publishing) return;
     let origTextDisplay = "";
     let sanitizedTextPlain = "";
     let sanitizedHtmlDisplay = "";
@@ -534,7 +628,9 @@ class SafeShareModal {
       for (const det of hDets) {
         const secretVal = det.secretToken || det.raw;
         const cand = this.candidates.find(c => c.raw.toLowerCase() === secretVal.toLowerCase() || c.fullRaw?.toLowerCase() === det.raw.toLowerCase());
-        const isProtected = !cand || (this.activeCategories.has(cand.category) && cand.enabled);
+        const linked = det.tag && this.candidates.find(c => c.tag === det.tag);
+        const target = linked || cand;
+        const isProtected = !target || (this.activeCategories.has(target.category) && target.enabled);
         if (isProtected) {
           turnText = turnText.replace(new RegExp(this.escapeRegExp(det.raw), "gi"), det.replacement);
         }
@@ -553,7 +649,7 @@ class SafeShareModal {
       const cand = this.candidates.find(c =>
         c.raw.toLowerCase() === cleanE.toLowerCase() ||
         c.raw.toLowerCase() === e.raw.toLowerCase() ||
-        (c.category === "FINANCIAL" && eVal > 0 && this.pseudonymizer.parseFinancialValue(c.raw) === eVal)
+        (c.isAmount && eVal > 0 && this.pseudonymizer.parseFinancialValue(c.raw) === eVal)
       );
       return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
     });
@@ -568,11 +664,13 @@ class SafeShareModal {
         c.fullRaw?.toLowerCase() === h.raw.toLowerCase() ||
         (c.category === "FINANCIAL" && hVal > 0 && this.pseudonymizer.parseFinancialValue(c.raw) === hVal)
       );
-      return !cand || (this.activeCategories.has(cand.category) && cand.enabled);
+      const linked = h.tag && this.candidates.find(c => c.tag === h.tag);
+      const target = linked || cand;
+      return !target || (this.activeCategories.has(target.category) && target.enabled);
     });
 
     const disabledFinancialVals = this.candidates
-      .filter(c => c.category === "FINANCIAL" && (!this.activeCategories.has(c.category) || !c.enabled))
+      .filter(c => c.isAmount && (!this.activeCategories.has(c.category) || !c.enabled))
       .map(c => this.pseudonymizer.parseFinancialValue(c.raw))
       .filter(v => !isNaN(v) && v > 0);
 
@@ -589,7 +687,8 @@ class SafeShareModal {
         masterEntityMap: this.masterEntityMap,
         disabledLeaks,
         disabledFinancialVals,
-        keepNames: trusted
+        keepNames: trusted,
+        labelLeak: raw => this.financialLeakLabel(raw)
       }
     );
 
@@ -601,6 +700,13 @@ class SafeShareModal {
         .map(e => e.raw.trim().toLowerCase()));
       this.sanitizedTurns = SafeSharePolicy.generalizeNumbers(anonymizedTurns, this.pseudonymizer, userAmounts);
     }
+    // Review the final safety scan, not an earlier text that changes during publication.
+    this.previewLeaks = this.sanitizedTurns.map(t => t.solverLeaks || []);
+    this.reviewBaseTurns = this.finalSafetyScan(this.sanitizedTurns).map(({ role, content }) => ({ role, content }));
+    const modelSpans = this.reviewBaseTurns.flatMap((t, turnIndex) => (this.modelReview.get(t.content) || []).map(s => ({ ...s, turnIndex })));
+    this.maybeCandidates = this.maybe.scan(this.reviewBaseTurns, modelSpans).filter(m => !this.candidates.some(c =>
+      [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
+    this.sanitizedTurns = this.maybe.apply(this.reviewBaseTurns, this.maybeCandidates, this.maybeChoices);
 
     // Helper to replace text without penetrating existing <span ...>...</span> badges
     const replaceOutsideSpans = (html, regex, replacer) => {
@@ -631,9 +737,21 @@ class SafeShareModal {
         htmlContent = replaceOutsideSpans(htmlContent, regRaw, (m) => `<span class="ss-badge ss-badge-unmasked" data-cand-id="${cand.id}" data-tag="${cand.tag}" title="Click to re-redact">${m}<span class="ss-badge-icon">👁️</span></span>`);
       }
 
+      // Ranges retain the amount's click target instead of becoming inert plain text.
+      if (this.numbersMode === "range" && !trusted) {
+        for (const candidate of this.candidates.filter(c => c.isAmount && c.enabled && this.activeCategories.has(c.category))) {
+          const value = this.pseudonymizer.parseFinancialValue(candidate.raw);
+          if (!(value >= 10)) continue;
+          if (!this.currentTurns.some((t, i) => t.role === "user" && (this.cachedTurnDetections[i]?.cDetections || []).some(e => e.raw.trim().toLowerCase() === candidate.raw.toLowerCase()))) continue;
+          const range = SafeSharePolicy.formatRange(...SafeSharePolicy.bucket(value), SafeSharePolicy.currencyOf(candidate.raw));
+          htmlContent = replaceOutsideSpans(htmlContent, new RegExp(this.escapeRegExp(this.escapeHtml(range)), "g"), m =>
+            `<span class="ss-badge ss-badge-redacted" data-cand-id="${candidate.id}" data-tag="${candidate.tag}" title="Click to show exact amount">${m}</span>`);
+        }
+      }
+
       // B. Single-pass regex replacing all redacted tags outside existing spans
       const turnDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
-      const turnLeaks = turn.solverLeaks || [];
+      const turnLeaks = this.previewLeaks[tIdx] || [];
       let solverLeakIdx = 0;
 
       htmlContent = replaceOutsideSpans(htmlContent, /\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, (tag) => {
@@ -654,17 +772,18 @@ class SafeShareModal {
         if (!cand) {
           cand = this.candidates.find(c => c.tag === tag || c.replacement === tag);
         }
-        const candId = cand ? cand.id : "c_tag";
+        if (!cand || cand.raw === tag) return `<span class="ss-placeholder" title="Original value unavailable; cannot unmask">${tag}</span>`;
+        const candId = cand.id;
         const rawText = (cand && cand.raw !== cand.tag) ? this.escapeHtml(cand.raw) : tag;
         return `<span class="ss-badge ss-badge-redacted" data-cand-id="${candId}" data-tag="${tag}" title="Click to unmask (Original: ${rawText})">${tag}<span class="ss-badge-icon">✕</span></span>`;
       });
 
-      sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${turn.role.toUpperCase()}]:</div><div class="turn-body">${htmlContent}</div></div>`;
+      sanitizedHtmlDisplay += `<div class="turn-block"><div class="turn-header">[${this.escapeHtml(turn.role.toUpperCase())}]:</div><div class="turn-body">${this.transcript.renderEscaped(htmlContent)}</div></div>`;
     }
 
     // 1. Update Diff Boxes
     const diffOrigEl = document.getElementById("diff-box-orig");
-    if (diffOrigEl) diffOrigEl.innerText = origTextDisplay.trimEnd();
+    if (diffOrigEl) diffOrigEl.innerHTML = this.currentTurns.map(t => `<div class="turn-block"><div class="turn-header">[${this.escapeHtml(t.role.toUpperCase())}]:</div><div class="turn-body">${this.transcript.renderEscaped(this.escapeHtml(t.content))}</div></div>`).join("");
 
     const diffSanEl = document.getElementById("diff-box-sanitized");
     if (diffSanEl) {
@@ -672,6 +791,7 @@ class SafeShareModal {
       // Attach click events on inline badges
       diffSanEl.querySelectorAll(".ss-badge").forEach(badge => {
         badge.addEventListener("click", (e) => {
+          if (this.publishing) return;
           e.stopPropagation();
           let candId = badge.getAttribute("data-cand-id");
           let cand = this.candidates.find(c => c.id === candId);
@@ -686,7 +806,7 @@ class SafeShareModal {
             this.candidates.forEach(other => {
               const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
               const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
-              const isSameFinVal = (cand.category === "FINANCIAL" && other.category === "FINANCIAL" && candVal > 0 && otherVal === candVal);
+              const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
               if (isSameRaw || isSameFinVal) {
                 other.enabled = nextState;
               }
@@ -702,6 +822,7 @@ class SafeShareModal {
 
     // 3. Update Entity Inspector Drawer
     this.renderInspectorList();
+    this.renderMaybeItems();
 
     // 4. Update Stats & Compatibility Counters
     const activeProtectedCount = this.candidates.filter(c => this.activeCategories.has(c.category) && c.enabled).length;
@@ -713,19 +834,19 @@ class SafeShareModal {
 
     if (summaryTitleEl) {
       if (activeProtectedCount === totalDetectedCount && totalDetectedCount > 0) {
-        summaryTitleEl.innerText = `Protected · All ${totalDetectedCount} sensitive items masked`;
+        summaryTitleEl.innerText = `${totalDetectedCount} detected items masked · review suggestions below`;
       } else if (activeProtectedCount > 0) {
         summaryTitleEl.innerText = `Custom Protected · ${activeProtectedCount} of ${totalDetectedCount} items masked`;
       } else if (totalDetectedCount === 0) {
         // Nothing detected: either nothing sensitive, or it was already replaced before sending
-        summaryTitleEl.innerText = `Nothing new to hide · placeholders are kept as they are`;
+        summaryTitleEl.innerText = `No automatic detections · review the text and suggestions below`;
       } else {
         summaryTitleEl.innerText = `All Unmasked · Original content shared`;
       }
     }
 
     if (summarySubEl) {
-      summarySubEl.innerText = `${this.currentTurns.length} ${this.currentTurns.length === 1 ? 'turn' : 'turns'} prepared`;
+      summarySubEl.innerText = `${this.currentTurns.length} turns prepared · ${this.maybeCandidates.length} unverified suggestion(s)`;
     }
 
     if (chipsEl) {
@@ -756,6 +877,54 @@ class SafeShareModal {
     if (statContextualEl) statContextualEl.innerText = 0;
   }
 
+  renderMaybeItems() {
+    const list = document.getElementById("safeshare-maybe-items");
+    if (!list) return;
+    const status = document.getElementById("safeshare-model-status");
+    const missing = this.reviewBaseTurns?.some(t => !this.modelReview.has(t.content));
+    if (status) status.textContent = this.modelState.startsWith("Local model checked") && missing
+      ? "Review text changed — run the local model again for the current preview" : this.modelState;
+    list.innerHTML = "";
+    if (!this.maybeCandidates.length) {
+      list.textContent = "No additional candidates found. This does not mean the conversation is free of sensitive data.";
+      return;
+    }
+    for (const candidate of this.maybeCandidates) {
+      const label = document.createElement("label");
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = this.maybeChoices.get(candidate.raw) ?? candidate.risky;
+      check.addEventListener("change", () => {
+        if (this.publishing) return;
+        this.maybeChoices.set(candidate.raw, check.checked);
+        this.rebuildViews();
+        document.getElementById(candidate.id)?.focus();
+      });
+      check.id = candidate.id;
+      const text = document.createElement("span");
+      const shown = candidate.raw.length > 36 ? candidate.raw.slice(0, 20) + "…" + candidate.raw.slice(-8) : candidate.raw;
+      const first = candidate.occurrences[0];
+      const content = this.reviewBaseTurns[first.turnIndex].content;
+      const context = (start, end) => {
+        let value = content.slice(start, end);
+        const spans = this.maybeCandidates.flatMap(c => c.occurrences)
+          .filter(o => o.turnIndex === first.turnIndex && o.start < end && o.end > start)
+          .sort((a, b) => b.start - a.start);
+        for (const o of spans) {
+          const from = Math.max(start, o.start) - start;
+          const to = Math.min(end, o.end) - start;
+          value = value.slice(0, from) + "[POSSIBLE_SECRET]" + value.slice(to);
+        }
+        return value;
+      };
+      const snippet = context(Math.max(0, first.start - 35), first.start) + shown + context(first.end, first.end + 35);
+      text.textContent = `${shown} — ${candidate.reason} (${candidate.occurrences.length} occurrence(s)). Context: ${snippet}`;
+      label.appendChild(check);
+      label.appendChild(text);
+      list.appendChild(label);
+    }
+  }
+
   /**
    * Last check before encrypting: scan the exact text that will be shared for hard identifiers
    * (keys, IDs, cards, contacts) and redact any the user did not deliberately untick. Catches
@@ -771,11 +940,13 @@ class SafeShareModal {
     );
     return turns.map(t => {
       const text = this.heuristics.normalizeHomoglyphs(t.content);
-      const scan = this.heuristics.scan(text);
+      const scan = this.heuristics.scan(text, { labelDetection: det => this.hardLabel(det) });
       let out = text;
       for (const det of [...scan.detections].sort((a, b) => b.index - a.index)) {
         const raw = det.raw.toLowerCase();
         const secret = (det.secretToken || "").toLowerCase();
+        const candidate = this.candidates.find(c => c.tag === det.tag);
+        if (candidate && (!candidate.enabled || !this.activeCategories.has(candidate.category))) continue;
         if (kept.has(raw) || (secret && kept.has(secret))) continue;
         out = out.slice(0, det.index) + det.replacement + out.slice(det.index + det.length);
       }
@@ -898,7 +1069,7 @@ class SafeShareModal {
           this.candidates.forEach(other => {
             const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
             const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
-            const isSameFinVal = (cand.category === "FINANCIAL" && other.category === "FINANCIAL" && candVal > 0 && otherVal === candVal);
+            const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
             if (isSameRaw || isSameFinVal) {
               other.enabled = nextState;
             }
@@ -929,6 +1100,37 @@ class SafeShareModal {
   }
 
   bindEvents(backdrop) {
+    backdrop.querySelector("#safeshare-model-check")?.addEventListener("click", async () => {
+      if (this.publishing || this.modelBusy) return;
+      this.modelBusy = true;
+      const generation = this.reviewGeneration;
+      const button = backdrop.querySelector("#safeshare-model-check");
+      const publish = backdrop.querySelector("#btn-encrypt-publish");
+      button.disabled = publish.disabled = true;
+      this.modelState = "Loading/checking local model…";
+      this.renderMaybeItems();
+      const snapshot = this.reviewBaseTurns.map(t => ({ ...t }));
+      try {
+        const api = typeof SafeShareNer !== "undefined" ? SafeShareNer : require("../engine/ner_client.js");
+        const arbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
+        for (const turn of snapshot) {
+          if (this.modelReview.has(turn.content)) continue;
+          const result = await api.analyze(turn.content, 60000, true);
+          if (!result.success || !Array.isArray(result.spans)) throw new Error(result.error || "Invalid local model response");
+          const protectedSpans = arbiter ? arbiter.extractProtectedSpans(turn.content) : [];
+          const spans = result.spans.filter(s => !protectedSpans.some(p => s.start < p.end && s.end > p.start));
+          if (generation !== this.reviewGeneration || !this.currentTurns.length) return;
+          this.modelReview.set(turn.content, spans);
+        }
+        if (generation === this.reviewGeneration) this.modelState = "Local model checked — suggestions are unverified, not calibrated probabilities";
+      } catch (_) {
+        if (generation === this.reviewGeneration) this.modelState = "Local model unavailable or timed out — rules still work. Retry or review manually.";
+      } finally {
+        this.modelBusy = false;
+        button.disabled = publish.disabled = false;
+        if (generation === this.reviewGeneration && this.currentTurns.length) this.rebuildViews();
+      }
+    });
     backdrop.querySelector("#safeshare-close-btn").addEventListener("click", () => this.removeExisting());
     backdrop.querySelector("#btn-cancel").addEventListener("click", () => this.removeExisting());
 
@@ -959,12 +1161,14 @@ class SafeShareModal {
     backdrop.querySelector("#btn-select-all-cands").addEventListener("click", () => {
       this.activeCategories = new Set(Object.keys(SS_CATEGORIES));
       for (const c of this.candidates) c.enabled = true;
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
       this.savePreferences();
       this.rebuildViews();
     });
 
     backdrop.querySelector("#btn-deselect-all-cands").addEventListener("click", () => {
       for (const c of this.candidates) c.enabled = false;
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, false);
       this.rebuildViews();
     });
 
@@ -972,6 +1176,7 @@ class SafeShareModal {
     backdrop.querySelector("#btn-reset-default").addEventListener("click", () => {
       this.activeCategories = new Set(Object.keys(SS_CATEGORIES));
       for (const c of this.candidates) c.enabled = true;
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
       this.savePreferences();
       this.rebuildViews();
     });
@@ -993,14 +1198,22 @@ class SafeShareModal {
 
     // Publish & Encrypt Event
     backdrop.querySelector("#btn-encrypt-publish").addEventListener("click", async () => {
+      if (this.publishing || this.modelBusy) return;
+      const riskyLeft = this.maybeCandidates.filter(c => c.risky && !(this.maybeChoices.get(c.raw) ?? c.risky)).length;
+      if (riskyLeft && !window.confirm(`${riskyLeft} possible credential(s) remain visible to link readers and any AI they continue with. Create the link anyway?`)) return;
+      // Snapshot only public fields; never share solverLeaks, original values or detector metadata.
+      const turns = this.sanitizedTurns.map(({ role, content }) => ({ role, content }));
       const btn = backdrop.querySelector("#btn-encrypt-publish");
+      this.publishing = true;
+      const controls = [...backdrop.querySelectorAll("button, input, select")].map(el => [el, el.disabled]);
+      controls.forEach(([el]) => { el.disabled = true; });
       btn.innerText = "Encrypting...";
       btn.disabled = true;
 
       try {
         const ttl = document.getElementById("safeshare-ttl").value;
         const payload = {
-          turns: this.finalSafetyScan(this.sanitizedTurns),
+          turns,
           timestamp: new Date().toISOString(),
           ttl: ttl
         };
@@ -1130,6 +1343,9 @@ class SafeShareModal {
         console.error("[SafeShare] Encryption error:", err);
         btn.innerText = "Error Encrypting";
         btn.disabled = false;
+      } finally {
+        this.publishing = false;
+        controls.forEach(([el, disabled]) => { el.disabled = disabled; });
       }
     });
   }

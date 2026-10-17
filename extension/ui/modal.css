@@ -637,7 +637,16 @@
 
 .turn-body {
   color: var(--ss-text-primary);
+  white-space: normal;
+  font-family: var(--ss-font-sans, sans-serif);
 }
+.turn-body h1, .turn-body h2, .turn-body h3 { font-size: 1.1em; margin: 12px 0 6px; }
+.turn-body pre { white-space: pre-wrap; font-family: monospace; padding: 8px; border: 1px solid var(--ss-border); }
+.ss-table-wrap { overflow-x: auto; margin: 8px 0; }
+.ss-table-wrap table { border-collapse: collapse; width: 100%; }
+.ss-table-wrap th, .ss-table-wrap td { border: 1px solid var(--ss-border); padding: 6px 8px; text-align: left; }
+.ss-placeholder { cursor: default; opacity: .85; }
+.ss-review-warning { font-size: 12px; color: var(--ss-text-secondary); margin: 8px 0; }
 
 /* Interactive Badges in Sanitized Box */
 .ss-badge {
@@ -1052,3 +1061,14 @@
   border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
   cursor: help;
 }
+#safeshare-maybe-review {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #a1a1aa;
+  border-radius: 8px;
+}
+#safeshare-maybe-review summary { cursor: pointer; font-weight: 600; }
+#safeshare-maybe-review p { font-size: 12px; margin: 8px 0; }
+#safeshare-maybe-items { max-height: 220px; overflow-y: auto; }
+#safeshare-maybe-items label { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; overflow-wrap: anywhere; }
+#safeshare-maybe-items input { flex-shrink: 0; margin-top: 3px; }

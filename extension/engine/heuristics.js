@@ -131,6 +131,13 @@ class HeuristicsRedactor {
       },
       // 2d. Universal Record, Account, Policy, Loan, & Booking Identifiers (Cross-Domain)
       {
+        id: "CARD_EXPIRY_WORDS",
+        name: "Card Expiration (month name)",
+        category: "FINANCIAL",
+        regex: /\b((?:card\s+)?(?:expir(?:ation|y|es)|exp)(?:\s+date)?\s*(?:is|in|as|means|:)?\s*)((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+20\d{2})\b/gi,
+        replacement: "$1[REDACTED_CARD_EXPIRY]"
+      },
+      {
         id: "UNIVERSAL_RECORD_IDENTIFIER",
         name: "Account / Record Identifier",
         category: "FINANCIAL",
@@ -173,7 +180,7 @@ class HeuristicsRedactor {
         id: "CARD_LAST_FOUR",
         name: "Card Last Four Digits",
         category: "FINANCIAL",
-        regex: /\b((?:(?:(?:(?:debit|credit)\s+)?(?:card|account))\s*[:=\-]?\s*)?(?:ends|ending)\s+in\s*)([0-9]{4})\b/gi,
+        regex: /\b((?:(?:(?:(?:debit|credit)\s+)?(?:card|account))\s*[:=\-]?\s*)?(?:ends|ending)\s+in\s*|(?:(?:debit|credit)\s+)?card\s+ending\s+)([0-9]{4})\b/gi,
         validator: (raw, index, text) => {
           if (text) {
             const start = Math.max(0, index - 40);
@@ -1181,7 +1188,7 @@ class HeuristicsRedactor {
    * Scans and redacts deterministic secrets and PII from input text.
    * Returns: { sanitizedText, detections: [{ type, matched, offset, length }] }
    */
-  scan(text) {
+  scan(text, { labelDetection } = {}) {
     if (!text) return { sanitizedText: "", detections: [] };
     // Pre-processing: Apply Homoglyph normalization & strip zero-width characters
     text = this.normalizeHomoglyphs(text);
@@ -1194,6 +1201,7 @@ class HeuristicsRedactor {
       
       while ((match = regex.exec(text)) !== null) {
         const raw = match[0];
+        if (pattern.id === "ENGLISH_PHYSICAL_ADDRESS" && /\[(?:have|enter|insert|your|REDACTED)[^\]]*\]/i.test(raw)) continue;
         if (pattern.validator && !pattern.validator(raw, match.index, text)) {
           continue;
         }
@@ -1267,6 +1275,13 @@ class HeuristicsRedactor {
     // Apply replacements from back to front to preserve offsets
     nonOverlapping.sort((a, b) => b.index - a.index);
     for (const det of nonOverlapping) {
+      if (labelDetection) {
+        const tag = labelDetection(det);
+        if (tag) {
+          det.tag = tag;
+          det.replacement = det.replacement.replace(/\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]/g, tag);
+        }
+      }
       sanitizedText = 
         sanitizedText.substring(0, det.index) + 
         det.replacement + 

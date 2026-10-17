@@ -6,6 +6,20 @@ can be added the same way.
 
 ## Metrics
 
+### Share-review credential suggestions (experimental)
+
+`node tools/eval/maybe.js` runs a small fictional development screen. It reports existing-rule
+coverage separately from additional candidates, misses and noise. This set is used during
+development, **not** a held-out accuracy benchmark. Current screen: 10 positive examples,
+1 hidden by existing rules, 8 additional candidates, 1 remaining miss (`sshpass -p`);
+0 candidates on 18 safe examples. These numbers are not real-world recall or precision.
+
+`node tools/eval/maybe.js path/to/local-wildchat.jsonl` optionally reads existing local JSONL
+with `conversation` or `turns` arrays and prints candidate counts (median/p90), never raw text.
+Unlabelled chat counts measure review burden, not false positives. Do not upload real chat data.
+Before claiming accuracy, freeze thresholds and use independent labelled credential/config and
+safe-chat holdouts. No model, credential verification requests or new dependencies are used.
+
 - **value recall**: share of gold PII values that no longer appear in the output.
 - **token precision / recall / F1**: word level. A removed word inside a gold span is a hit;
   a removed word outside one is over-redaction.

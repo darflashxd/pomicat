@@ -2,23 +2,36 @@
 
 ## Shipped: MiniLM Q4 NER (browser extension only)
 
-The extension runs a local token-classification model in-page via `offscreen.js`
+The extension runs a local token-classification model via `offscreen.js`
 (ONNX WASM, zero network egress):
 
 * Backbone: 6-layer MiniLM, hidden 384, fine-tuned for 35 PII labels
   (`GIVEN_NAME`, `SURNAME`, `EMAIL`, `PHONE`, `STREET_NAME`, `CITY`, … — see
   `training/model_output/minilm_q4/config.json`).
 * Vocabulary pruned to 19,730 tokens → `model_q4.onnx` is **14.01 MB**.
-* Where it runs: **only before sending, in Chrome** (the offscreen page is Chrome-only; Firefox
-  and a model that doesn't answer within 400 ms fall back to the rules, and the chip says so).
-  The share dialog does not use it; names there come from the contextual rules.
-* Only name/address labels are used, and only the writer's own ("my wife Rina", "saya tinggal di
+* Chrome/Chromium runs it in an offscreen document; Firefox runs the same WASM code in its
+  background page. Assets use absolute extension URLs. Loading failures can be retried.
+* Before sending, only name/address labels are used, and only the writer's own ("my wife Rina", "saya tinggal di
   Bandung", same rule as the CLI's `--presidio`); they become `[NAME_1]` / `[PLACE_1]`. Each span
   first passes `extension/engine/span_arbiter.js` (Tier-0 technical veto + per-label confidence
   thresholds on the softmax probability + technical-density bypass).
-* Measured: token F1 **0.85** on ai4privacy EN 2000
+* The share dialog has an explicit **Check names and other PII with local model** button. It
+  examines the rules-redacted review text and adds unverified, initially unchecked suggestions.
+  It can retain non-O alternatives above an experimental score floor of 0.15. These scores are
+  NOT calibrated probabilities. Span confidence uses the minimum contributing token score.
+  Technical protected spans and existing placeholders are excluded. No model is trained from clicks.
+* Before-send requests time out after 30 seconds; share review allows 60 seconds per turn. UI
+  reports model failure instead of treating it as an empty successful scan. Review must be rerun
+  after the underlying text changes. The rules still work without model inference.
+* Real runtime smoke: Firefox 158 and Chromium 149 loaded the packaged ONNX/WASM assets,
+  returned entity spans through extension messaging, and passed real share-dialog ID/Maybe checks.
+  Reproduce: `python tools/eval/firefox_ner.py`, `python tools/eval/chrome_ner.py` (latter uses an
+  already installed Playwright). Temporary isolated profiles; fictional data, no relay uploads.
+* Historical raw-model measurement: token F1 **0.85** on ai4privacy EN 2000
   (`tools/eval/RESULTS_SOTA.md`). CLI `redact` does not use this model;
   use `--presidio` there for general name detection.
+  The new review floor, conservative span scores and before-send policy need independent accuracy
+  and calibration evaluation. Runtime smoke proves execution, not general detection accuracy.
 
 ## Research only: DistilBERT token classifier
 

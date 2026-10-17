@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><title>Range and formatted transcript check</title>
+<link rel="stylesheet" href="../../extension/ui/modal.css">
+<body style="background:#111;color:#eee"><pre id="result">Running…</pre>
+<script src="../../extension/engine/heuristics.js"></script>
+<script src="../../extension/engine/contextual.js"></script>
+<script src="../../extension/engine/pseudonymizer.js"></script>
+<script src="../../extension/engine/policy.js"></script>
+<script src="../../extension/engine/crypto.js"></script>
+<script src="../../extension/engine/maybe.js"></script>
+<script src="../../extension/engine/transcript.js"></script>
+<script src="../../extension/ui/modal.js"></script>
+<script>
+(async () => {
+  const assert = (ok, message) => { if (!ok) throw new Error(message); };
+  const source = document.createElement("div");
+  // Synthetic KaTeX contains accessible MathML and visual HTML for the same equation.
+  source.innerHTML = '<h2>2. Sisa uang per bulan</h2><p><span class="katex"><span class="katex-mathml"><math><annotation encoding="application/x-tex">Rp\\,3.000.000-Rp\\,900.000=Rp\\,2.100.000</annotation></math></span><span class="katex-html">DUPLICATE VISUAL EQUATION</span></span></p><p>Sisa uang setelah menabung adalah Rp 2.100.000 per bulan.</p><h2>3. Akumulasi tabungan selama 12 bulan</h2><table><thead><tr><th>Periode</th><th>Total tabungan</th></tr></thead><tbody><tr><td>1 bulan</td><td>Rp 900.000</td></tr><tr><td>3 bulan</td><td>Rp 2.700.000</td></tr><tr><td>6 bulan</td><td>Rp 5.400.000</td></tr><tr><td>12 bulan</td><td>Rp 10.800.000</td></tr></tbody></table>';
+  const extracted = SafeShareTranscript.extract(source);
+  assert(!extracted.includes("DUPLICATE"), "KaTeX emitted once");
+  assert((extracted.match(/3\.000\.000/g) || []).length === 1, "one math representation");
+  const modal = new SafeShareModal();
+  modal.numbersMode = "range";
+  modal.profile = "public";
+  modal.activeCategories = new Set(Object.keys(SS_CATEGORIES));
+  modal.open([{role:"user", content:"Gaji saya Rp 3.000.000 per bulan. Target menabung 30%."}, {role:"assistant", content: extracted}]);
+  const preview = () => document.getElementById("diff-box-sanitized");
+  assert(preview().querySelector("table tbody tr"), "table rows preserved");
+  assert(preview().querySelector("h2"), "headings preserved");
+  assert([...preview().querySelectorAll(".ss-badge")].some(b => b.textContent.includes("Rp 2–5 juta")), "range is interactive");
+  for (const value of [2100000, 900000, 10800000, 3000000]) {
+    document.getElementById("btn-reset-default").click();
+    const candidate = modal.candidates.find(c => !c.raw.startsWith("[") && modal.pseudonymizer.parseFinancialValue(c.raw) === value);
+    assert(candidate, "candidate " + value);
+    const badge = preview().querySelector('[data-cand-id="' + candidate.id + '"]');
+    assert(badge, "clickable badge " + value);
+    badge.click();
+    assert(modal.sanitizedTurns.some(t => t.content.includes(value.toLocaleString("id-ID"))), "revealed " + value);
+    assert(!preview().querySelector('[data-cand-id="c_tag"]'), "no orphan buttons");
+  }
+  modal.removeExisting();
+  modal.open([{role:"user", content:"Previously hidden [REDACTED_FINANCIAL_9]"}]);
+  assert(preview().querySelector(".ss-placeholder"), "unknown original gets an honest inert label");
+  assert(!preview().querySelector(".ss-badge"), "unknown original is not a fake button");
+  modal.removeExisting();
+  document.getElementById("result").textContent = "PASS: KaTeX once, headings/tables, range badge, IDR clicks, no orphan buttons. No uploads.";
+})().catch(e => { document.getElementById("result").textContent = "FAIL: " + e.message; console.error(e); });
+</script>

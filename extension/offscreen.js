@@ -8,7 +8,7 @@
 
 console.log("[SafeShare-AI Offscreen] Isolated NER runtime initialized with connect-src 'self' (local assets only).");
 
-const webExtApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+const nerExtApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
 
 let session = null;
 let id2label = null;
@@ -18,7 +18,7 @@ let loadingPromise = null;
 // Tokenizer: engine/wordpiece.js (loaded before this file by offscreen.html)
 const { encode } = typeof SafeShareWordPiece !== "undefined" ? SafeShareWordPiece : require("./engine/wordpiece.js");
 
-function extractSpans(text, enc, logits) {
+function extractSpans(text, enc, logits, review = false) {
   const numLabels = 35;
   const seqLen = enc.inputIds.length;
   const spans = [];
@@ -38,7 +38,18 @@ function extractSpans(text, enc, logits) {
     // probabilities, and raw logits would pass them almost always
     let expSum = 0;
     for (let c = 0; c < numLabels; c++) expSum += Math.exp(logits[i * numLabels + c] - maxVal);
-    const prob = 1 / expSum;
+    let prob = 1 / expSum;
+    // Review may retain a plausible non-O alternative, but never claims it is calibrated.
+    if (review && id2label[String(maxIdx)] === "O") {
+      let entityIdx = -1;
+      for (let c = 0; c < numLabels; c++) {
+        if (id2label[String(c)] !== "O" && (entityIdx < 0 || logits[i * numLabels + c] > logits[i * numLabels + entityIdx])) entityIdx = c;
+      }
+      if (entityIdx >= 0) {
+        const alternative = Math.exp(logits[i * numLabels + entityIdx] - maxVal) / expSum;
+        if (alternative >= 0.15) { maxIdx = entityIdx; prob = alternative; }
+      }
+    }
     const rawTag = id2label[String(maxIdx)];
     if (!rawTag || rawTag === "O") {
       if (currentSpan) {
@@ -66,7 +77,7 @@ function extractSpans(text, enc, logits) {
       };
     } else if (prefix === "I-" && currentSpan && currentSpan.label === labelType) {
       currentSpan.end = Math.max(currentSpan.end, tokenSpan.end);
-      currentSpan.score = Math.max(currentSpan.score, prob);
+      currentSpan.score = Math.min(currentSpan.score, prob);
     } else {
       if (currentSpan) {
         currentSpan.text = text.slice(currentSpan.start, currentSpan.end);
@@ -97,7 +108,7 @@ function mergeSpans(spans) {
     const prev = merged[merged.length - 1];
     if (prev.label === cur.label && cur.start <= prev.end + 1) {
       prev.end = Math.max(prev.end, cur.end);
-      prev.score = Math.max(prev.score, cur.score);
+      prev.score = Math.min(prev.score, cur.score);
     } else {
       merged.push(Object.assign({}, cur));
     }
@@ -109,15 +120,15 @@ async function loadModel() {
   if (session) return session;
   try {
     if (typeof ort !== "undefined" && ort.env && ort.env.wasm) {
-      ort.env.wasm.wasmPaths = "models/";
+      ort.env.wasm.wasmPaths = nerExtApi ? nerExtApi.runtime.getURL("models/") : new URL("models/", location.href).href;
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.proxy = false;
     }
 
     const [cfgRes, vocabRes, modelRes] = await Promise.all([
-      fetch("models/config.json").then((r) => r.json()),
-      fetch("models/vocab.txt").then((r) => r.text()),
-      fetch("models/model_q4.onnx").then((r) => r.arrayBuffer())
+      fetch("models/config.json").then((r) => { if (!r.ok) throw new Error("Model config missing"); return r.json(); }),
+      fetch("models/vocab.txt").then((r) => { if (!r.ok) throw new Error("Model vocabulary missing"); return r.text(); }),
+      fetch("models/model_q4.onnx").then((r) => { if (!r.ok) throw new Error("Model missing"); return r.arrayBuffer(); })
     ]);
 
     id2label = cfgRes.id2label;
@@ -137,11 +148,14 @@ async function loadModel() {
   }
 }
 
-async function runInference(text) {
+async function runInference(text, review = false) {
   if (!text || typeof text !== "string" || !text.trim()) {
     return [];
   }
-  await (loadingPromise || (loadingPromise = loadModel()));
+  if (!session) {
+    loadingPromise ||= loadModel().catch(err => { loadingPromise = null; throw err; });
+    await loadingPromise;
+  }
   const spans = [];
   for (const enc of encode(text, vocab)) {
     if (enc.inputIds.length <= 2) continue;
@@ -151,7 +165,7 @@ async function runInference(text) {
       token_type_ids: new ort.Tensor("int64", enc.tokenTypeIds, [1, enc.tokenTypeIds.length])
     };
     const results = await session.run(feeds);
-    spans.push(...extractSpans(text, enc, results.logits.data));
+    spans.push(...extractSpans(text, enc, results.logits.data, review));
   }
   // Windows overlap: the same span can come twice; mergeSpans joins overlapping same-label spans
   const merged = mergeSpans(spans.sort((a, b) => a.start - b.start));
@@ -162,15 +176,11 @@ async function runInference(text) {
 }
 
 // Warm up model in background
-if (typeof fetch !== "undefined") {
-  loadingPromise = loadModel().catch((err) => {
-    console.warn("[SafeShare-AI Offscreen] Background model warmup deferred:", err.message);
-  });
-}
+// Load on demand; Firefox event pages may restart. Failed loads can be retried.
 
 // 1-Hop Direct Port Receiver (Connects directly with Content Script, bypassing SW proxy)
-if (webExtApi && webExtApi.runtime && webExtApi.runtime.onConnect) {
-  webExtApi.runtime.onConnect.addListener((port) => {
+if (nerExtApi && nerExtApi.runtime && nerExtApi.runtime.onConnect) {
+  nerExtApi.runtime.onConnect.addListener((port) => {
     if (port.name !== "OFFSCREEN_DIRECT_NER") return;
 
     port.onMessage.addListener(async (msg) => {
@@ -197,13 +207,14 @@ if (webExtApi && webExtApi.runtime && webExtApi.runtime.onConnect) {
   });
 }
 
-if (webExtApi && webExtApi.runtime && webExtApi.runtime.onMessage) {
-  webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "RUN_NER_INFERENCE") {
+if (nerExtApi && nerExtApi.runtime && nerExtApi.runtime.onMessage &&
+    typeof location !== "undefined" && location.pathname.endsWith("/offscreen.html")) {
+  nerExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "RUN_NER_INFERENCE" && request.target === "NER_RUNTIME") {
       const { text } = request;
       const t0 = performance.now();
 
-      runInference(text)
+      runInference(text, request.review === true)
         .then((spans) => {
           sendResponse({
             success: true,

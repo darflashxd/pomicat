@@ -264,7 +264,7 @@ class AdversaryOracleSolver {
     return tokens;
   }
 
-  solveAndRedact(text, secretValues, disabledLeaks = []) {
+  solveAndRedact(text, secretValues, disabledLeaks = [], labelLeak = null) {
     if (!secretValues || secretValues.length === 0) return text;
     const tokens = this.lexNumericSpans(text);
     const ratios = tokens.filter(t => t.isRatio && t.val > 0).map(t => t.val);
@@ -324,10 +324,8 @@ class AdversaryOracleSolver {
         if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         if (this.isSafePublicSpan(text, token.start, token.end)) continue;
-        if (disabledLeaks && (disabledLeaks.includes(token.raw) || disabledLeaks.includes(String(token.val)) || disabledLeaks.some(dl => {
-          const dlNum = parseFloat(String(dl).replace(/[^\d.]/g, ""));
-          return !isNaN(dlNum) && Math.abs(token.val - dlNum) <= 0.01;
-        }))) continue;
+        if (disabledLeaks.some(dl => String(dl).trim().toLowerCase() === token.raw.trim().toLowerCase() ||
+          this.lexNumericSpans(String(dl)).some(t => !t.isRatio && Math.abs(token.val - t.val) <= 0.01))) continue;
 
         let isLeak = false;
 
@@ -446,7 +444,7 @@ class AdversaryOracleSolver {
             end: token.end,
             raw: token.raw,
             val: token.val,
-            replacement: tag
+            replacement: labelLeak ? labelLeak(token.raw, tag) : tag
           });
         }
       }
@@ -1077,6 +1075,7 @@ class ConsistentPseudonymizer {
     const heuristicRules = [];
     for (const hd of heuristicDetections) {
       if (hd && hd.raw) {
+        const ruleStart = heuristicRules.length;
         const hEsc = hd.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         heuristicRules.push({
           regexStr: `\\b${hEsc}\\b`,
@@ -1196,6 +1195,11 @@ class ConsistentPseudonymizer {
             }
           }
         }
+        if (hd.tag) {
+          for (const rule of heuristicRules.slice(ruleStart)) {
+            rule.replacement = rule.replacement.replace(/\[REDACTED_[A-Z0-9_]+\]/g, hd.tag);
+          }
+        }
       }
     }
     heuristicRules.sort((a, b) => b.length - a.length);
@@ -1230,6 +1234,13 @@ class ConsistentPseudonymizer {
 
     const solverHelper = new AdversaryOracleSolver();
     const allDerivedLeaks = [];
+    const isKeptAmount = raw => (options.disabledLeaks || []).some(dl => {
+      if (raw.trim().toLowerCase() === dl.trim().toLowerCase()) return true;
+      const values = solverHelper.lexNumericSpans(raw).filter(t => !t.isRatio);
+      const kept = solverHelper.lexNumericSpans(dl).filter(t => !t.isRatio);
+      return values.length === 1 && kept.some(t => Math.abs(t.val - values[0].val) <= 0.01);
+    });
+    const labelLeak = (raw, tag) => options.labelLeak ? options.labelLeak(raw, tag) : tag;
 
     // Step A: Apply Base Rules (Immutable Primary User Secrets)
     for (const rule of baseRules) {
@@ -1277,17 +1288,18 @@ class ConsistentPseudonymizer {
               return match; // Safe public benchmark line, preserve!
             }
             const cleanMatch = match.trim();
-            if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanMatch.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanMatch.toLowerCase())))) {
+            if (isKeptAmount(cleanMatch)) {
               return match;
             }
+            const replacement = labelLeak(cleanMatch, rule.replacement);
             allDerivedLeaks.push({
               raw: cleanMatch,
-              replacement: rule.replacement,
+              replacement,
               category: "FINANCIAL",
               isDerived: true,
               isAlgebraic: true
             });
-            return rule.replacement;
+            return replacement;
           });
         }
       }
@@ -1299,17 +1311,18 @@ class ConsistentPseudonymizer {
       if (turn.content) {
         turn.content = turn.content.replace(arrowRx, (fullMatch, p1, rawNum) => {
           const cleanNum = rawNum.trim();
-          if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanNum.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanNum.toLowerCase())))) {
+          if (isKeptAmount(cleanNum)) {
             return fullMatch;
           }
+          const replacement = labelLeak(cleanNum, "[REDACTED_PROJECTED_SALARY]");
           allDerivedLeaks.push({
             raw: cleanNum,
-            replacement: "[REDACTED_PROJECTED_SALARY]",
+            replacement,
             category: "FINANCIAL",
             isDerived: true,
             isAlgebraic: true
           });
-          return `${p1}[REDACTED_PROJECTED_SALARY]`;
+          return `${p1}${replacement}`;
         });
       }
     }
@@ -1320,17 +1333,18 @@ class ConsistentPseudonymizer {
       if (turn.content) {
         turn.content = turn.content.replace(incRx, (fullMatch, p1, rawNum) => {
           const cleanNum = rawNum.trim();
-          if (options.disabledLeaks && options.disabledLeaks.some(dl => dl && (cleanNum.toLowerCase() === dl.toLowerCase() || dl.toLowerCase().includes(cleanNum.toLowerCase())))) {
+          if (isKeptAmount(cleanNum)) {
             return fullMatch;
           }
+          const replacement = labelLeak(cleanNum, "[REDACTED_SALARY_INCREMENT]");
           allDerivedLeaks.push({
             raw: cleanNum,
-            replacement: "[REDACTED_SALARY_INCREMENT]",
+            replacement,
             category: "FINANCIAL",
             isDerived: true,
             isAlgebraic: true
           });
-          return `${p1}[REDACTED_SALARY_INCREMENT]`;
+          return `${p1}${replacement}`;
         });
       }
     }
@@ -1346,7 +1360,7 @@ class ConsistentPseudonymizer {
       const solver = new AdversaryOracleSolver();
       for (let turn of updatedTurns) {
         if (turn.content && turn.role === "assistant") {
-          turn.content = solver.solveAndRedact(turn.content, financialSecrets, options.disabledLeaks || []);
+          turn.content = solver.solveAndRedact(turn.content, financialSecrets, options.disabledLeaks || [], options.labelLeak);
           if (solver.lastLeaks && solver.lastLeaks.length > 0) {
             turn.solverLeaks = [...solver.lastLeaks].sort((a, b) => (a.start || 0) - (b.start || 0));
             allSolverLeaks.push(...solver.lastLeaks);
@@ -1370,7 +1384,7 @@ class ConsistentPseudonymizer {
 
     // A hidden birth date is undone by "I am 28" + the current year, or "in 2020 at 22":
     // once a birth date is redacted anywhere, hide stated ages everywhere too.
-    if (updatedTurns.some(t => /\[REDACTED_DOB\]/.test(t.content))) {
+    if (updatedTurns.some(t => /\[REDACTED_DOB(?:_\d+)?\]/.test(t.content))) {
       for (const t of updatedTurns) {
         t.content = t.content
           .replace(new RegExp(AGE_PATTERNS.age.source, "gi"), (m, n) => m.replace(n, "[REDACTED_AGE]"))

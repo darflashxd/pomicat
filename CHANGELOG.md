@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — experimental share review
+
+- Local MiniLM inference now runs in Firefox's background page as well as Chrome's offscreen
+  document; shared request client validates text and reports failure/timeout. Absolute WASM asset
+  paths fix Firefox module resolution. Real Firefox/Chromium extension smoke harnesses added.
+- Optional local-model review adds unchecked PII suggestions (including plausible alternatives
+  to O); scores are experimental, not calibrated. No new weights, training or remote inference.
+- Hard identifiers get stable per-entity review labels across rules/turns. Account IDs no longer
+  share ambiguous buttons; identifiers are not merged with money by numeric value. Card ending
+  digits, month-name expiration aliases and bracketed address instructions have regression checks.
+
+- Fixed Indonesian grouped amounts being re-redacted after an explicit reveal (case-insensitive,
+  numeric-equivalent exceptions). Derived amounts now have stable per-value review tags, ranges
+  remain clickable, and placeholders without an original value no longer pretend to be buttons.
+- Share preview preserves basic headings, tables and code; arithmetic LaTeX is converted to
+  readable text. Chat extraction chooses one KaTeX annotation instead of both visual/accessibility
+  representations. No remote renderer or raw chat HTML is used.
+
+- Share dialog: local, unverified credential suggestions using assignments and entropy; exact
+  repeated values share one checkbox. Credential-context suggestions start hidden for both profiles.
+  Names, amounts, the send-time shield, CLI and proxy are unchanged.
+- Preview includes the final safety scan; publication snapshots only `role` and `content`, excluding
+  private solver metadata. Choices lock during upload; visible risky suggestions require confirmation.
+- Added offline regression checks and a fictional screening harness (`tools/eval/maybe.js`).
+  Real-chat burden and independent held-out accuracy still require evaluation before release claims.
+- Review audit fixes: selected overlapping spans hide their full union; numeric credential values
+  are considered, punctuation/path echoes are swept and variable placeholders stay unchanged.
+  Protect/Unprotect All and Reset include suggestions. Amount badge metadata remains private to
+  the review rather than entering the encrypted payload. Real DOM self-check added in
+  `tests/fixtures/maybe_review.html` (fake relay, no uploads).
+
 ## 2.4.0 (2026-10-16)
 
 ### Fixed (P0)

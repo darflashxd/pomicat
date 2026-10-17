@@ -1,0 +1,109 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Share review browser self-check</title>
+<link rel="stylesheet" href="../../extension/ui/modal.css">
+<body style="background:#111;color:#eee">
+<pre id="result">Running…</pre>
+<script src="../../extension/engine/heuristics.js"></script>
+<script src="../../extension/engine/contextual.js"></script>
+<script src="../../extension/engine/pseudonymizer.js"></script>
+<script src="../../extension/engine/policy.js"></script>
+<script src="../../extension/engine/crypto.js"></script>
+<script src="../../extension/engine/maybe.js"></script>
+<script src="../../extension/engine/transcript.js"></script>
+<script src="../../extension/ui/modal.js"></script>
+<script>
+// Serve the repo locally, open /tests/fixtures/maybe_review.html. Fake relay; no uploads.
+(async () => {
+  const assert = (ok, message) => { if (!ok) throw new Error(message); };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const modal = new SafeShareModal();
+  // Independent of preferences saved by other tests or extension use on this origin.
+  modal.activeCategories = new Set(Object.keys(SS_CATEGORIES));
+  modal.profile = "public";
+  modal.numbersMode = "remove";
+  modal.open([
+    { role: "user", content: "My salary is USD 5,000 per month. API_TOKEN=OddSecret42. token=${ABC123} EXTRA_TOKEN=ABC123" },
+    { role: "assistant", content: "At 13% allocate USD 650; at 17% allocate USD 850; annually USD 7,800 and USD 10,200. /OddSecret42" }
+  ]);
+  const preview = () => [...document.querySelectorAll("#diff-box-sanitized .turn-block")].map(block => {
+    const body = block.querySelector(".turn-body").cloneNode(true);
+    body.querySelectorAll(".ss-badge-icon").forEach(el => el.remove());
+    return { role: block.querySelector(".turn-header").textContent.includes("USER") ? "user" : "assistant", content: body.textContent };
+  });
+  const badge = [...document.querySelectorAll("#diff-box-sanitized .ss-badge")].find(el => el.title.includes("USD 850"));
+  assert(badge, "distinct badge exists for USD 850");
+  badge.click();
+  assert(preview()[1].content.includes("USD 850"), "click opens the selected amount");
+  assert(!preview()[1].content.includes("USD 650"), "click does not open another amount");
+  const candidate = modal.maybeCandidates.find(c => c.raw === "OddSecret42");
+  document.getElementById(candidate.id).click();
+  assert(document.activeElement.id === candidate.id, "checkbox keeps focus after rebuild");
+  assert(preview()[1].content.includes("/OddSecret42"), "untick opens repeated value");
+  let confirmations = 0;
+  const realConfirm = window.confirm;
+  window.confirm = () => { confirmations++; return false; };
+  document.getElementById("btn-encrypt-publish").click();
+  assert(confirmations === 1 && !modal.publishing, "cancel confirmation does not publish");
+  window.confirm = realConfirm;
+  document.getElementById("btn-reset-default").click();
+  assert(!preview().some(t => t.content.includes("OddSecret42")), "reset protects all suggestions");
+  assert(preview()[0].content.includes("${ABC123}"), "variable placeholder stays intact");
+  assert(same(preview(), modal.sanitizedTurns), "DOM preview equals public turns");
+
+  let release, encrypted;
+  const gate = new Promise(resolve => { release = resolve; });
+  const encrypt = modal.crypto.encrypt.bind(modal.crypto);
+  const expected = preview();
+  modal.crypto.encrypt = async payload => {
+    assert(same(payload.turns, expected), "payload equals DOM before encryption");
+    await gate;
+    encrypted = await encrypt(payload);
+    return encrypted;
+  };
+  let uploads = 0;
+  window.browser = {
+    storage: { local: { get: async () => ({}) } },
+    runtime: { sendMessage: async () => { uploads++; return { success: true, data: { revoke_token: "fake" } }; } }
+  };
+  window.fetch = () => { throw new Error("Real network forbidden in this self-check"); };
+  document.getElementById("btn-encrypt-publish").click();
+  assert(modal.publishing, "publication locks immediately");
+  assert([...document.querySelectorAll("#safeshare-modal-backdrop button, #safeshare-modal-backdrop input, #safeshare-modal-backdrop select")].every(el => el.disabled), "all real controls disabled");
+  document.querySelector("#diff-box-sanitized .ss-badge").click();
+  assert(same(preview(), expected), "badges cannot change the preview during encryption");
+  release();
+  // Yield until the real async encryption/publication handler finishes (bounded).
+  for (let i = 0; i < 100 && modal.publishing; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  assert(encrypted && !modal.publishing && uploads === 1, "one completed fake upload");
+  const decoded = await modal.crypto.decrypt(encrypted.ciphertext, encrypted.key);
+  assert(same(decoded.turns, expected), "decrypted turns equal reviewed DOM");
+  assert(decoded.turns.every(t => Object.keys(t).sort().join() === "content,role"), "no private metadata");
+  assert(!document.getElementById("btn-copy-url").disabled, "result controls unlocked");
+  modal.removeExisting();
+  assert(!modal.previewLeaks.length && !modal.maybeChoices.size, "review state cleared");
+  modal.open([{ role: "user", content: 'client_secret="alpha Z8kL2mN7pQ4rS9tU6vW3xY omega" API_TOKEN=123456' }]);
+  document.querySelectorAll("#safeshare-maybe-items input").forEach(check => {
+    // Rebuild replaces the controls, so click the current element, not a detached snapshot.
+    const current = document.getElementById(check.id);
+    if (!current.checked) current.click();
+  });
+  assert(!preview()[0].content.includes("alpha") && !preview()[0].content.includes("omega"), "overlapping checkboxes hide the entire value");
+  assert(!preview()[0].content.includes("123456"), "numeric credential hidden");
+  assert(!document.querySelector("#safeshare-maybe-items span img"), "candidate labels are text");
+  modal.crypto.encrypt = async () => { throw new Error("Expected offline failure"); };
+  const logError = console.error;
+  console.error = () => {};
+  try {
+    document.getElementById("btn-encrypt-publish").click();
+    for (let i = 0; i < 100 && modal.publishing; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  } finally { console.error = logError; }
+  assert(!modal.publishing && !document.getElementById("btn-encrypt-publish").disabled &&
+    !document.querySelector("#safeshare-maybe-items input").disabled, "failure unlocks real review controls");
+  modal.removeExisting();
+  document.getElementById("result").textContent = "PASS: badges, reset, overlaps, numeric credentials, exclusions, focus, cancellation, control lock, failure recovery, DOM/payload equality, cleanup. No real uploads.";
+})().catch(error => {
+  document.getElementById("result").textContent = "FAIL: " + error.message;
+  console.error(error);
+});
+</script>

@@ -1,9 +1,60 @@
 # Manual test checklist (Chrome)
 
+## Cross-browser local model and banking review
+
+Build fresh packages with `python tools/build_extension.py`. Chrome loads `extension/manifest.json`;
+Firefox loads `manifest.json` from an extracted Firefox ZIP, not the Chrome source manifest.
+
+- In both browsers, use fictional checking/savings/loan IDs and click each badge. Only the chosen
+  ID should appear, across all its occurrences; card last-four digits must never become money ranges.
+- Expiration `08/27` and the same month-name echo near card context should be hidden together.
+  Unrelated conference dates and `[have address ready]` must stay unchanged.
+- Click **Check names and other PII with local model** in the share dialog. It should report
+  loading/checking, then checked, and add unchecked model suggestions. Check one to hide it.
+- Model errors/timeouts must display unavailable status, not "no candidates" as if a scan succeeded.
+  Re-run after changing the reviewed text. Do not interpret model scores as calibrated probabilities.
+
+Automated real-browser checks (isolated temporary profiles, fictional data, no relay upload):
+`python tools/eval/firefox_ner.py` uses installed Firefox and stdlib Marionette transport;
+`python tools/eval/chrome_ner.py` uses an existing Playwright Chromium installation. These test
+actual packaged ONNX/WASM inference and share-dialog ID clicks/model suggestions. They do not
+prove held-out accuracy or verify the DOM of logged-in vendor sites.
+
+## Experimental “Maybe sensitive” share review
+
+Test in Chrome and Firefox, with both reader profiles. Use fictional data only.
+
+- Open the share dialog on `API_TOKEN=OddSecret42` followed by an assistant echo of
+  `OddSecret42`. Both should be hidden by one checked suggestion.
+- Untick it: both reappear. Creating the link asks about visible possible credentials;
+  cancelling must not upload anything. Recheck and publish: viewer text matches the preview.
+- Try `Z8kL2mN7pQ4rS9tU6vW3xY`: suggestion starts unchecked. Docker `-p 8080:80`, Git hashes
+  in Git commands and existing placeholders should not become suggestions.
+- Use Tab/Space to operate checkboxes, including after the preview rebuild. Candidate labels
+  announce the reason and count; focus stays on the checkbox. Long lists remain scrollable.
+- Close and reopen: decisions reset. Disable the network: scanning still works; a failed
+  publication unlocks controls without losing the review.
+
+Automated checks: `node tests/maybe.test.js` (offline encrypt/decrypt with fake relay messaging)
+and `node tools/eval/maybe.js` (fictional development screen, not held-out accuracy).
+
+Real DOM self-check: serve the repository with `python -m http.server 8791 --bind 127.0.0.1`,
+then open `http://127.0.0.1:8791/tests/fixtures/maybe_review.html`. It must end with `PASS`.
+This fixture uses fake relay messaging and never uploads a share. It checks distinct amount
+badges, reset, overlapping selections, numeric credentials, variable exclusions, checkbox focus,
+control locking, failed-publication recovery and decrypted content against the actual DOM preview.
+Run in Chrome and Firefox; this does not replace testing the installed extensions on chat sites.
+
+For IDR range/toggle and formatting checks, open `/tests/fixtures/range_review.html` on that
+same local server. It must report `PASS`: one KaTeX representation, readable headings/tables,
+clickable ranges, revealed IDR amounts staying visible, and no buttons with unavailable originals.
+Arithmetic LaTeX is simplified to readable text; full TeX layout is not supported. Revealing an
+exact amount intentionally can make another hidden amount inferable.
+
 Everything runs on your laptop with fake data. Tick each box; if something fails, note the site,
 the test number and what you saw (a screenshot helps).
 
-Automated tests cover the engine, relay, CLI and proxy: `npm test` should end with `31/31 passed`.
+Automated tests cover the engine, relay, CLI and proxy: `npm test` should end with `35/35 passed`.
 This list covers what needs a real browser and your logged-in chat accounts.
 
 ## 0. Setup (once, ~5 min)

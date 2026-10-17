@@ -45,55 +45,8 @@
   const spanArbiter = typeof PrioritySpanArbiter !== "undefined" ? new PrioritySpanArbiter() : null;
   // "Is this name/place the writer's own?" rules, shared with the CLI (engine/pseudonymizer.js)
   const personalBefore = ConsistentPseudonymizer.PERSONAL_BEFORE;
-  let directNerPort = null;
-  const pendingNerRequests = new Map();
-  let requestIdCounter = 0;
-
-  async function getDirectOffscreenPort() {
-    if (directNerPort) return directNerPort;
-    const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
-    if (!api || !api.runtime || !api.runtime.connect) return null;
-
-    try {
-      await api.runtime.sendMessage({ action: "ENSURE_OFFSCREEN_READY" });
-      directNerPort = api.runtime.connect({ name: "OFFSCREEN_DIRECT_NER" });
-      directNerPort.onMessage.addListener((res) => {
-        const resolver = pendingNerRequests.get(res.requestId);
-        if (resolver) {
-          pendingNerRequests.delete(res.requestId);
-          resolver(res.ok ? res.spans : null);
-        }
-      });
-      directNerPort.onDisconnect.addListener(() => {
-        directNerPort = null;
-      });
-      return directNerPort;
-    } catch (_) {
-      return null;
-    }
-  }
-
   function requestOffscreenNer(text) {
-    return new Promise(async (resolve) => {
-      try {
-        const port = await getDirectOffscreenPort();
-        if (!port) return resolve(null);
-        const requestId = `ner_${Date.now()}_${++requestIdCounter}`;
-        const timer = setTimeout(() => {
-          pendingNerRequests.delete(requestId);
-          resolve(null);
-        }, 400);
-
-        pendingNerRequests.set(requestId, (spans) => {
-          clearTimeout(timer);
-          resolve(spans);
-        });
-
-        port.postMessage({ requestId, text });
-      } catch (_) {
-        resolve(null);
-      }
-    });
+    return SafeShareNer.analyze(text).then(result => result.success ? result.spans : null);
   }
 
   /**
@@ -796,7 +749,7 @@
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
     // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
-    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr]")) {
+    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr], .katex, table, h1, h2, h3, pre")) {
       return (containerEl.innerText || containerEl.textContent || "").trim();
     }
     try {
@@ -812,7 +765,7 @@
           span.replaceWith(textNode);
         }
       });
-      const cleanText = clone.innerText || clone.textContent || "";
+      const cleanText = SafeShareTranscript.extract(clone);
       return cleanText.trim() || (containerEl.innerText || containerEl.textContent || "").trim();
     } catch (_) {
       return (containerEl.innerText || containerEl.textContent || "").trim();

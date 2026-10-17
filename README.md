@@ -151,6 +151,16 @@ the `extension/` folder directly.
 Open chatgpt.com, claude.ai or chat.deepseek.com and click the SafeShare button to review the
 redactions and create a link.
 
+The share dialog also lists **Maybe sensitive** credential suggestions. Values assigned to a
+credential-like key start checked for both reader profiles; random-looking strings without that
+context start unchecked. Each choice applies to exact occurrences across both roles. Suggestions
+are local and unverified, not proof a credential works or that all secrets were found. No candidate
+values or choices are saved. The encrypted turns contain only the reviewed roles and text, never
+internal detection metadata. Click **Check names and other PII with local model** to add local
+MiniLM suggestions on Chrome or Firefox. Model suggestions start unchecked; their experimental
+scores are not calibrated probabilities. A visible status distinguishes a checked review from a
+failed/unrun model check. CLI and proxy do not use this model.
+
 ### CLI and library (Node 18+, no dependencies)
 
 ```bash
