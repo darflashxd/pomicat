@@ -23,7 +23,7 @@
   modal.profile = "public";
   modal.numbersMode = "remove";
   modal.open([
-    { role: "user", content: "My salary is USD 5,000 per month. API_TOKEN=OddSecret42. token=${ABC123} EXTRA_TOKEN=ABC123" },
+    { role: "user", content: "My salary is USD 5,000 per month. access_token: OddSecret42. token=${ABC123} EXTRA_TOKEN=ABC123" },
     { role: "assistant", content: "At 13% allocate USD 650; at 17% allocate USD 850; annually USD 7,800 and USD 10,200. /OddSecret42" }
   ]);
   const preview = () => [...document.querySelectorAll("#diff-box-sanitized .turn-block")].map(block => {

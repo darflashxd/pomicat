@@ -24,7 +24,7 @@ prove held-out accuracy or verify the DOM of logged-in vendor sites.
 
 Test in Chrome and Firefox, with both reader profiles. Use fictional data only.
 
-- Open the share dialog on `API_TOKEN=OddSecret42` followed by an assistant echo of
+- Open the share dialog on `access_token: OddSecret42` followed by an assistant echo of
   `OddSecret42`. Both should be hidden by one checked suggestion.
 - Untick it: both reappear. Creating the link asks about visible possible credentials;
   cancelling must not upload anything. Recheck and publish: viewer text matches the preview.

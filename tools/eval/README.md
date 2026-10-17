@@ -11,7 +11,7 @@ can be added the same way.
 `node tools/eval/maybe.js` runs a small fictional development screen. It reports existing-rule
 coverage separately from additional candidates, misses and noise. This set is used during
 development, **not** a held-out accuracy benchmark. Current screen: 10 positive examples,
-1 hidden by existing rules, 8 additional candidates, 1 remaining miss (`sshpass -p`);
+5 hidden by existing rules, 5 additional candidates, no remaining misses on this small set;
 0 candidates on 18 safe examples. These numbers are not real-world recall or precision.
 
 `node tools/eval/maybe.js path/to/local-wildchat.jsonl` optionally reads existing local JSONL

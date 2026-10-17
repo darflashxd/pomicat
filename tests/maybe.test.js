@@ -82,7 +82,7 @@ const Modal = require("../extension/ui/modal.js");
 (async () => {
   const modal = new Modal();
   modal.currentTurns = [
-    { role: "user", content: "My salary is USD 5,000 per month. API_TOKEN=OddSecret42. Email аlice@example.com" },
+    { role: "user", content: "My salary is USD 5,000 per month. access_token: OddSecret42. Email аlice@example.com" },
     { role: "assistant", content: "At 20% you save USD 1,000 per month or USD 12,000 per year. OddSecret42" }
   ];
   modal.runPipeline();
@@ -118,7 +118,7 @@ const Modal = require("../extension/ui/modal.js");
   assert(decrypted.turns.every(t => Object.keys(t).sort().join() === "content,role"));
   assert(!JSON.stringify(decrypted).includes("USD 12,000"), "no secret in metadata");
   const reset = new Modal();
-  reset.currentTurns = turns("API_TOKEN=OddSecret42 Z8kL2mN7pQ4rS9tU6vW3xY");
+  reset.currentTurns = turns("access_token: OddSecret42 Z8kL2mN7pQ4rS9tU6vW3xY");
   reset.runPipeline();
   reset.bindEvents(get("backdrop"));
   get("btn-deselect-all-cands").click();
@@ -146,14 +146,14 @@ const Modal = require("../extension/ui/modal.js");
   assert.deepEqual(modal.sanitizedTurns, []);
   assert.deepEqual(new Modal().maybeCandidates, []);
   const snippets = new Modal();
-  snippets.currentTurns = turns("API_TOKEN=OddSecret42 NEXT_TOKEN=AnotherPrivate43");
+  snippets.currentTurns = turns("access_token: OddSecret42 next_token: AnotherPrivate43");
   snippets.runPipeline();
   const rows = get("safeshare-maybe-items").children.slice(-2);
   assert(rows[0].children[1].textContent.includes("[POSSIBLE_SECRET]"), "nearby candidate masked in snippet");
   assert(!rows[0].children[1].textContent.includes("AnotherPrivate43"), "other raw candidates not exposed in context");
   const trusted = new Modal();
   trusted.profile = "trusted";
-  trusted.currentTurns = turns("API_TOKEN=OddSecret42");
+  trusted.currentTurns = turns("access_token: OddSecret42");
   trusted.runPipeline();
   assert(!trusted.sanitizedTurns[0].content.includes("OddSecret42"), "trusted still hides suggested credentials");
   trusted.crypto.encrypt = async () => { throw new Error("expected test failure"); };
