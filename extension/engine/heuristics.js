@@ -1249,8 +1249,10 @@ class HeuristicsRedactor {
         if (pattern.validator && !pattern.validator(raw, match.index, text)) {
           continue;
         }
-        // Purely numeric matches inside a URL or DOI are identifiers (doi.org/10.1128/..., /posts/123...)
-        if (/^[\d\s.\-\/]+$/.test(raw) && /(?:https?:\/\/|doi\.org\/|www\.)[^\s"\'<>]*$/i.test(text.substring(Math.max(0, match.index - 200), match.index))) {
+        // Purely numeric matches inside a URL or DOI are identifiers (doi.org/10.1128/..., /posts/123...),
+        // except an IP that is the URL's host (http://36.72.150.11:53/, https://user@36.72.150.11)
+        const isUrlHostIp = pattern.id === "IPV4_ADDRESS" && /(?:\/\/|@)$/.test(text.substring(Math.max(0, match.index - 2), match.index));
+        if (!isUrlHostIp && /^[\d\s.\-\/]+$/.test(raw) && /(?:https?:\/\/|doi\.org\/|www\.)[^\s"\'<>]*$/i.test(text.substring(Math.max(0, match.index - 200), match.index))) {
           continue;
         }
 
