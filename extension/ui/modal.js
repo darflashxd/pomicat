@@ -10,7 +10,8 @@ const SS_CATEGORIES = {
   GOV_ID: { id: "GOV_ID", label: "Gov & Academic IDs", icon: "🆔", color: "#3b82f6" },
   PROFILE: { id: "PROFILE", label: "Contact & Profile", icon: "👤", color: "#8b5cf6" },
   HEALTH: { id: "HEALTH", label: "Health & Medical", icon: "🏥", color: "#ec4899" },
-  SYSTEM: { id: "SYSTEM", label: "System & Shell", icon: "💻", color: "#eab308" }
+  SYSTEM: { id: "SYSTEM", label: "System & Shell", icon: "💻", color: "#eab308" },
+  CUSTOM: { id: "CUSTOM", label: "User Added", icon: "✏️", color: "#6366f1" }
 };
 
 class SafeShareModal {
@@ -23,6 +24,8 @@ class SafeShareModal {
     this.transcript = typeof SafeShareTranscript !== "undefined" ? SafeShareTranscript : require("../engine/transcript.js");
     this.maybeChoices = new Map();
     this.maybeCandidates = [];
+    this.customSelections = new Map();
+    this.customCounter = 0;
     this.publishing = false;
     this.hardEntities = new Map();
     this.modelReview = new Map();
@@ -120,6 +123,8 @@ class SafeShareModal {
 
   open(turns) {
     this.removeExisting();
+    this.customSelections.clear();
+    this.customCounter = 0;
     this.currentTurns = turns.map(({ role, content }) => ({ role, content: this.transcript.normalize(content) }));
 
     const backdrop = document.createElement("div");
@@ -344,6 +349,61 @@ class SafeShareModal {
     this.hardEntities.clear();
     this.modelState = "Not checked — credential rules only";
     this.pseudonymizer.reset();
+  }
+
+  syncCustomCandidates() {
+    for (const [raw, meta] of this.customSelections.entries()) {
+      let cand = this.candidates.find(c => c.category === "CUSTOM" && c.raw.toLowerCase() === raw.toLowerCase());
+      if (!cand) {
+        this.candidates.push({ ...meta });
+      } else {
+        cand.enabled = meta.enabled;
+      }
+    }
+  }
+
+  addCustomSelection(selectedText) {
+    if (!selectedText || typeof selectedText !== "string") return;
+    const clean = selectedText.trim();
+    if (clean.length < 2) return;
+    if (/^\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]$/.test(clean)) return;
+
+    let existing = null;
+    const lower = clean.toLowerCase();
+    for (const [k, v] of this.customSelections.entries()) {
+      if (k.toLowerCase() === lower) {
+        existing = v;
+        break;
+      }
+    }
+
+    if (existing) {
+      existing.enabled = true;
+    } else {
+      this.customCounter++;
+      const tag = `[REDACTED_CUSTOM_${this.customCounter}]`;
+      const meta = {
+        id: `c_custom_${this.customCounter}_${Date.now()}`,
+        role: "user",
+        turnIndex: 0,
+        category: "CUSTOM",
+        categoryLabel: SS_CATEGORIES.CUSTOM.label,
+        ruleName: "Manual Selection",
+        raw: clean,
+        fullRaw: clean,
+        tag: tag,
+        replacement: tag,
+        enabled: true,
+        isAmount: false,
+        isAlgebraic: false,
+        occurrences: 1
+      };
+      this.customSelections.set(clean, meta);
+    }
+
+    this.activeCategories.add("CUSTOM");
+    this.syncCustomCandidates();
+    this.rebuildViews();
   }
 
   /**
@@ -587,6 +647,8 @@ class SafeShareModal {
       cand.occurrences = Math.max(1, count);
     }
 
+    this.syncCustomCandidates();
+
     // Rebuild UI views and assemble output
     this.rebuildViews();
   }
@@ -708,6 +770,18 @@ class SafeShareModal {
       [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
     this.sanitizedTurns = this.maybe.apply(this.reviewBaseTurns, this.maybeCandidates, this.maybeChoices);
 
+    // Apply custom user-selected redactions across all turns
+    for (const cand of this.candidates.filter(c => c.category === "CUSTOM" && c.enabled)) {
+      const escapedRaw = this.escapeRegExp(cand.raw);
+      const isWordBoundaryStart = /^\w/.test(cand.raw) ? "(?<![\\w])" : "";
+      const isWordBoundaryEnd = /\w$/.test(cand.raw) ? "(?![\\w])" : "";
+      const reg = new RegExp(`${isWordBoundaryStart}${escapedRaw}${isWordBoundaryEnd}`, "gi");
+      this.sanitizedTurns = this.sanitizedTurns.map(turn => ({
+        role: turn.role,
+        content: turn.content.replace(reg, cand.tag)
+      }));
+    }
+
     // Helper to replace text without penetrating existing <span ...>...</span> badges
     const replaceOutsideSpans = (html, regex, replacer) => {
       return html.replace(new RegExp(`(<span[^>]*>[\\s\\S]*?<\\/span>)|(${regex.source})`, regex.flags), (match, span, target, ...args) => {
@@ -802,6 +876,10 @@ class SafeShareModal {
           if (cand) {
             const nextState = !cand.enabled;
             cand.enabled = nextState;
+            if (cand.category === "CUSTOM") {
+              const meta = this.customSelections.get(cand.raw);
+              if (meta) meta.enabled = nextState;
+            }
             const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
             this.candidates.forEach(other => {
               const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
@@ -889,11 +967,47 @@ class SafeShareModal {
       list.textContent = "No additional candidates found. This does not mean the conversation is free of sensitive data.";
       return;
     }
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "maybe-quick-toolbar";
+
+    const btnAll = document.createElement("button");
+    btnAll.type = "button";
+    btnAll.id = "btn-maybe-protect-all";
+    btnAll.className = "btn-drawer-action btn-maybe-bulk";
+    btnAll.textContent = "🛡️ Redact All Suggestions";
+    btnAll.addEventListener("click", (e) => {
+      if (this.publishing) return;
+      if (e?.preventDefault) e.preventDefault();
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
+      this.rebuildViews();
+    });
+
+    const btnNone = document.createElement("button");
+    btnNone.type = "button";
+    btnNone.id = "btn-maybe-unprotect-all";
+    btnNone.className = "btn-drawer-action btn-maybe-bulk";
+    btnNone.textContent = "Keep All Unmasked";
+    btnNone.addEventListener("click", (e) => {
+      if (this.publishing) return;
+      if (e?.preventDefault) e.preventDefault();
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, false);
+      this.rebuildViews();
+    });
+
+    toolbar.appendChild(btnAll);
+    toolbar.appendChild(btnNone);
+    list.appendChild(toolbar);
+
     for (const candidate of this.maybeCandidates) {
+      const isRedacted = this.maybeChoices.get(candidate.raw) ?? candidate.risky;
+
       const label = document.createElement("label");
+      label.className = "maybe-item-card" + (isRedacted ? " is-redacted" : "");
+
       const check = document.createElement("input");
       check.type = "checkbox";
-      check.checked = this.maybeChoices.get(candidate.raw) ?? candidate.risky;
+      check.checked = isRedacted;
       check.addEventListener("change", () => {
         if (this.publishing) return;
         this.maybeChoices.set(candidate.raw, check.checked);
@@ -901,7 +1015,7 @@ class SafeShareModal {
         document.getElementById(candidate.id)?.focus();
       });
       check.id = candidate.id;
-      const text = document.createElement("span");
+
       const shown = candidate.raw.length > 36 ? candidate.raw.slice(0, 20) + "…" + candidate.raw.slice(-8) : candidate.raw;
       const first = candidate.occurrences[0];
       const content = this.reviewBaseTurns[first.turnIndex].content;
@@ -918,9 +1032,25 @@ class SafeShareModal {
         return value;
       };
       const snippet = context(Math.max(0, first.start - 35), first.start) + shown + context(first.end, first.end + 35);
+
+      const text = document.createElement("span");
+      text.className = "maybe-item-text";
       text.textContent = `${shown} — ${candidate.reason} (${candidate.occurrences.length} occurrence(s)). Context: ${snippet}`;
+
+      const actBtn = document.createElement("button");
+      actBtn.type = "button";
+      actBtn.className = "btn-maybe-quick " + (isRedacted ? "btn-maybe-redacted" : "btn-maybe-unmasked");
+      actBtn.textContent = isRedacted ? "✓ Redacted" : "🛡️ Redact this";
+      actBtn.title = isRedacted ? "Click to keep visible in share" : "Click to redact across all occurrences";
+      actBtn.addEventListener("click", (e) => {
+        if (this.publishing) return;
+        if (e?.preventDefault) e.preventDefault();
+        check.click();
+      });
+
       label.appendChild(check);
       label.appendChild(text);
+      label.appendChild(actBtn);
       list.appendChild(label);
     }
   }
@@ -1158,25 +1288,28 @@ class SafeShareModal {
     });
 
     // Inspector Select All / Deselect All
-    backdrop.querySelector("#btn-select-all-cands").addEventListener("click", () => {
+    backdrop.querySelector("#btn-select-all-cands")?.addEventListener("click", () => {
       this.activeCategories = new Set(Object.keys(SS_CATEGORIES));
       for (const c of this.candidates) c.enabled = true;
       for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
+      for (const meta of this.customSelections.values()) meta.enabled = true;
       this.savePreferences();
       this.rebuildViews();
     });
 
-    backdrop.querySelector("#btn-deselect-all-cands").addEventListener("click", () => {
+    backdrop.querySelector("#btn-deselect-all-cands")?.addEventListener("click", () => {
       for (const c of this.candidates) c.enabled = false;
       for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, false);
+      for (const meta of this.customSelections.values()) meta.enabled = false;
       this.rebuildViews();
     });
 
     // Footer Reset button
-    backdrop.querySelector("#btn-reset-default").addEventListener("click", () => {
+    backdrop.querySelector("#btn-reset-default")?.addEventListener("click", () => {
       this.activeCategories = new Set(Object.keys(SS_CATEGORIES));
       for (const c of this.candidates) c.enabled = true;
       for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
+      for (const meta of this.customSelections.values()) meta.enabled = true;
       this.savePreferences();
       this.rebuildViews();
     });
@@ -1348,6 +1481,97 @@ class SafeShareModal {
         controls.forEach(([el, disabled]) => { el.disabled = disabled; });
       }
     });
+
+    this.setupTextSelectionRedactor(backdrop);
+  }
+
+  setupTextSelectionRedactor(backdrop) {
+    let floatingBtn = backdrop.querySelector("#safeshare-floating-redact-btn");
+    if (!floatingBtn && typeof document !== "undefined" && document.createElement) {
+      floatingBtn = document.createElement("button");
+      floatingBtn.id = "safeshare-floating-redact-btn";
+      floatingBtn.type = "button";
+      floatingBtn.className = "ss-floating-redact-btn";
+      floatingBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Redact selection</span>
+      `;
+      floatingBtn.style.display = "none";
+      backdrop.appendChild(floatingBtn);
+    }
+
+    let selectedRaw = "";
+
+    const handleSelection = () => {
+      if (typeof window === "undefined" || !window.getSelection) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+        if (floatingBtn) floatingBtn.style.display = "none";
+        selectedRaw = "";
+        return;
+      }
+
+      const raw = sel.toString().trim();
+      if (raw.length < 2 || /^\[(?:REDACTED|CONFIDENTIAL|INTERNAL|HR|User|ANONYMIZED)_[A-Z0-9_]+\]$/.test(raw)) {
+        if (floatingBtn) floatingBtn.style.display = "none";
+        selectedRaw = "";
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+      const parent = range.commonAncestorContainer;
+      const el = parent && (parent.nodeType === 1 ? parent : parent.parentElement);
+      if (!el || !el.closest || !el.closest("#diff-box-orig, #diff-box-sanitized")) {
+        if (floatingBtn) floatingBtn.style.display = "none";
+        selectedRaw = "";
+        return;
+      }
+
+      selectedRaw = raw;
+      if (floatingBtn && range.getBoundingClientRect) {
+        const rect = range.getBoundingClientRect();
+        floatingBtn.style.position = "fixed";
+        floatingBtn.style.top = `${Math.max(10, rect.top - 36)}px`;
+        floatingBtn.style.left = `${Math.max(10, rect.left + (rect.width / 2) - 65)}px`;
+        floatingBtn.style.display = "flex";
+      }
+    };
+
+    const diffArea = backdrop.querySelector(".direct-comparison-grid") || backdrop;
+    if (diffArea && diffArea.addEventListener) {
+      diffArea.addEventListener("mouseup", () => setTimeout(handleSelection, 20));
+      diffArea.addEventListener("keyup", () => setTimeout(handleSelection, 20));
+    }
+
+    if (typeof document !== "undefined" && document.addEventListener) {
+      document.addEventListener("selectionchange", () => {
+        if (typeof window !== "undefined" && window.getSelection) {
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) {
+            if (floatingBtn) floatingBtn.style.display = "none";
+          }
+        }
+      });
+    }
+
+    if (floatingBtn && floatingBtn.addEventListener) {
+      floatingBtn.addEventListener("mousedown", (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+      });
+      floatingBtn.addEventListener("click", (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (e && e.preventDefault) e.preventDefault();
+        if (selectedRaw) {
+          this.addCustomSelection(selectedRaw);
+          floatingBtn.style.display = "none";
+          if (typeof window !== "undefined" && window.getSelection) {
+            window.getSelection().removeAllRanges();
+          }
+        }
+      });
+    }
   }
 }
 
