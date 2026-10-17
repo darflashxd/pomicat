@@ -15,7 +15,7 @@ stated ages. SafeShare's redactor removes the secret together with the figures d
 per-period amounts, projections, sums and differences),
 can show amounts as ranges so the chat stays useful, and shares the result as an end-to-end
 encrypted link that expires or burns after one read. It runs as a browser extension for ChatGPT,
-Claude and DeepSeek (with protection before sending, too), a CLI and an OpenAI-compatible proxy,
+Claude and DeepSeek (with optional protection before sending), a CLI and an OpenAI-compatible proxy,
 and handles Indonesian and English formats.
 
 ## What we will show

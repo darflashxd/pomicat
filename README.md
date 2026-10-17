@@ -102,8 +102,8 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
   every name and date turned on it matches Presidio (0.78 vs 0.79) while also blocking
   the inversion attack. The extension's MiniLM alone scores token F1 0.85 on ai4privacy
   (`tools/eval/RESULTS_SOTA.md`). That is the raw model on a benchmark: in a chat the extension
-  uses it only before sending (Chrome) and only for the writer's own names and places, and the
-  share dialog doesn't use it. The "0% false positives" there is on a technical hard-negative set
+  uses it before sending (opt-in, writer's own names and places only) and, when you click it, as
+  unchecked suggestions in the share dialog. The "0% false positives" there is on a technical hard-negative set
   only, not real chats.
 - **Benchmarks and real chats disagree about names.** ai4privacy labels every name as PII; real
   chats are full of names that aren't the user's (celebrities, story characters, authors). Turning
@@ -153,7 +153,12 @@ redactions and create a link.
 
 The share dialog also lists **Maybe sensitive** credential suggestions. Values assigned to a
 credential-like key start checked for both reader profiles; random-looking strings without that
-context start unchecked. Each choice applies to exact occurrences across both roles. Suggestions
+context start unchecked. Each suggestion gets a context score (0–1: where it came from, how
+random it looks, whether a word like "token" or "password" sits just before it, minus points
+near "example"/"placeholder"); the list is sorted by it, the top 5 are shown, and a score of 0.75
+or more starts checked. The weights are hand-set until labelled data exists. Unchecking every
+suggestion at once asks first if any look like credentials, and creating a second link from the
+same chat offers to revoke the first. Each choice applies to exact occurrences across both roles. Suggestions
 are local and unverified, not proof a credential works or that all secrets were found. No candidate
 values or choices are saved. The encrypted turns contain only the reviewed roles and text, never
 internal detection metadata. Click **Check names and other PII with local model** to add local

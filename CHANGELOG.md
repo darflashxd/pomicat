@@ -2,6 +2,15 @@
 
 ## Unreleased — experimental share review
 
+- Maybe suggestions get a context score (source + entropy + credential word before it + shape,
+  minus "example" wording), sorted, top 5 shown with "Show N more"; score >= 0.75 starts checked.
+  Numbered placeholders from before sending are never suggested. "Keep All Unmasked" asks before
+  revealing likely credentials; a second link from the same chat offers to revoke the first.
+- "@" in prose is no longer redacted as user@host ("meet me@5pm", "me@home"); user@host needs a
+  login command, a host:path or a machine-like host. "john@gmail" without ".com" counts as an
+  email; git@github.com does not.
+- Before-sending protection is off by default (opt-in from the chip).
+
 - Proxy redacts structured tool outputs: OpenAI Responses string/block tool calls and
   Anthropic `tool_result` blocks; JSON arguments decoded and verified. Unsupported tool/multimodal
   structures refused (400) instead of leaking raw text.
