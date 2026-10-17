@@ -23,7 +23,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lockMeta = document.querySelector("#crawler-lock-screen .lock-meta");
   if (lockMeta) {
     lockMeta.innerText = inExtension
-      ? "Opened inside the SafeShare extension: decrypted by the extension's own copy of this page."
+      ? "Opened inside the SafeShare extension: decrypted by the extension's own copy of this page." +
+        (/^https:\/\/safeshare-relay\.bleedguard\.workers\.dev$/.test(window.SAFESHARE_RELAY_URL)
+          ? "" : ` Chat loaded from ${window.SAFESHARE_RELAY_URL}, not the official relay.`)
       : "Decrypted by this page, served by the relay. With the SafeShare extension installed, links open inside the extension instead.";
   }
   let shareId = params.get("id");

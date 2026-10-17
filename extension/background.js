@@ -45,6 +45,25 @@ async function getOrCreateOffscreenDocument() {
   return true;
 }
 
+// Relays the background worker will talk to: the official one, a local one, or the one set
+// with chrome.storage.local.set({ safeshare_relay }) (see DEPLOY.md). Anything else is refused,
+// so a bug elsewhere can't turn upload/revoke into requests to arbitrary sites.
+const OFFICIAL_RELAY = /^(?:https:\/\/safeshare-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/;
+async function relayAllowed(relayUrl) {
+  let origin;
+  try { origin = new URL(relayUrl).origin; } catch (_) { return false; }
+  if (OFFICIAL_RELAY.test(origin)) return true;
+  try {
+    const { safeshare_relay } = await webExtApi.storage.local.get("safeshare_relay");
+    return Boolean(safeshare_relay) && new URL(safeshare_relay).origin === origin;
+  } catch (_) {
+    return false;
+  }
+}
+function fromOwnContentScript(sender) {
+  return sender && sender.id === webExtApi.runtime.id;
+}
+
 webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "PING") {
     if (typeof sendResponse === "function") sendResponse({ status: "PONG" });
@@ -84,14 +103,17 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "UPLOAD_TO_RELAY") {
     const { relayUrl, payload } = request;
-    console.log("[SafeShare-AI Background] Relaying upload to:", `${relayUrl}/api/share`);
+    if (!fromOwnContentScript(sender)) return false;
 
-    fetch(`${relayUrl}/api/share`, {
+    relayAllowed(relayUrl).then((ok) => {
+      if (!ok) throw new Error("Relay not allowed: " + relayUrl);
+      return fetch(`${relayUrl}/api/share`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify(payload)
+      });
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -101,7 +123,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return response.json();
       })
       .then((data) => {
-        console.log("[SafeShare-AI Background] Upload success:", data);
+        console.log("[SafeShare-AI Background] Upload success");
         if (typeof sendResponse === "function") sendResponse({ success: true, data });
       })
       .catch((err) => {
@@ -149,10 +171,14 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "REVOKE_SHARE") {
     const { relayUrl, shareId, token } = request;
-    fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token })
+    if (!fromOwnContentScript(sender)) return false;
+    relayAllowed(relayUrl).then((ok) => {
+      if (!ok) throw new Error("Relay not allowed: " + relayUrl);
+      return fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token })
+      });
     })
       .then((response) => sendResponse({ success: response.ok }))
       .catch((err) => sendResponse({ success: false, error: err.message }));

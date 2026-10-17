@@ -159,7 +159,7 @@
       // Strip the viewer's zero-width watermark and any send-time shield instruction (links made by
       // older versions still contain it): both are noise for the next model
       const fmt = (t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content
-        .replace(/[​-‍⁠﻿]/g, "")
+        .replace(/[\u200B-\u200F\uFEFF\u00AD\u2060-\u2064\u180E\u202A-\u202E\u2066-\u2069]|[\u{E0000}-\u{E007F}]/gu, "") // watermark, and invisible text a shared chat could use to smuggle instructions into the next AI
         .replace(/\s*\[(?:PRIVACY PROTOCOL|PROTOKOL PRIVASI):[^\]]*\]\s*/g, "\n")
         .trim()}`;
       // Drop a turn identical to the one before it (duplicate extraction in older links)

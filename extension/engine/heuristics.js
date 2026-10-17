@@ -1212,8 +1212,10 @@ class HeuristicsRedactor {
    */
   normalizeHomoglyphs(text) {
     if (!text || typeof text !== "string") return "";
-    // Step 1: Strip zero-width & non-printable evasion markers
-    let s = text.replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E]/g, "");
+    // Step 1: Strip invisible evasion markers: zero-width and joiners, soft hyphen, bidi controls
+    // (U+202A-202E, U+2066-2069, LRM/RLM) and Unicode tag characters (U+E0000-E007F, "ASCII
+    // smuggling"). Any of them inside "sk-proj-…" or a NIK used to hide it from every rule.
+    let s = text.replace(/[\u200B-\u200F\uFEFF\u00AD\u2060-\u2064\u180E\u202A-\u202E\u2066-\u2069]|[\u{E0000}-\u{E007F}]/gu, "");
     // Step 2: Unicode NFKC Canonical Decomposition & Compatibility Composition
     s = s.normalize("NFKC");
     // Step 3: Cyrillic / Greek confusable character mapping to Latin ASCII
