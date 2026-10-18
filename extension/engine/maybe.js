@@ -43,6 +43,56 @@
     return { score: Math.max(0, Math.min(1, Math.round(score * 100) / 100)), why };
   }
 
+  /**
+   * Numbers the amount rules left in place but that may be money: the rules need a money word,
+   * and a typo too far off ("my slry is 70000", "slaary") hides it from them. Here a word within
+   * two letters of a money word, or "my/saya/aku" before it, is enough to ask. Never pre-ticked.
+   *   score: 0.35 · +0.25 money-like word within 60 characters before · +0.10 "my/saya/aku…"
+   */
+  const MONEY_WORDS = ["salary", "income", "paycheck", "savings", "budget", "revenue", "pension", "bonus", "wage", "wages", "rent", "debt", "loan", "mortgage",
+    "gaji", "gajian", "tabungan", "cicilan", "penghasilan", "pendapatan", "hutang", "utang", "pinjaman", "sewa", "upah"];
+  // Typing slips: a letter missing, extra or wrong, or two neighbours swapped, each count as one
+  const editDistance = (a, b) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  };
+  // Same first letter (slips rarely hit it, and "version" is not "pension"); two slips allowed
+  // in words of 6+ letters, one in shorter ones
+  const NOT_MONEY = new Set(["person", "persons", "version", "session", "passion", "tension", "rest", "rant", "wave", "wake", "wade",
+    "lean", "loin", "debut", "budge", "budgie", "bones", "bonds", "sayings", "revenge", "haji", "saji", "kaji", "gali", "sewer", "upon"]);
+  const moneyLike = (word) => {
+    const w = word.toLowerCase();
+    return w.length >= 4 && !NOT_MONEY.has(w) && MONEY_WORDS.some(k => k[0] === w[0] && Math.abs(k.length - w.length) <= 2 &&
+      editDistance(w, k) <= (k.length >= 6 ? 2 : 1));
+  };
+  const NOT_MONEY_UNIT = /^\s*(?:%|x\b|km|kg|g\b|m\b|cm|mm|ml|l\b|gb|mb|kb|tb|ms|s\b|sec|min|hours?|days?|weeks?|months?|years?|tahun|bulan|hari|rows?|lines?|items?|pages?|words?|people|users?|steps?|times?|calories|kcal|mph|kph|rpm|px|dpi|°)/i;
+  function possibleAmounts(text) {
+    const out = [];
+    for (const m of text.matchAll(/(?<![\w.,:/#$€£¥₹+-])(?:\d{1,3}(?:[.,]\d{3})+|\d{4,15})(?![\w.,:/-]?\d)(?![\w%])/g)) {
+      const raw = m[0];
+      const digits = raw.replace(/\D/g, "");
+      if (Number(digits) < 1000) continue;
+      if (/^\d{4}$/.test(raw) && +raw >= 1950 && +raw <= 2040) continue; // a year
+      if (NOT_MONEY_UNIT.test(text.slice(m.index + raw.length))) continue;
+      const lineStart = text.lastIndexOf("\n", m.index) + 1;
+      const before = text.slice(Math.max(lineStart, m.index - 60), m.index);
+      if (/[\w.-]+\s*=\s*["']?$/.test(before)) continue; // a setting (token_budget=320000), not money
+      const moneyWord = (before.match(/\p{L}+/gu) || []).some(moneyLike);
+      const own = /\b(?:my|our|saya|aku|gue|gw|kami)\b/i.test(before);
+      if (!moneyWord && !own) continue;
+      const score = Math.round((0.35 + (moneyWord ? 0.25 : 0) + (own ? 0.1 : 0)) * 100) / 100;
+      out.push({ raw, start: m.index, score, why: [moneyWord ? "near a word like \"salary\" (may be misspelled)" : "", own ? "after \"my\"/\"saya\"" : ""].filter(Boolean) });
+    }
+    return out;
+  }
+
   function scan(turns, modelSpans = []) {
     const candidates = new Map();
     // The text as typed (minus smuggling characters): the share keeps everything else unchanged
@@ -85,6 +135,11 @@
         const isUuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(raw);
         if ((isHex || isUuid) && /\b(?:git|commit|sha\d*|checksum|digest|uuid|request[_-]?id|trace[_-]?id|public[_-]?key)\b[^\n]*$/i.test(before)) continue;
         if (heuristics.shannonEntropy(raw) >= (isHex ? 3 : 4)) add(raw, m.index, false, "Random-looking value; not verified as a secret", "random");
+      }
+      // Plain numbers skip add() (it drops unticked digit strings); these are asked about, unticked
+      for (const a of possibleAmounts(text)) {
+        if (excluded.some(([s, e]) => a.start < e && a.start + a.raw.length > s) || candidates.has(a.raw)) continue;
+        candidates.set(a.raw, { raw: a.raw, risky: false, reason: "Possible amount the amount rules didn't catch; not verified", score: a.score, why: a.why });
       }
     });
     // Highest score first, so the review list shows the likeliest misses at the top

@@ -404,6 +404,8 @@ class SafeShareModal {
       let mCat = "CREDENTIALS";
       if (m.reason.includes("Local model: PERSON") || m.reason.includes("Local model: GIVEN_NAME") || m.reason.includes("Local model: SURNAME") || m.reason.includes("Local model: LOCATION") || m.reason.includes("Local model: CITY") || m.reason.includes("Local model: STREET")) {
         mCat = "PROFILE";
+      } else if (m.reason.startsWith("Possible amount")) {
+        mCat = "FINANCIAL";
       } else if (!m.risky && (m.reason.includes("Random") || m.reason.includes("Entropy"))) {
         mCat = "SYSTEM";
       }

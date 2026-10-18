@@ -27,6 +27,13 @@ const labelText = "My NIK is [NIK_1], I use SafeShare, my friend Sim and NIK hol
 const spanOf = (w, from = 0) => ({ turnIndex: 0, start: labelText.indexOf(w, from), end: labelText.indexOf(w, from) + w.length, label: "PERSON", score: 0.4 });
 const labelCandidates = Maybe.scan(turns(labelText), [spanOf("NIK"), spanOf("SafeShare"), spanOf("Sim"), spanOf("Rina")]).map(c => c.raw);
 assert.deepEqual(labelCandidates.sort(), ["Rina", "Sim"], labelCandidates.join(","));
+// Amounts behind a money word too misspelled for the amount rules: asked about, never pre-ticked
+for (const [text, raw] of [["my slry is 70000", "70000"], ["my slaary is 70.000.000", "70.000.000"], ["gjai saya 7500000", "7500000"], ["incmoe 92000 per year?", "92000"]]) {
+  const hit = scan(text).find(c => c.raw === raw);
+  assert(hit && !hit.risky && hit.reason.startsWith("Possible amount"), text);
+}
+for (const text of ["version 2.4.0.1 on port 8080", "person 5521 in line", "I have 3000 steps today", "It was built in 1998 and has 2500 rows",
+  "Room 4410 is free", "we drove 1200 km", "token_budget=320000", "my salary is <S1>"]) assert.deepEqual(scan(text), [], text);
 const long = "mN3qT8zW5kR1yP7vL4cX9sF2hJ6dB0aE".repeat(12);
 assert(scan(`API_TOKEN=${long}`).some(c => c.raw === long), "long tokens must not disappear");
 assert(scan("API_TOKEN=abcdef0123456789abcdef0123456789").some(c => c.risky), "credential context beats hash shape");
