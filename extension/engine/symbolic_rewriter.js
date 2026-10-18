@@ -70,7 +70,7 @@ class SafeShareSymbolicRewriter {
   isWithinDependencyDistance(text, rawMatch, maxTokenDistance = 12) {
     if (!text || !rawMatch) return false;
     // Explicit currency symbols/indicators always bind (distance = 0)
-    if (/[$€£¥₹]|(?:Rp|IDR|USD|EUR|GBP|SGD|AUD|CAD|CHF|k|M|miliar|juta)\b/i.test(rawMatch)) {
+    if (/[$€£¥₹]|(?:Rp|IDR|USD|EUR|GBP|SGD|AUD|CAD|CHF|k|M|miliar|juta|dollars?|bucks|rupiah|euros?|pounds?)\b/i.test(rawMatch)) {
       return true;
     }
 
@@ -86,7 +86,9 @@ class SafeShareSymbolicRewriter {
 
     const triggerRx = /\b(?:salary|gaji|income|revenue|valuation|arr|mrr|ebitda|burn|runway|bonus|severance|debt|equity|safe|investment|funding|spend|spending|budget|cost|fee|rent|sewa|cicilan|tabungan|payout|compensation|deductible|mortgage|loan|pay)\b/i;
 
-    return triggerRx.test(windowContext);
+    const Contextual = this.contextual && this.contextual.constructor;
+    return triggerRx.test(windowContext) ||
+      Boolean(Contextual && Contextual.fixMoneyTypos && triggerRx.test(Contextual.fixMoneyTypos(windowContext)));
   }
 
   /**

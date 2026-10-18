@@ -11,6 +11,12 @@ const CODE_AT_WORDS = new Set(("import media keyframes font-face supports charse
   "app router test before after component injectable input output viewchild hostlistener " +
   "dataclass staticmethod classmethod property pytest mock patch").split(" "));
 
+// Money words checked for one-letter typos (see fixMoneyTypos), and real words one letter away
+const MONEY_WORDS = ["salary", "salaries", "income", "paycheck", "savings", "mortgage", "budget", "revenue", "pension", "allowance", "gaji", "gajian", "tabungan", "cicilan", "penghasilan", "pendapatan"];
+const NOT_MONEY_TYPOS = new Set(["gali", "haji", "saji", "kaji", "baji", "sayings", "revenge", "tension", "mension", "budgie", "budge", "budged", "salami"]);
+// An amount written with its currency ("$5,000", "70000 dollars", "Rp 5 juta")
+const EXPLICIT_CURRENCY = /(?:[$€£¥₹]\s*\d|\b(?:Rp|IDR|USD|EUR|GBP|SGD)\s*\d|\d[\d.,]*\s*(?:dollars?|bucks|rupiah|euros?|pounds?|juta|jt|ribu|rb|miliar|milyar)\b)/i;
+
 class ContextualClassifier {
   constructor() {
     // Contextual trigger patterns (1st & 2nd person, Casual, Advice, & Elliptical)
@@ -90,12 +96,42 @@ class ContextualClassifier {
    * Scans a text turn and identifies whether any embedded financial, health, corporate,
    * or HR entities are personal/sensitive vs safe/public.
    */
+  /**
+   * Money words typed with one slip ("slary", "sallary", "incmoe", "gajii") read as the word
+   * itself, so a typo doesn't switch amount protection off. One letter missing, extra, wrong or
+   * two swapped; words of 4+ letters only, and real words that sit one letter away are left alone.
+   * Only used to decide whether a sentence is about your money, never shown or sent.
+   */
+  static fixMoneyTypos(text) {
+    const near = (a, b) => {
+      if (a === b || Math.abs(a.length - b.length) > 1) return a === b;
+      if (a.length === b.length) {
+        const diff = [...a].map((c, i) => (c !== b[i] ? i : -1)).filter(i => i >= 0);
+        return diff.length === 1 || (diff.length === 2 && diff[1] === diff[0] + 1 && a[diff[0]] === b[diff[1]] && a[diff[1]] === b[diff[0]]);
+      }
+      const [l, sh] = a.length > b.length ? [a, b] : [b, a];
+      for (let i = 0; i < l.length; i++) if (l.slice(0, i) + l.slice(i + 1) === sh) return true;
+      return false;
+    };
+    return text.replace(/\p{L}{4,}/gu, (w) => {
+      const lw = w.toLowerCase();
+      if (MONEY_WORDS.includes(lw) || NOT_MONEY_TYPOS.has(lw)) return w;
+      return MONEY_WORDS.find(k => near(lw, k)) || w;
+    });
+  }
+
   classifyTurn(turnText, turnIndex) {
     const detected = [];
     const sentences = turnText.split(/(?<=[.!?\n])\s+/);
 
     for (const sent of sentences) {
-      const isPersonal = this.personalAnchors.some(rx => rx.test(sent));
+      // A typo in the money word, or "my/I" plus an explicit currency, still makes it personal
+      let isPersonal = this.personalAnchors.some(rx => rx.test(sent)) ||
+        (/\b(?:my|our|saya|aku|gue|gw|kami)\b/i.test(sent) && EXPLICIT_CURRENCY.test(sent));
+      if (!isPersonal && /\d/.test(sent)) {
+        const fixed = ContextualClassifier.fixMoneyTypos(sent);
+        isPersonal = fixed !== sent && this.personalAnchors.some(rx => rx.test(fixed));
+      }
       const isPublic = this.publicAnchors.some(rx => rx.test(sent));
       const hasExplicitPerson = /\b(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku|my|your|our|i|we|patient|i\s*['`]?(?:m|ve|ll|d)?)\b/i.test(sent);
 

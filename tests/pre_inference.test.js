@@ -249,6 +249,18 @@ Please analyze the code.`;
   assert.deepEqual(rewriter.analyze("I paid 3 dollars for coffee").detectedItems, [], "small everyday amounts left alone");
   console.log("  [✓] Bare amounts with currency words (dollars, euros) caught; not mistaken for phone numbers");
 
+  // Live DeepSeek, 18 Oct: "my slary is 70000000000000 dollar" went out as typed (typo in the money word)
+  for (const [text, raw] of [["my name is lia and im from bekasi and my slary is 70000000000000 dollar", "70000000000000 dollar"],
+    ["my sallary is 70000", "70000"], ["my slary is $70000", "$70000"], ["gajii saya 7000000", "7000000"], ["Our budget is $5,000", "$5,000"]]) {
+    const items = rewriter.analyze(text).detectedItems.map(d => d.raw);
+    assert(items.includes(raw), `${text}: amount not found (${items})`);
+  }
+  for (const text of ["Old sayings about 2500 years of history", "The revenge plot cost 5000 lives", "I read that Apple earned $394 billion last year",
+    "pergi haji tahun ini bayar 35000000", "the tension was 4000 newtons", "The report lists 2024 entries and 15000 rows"]) {
+    assert.deepEqual(rewriter.analyze(text).detectedItems, [], `false alarm: ${text}`);
+  }
+  console.log("  [✓] One-letter typos in money words still protect; look-alike words and public figures left alone");
+
   console.log("\n================================================================================");
   console.log("  ALL PRE-INFERENCE TESTS PASSED: SHIELD LAYER FULLY VERIFIED (100%)");
   console.log("================================================================================");
