@@ -237,6 +237,18 @@ Please analyze the code.`;
   assert(!cleaned.includes("$12,000"), "Decrypted RAM amount $12,000 must NEVER leak into extracted share turn!");
   console.log("  [✓] Un-hydration on share confirmed: decrypted RAM secrets never cross into share payload!");
 
+  // Live DeepSeek, 18 Oct: a long bare number with a currency word went out as typed, and a
+  // 10-digit one was taken for a phone number (so "amounts only" mode sent it unchanged)
+  for (const [text, raw] of [["my salary is 70000000000000 dollars", "70000000000000 dollars"],
+    ["my salary is 7000000000 dollars", "7000000000 dollars"], ["rent is 1500 euros a month", "1500 euros"]]) {
+    const items = rewriter.analyze(text).detectedItems.map(d => d.raw);
+    assert(items.includes(raw), `${text}: amount not found (${items})`);
+    assert(!heuristics.scan(text).detections.some(d => d.type === "PHONE"), `${text}: taken for a phone number`);
+  }
+  assert(heuristics.scan("call me 0812345678901").detections.some(d => d.type === "PHONE"), "real phone numbers still caught");
+  assert.deepEqual(rewriter.analyze("I paid 3 dollars for coffee").detectedItems, [], "small everyday amounts left alone");
+  console.log("  [✓] Bare amounts with currency words (dollars, euros) caught; not mistaken for phone numbers");
+
   console.log("\n================================================================================");
   console.log("  ALL PRE-INFERENCE TESTS PASSED: SHIELD LAYER FULLY VERIFIED (100%)");
   console.log("================================================================================");

@@ -220,6 +220,9 @@ class HeuristicsRedactor {
         validator: (raw, index, text) => {
           // If it's a toll-free number (800, 888, 877, 866, 855, 844, 833) in corporate/support context, preserve it!
           const digits = raw.replace(/\D/g, "");
+          // "7000000000 dollars" is an amount (the amount rules take it), not a phone number
+          if (/^\d+$/.test(raw) && text &&
+            /^\s*(?:dollars?|bucks|usd|idr|rupiah|euros?|pounds?|juta|ribu|rb|miliar|milyar)\b/i.test(text.slice(index + raw.length))) return false;
           const isTollFree = /^(?:1)?(?:800|888|877|866|855|844|833)/.test(digits);
           if (isTollFree && text) {
             const start = Math.max(0, index - 80);
