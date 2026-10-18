@@ -264,6 +264,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   }
+  // A shared chat can carry invisible "smuggled" instructions (Unicode tag characters, bidi
+  // controls) aimed at whoever copies it into an AI; drop them before showing anything.
+  decryptedData.turns = decryptedData.turns.map(({ role, content }) =>
+    ({ role, content: String(content).replace(/(?<!\u{1F3F4}[\u{E0020}-\u{E007E}]*)[\u{E0000}-\u{E007F}]|[‪-‮⁦-⁩]/gu, "") }));
   renderTurns(decryptedData.turns);
 
   // The sharer's own originals. Saved by the share dialog encrypted with this link's key, in this

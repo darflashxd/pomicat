@@ -154,7 +154,13 @@
    * What the shield would send: in "all" mode, hard identifiers become numbered placeholders,
    * then amounts become <S1>. Returns { isTransformed, sanitizedPrompt, count }.
    */
+  // Invisible "ASCII smuggling" characters: Unicode tag characters (kept only inside a flag emoji
+  // such as England's) and bidi override/isolate controls. Text pasted from a web page can carry
+  // hidden instructions for the AI in them; protection removes them before sending.
+  const SMUGGLED = /(?<!\u{1F3F4}[\u{E0020}-\u{E007E}]*)[\u{E0000}-\u{E007F}]|[‪-‮⁦-⁩]/gu;
   function shieldRewrite(text, { dryRun = false } = {}) {
+    const original = text;
+    text = text.replace(SMUGGLED, "");
     let out = text;
     let count = 0;
     if (getShieldMode() === "all" && shieldIdScanner) {
@@ -173,7 +179,7 @@
       out = rewritten.sanitizedPrompt;
       count += (rewritten.symbols || []).length || 1;
     }
-    return { isTransformed: out !== text, sanitizedPrompt: out, count };
+    return { isTransformed: out !== original, sanitizedPrompt: out, count };
   }
 
   /**

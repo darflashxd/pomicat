@@ -2,6 +2,11 @@
 
 ## Unreleased — experimental share review
 
+- Security: invisible characters (Unicode tag characters, bidi controls) no longer hide a key or ID
+  from the rules, and are removed from outgoing messages (when protection is on), the Continue
+  prompt and the share viewer, so pasted or shared text can't smuggle hidden instructions to an AI.
+  Flag emoji that use tag characters (England, Scotland, Wales) are kept.
+
 - Sharer-only originals: creating a link saves which original sits behind each tag, encrypted with
   that link's key, in extension storage (expires with the link, deleted on revoke). Opening your
   own link inside the extension shows "Show my original values (only on this device)". Link
