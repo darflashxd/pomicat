@@ -2,6 +2,13 @@
 
 ## Unreleased — experimental share review
 
+- Attack check in the share dialog: SafeShare's own attacks (amount inversion, birth year, dates,
+  combinations of details) run on exactly the text about to be shared; a successful attack is
+  shown in red and creating the link asks first.
+- Site health check: every 10 s on an open chat SafeShare checks it can still find the chat box,
+  your messages and the AI's answers; if not (site layout changed) the chip warns and the status
+  is saved per site. The SafeShare button warns before sharing a chat where only one side was found.
+
 - Only the hidden parts of a message change. Rules still match on a normalised copy (look-alike
   letters, full-width digits, invisible characters), but each match is mapped back to the text as
   typed: Russian/Greek words no longer get Latin look-alike letters, and emoji (👨‍👩‍👧), ligatures

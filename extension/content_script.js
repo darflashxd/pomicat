@@ -299,6 +299,12 @@
         alert("SafeShare: No active conversation found in the current chat window.");
         return;
       }
+      // Reading only one side means the site's layout changed: a share without your own messages
+      // also stops the inversion defence from knowing which amounts were yours (see ROADMAP P0.1)
+      const users = turns.filter(t => t.role === "user").length;
+      const answers = turns.filter(t => t.role === "assistant").length;
+      if ((!users || !answers) && !window.confirm(`SafeShare found ${users} of your messages and ${answers} AI answers in this chat. ` +
+        "The site may have changed its layout, so the share could be incomplete and protection weaker. Open the share dialog anyway?")) return;
       const modal = new SafeShareModal();
       modal.open(turns);
     });
@@ -1162,6 +1168,43 @@
 
   // Initialize inbound streaming local hydration observer
   initLocalHydrationObserver();
+
+  /**
+   * Site health check. The chat sites change their page structure without notice (ChatGPT did in
+   * Oct 2026), and SafeShare then silently stops reading messages. Every 10 s on an open chat:
+   * can we find the chat box, your messages, the AI's answers? Two failed checks in a row (so a
+   * reply that is still streaming doesn't count) show a warning on the chip; the status is saved
+   * per site in extension storage (safeshare_health_<host>) for diagnosis. Counts only, no text.
+   */
+  let healthFailures = 0;
+  let lastHealthKey = "";
+  function checkSiteHealth() {
+    if (!chatIdOf(location.href) || document.hidden) return;
+    let turns = [];
+    try { turns = extractRawTurns(); } catch (_) {}
+    const users = turns.filter(t => t.role === "user").length;
+    const answers = turns.filter(t => t.role === "assistant").length;
+    const problems = [];
+    if (!findPromptInputElement()) problems.push("chat box not found");
+    if (!users) problems.push("your messages not found");
+    if (!answers) problems.push("AI answers not found");
+    if (answers && !document.querySelectorAll(MESSAGE_SELECTOR).length) problems.push("answers not found for on-screen values");
+    healthFailures = problems.length ? healthFailures + 1 : 0;
+    const ok = healthFailures < 2;
+    const status = { site: location.hostname, ok, problems: ok ? [] : problems, users, answers, version: loadedVersion, at: Date.now() };
+    const key = JSON.stringify([status.ok, status.problems]);
+    if (key !== lastHealthKey && extApi && extApi.storage && extApi.storage.local) {
+      lastHealthKey = key;
+      Promise.resolve(extApi.storage.local.set({ [`safeshare_health_${location.hostname}`]: status })).catch(() => {});
+      if (!ok) console.warn("[SafeShare-AI] Site health check failed:", problems.join(", "));
+    }
+    const indicator = document.getElementById("safeshare-shield-indicator");
+    if (!ok && indicator) {
+      indicator.textContent = `⚠️ SafeShare can't fully read this page (${problems.join(", ")}). The site may have changed; shares may be incomplete ▾`;
+      indicator.dataset.errorUntil = String(Date.now() + 11000);
+    }
+  }
+  setInterval(checkSiteHealth, 10000);
 
   // Listen to modal toggle events
   window.addEventListener("safeshare:shield_toggle", (e) => {
