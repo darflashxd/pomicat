@@ -70,7 +70,7 @@ class SafeShareSymbolicRewriter {
   isWithinDependencyDistance(text, rawMatch, maxTokenDistance = 12) {
     if (!text || !rawMatch) return false;
     // Explicit currency symbols/indicators always bind (distance = 0)
-    if (/[$€£¥₹]|(?:Rp|IDR|USD|EUR|GBP|SGD|AUD|CAD|CHF|k|M|miliar|juta|dollars?|bucks|rupiah|euros?|pounds?)\b/i.test(rawMatch)) {
+    if (/[$€£¥₹]|(?:Rp|IDR|USD|EUR|GBP|SGD|AUD|CAD|CHF|k|M|miliar|juta|dollars?|dolar|bucks|rupiah|euros?|pounds?)\b/i.test(rawMatch)) {
       return true;
     }
 

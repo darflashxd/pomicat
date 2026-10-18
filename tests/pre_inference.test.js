@@ -261,6 +261,18 @@ Please analyze the code.`;
   }
   console.log("  [✓] One-letter typos in money words still protect; look-alike words and public figures left alone");
 
+  // Live DeepSeek, 18 Oct: "slaary 7000000000000000 dlar" became [NIK_1], so the AI did its maths
+  // on NIK_1 and nothing was computed on screen. Round 16-digit amounts are amounts; NIKs stay NIKs.
+  for (const [text, raw] of [["slaary 7000000000000000 dlar", "7000000000000000"], ["my salary is 7000000000000000 dolar", "7000000000000000 dolar"],
+    ["gaji saya Rp 1500000000000000", "Rp 1500000000000000"]]) {
+    assert(!heuristics.scan(text).detections.some(d => d.type === "ID_NIK"), `${text}: taken for a NIK`);
+    assert(rewriter.analyze(text).detectedItems.map(d => d.raw).includes(raw), `${text}: amount not found`);
+  }
+  for (const text of ["My NIK is 3201234567890123", "NIK saya 3201012304950001 ya"]) {
+    assert(heuristics.scan(text).detections.some(d => d.type === "ID_NIK"), `${text}: NIK missed`);
+  }
+  console.log("  [✓] 16-digit amounts are amounts, not NIKs; real NIKs still caught");
+
   console.log("\n================================================================================");
   console.log("  ALL PRE-INFERENCE TESTS PASSED: SHIELD LAYER FULLY VERIFIED (100%)");
   console.log("================================================================================");

@@ -13,6 +13,16 @@ class HeuristicsRedactor {
         name: "Indonesian NIK / KTP",
         category: "GOV_ID",
         regex: /\b([1-9][0-9]{15})\b/g,
+        // A 16-digit amount ("7000000000000000 dollars") is not a NIK: the amount rules take it, so
+        // the AI gets <S1> and the maths is done on your screen. A real NIK ends in a serial number
+        // from 0001, never 0000, and isn't written with a currency.
+        validator: (raw, index, text) => {
+          if (raw.endsWith("0000")) return false;
+          if (!text) return true;
+          const after = text.slice(index + raw.length, index + raw.length + 12);
+          const before = text.slice(Math.max(0, index - 5), index);
+          return !/^\s*(?:dollars?|dolar|bucks|usd|idr|rupiah|euros?|pounds?)\b/i.test(after) && !/(?:Rp\.?|IDR|USD|[$€£])\s*$/i.test(before);
+        },
         replacement: "[REDACTED_NIK]"
       },
       // 1b. US Social Security Number (SSN - 9 digits formatted)
@@ -222,7 +232,7 @@ class HeuristicsRedactor {
           const digits = raw.replace(/\D/g, "");
           // "7000000000 dollars" is an amount (the amount rules take it), not a phone number
           if (/^\d+$/.test(raw) && text &&
-            /^\s*(?:dollars?|bucks|usd|idr|rupiah|euros?|pounds?|juta|ribu|rb|miliar|milyar)\b/i.test(text.slice(index + raw.length))) return false;
+            /^\s*(?:dollars?|dolar|bucks|usd|idr|rupiah|euros?|pounds?|juta|ribu|rb|miliar|milyar)\b/i.test(text.slice(index + raw.length))) return false;
           const isTollFree = /^(?:1)?(?:800|888|877|866|855|844|833)/.test(digits);
           if (isTollFree && text) {
             const start = Math.max(0, index - 80);

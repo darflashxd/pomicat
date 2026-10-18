@@ -75,7 +75,7 @@
   const NOT_MONEY_UNIT = /^\s*(?:%|x\b|km|kg|g\b|m\b|cm|mm|ml|l\b|gb|mb|kb|tb|ms|s\b|sec|min|hours?|days?|weeks?|months?|years?|tahun|bulan|hari|rows?|lines?|items?|pages?|words?|people|users?|steps?|times?|calories|kcal|mph|kph|rpm|px|dpi|°)/i;
   function possibleAmounts(text) {
     const out = [];
-    for (const m of text.matchAll(/(?<![\w.,:/#$€£¥₹+-])(?:\d{1,3}(?:[.,]\d{3})+|\d{4,15})(?![\w.,:/-]?\d)(?![\w%])/g)) {
+    for (const m of text.matchAll(/(?<![\w.,:/#$€£¥₹+-])(?:\d{1,3}(?:[.,]\d{3})+|\d{4,18})(?![\w.,:/-]?\d)(?![\w%])/g)) {
       const raw = m[0];
       const digits = raw.replace(/\D/g, "");
       if (Number(digits) < 1000) continue;
@@ -113,7 +113,10 @@
       for (const span of modelSpans.filter(s => s.turnIndex === turnIndex)) {
         if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end <= span.start || span.end > text.length ||
           !Number.isFinite(span.score) || span.score < 0.15 || span.score > 1) continue;
-        if (LABEL_WORDS.test(text.slice(span.start, span.end).trim())) continue;
+        const spanText = text.slice(span.start, span.end).trim();
+        // Field labels, and our own symbols the AI repeats bare ("0.25 * S1", "NIK_1"): the model
+        // tagged S1 as a ZIP code on DeepSeek
+        if (LABEL_WORDS.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
         add(text.slice(span.start, span.end), span.start, false, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score);
       }
       // A credential assignment matters even for a low-entropy human password. '=' alone does not.
@@ -146,6 +149,8 @@
     return [...candidates.values()].sort((a, b) => b.score - a.score).map((c, i) => {
       const occurrences = normalized.flatMap((t, turnIndex) => [...t.content.matchAll(literal(c.raw))]
         .filter(m => !occurrencesByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
+        // Never inside our own placeholders: hiding "S1" in "<S1>" would break it
+        .filter(m => !excludedByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
         .map((m) => ({ turnIndex, start: m.index, end: m.index + c.raw.length })));
       return { ...c, id: `maybe_${i + 1}`, replacement: `[REDACTED_POSSIBLE_SECRET_${i + 1}]`, occurrences };
     }).filter(c => c.occurrences.length);

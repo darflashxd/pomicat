@@ -15,7 +15,7 @@ const CODE_AT_WORDS = new Set(("import media keyframes font-face supports charse
 const MONEY_WORDS = ["salary", "salaries", "income", "paycheck", "savings", "mortgage", "budget", "revenue", "pension", "allowance", "gaji", "gajian", "tabungan", "cicilan", "penghasilan", "pendapatan"];
 const NOT_MONEY_TYPOS = new Set(["gali", "haji", "saji", "kaji", "baji", "sayings", "revenge", "tension", "mension", "budgie", "budge", "budged", "salami"]);
 // An amount written with its currency ("$5,000", "70000 dollars", "Rp 5 juta")
-const EXPLICIT_CURRENCY = /(?:[$€£¥₹]\s*\d|\b(?:Rp|IDR|USD|EUR|GBP|SGD)\s*\d|\d[\d.,]*\s*(?:dollars?|bucks|rupiah|euros?|pounds?|juta|jt|ribu|rb|miliar|milyar)\b)/i;
+const EXPLICIT_CURRENCY = /(?:[$€£¥₹]\s*\d|\b(?:Rp|IDR|USD|EUR|GBP|SGD)\s*\d|\d[\d.,]*\s*(?:dollars?|dolar|bucks|rupiah|euros?|pounds?|juta|jt|ribu|rb|miliar|milyar)\b)/i;
 
 class ContextualClassifier {
   constructor() {
@@ -178,7 +178,7 @@ class ContextualClassifier {
         }
 
         // Universal Financial check (Supports Rp 28.500.000, $380k, ($650,000), $18M, 45 jeti, 15 juta, 20jt, 45 LPA, 10 Lakh, $150k, 90k, half a mil, 250 racks, strike price, float balances, global currencies: SGD, AUD, CAD, EUR, GBP, CHF, JPY, HKD, NZD, MYR)
-        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|dollars?|bucks|usd|idr|euros?|pounds?|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,12}\b)/gi;
+        const finRegex = /(?:(?:\(\s*(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:k|m|million|billion|juta|jt|lpa|lakhs?|crores?))?\s*\))|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*|₹|INR\s*)?[\d.,]+(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|million|billion|k|rb|ribu|thousand|rupiah|dollars?|dolar|bucks|usd|idr|euros?|pounds?|racks|bands|ember|lpa|lakhs?|crores?)\b|[mb](?!\w)|\s+[mb]\b))|(?:half\s+a\s+mil\b)|(?:(?:Rp\s*|IDR\s*|\$|USD\s*|€|EUR\s*|£|GBP\s*|CHF\s*|SGD\s*|AUD\s*|CAD\s*|JPY\s*|¥|HKD\s*|NZD\s*|MYR\s*)[\d.,]+)|\b\d{4,12}(?:[.,]\d{2})\b|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?|\b\d{4,18}\b)/gi;
         const nonFinUnits = /^\s*(?:copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar|shares|bps|basis\s+points|years?|months?)\b/i;
         const finSpans = [];
         const finMatches = sent.matchAll(finRegex);

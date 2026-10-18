@@ -34,6 +34,10 @@ for (const [text, raw] of [["my slry is 70000", "70000"], ["my slaary is 70.000.
 }
 for (const text of ["version 2.4.0.1 on port 8080", "person 5521 in line", "I have 3000 steps today", "It was built in 1998 and has 2500 rows",
   "Room 4410 is free", "we drove 1200 km", "token_budget=320000", "my salary is <S1>"]) assert.deepEqual(scan(text), [], text);
+// Our own symbols repeated bare by the AI are not suggestions, and never hidden inside <S1>
+const symText = "my slary is <S1>. Housing: 0.25 * S1, then NIK_1";
+const symSpan = (w, from = 0) => ({ turnIndex: 0, start: symText.indexOf(w, from), end: symText.indexOf(w, from) + w.length, label: "ZIP_CODE", score: 0.23 });
+assert.deepEqual(Maybe.scan(turns(symText), [symSpan("S1"), symSpan("S1", 20), symSpan("NIK_1")]), [], "own symbols suggested");
 const long = "mN3qT8zW5kR1yP7vL4cX9sF2hJ6dB0aE".repeat(12);
 assert(scan(`API_TOKEN=${long}`).some(c => c.raw === long), "long tokens must not disappear");
 assert(scan("API_TOKEN=abcdef0123456789abcdef0123456789").some(c => c.risky), "credential context beats hash shape");
