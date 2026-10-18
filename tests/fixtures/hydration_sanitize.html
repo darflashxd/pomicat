@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>hydration sanitize</title>
+<!-- On-screen sums: the badge mounter must keep the site's own markup and drop anything that runs
+     code or loads from elsewhere. Open via the "fixtures" server; it must end with PASS. -->
+<pre id="result">running…</pre>
+<script src="../../extension/engine/local_compute.js"></script>
+<script>
+(() => {
+  const LC = SafeShareLocalCompute;
+  const badge = '<span class="ss-local-compute" data-expr="%3CS1%3E" title="t">Rp 12.500.000</span>';
+  const mount = (html) => { const d = document.createElement("div"); LC.mountSanitized(d, html); return d; };
+  const check = (ok, what) => { if (!ok) throw new Error(what); };
+  try {
+    // ChatGPT's own rendered markup (Oct 2026) stays as elements, with the badge inside
+    let d = mount(`<div class="Content-x"><p data-d-text-flow=""><span>Monthly salary:</span> <code>${badge}</code></p></div>`);
+    check(d.querySelector("div.Content-x p code span.ss-local-compute"), "site markup flattened");
+    check(!d.textContent.includes("<"), "markup shown as text");
+
+    d = mount(`<a href=" javascript:alert(1)">x</a><a href="https://ok.example/">ok</a><a href="//evil.example/">p</a><a href="data:text/html,x">d</a>`);
+    const hrefs = [...d.querySelectorAll("a")].map(a => a.getAttribute("href"));
+    check(JSON.stringify(hrefs) === JSON.stringify([null, "https://ok.example/", null, null]), "links: " + JSON.stringify(hrefs));
+
+    d = mount(`<svg><a xlink:href="javascript:1"></a></svg><form action="https://e.example/"><button formaction="javascript:1">go</button></form><iframe src="https://e.example"></iframe><script>1<\/script><style>*{}</style>`);
+    check(!d.querySelector("svg, form, iframe, script, style"), "dangerous tags kept");
+
+    d = mount(`<img src="/x.png" onerror="alert(1)" onload="alert(2)">${badge}`);
+    check(![...d.querySelector("img").attributes].some(a => a.name.startsWith("on")), "handler kept");
+    check(d.querySelector("span.ss-local-compute"), "badge lost");
+
+    // Formula text is decoded and AI-controlled: escaped first, so a dangling <img stays text
+    const vault = { "<S1>": { value: 20000000, currency: "IDR", raw: "Rp 20.000.000" } };
+    const res = new LC().hydrateText(LC.escapeHtml(`x <img src='https://e.example/?v= 0.25 \\times <S1>`), vault, true);
+    d = mount(res.hydratedText);
+    check(res.computedCount > 0 && d.querySelector("span.ss-local-compute"), "formula not computed after escaping");
+    check(!d.querySelector("img") && d.textContent.includes("<img"), "escaped formula text became markup");
+
+    // Any parser failure leaves the node untouched
+    d = document.createElement("div"); d.textContent = "before";
+    const real = window.DOMParser; window.DOMParser = function () { throw new Error("x"); };
+    try { LC.mountSanitized(d, "<b>after</b>"); } finally { window.DOMParser = real; }
+    check(d.textContent === "before", "fallback mounted unchecked HTML");
+
+    document.getElementById("result").textContent = "PASS: site markup kept, links, dangerous tags, handlers, escaped formulas, failure fallback.";
+  } catch (error) {
+    document.getElementById("result").textContent = "FAIL: " + error.message;
+  }
+})();
+</script>

@@ -43,7 +43,7 @@
   function set(key, value) {
     if (area) {
       cache[key] = value;
-      Promise.resolve(area.set({ [KEY]: { ...cache } })).catch(() => {});
+      try { Promise.resolve(area.set({ [KEY]: { ...cache } })).catch(() => {}); } catch (_) {} // extension reloaded
       return;
     }
     try { localStorage.setItem(`safeshare_${key}`, typeof value === "string" ? value : JSON.stringify(value)); } catch (_) {}

@@ -126,6 +126,11 @@ Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md
   while you type. Values shown again on your screen are kept from the site's scripts for IDs,
   names and places (closed shadow DOM), but restored amounts are ordinary page text. Other
   extensions that can read all sites can read everything too.
+- The real values behind placeholders are kept only in the browser's session storage for the
+  extension. Closing the browser, or reloading or updating the extension, clears them: messages
+  sent before that keep showing `[NIK_1]` / `<S1>`, and the AI never had the values. This is
+  deliberate (nothing written to disk). After an update, tabs that were already open show
+  "SafeShare was updated: refresh this tab"; they still protect what you send until refreshed.
 - Share links open inside the extension when it's installed, so the relay can't change the page
   that holds the key. Without the extension, the relay's page decrypts the chat, and you trust
   whoever runs the relay not to change it (`dist/SHA256SUMS` lists the page's files for

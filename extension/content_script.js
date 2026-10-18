@@ -81,7 +81,8 @@
   const idMapsSeen = new Map(); // this tab's maps per chat, so switching back is instant
   function saveIdMap() {
     idMapsSeen.set(idMapKey, [...idMap.byPlaceholder]);
-    if (idStore) Promise.resolve(idStore.set({ [idMapKey]: [...idMap.byPlaceholder] })).catch(() => {});
+    // try: in a tab left over after an extension reload this throws, and it must not hold the send
+    try { if (idStore) Promise.resolve(idStore.set({ [idMapKey]: [...idMap.byPlaceholder] })).catch(() => {}); } catch (_) {}
   }
   loadIdMap(chatIdOf(typeof location !== "undefined" ? location.href : ""));
   function rememberId(placeholder, value) {
@@ -436,6 +437,7 @@
       indicator.title = "SafeShare: what to protect before sending (click to change)";
       indicator.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (extensionGone()) return; // "SafeShare was updated: refresh this tab"
         toggleShieldMenu(indicator, () => {
           updateShieldIndicator(findPromptInputElement() || inputEl);
           runHydrationPass();
@@ -660,33 +662,9 @@
     }, true);
   }
 
-  /**
-   * Mounts locally computed badges into an answer. The input is the answer's own HTML (innerHTML,
-   * so anything the AI wrote as text arrives escaped) or escaped formula text (escapeHtml below),
-   * with our badge spans spliced in. Second line of defence anyway: no executable or embedding
-   * tags, no on* handlers, and links/sources only to http(s), # or / (a " javascript:" with a
-   * leading space used to get past a startsWith check).
-   */
-  const DANGEROUS_TAGS = "script, iframe, frame, object, embed, style, link, meta, base, form, svg, math, template, noscript";
-  const URL_ATTRS = ["href", "src", "srcset", "action", "formaction", "xlink:href", "poster", "background", "data"];
-  function sanitizeAndMountHydration(node, htmlStr) {
-    try {
-      const doc = new DOMParser().parseFromString(htmlStr, "text/html");
-      doc.body.querySelectorAll(DANGEROUS_TAGS).forEach(el => el.remove());
-      for (const el of doc.body.querySelectorAll("*")) {
-        for (const a of Array.from(el.attributes)) {
-          const name = a.name.toLowerCase();
-          const bad = name.startsWith("on") || name === "srcdoc" ||
-            (URL_ATTRS.includes(name) && !/^(?:https?:|#|\/(?!\/))/i.test(a.value.trim()));
-          if (bad) el.removeAttribute(a.name);
-        }
-      }
-      node.replaceChildren(...doc.body.childNodes);
-    } catch (_) {
-      // Leave the answer as it was rather than mount anything unchecked
-    }
-  }
-  const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Badge mounting and escaping live in engine/local_compute.js (tested in tests/fixtures/hydration_sanitize.html)
+  const sanitizeAndMountHydration = (node, htmlStr) => SafeShareLocalCompute.mountSanitized(node, htmlStr);
+  const escapeHtml = (s) => SafeShareLocalCompute.escapeHtml(s);
 
   const MESSAGE_SELECTOR = "[data-markdown-text-style='assistant-message'], [data-message-author-role='assistant'], " +
     ".font-claude-message, .font-claude-response, div.ds-markdown";
@@ -1196,7 +1174,18 @@
   const startedInExtension = Boolean(runtimeId()); // test pages run without one: keep going there
   const extensionGone = () => startedInExtension && !runtimeId();
   const mainTimer = setInterval(() => {
-    if (extensionGone()) return clearInterval(mainTimer);
+    if (extensionGone()) {
+      clearInterval(mainTimer);
+      // Sends are still protected (the guard needs no extension calls), but values are no longer
+      // shown on screen and shares can't be made: say so instead of failing quietly
+      const indicator = document.getElementById("safeshare-shield-indicator");
+      if (indicator) {
+        indicator.textContent = "⚠️ SafeShare was updated: refresh this tab";
+        indicator.className = "shield-disabled";
+        indicator.dataset.errorUntil = String(Number.MAX_SAFE_INTEGER);
+      }
+      return;
+    }
     handleSessionRouteChange();
     initSafeShareButton();
     initPreInferenceInterception();

@@ -45,6 +45,10 @@ badges, reset, overlapping selections, numeric credentials, variable exclusions,
 control locking, failed-publication recovery and decrypted content against the actual DOM preview.
 Run in Chrome and Firefox; this does not replace testing the installed extensions on chat sites.
 
+On-screen sums: open `/tests/fixtures/hydration_sanitize.html` on that same server. It must end
+with `PASS`: the site's own answer markup is kept, while `javascript:` / `data:` links, script,
+svg, form and iframe tags, `on*` handlers and markup in formula text never reach the page.
+
 For IDR range/toggle and formatting checks, open `/tests/fixtures/range_review.html` on that
 same local server. It must report `PASS`: one KaTeX representation, readable headings/tables,
 clickable ranges, revealed IDR amounts staying visible, and no buttons with unavailable originals.

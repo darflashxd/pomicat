@@ -22,7 +22,11 @@
    * Pre-ticked ("risky"): assigned to a credential name (as before), or score >= 0.75.
    */
   const CREDENTIAL_WORD = /(?:\b(?:token|api[_ -]?key|key|secret|pass(?:word|wd|phrase)?|pwd|auth|bearer|credentials?|otp|pin|kata\s+sandi|sandi)\b|(?:^|\s)-p\s*)[^\n]{0,40}$/i;
-  const DAMPING_WORD = /\b(?:example|sample|dummy|placeholder|contoh)\b/i;
+  // The local model tags field labels ("My NIK is …") and our own name as entities; the values
+  // after them are the rules' job. Exact word, acronyms in capitals only ("Sim" or "Pin" can be a
+  // name), so "Rina" or "NIK 3201…" still go through.
+  const LABEL_WORDS = /^(?:[Ss]afe[Ss]hare(?:-AI)?|NIK|NPWP|KTP|KK|SIM|BPJS|NIP|NISN|NIB|SSN|NINO|IBAN|SWIFT|BIC|CVV|CVC|OTP|PIN|API|URL|IP|ID|[Ee]-?mail)$/;
+  const DAMPING_WORD =/\b(?:example|sample|dummy|placeholder|contoh)\b/i;
   function contextScore(raw, text, start, source, modelScore = 0) {
     const why = [];
     let score = source === "assignment" ? 0.55 : source === "model" ? 0.5 * modelScore : 0.3;
@@ -59,6 +63,7 @@
       for (const span of modelSpans.filter(s => s.turnIndex === turnIndex)) {
         if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end <= span.start || span.end > text.length ||
           !Number.isFinite(span.score) || span.score < 0.15 || span.score > 1) continue;
+        if (LABEL_WORDS.test(text.slice(span.start, span.end).trim())) continue;
         add(text.slice(span.start, span.end), span.start, false, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score);
       }
       // A credential assignment matters even for a low-entropy human password. '=' alone does not.

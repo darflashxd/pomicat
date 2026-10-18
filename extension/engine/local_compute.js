@@ -809,6 +809,37 @@ class SafeShareLocalCompute {
     result += text.slice(lastIndex);
     return result;
   }
+  /**
+   * Mounts locally computed badges into an answer. The input is the answer's own HTML (innerHTML,
+   * so anything the AI wrote as text arrives escaped) or escaped formula text (escapeHtml below),
+   * with our badge spans spliced in. Second line of defence anyway: no executable or embedding
+   * tags, no on* handlers, and links/sources only to http(s), # or / (a " javascript:" with a
+   * leading space used to get past a startsWith check). On any error the answer is left as it was.
+   */
+  static mountSanitized(node, htmlStr) {
+    const DANGEROUS_TAGS = "script, iframe, frame, object, embed, style, link, meta, base, form, svg, math, template, noscript";
+    const URL_ATTRS = ["href", "src", "srcset", "action", "formaction", "xlink:href", "poster", "background", "data"];
+    try {
+      const doc = new DOMParser().parseFromString(htmlStr, "text/html");
+      doc.body.querySelectorAll(DANGEROUS_TAGS).forEach(el => el.remove());
+      for (const el of doc.body.querySelectorAll("*")) {
+        for (const a of Array.from(el.attributes)) {
+          const name = a.name.toLowerCase();
+          const bad = name.startsWith("on") || name === "srcdoc" ||
+            (URL_ATTRS.includes(name) && !/^(?:https?:|#|\/(?!\/))/i.test(a.value.trim()));
+          if (bad) el.removeAttribute(a.name);
+        }
+      }
+      node.replaceChildren(...doc.body.childNodes);
+    } catch (_) {
+      // Leave the answer as it was rather than mount anything unchecked
+    }
+  }
+
+  /** Formula text read from the page (decoded, AI-controlled) must be escaped before hydrateText. */
+  static escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
 }
 
 if (typeof module !== "undefined" && module.exports) {

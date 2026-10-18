@@ -38,11 +38,14 @@ Done work is tracked in [TODO.md](TODO.md); this file is what's next.
 - [x] Final audit (18 Oct): no secrets in git history (only fictional test values); zip and npm
       package contain only what they should; no dependencies; minimal permissions; fixed a path
       traversal in the local relay (`/../viewer_redirect.js`).
-- [ ] Settings (protection mode, debug switch, categories) live in the chat site's localStorage, so
-      its scripts could switch protection off. Low risk (the site already sees typed text); move to
-      extension storage. · `me`
-- [ ] Firefox manifest has no `browser_specific_settings.gecko.id`; needed for an add-ons.mozilla.org
-      listing. · `me`
+- [x] Settings (protection mode, debug switch, categories) moved from the chat site's localStorage
+      to extension storage (`engine/settings.js`); a page script can no longer switch protection off
+      or set the reader to "Someone I trust" (checked live on all three sites, 18 Oct).
+- [x] Firefox manifest has a `browser_specific_settings.gecko.id` (`safeshare@research.local`).
+- [x] 18 Oct live round: tabs left open after an extension reload say "SafeShare was updated:
+      refresh this tab" (and still protect sends); the share review no longer suggests field labels
+      ("NIK") or "SafeShare" as names; on-screen sums keep the site's markup and escape formula text
+      (`tests/fixtures/hydration_sanitize.html`).
 - [x] Bugs found on real ChatGPT: formulas split across streamed spans, address rule running across
       sentences, `@` in prose redacted.
 

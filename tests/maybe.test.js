@@ -22,6 +22,11 @@ assert.equal(modelCandidates.length, 1);
 assert.equal(modelCandidates[0].risky, false);
 assert.deepEqual(Maybe.apply(modelInput, modelCandidates, new Map()), modelInput);
 assert(!Maybe.apply(modelInput, modelCandidates, new Map([["Amelia Hartwell", true]]))[0].content.includes("Amelia"));
+// The model tags field labels and our own name as entities (live DeepSeek, Oct 2026); names still go through
+const labelText = "My NIK is [NIK_1], I use SafeShare, my friend Sim and NIK holder Rina.";
+const spanOf = (w, from = 0) => ({ turnIndex: 0, start: labelText.indexOf(w, from), end: labelText.indexOf(w, from) + w.length, label: "PERSON", score: 0.4 });
+const labelCandidates = Maybe.scan(turns(labelText), [spanOf("NIK"), spanOf("SafeShare"), spanOf("Sim"), spanOf("Rina")]).map(c => c.raw);
+assert.deepEqual(labelCandidates.sort(), ["Rina", "Sim"], labelCandidates.join(","));
 const long = "mN3qT8zW5kR1yP7vL4cX9sF2hJ6dB0aE".repeat(12);
 assert(scan(`API_TOKEN=${long}`).some(c => c.raw === long), "long tokens must not disappear");
 assert(scan("API_TOKEN=abcdef0123456789abcdef0123456789").some(c => c.risky), "credential context beats hash shape");
