@@ -2,6 +2,15 @@
 
 ## Unreleased — experimental share review
 
+- Found on the live sites (18 Oct): clicking DeepSeek's send arrow sent messages **without
+  protection** (it matched no send-button pattern); on Claude the re-send clicked the "+" menu and
+  any click on it ran the guard. Send buttons are now exact, per site, in priority order.
+- DeepSeek's new layout: your messages weren't read (shares would have lost them); the health
+  check caught it. New DeepSeek reader on stable ds-* class names.
+- Settings (protection mode, debug details, reader, amounts, categories) moved from the chat site's
+  localStorage to extension storage: a page script could switch protection off or set the next
+  share to "Someone I trust". Old values are not imported; safe defaults.
+
 - Security: the local relay served files next to the viewer folder whose names start with
   "viewer" (`/../viewer_redirect.js`) because of a string-prefix path check; now a real
   folder-containment check, with a regression test.

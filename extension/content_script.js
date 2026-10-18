@@ -31,18 +31,14 @@
     amounts: "Protect amounts only",
     off: "Off (send as typed)"
   };
+  // Settings live in extension storage (engine/settings.js), out of the chat site's reach
+  const settings = typeof SafeShareSettings !== "undefined" ? SafeShareSettings : null;
   function getShieldMode() {
-    try {
-      const m = localStorage.getItem("safeshare_shield_mode");
-      if (SHIELD_MODES[m]) return m;
-      if (localStorage.getItem("safeshare_pre_inference") === "true") return "all";
-      return "off";
-    } catch (_) {
-      return "off";
-    }
+    const m = settings ? settings.get("shield_mode", "off") : "off";
+    return SHIELD_MODES[m] ? m : "off";
   }
   function setShieldMode(mode) {
-    try { localStorage.setItem("safeshare_shield_mode", mode); } catch (_) {}
+    if (settings) settings.set("shield_mode", mode);
   }
   function isPreInferenceEnabled() {
     return getShieldMode() !== "off";
@@ -120,7 +116,8 @@
   // "Keep debug details": IPs, hostnames, user@host and paths (the System & Shell rules) are sent
   // as typed so the AI can help debug. Passwords, keys and tokens are still replaced.
   function keepDebugDetails() {
-    try { return localStorage.getItem("safeshare_debug_details") === "true"; } catch (_) { return false; }
+    const v = settings ? settings.get("debug_details", false) : false;
+    return v === true || v === "true";
   }
   function replaceIds(text, { dryRun }) {
     const scan = shieldIdScanner.scan(text);
@@ -501,7 +498,7 @@
     debugBox.style.cssText = "appearance: auto; -webkit-appearance: checkbox; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; opacity: 1; position: static;";
     debugBox.addEventListener("click", (e) => e.stopPropagation());
     debugBox.addEventListener("change", () => {
-      try { localStorage.setItem("safeshare_debug_details", String(debugBox.checked)); } catch (_) {}
+      if (settings) settings.set("debug_details", debugBox.checked);
       onChange();
     });
     debug.title = "IPs, hostnames, user@host and file paths are sent as typed. Passwords, keys and tokens are still replaced.";
@@ -544,8 +541,27 @@
     updateShieldIndicator(inputEl);
   }
 
-  const SEND_BUTTON_SELECTOR =
-    "button[data-testid='send-button'], button[aria-label*='Send'], button[aria-label*='Kirim'], fieldset button, form button[type='submit']";
+  // Send buttons, most specific first. Checked on the live sites (Oct 2026): a loose pattern such as
+  // "fieldset button" matched Claude's "+" (attach) button, so the re-send opened a menu and any
+  // click on it ran the guard; DeepSeek's send arrow (a div) matched nothing, so clicking it sent
+  // the message without protection.
+  const SEND_BUTTONS = [
+    "button[data-testid='send-button']",                       // ChatGPT
+    "button[data-testid='chat-input-send']",                   // Claude
+    "button[aria-label='Send message']", "button[aria-label='Send prompt']",
+    "div[role='button'].ds-button--primary.ds-button--circle", // DeepSeek
+    "button[aria-label*='Send']", "button[aria-label*='Kirim']",
+    "form button[type='submit']"
+  ];
+  const SEND_BUTTON_SELECTOR = SEND_BUTTONS.join(", ");
+  function findSendButton() {
+    for (const sel of SEND_BUTTONS) {
+      const btn = [...document.querySelectorAll(sel)].find((b) => !b.disabled && b.getAttribute("aria-disabled") !== "true" &&
+        b.getBoundingClientRect().width > 0 && !b.closest("#safeshare-modal-backdrop"));
+      if (btn) return btn;
+    }
+    return null;
+  }
   let submitGuardInstalled = false;
   let resubmitting = false;
   let isRewriting = false;
@@ -631,8 +647,8 @@
       const inputEl = findPromptInputElement();
       if (!inputEl || !(e.target === inputEl || inputEl.contains(e.target))) return;
       guard(e, () => {
-        const btn = document.querySelector(SEND_BUTTON_SELECTOR);
-        if (btn && !btn.disabled) btn.click();
+        const btn = findSendButton();
+        if (btn) btn.click();
         else inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true, cancelable: true }));
       });
     }, true);
@@ -1088,6 +1104,21 @@
         }
       });
       if (turns.length > 0) return turns;
+    }
+
+    // Strategy 2b: DeepSeek (Oct 2026 layout). Every turn is a div.ds-message; answers contain
+    // .ds-assistant-message-main-content (DeepThink's reasoning block sits outside it), your
+    // messages don't, and keep their text in .ds-collapsible-text. Only stable ds-* class names.
+    const dsMessages = Array.from(container.querySelectorAll("div.ds-message")).filter(el => !isComposerOrSafeShareUI(el));
+    if (dsMessages.length > 0) {
+      for (const el of dsMessages) {
+        const answer = el.querySelector(".ds-assistant-message-main-content") || el.querySelector("div.ds-markdown");
+        const source = answer || el.querySelector(".ds-collapsible-text") || el;
+        const textContent = getCleanNodeContent(source);
+        if (textContent) turns.push({ role: answer ? "assistant" : "user", content: textContent });
+      }
+      if (turns.some(t => t.role === "user") && turns.some(t => t.role === "assistant")) return turns;
+      turns.length = 0; // partial read: let the older strategies try
     }
 
     // Strategy 3: DeepSeek & generic markdown message turns

@@ -58,6 +58,7 @@
         "engine/symbolic_vault.js",
         "engine/symbolic_rewriter.js",
         "engine/local_compute.js",
+        "engine/settings.js",
         "ui/modal.js",
         "content_script.js"
       ],

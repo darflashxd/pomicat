@@ -49,26 +49,24 @@ class SafeShareModal {
     this.loadPreferences();
   }
 
+  // Settings live in extension storage (engine/settings.js): the chat site's scripts used to be
+  // able to set the next share to "Someone I trust" through localStorage
+  get settings() {
+    if (typeof SafeShareSettings !== "undefined") return SafeShareSettings;
+    try { return require("../engine/settings.js"); } catch (_) { return null; }
+  }
+
   loadPreferences() {
-    try {
-      if (localStorage.getItem("safeshare_profile") === "trusted") this.profile = "trusted";
-      if (localStorage.getItem("safeshare_numbers") === "range") this.numbersMode = "range";
-    } catch (_) {}
-    try {
-      const saved = localStorage.getItem("safeshare_active_categories");
-      if (saved) {
-        const arr = JSON.parse(saved);
-        if (Array.isArray(arr) && arr.length > 0) {
-          this.activeCategories = new Set(arr);
-        }
-      }
-    } catch (_) {}
+    const s = this.settings;
+    if (!s) return;
+    if (s.get("profile") === "trusted") this.profile = "trusted";
+    if (s.get("numbers") === "range") this.numbersMode = "range";
+    const arr = s.get("active_categories");
+    if (Array.isArray(arr) && arr.length > 0) this.activeCategories = new Set(arr);
   }
 
   savePreferences() {
-    try {
-      localStorage.setItem("safeshare_active_categories", JSON.stringify(Array.from(this.activeCategories)));
-    } catch (_) {}
+    if (this.settings) this.settings.set("active_categories", Array.from(this.activeCategories));
   }
 
   extractTag(replacement) {
@@ -1509,12 +1507,12 @@ class SafeShareModal {
     backdrop.querySelector("#btn-cancel").addEventListener("click", () => this.removeExisting());
 
     // Reader profile and amount display
-    for (const [id, key, storageKey] of [["#safeshare-profile", "profile", "safeshare_profile"], ["#safeshare-numbers", "numbersMode", "safeshare_numbers"]]) {
+    for (const [id, key, storageKey] of [["#safeshare-profile", "profile", "profile"], ["#safeshare-numbers", "numbersMode", "numbers"]]) {
       const sel = backdrop.querySelector(id);
       sel.value = this[key];
       sel.addEventListener("change", () => {
         this[key] = sel.value;
-        try { localStorage.setItem(storageKey, sel.value); } catch (_) {}
+        if (this.settings) this.settings.set(storageKey, sel.value);
         this.rebuildViews();
       });
     }
