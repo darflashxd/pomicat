@@ -60,3 +60,21 @@ redact([
   assert.strictEqual(t[1].content, "The cafe near the station is nice.", "no hidden address: landmarks stay");
   console.log("inference: combination and location checks passed");
 }).catch((e) => { console.error(e); process.exit(1); });
+
+// Attack check in the share dialog: runs on exactly what would be shared
+{
+  global.window = global.window || {};
+  global.document = global.document || { getElementById: () => null };
+  const M = require("../extension/ui/modal.js");
+  const Modal = M.SafeShareModal || M;
+  const m = Object.create(Modal.prototype);
+  const salary = "Saving 30% gives Rp 900.000 a month, Rp 10.800.000 a year, and Rp 2.100.000 left each month.";
+  const leaky = m.attackCheck([{ role: "user", content: "My salary is [REDACTED_FINANCIAL_1] per month." }, { role: "assistant", content: salary }]);
+  assert.strictEqual(leaky.amounts.length, 1, "one hidden amount -> one finding");
+  assert.strictEqual(Math.round(leaky.amounts[0].value), 3000000);
+  const safe = m.attackCheck([{ role: "user", content: "My salary is [REDACTED_FINANCIAL_1] per month." }, { role: "assistant", content: "Saving 30% gives [REDACTED_DERIVED_1] a month." }]);
+  assert.strictEqual(safe.leaks, 0, "nothing recoverable when derived amounts are hidden");
+  const trusted = m.attackCheck([{ role: "user", content: "My salary is Rp 3.000.000 per month." }, { role: "assistant", content: salary }]);
+  assert.strictEqual(trusted.leaks, 0, "nothing hidden, nothing to recover (trusted reader)");
+  console.log("inference: attack check passed");
+}

@@ -246,6 +246,11 @@ class SafeShareModal {
             </div>
           </div>
 
+          <section id="safeshare-attack-check" aria-live="polite">
+            <div class="attack-check-title">Attack check on what you're about to share</div>
+            <div id="safeshare-attack-results"></div>
+          </section>
+
           <details id="safeshare-maybe-review" open>
             <summary>Maybe sensitive — review before sharing</summary>
             <p>These are unverified suggestions, not a guarantee that every secret was found. Checked values are hidden in every occurrence.</p>
@@ -993,6 +998,7 @@ class SafeShareModal {
     // 3. Update Entity Inspector Drawer
     this.renderInspectorList();
     this.renderMaybeItems();
+    this.renderAttackCheck();
 
     // 4. Update Stats & Compatibility Counters
     const activeProtectedCount = this.candidates.filter(c => this.activeCategories.has(c.category) && c.enabled).length;
@@ -1045,6 +1051,58 @@ class SafeShareModal {
 
     const statContextualEl = document.getElementById("stat-contextual");
     if (statContextualEl) statContextualEl.innerText = 0;
+  }
+
+  /**
+   * Runs SafeShare's own attacks on exactly the text that would be shared: amount inversion
+   * (a hidden figure agreed on by visible numbers), birth year from ages, dates from weekday /
+   * "the day after the 14th" clues, and combinations of identifying details in one message.
+   */
+  attackCheck(turns) {
+    const P = typeof SafeSharePolicy !== "undefined" ? SafeSharePolicy : require("../engine/policy.js");
+    const text = turns.map(t => t.content).join("\n");
+    // Only hidden amounts can leak: count the amount placeholders, ignore values that are visible
+    // anyway (a trusted reader sees them), and report at most one finding per hidden amount
+    const hiddenAmounts = (text.match(/\[[^\]]*(?:FINANCIAL|AMOUNT|SALARY|MONEY|INCOME|DERIVED|BUDGET)[^\]]*\]|<S\d+>/gi) || []).length;
+    const Solver = (typeof ConsistentPseudonymizer !== "undefined" ? ConsistentPseudonymizer : require("../engine/pseudonymizer.js")).AdversaryOracleSolver;
+    const visible = new Solver().lexNumericSpans(text).map(t => t.val);
+    const amounts = hiddenAmounts ? P.invert(text)
+      .filter(f => !visible.some(v => Math.abs(v - f.value) <= Math.max(1, f.value * 0.005)))
+      .slice(0, hiddenAmounts) : [];
+    const hidesBirth = /\[[^\]]*(?:DOB|BIRTH)[^\]]*\]|<DATE_TIME>/i.test(text);
+    const births = hidesBirth ? P.inferBirthYears(text) : [];
+    const dates = P.inferDates(text).filter(d => d.candidates.length && d.candidates.length <= 14);
+    const combos = turns.map((t, i) => ({ turn: i + 1, role: t.role, ...P.quasiIdentifiers(t.content) }))
+      .filter(c => c.role === "user" && c.risky);
+    return { amounts, births, dates, combos, leaks: amounts.length + births.length + dates.length };
+  }
+
+  renderAttackCheck() {
+    const box = typeof document !== "undefined" && document.getElementById("safeshare-attack-results");
+    if (!box) return;
+    const r = this.attackCheck(this.sanitizedTurns || []);
+    this.lastAttack = r;
+    box.textContent = "";
+    const row = (ok, text) => {
+      const el = document.createElement("div");
+      el.className = "attack-row " + (ok ? "attack-ok" : "attack-fail");
+      el.textContent = (ok ? "✓ " : "✗ ") + text; // textContent only: values never become HTML
+      box.appendChild(el);
+    };
+    const money = (f) => `${f.currency || ""} ${Math.round(f.value).toLocaleString("en-US")}`.trim();
+    if (r.amounts.length) {
+      for (const f of r.amounts) row(false, `Hidden amount recoverable: ${money(f)} (agreed by ${f.support} visible numbers). Hide the amounts it is derived from, or use "Amounts: Remove".`);
+    } else row(true, "No hidden amount can be worked back from the visible numbers.");
+    if (r.births.length) row(false, `Hidden birth date, but the birth year is ${r.births[0].year} (from stated ages).`);
+    else row(true, "No birth year can be worked out from stated ages.");
+    if (r.dates.length) for (const d of r.dates) row(false, `Hidden date narrowed to ${d.candidates.length} possible day(s) by ${d.clues.join(", ")}.`);
+    else row(true, "No hidden date can be narrowed down from nearby clues.");
+    if (r.combos.length) for (const c of r.combos) row(false, `Message ${c.turn} combines ${c.kinds.join(", ")}${c.unique ? ' and "the only"' : ""}: together these may point at one person.`);
+    else row(true, "No message combines enough details to point at one person.");
+    const note = document.createElement("div");
+    note.className = "attack-note";
+    note.textContent = "Covers the attacks SafeShare knows; it can't prove nothing else is inferable.";
+    box.appendChild(note);
   }
 
   renderMaybeItems() {
@@ -1505,6 +1563,8 @@ class SafeShareModal {
       if (this.publishing || this.modelBusy) return;
       const riskyLeft = this.maybeCandidates.filter(c => c.risky && !(this.maybeChoices.get(c.raw) ?? c.risky)).length;
       if (riskyLeft && !window.confirm(`${riskyLeft} possible credential(s) remain visible to link readers and any AI they continue with. Create the link anyway?`)) return;
+      const attack = this.attackCheck(this.sanitizedTurns || []);
+      if (attack.leaks && !window.confirm(`The attack check still recovers ${attack.leaks} hidden value(s) from this share (see "Attack check"). Create the link anyway?`)) return;
       // Re-sharing after changing choices: the earlier link still shows the earlier version
       if (this.lastShare && window.confirm("You already created a link from this chat. Revoke that earlier link? (Recommended if you hid something you had missed.)")) {
         const { relayUrl: prevRelay, shareId: prevId, token: prevToken } = this.lastShare;

@@ -1220,3 +1220,11 @@
   border-color: rgba(99, 102, 241, 0.6) !important;
   color: #a5b4fc !important;
 }
+
+/* Attack check: SafeShare's own attacks run on the text about to be shared */
+#safeshare-attack-check { margin: 10px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); }
+#safeshare-attack-check .attack-check-title { font-size: 12px; font-weight: 600; color: #e4e4e7; margin-bottom: 6px; }
+#safeshare-attack-check .attack-row { font-size: 12px; line-height: 1.5; }
+#safeshare-attack-check .attack-ok { color: #86efac; }
+#safeshare-attack-check .attack-fail { color: #fca5a5; font-weight: 600; }
+#safeshare-attack-check .attack-note { font-size: 11px; color: #71717a; margin-top: 4px; }
