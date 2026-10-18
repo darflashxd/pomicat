@@ -5,7 +5,7 @@ independent read-only audit. Black Hat Asia 2027 Arsenal call for tools reported
 **2 Nov 2026** (confirm on blackhat.com). Reviewers judge the submission, so items marked
 **before 2 Nov** go in the abstract; the rest can land before the conference (March 2027).
 
-**Owners:** `me` = Claude in this repo · `you` = project owner · `friend` = co-developer /
+**Owners:** `me` = done in this repo · `you` = project owner · `friend` = co-developer /
 Cloudflare account owner · `friends` = testers / labellers
 **Status tags:** ✅ confirmed by reproducing it · 🔎 reported, still to verify
 
@@ -14,6 +14,29 @@ Done work is tracked in [TODO.md](TODO.md); this file is what's next.
 > **P0 fixes are in (2026-10-16, commits `f484f89`..`24cfe6b`).** Still open before calling the
 > extension production-ready: the browser checks on real ChatGPT / Claude pages (P0.1, P0.2) and
 > a manual run of share links opening inside the extension (§1).
+>
+> **2026-10-18:** checked on real ChatGPT and DeepSeek through Claude in Chrome (on-screen values,
+> chip menu, ChatGPT's new streamed layout fixed). Security audit fixes and the new features below
+> are in; #2 (LLM attacker) and #4 (tool comparison) are tracked in
+> [docs/ATTACK_BENCH_PLAN.md](docs/ATTACK_BENCH_PLAN.md).
+
+## Done 2026-10-17 – 18 (summary)
+
+- [x] Security audit (live tests): no code injection into the share dialog or viewer; link
+      scanners can't fake the "Open" click; websites can't message the background worker.
+- [x] Fixed: invisible characters (tag characters, bidi controls) hid keys/IDs from every rule;
+      hidden "smuggled" instructions reached the next AI through Continue, outgoing messages and the
+      viewer; background upload/revoke accepted any relay address; protection failed **open** on
+      an engine error (now holds the message).
+- [x] Only matched parts change (offset map): Cyrillic/Greek, emoji and ligatures stay as typed.
+- [x] Share dialog: maybe-review context score + top-5 list, attack check (SafeShare's own attacks
+      on the text about to be shared), revoke-on-reshare, sharer-only originals (encrypted with the
+      link key, extension only).
+- [x] Before sending: off by default (opt-in), "Keep debug details" switch, public IPs hidden
+      (also inside URLs), per-chat restore map, values stay visible after switching protection off.
+- [x] Site health check: warns when a chat site's layout changes and SafeShare can't read it.
+- [x] Bugs found on real ChatGPT: formulas split across streamed spans, address rule running across
+      sentences, `@` in prose redacted.
 
 ---
 
@@ -240,20 +263,31 @@ Each needs an attack (in `invert`), a defence, tests and a benchmark row, like t
 
 ## 3. InversionBench: measure the attack for real
 
+Detailed steps, owners and needs: [docs/ATTACK_BENCH_PLAN.md](docs/ATTACK_BENCH_PLAN.md) (#2).
+
+- [x] Harness `tools/attack_bench/run.js`: 40 fictional chats, redactors none / naive / Presidio /
+      SafeShare, arithmetic attacker. Baseline: naive 53% leaked, Presidio 60%, SafeShare 0%
+      (`tools/attack_bench/RESULTS.md`). · `me`
+- [ ] LLM attacker (`--llm`), 2–3 models · `me` · **needs API key + budget + your OK**
+
 - [ ] ~300 fictional personal prompts (ID + EN): salaries, loans, ages, travel dates, doses,
       combinations of details. · `me`
-- [ ] Real replies from 3–4 current models. · `me` · **needs API keys**
+- [ ] Real replies from 2–3 current models instead of templated ones. · `me` · **needs API keys**
 - [ ] Redact with every tool in §4 + Presidio + a regex baseline; report recovery per tool and
       per inference type, and what's left after SafeShare. · `me`
 - [ ] Publish dataset (fictional only) and scripts; update RESULTS.md and the abstract. · `me`
 
 ## 4. Test real redaction tools, disclose responsibly
 
+Detailed steps, owners and needs: [docs/ATTACK_BENCH_PLAN.md](docs/ATTACK_BENCH_PLAN.md) (#4).
+
 Rules: fictional data only; follow each service's terms; no bypassing; call it a *limit of a class
 of tools*, not a vulnerability or CVE.
 
-- [ ] Harness: InversionBench through Presidio, scrubadub/philter, "anonymize before ChatGPT"
-      extensions; then `invert`. · `me`
+- [x] Harness with Presidio + naive baseline (`tools/attack_bench/run.js`). · `me`
+- [ ] Add scrubadub / Philter / regex baseline · `me` · **needs your tool list + OK to download**
+- [ ] "Anonymise before ChatGPT" extensions/SaaS: you install, we run fictional chats through
+      them via Claude in Chrome · `you` + `me`
 - [ ] Cloud services (Google SDP, AWS Comprehend PII, Azure PII) via free tiers. · `you`
 - [ ] Disclosure: GitHub issues for open source; notes to security contacts for the rest, **by
       early December** (~90 days before March); keep a log. · `you`
@@ -286,8 +320,9 @@ of tools*, not a vulnerability or CVE.
 
 | When | What |
 |---|---|
-| Now – 20 Oct | **P0.1–P0.7** with regression tests |
-| 20 – 25 Oct | P1 + claim fixes · §2A dates · §2C across turns |
+| ~~Now – 20 Oct~~ | ~~**P0.1–P0.7** with regression tests~~ done 16 Oct |
+| ~~20 – 25 Oct~~ | ~~P1 + claim fixes · §2A dates · §2C across turns~~ done 16–18 Oct |
+| 18 – 25 Oct | #2 LLM attacker (needs key) · #4 open-source tools · friend: redeploy relay, model licence |
 | 25 Oct – 2 Nov | Live deploy · TESTING.md on 3 sites · video · bios · reframed abstract · **submit** |
 | November | §1 in-extension decryption, shadow DOM, vault move · §4 harness · §5 data + first model |
 | Early December | §4 disclosure emails sent |
