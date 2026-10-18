@@ -26,6 +26,14 @@ const relay = spawn(py, [path.join(__dirname, "..", "relay", "server_local.py")]
     }
     assert(res, "relay did not start");
     assert.strictEqual(res.status, 500, "unsaved share must not be reported as stored");
+    // Path traversal: a file next to the viewer folder whose name starts with "viewer" must not be served
+    const http = require("http");
+    const body = await new Promise((resolve, reject) => {
+      http.get({ host: "127.0.0.1", port, path: "/../viewer_redirect.js" }, (r) => {
+        let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => resolve(d));
+      }).on("error", reject);
+    });
+    assert(!body.includes("document_start"), "traversal to extension/viewer_redirect.js must fail");
     console.log("relay_local: all checks passed");
   } finally {
     relay.kill();

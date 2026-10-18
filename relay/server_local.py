@@ -23,6 +23,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIEWER_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "extension", "viewer"))
 STORAGE_FILE = os.environ.get("SAFESHARE_STORAGE") or os.path.join(BASE_DIR, "storage.json")
 STORAGE_LOCK = threading.Lock()
+
+
+def inside_viewer(path):
+    """True only for files inside VIEWER_DIR. A plain prefix test let "/../viewer_redirect.js"
+    through, because ".../extension/viewer_redirect.js" starts with ".../extension/viewer"."""
+    try:
+        return os.path.commonpath([VIEWER_DIR, os.path.abspath(path)]) == VIEWER_DIR
+    except ValueError:  # different drives on Windows
+        return False
 VIEWER_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
               "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
@@ -271,7 +280,7 @@ class SafeShareHandler(BaseHTTPRequestHandler):
         candidate = os.path.abspath(os.path.join(VIEWER_DIR, rel_path))
 
         # Resilient subpath resolution: handles /s/style.css, /v/style.css, /s/<id>/engine/*.js
-        if not (os.path.isfile(candidate) and candidate.startswith(VIEWER_DIR)):
+        if not (os.path.isfile(candidate) and inside_viewer(candidate)):
             for prefix in ["s/", "v/"]:
                 if rel_path.startswith(prefix):
                     stripped = rel_path[len(prefix):]
@@ -282,11 +291,11 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                     for sub in candidates_to_try:
                         if sub:
                             sub_cand = os.path.abspath(os.path.join(VIEWER_DIR, sub))
-                            if os.path.isfile(sub_cand) and sub_cand.startswith(VIEWER_DIR):
+                            if os.path.isfile(sub_cand) and inside_viewer(sub_cand):
                                 candidate = sub_cand
                                 break
 
-        if os.path.isfile(candidate) and candidate.startswith(VIEWER_DIR):
+        if os.path.isfile(candidate) and inside_viewer(candidate):
             file_path = candidate
             if candidate.endswith(".css"):
                 content_type = "text/css"

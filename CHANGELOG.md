@@ -2,6 +2,10 @@
 
 ## Unreleased — experimental share review
 
+- Security: the local relay served files next to the viewer folder whose names start with
+  "viewer" (`/../viewer_redirect.js`) because of a string-prefix path check; now a real
+  folder-containment check, with a regression test.
+
 - Attack check in the share dialog: SafeShare's own attacks (amount inversion, birth year, dates,
   combinations of details) run on exactly the text about to be shared; a successful attack is
   shown in red and creating the link asks first.
