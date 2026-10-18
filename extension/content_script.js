@@ -886,6 +886,7 @@
 
     let wasStreaming = false;
     const observer = new MutationObserver(() => {
+      if (extensionGone()) return observer.disconnect();
       const isStreamingNow = Boolean(document.querySelector("[data-testid='stop-button'], button[aria-label*='Stop'], [data-is-streaming='true'], .result-streaming, [aria-label*='Stop response']"));
       if (wasStreaming && !isStreamingNow) {
         // Active generation ended! Run an immediate sweep to catch trailing paragraphs/tables
@@ -1186,7 +1187,13 @@
   window.addEventListener("popstate", handleSessionRouteChange);
 
   // Periodic check to inject button & prompt shield once UI is loaded and track SPA navigation
-  setInterval(() => {
+  // After the extension is reloaded or updated, the copy already running in open tabs is orphaned
+  // and every extension call throws "Extension context invalidated": stop its timers then.
+  const runtimeId = () => extApi && extApi.runtime && extApi.runtime.id;
+  const startedInExtension = Boolean(runtimeId()); // test pages run without one: keep going there
+  const extensionGone = () => startedInExtension && !runtimeId();
+  const mainTimer = setInterval(() => {
+    if (extensionGone()) return clearInterval(mainTimer);
     handleSessionRouteChange();
     initSafeShareButton();
     initPreInferenceInterception();
@@ -1231,7 +1238,7 @@
       indicator.dataset.errorUntil = String(Date.now() + 11000);
     }
   }
-  setInterval(checkSiteHealth, 10000);
+  const healthTimer = setInterval(() => (extensionGone() ? clearInterval(healthTimer) : checkSiteHealth()), 10000);
 
   // Listen to modal toggle events
   window.addEventListener("safeshare:shield_toggle", (e) => {
