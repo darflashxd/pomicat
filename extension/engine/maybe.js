@@ -41,7 +41,8 @@
 
   function scan(turns, modelSpans = []) {
     const candidates = new Map();
-    const normalized = turns.map(({ role, content }) => ({ role, content: heuristics.normalizeHomoglyphs(content) }));
+    // The text as typed (minus smuggling characters): the share keeps everything else unchanged
+    const normalized = turns.map(({ role, content }) => ({ role, content: heuristics.stripSmuggled(content) }));
     const excludedByTurn = normalized.map(t => [...t.content.matchAll(placeholders)].map(m => [m.index, m.index + m[0].length]));
     const occurrencesByTurn = normalized.map(t => [...t.content.matchAll(/\$\{[^}\n]*\}|\$[A-Za-z_][\w]*/g)].map(m => [m.index, m.index + m[0].length]));
     normalized.forEach((turn, turnIndex) => {
@@ -92,7 +93,7 @@
 
   function apply(turns, candidates, choices) {
     return turns.map(({ role, content }, turnIndex) => {
-      content = heuristics.normalizeHomoglyphs(content);
+      content = heuristics.stripSmuggled(content);
       const spans = candidates.filter((c) => choices.get(c.raw) ?? c.risky)
         .flatMap((c) => c.occurrences.filter((o) => o.turnIndex === turnIndex).map((o) => ({ ...o, replacement: c.replacement })))
         .sort((a, b) => a.start - b.start || b.end - a.end);

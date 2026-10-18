@@ -2,6 +2,14 @@
 
 ## Unreleased — experimental share review
 
+- Only the hidden parts of a message change. Rules still match on a normalised copy (look-alike
+  letters, full-width digits, invisible characters), but each match is mapped back to the text as
+  typed: Russian/Greek words no longer get Latin look-alike letters, and emoji (👨‍👩‍👧), ligatures
+  and flags survive, before sending, in shares, the CLI and the proxy. Manual selections match
+  look-alike/full-width text the same way.
+- Fail closed before sending: if protection itself throws, the message is held (chip says why)
+  instead of being sent unprotected.
+
 - Security: invisible characters (Unicode tag characters, bidi controls) no longer hide a key or ID
   from the rules, and are removed from outgoing messages (when protection is on), the Continue
   prompt and the share viewer, so pasted or shared text can't smuggle hidden instructions to an AI.

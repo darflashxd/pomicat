@@ -126,7 +126,9 @@
     const scan = shieldIdScanner.scan(text);
     const detections = keepDebugDetails() ? scan.detections.filter((d) => d.category !== "SYSTEM") : scan.detections;
     if (!detections.length) return { out: text, count: 0 };
-    let out = shieldIdScanner.normalizeHomoglyphs(text); // detection offsets refer to this text
+    // Detection offsets refer to scan.baseText: the message as typed (minus smuggling characters).
+    // Only the matched parts change; Cyrillic, Greek and emoji elsewhere are sent as typed.
+    let out = scan.baseText;
     // Number placeholders in reading order ([PHONE_1] is the first phone), then replace from the
     // end so earlier offsets stay valid
     const edits = [...detections].sort((a, b) => a.index - b.index).map((det) => {
@@ -440,6 +442,8 @@
       bar.appendChild(indicator);
     }
 
+    if (Number(indicator.dataset.errorUntil || 0) > Date.now()) return; // a held-message notice is showing
+
     if (!isEnabled) {
       indicator.className = "shield-disabled";
       indicator.textContent = "🛡️ Protection off ▾";
@@ -563,7 +567,24 @@
       const text = getInputText(inputEl);
       if (!text || !text.trim()) return;
 
-      const syncCheck = shieldRewrite(text, { dryRun: true });
+      // Fail closed: if protection itself breaks, hold the message instead of letting the site send
+      // it unprotected. Switching protection off (chip) sends as typed.
+      const holdOnError = (err) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        console.error("[SafeShare-AI] Protection failed; message held, not sent:", err);
+        const indicator = document.getElementById("safeshare-shield-indicator");
+        if (indicator) {
+          indicator.textContent = "🛡️ Protection error: message NOT sent. Retry, or switch protection off ▾";
+          indicator.dataset.errorUntil = String(Date.now() + 8000); // keep it readable (see updateShieldIndicator)
+        }
+      };
+      let syncCheck;
+      try {
+        syncCheck = shieldRewrite(text, { dryRun: true });
+      } catch (err) {
+        return holdOnError(err);
+      }
       if (!syncCheck.isTransformed && getShieldMode() !== "all") return;
 
       e.preventDefault();
@@ -574,8 +595,9 @@
       try {
         rewritten = await shieldRewriteAsync(text);
       } catch (err) {
-        console.warn("[SafeShare-AI] Pre-inference rewrite fallback:", err);
-        rewritten = { isTransformed: false, sanitizedPrompt: text, count: 0 };
+        // (The name model failing is handled inside as nerUnavailable; this is a real engine error)
+        isRewriting = false;
+        return holdOnError(err);
       } finally {
         isRewriting = false;
       }

@@ -739,10 +739,9 @@ class SafeShareModal {
       const turn = this.currentTurns[tIdx];
       origTextDisplay += `[${turn.role.toUpperCase()}]:\n${turn.content}\n\n`;
 
-      // Detections were found on the homoglyph-normalised text (heuristics.scan normalises
-      // look-alike letters), so rebuild from the same normalised text: replacing on the original
-      // would miss "аlice@example.com" with a Cyrillic "а" and leak it into the share.
-      let turnText = this.heuristics.normalizeHomoglyphs(turn.content);
+      // heuristics.scan matches on normalised text but reports each detection as the original span
+      // ("аlice@example.com" with its Cyrillic "а"), so it can be replaced in the text as typed.
+      let turnText = this.heuristics.stripSmuggled(turn.content);
       const hDets = (this.cachedTurnDetections && this.cachedTurnDetections[tIdx]?.hDetections) || [];
       for (const det of hDets) {
         const secretVal = det.secretToken || det.raw;
@@ -828,7 +827,7 @@ class SafeShareModal {
     this.reviewBaseTurns = this.finalSafetyScan(this.sanitizedTurns).map(({ role, content }) => ({ role, content }));
     const modelSpans = this.reviewBaseTurns.flatMap((t, turnIndex) => (this.modelReview.get(t.content) || []).map(s => ({ ...s, turnIndex })));
     this.maybeCandidates = this.maybe.scan(this.reviewBaseTurns, modelSpans).filter(m => !this.candidates.some(c =>
-      !c.id.startsWith("maybe_") && [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === m.raw)));
+      !c.id.startsWith("maybe_") && [c.raw, c.fullRaw].some(raw => raw && this.heuristics.normalizeHomoglyphs(raw) === this.heuristics.normalizeHomoglyphs(m.raw))));
     this.maybeCandidates = this.maybeCandidates.map(m => {
       if (!this.maybeIdentities.has(m.raw)) this.maybeIdentities.set(m.raw, this.maybeIdentities.size + 1);
       const identity = this.maybeIdentities.get(m.raw);
@@ -842,9 +841,13 @@ class SafeShareModal {
     // Replace selected intervals together, so a short selection cannot defeat a longer one.
     const custom = this.candidates.filter(c => c.category === "CUSTOM" && c.enabled && this.activeCategories.has("CUSTOM"));
     this.sanitizedTurns = this.sanitizedTurns.map(({ role, content }) => {
-      const spans = custom.flatMap(c => [...content.matchAll(new RegExp(
-        `(?<![\\p{L}\\p{N}_])${this.escapeRegExp(c.raw)}(?![\\p{L}\\p{N}_])`, "giu"))]
-        .map(m => ({ start: m.index, end: m.index + m[0].length, replacement: c.tag })))
+      // Selections are stored normalised ("Ａｕｒｏｒａ" -> "Aurora"); match on a normalised copy and
+      // map each hit back to the span as typed, so look-alike or full-width text is hidden too
+      const norm = this.heuristics.normalizeWithMap(content);
+      const spans = custom.flatMap(c => [...norm.text.matchAll(new RegExp(
+        `(?<![\\p{L}\\p{N}_])${this.escapeRegExp(this.heuristics.normalizeHomoglyphs(c.raw))}(?![\\p{L}\\p{N}_])`, "giu"))]
+        .filter(m => m[0].length)
+        .map(m => ({ start: norm.start[m.index], end: norm.end[m.index + m[0].length - 1], replacement: c.tag })))
         .sort((a, b) => a.start - b.start || b.end - a.end);
       const merged = [];
       for (const span of spans) {
@@ -1182,7 +1185,7 @@ class SafeShareModal {
     return sharedTurns.map((shared, i) => {
       const source = this.currentTurns[i];
       if (!source || source.role !== shared.role) return [];
-      const orig = this.heuristics.normalizeHomoglyphs(source.content);
+      const orig = this.heuristics.stripSmuggled(source.content);
       const tags = [...shared.content.matchAll(TAG)];
       const out = [];
       let pos = 0;
@@ -1235,12 +1238,11 @@ class SafeShareModal {
         .map(v => this.heuristics.normalizeHomoglyphs(v).toLowerCase())
     );
     return turns.map(t => {
-      const text = this.heuristics.normalizeHomoglyphs(t.content);
-      const scan = this.heuristics.scan(text, { labelDetection: det => this.hardLabel(det) });
-      let out = text;
+      const scan = this.heuristics.scan(t.content, { labelDetection: det => this.hardLabel(det) });
+      let out = scan.baseText; // offsets refer to the text as typed; nothing else is changed
       for (const det of [...scan.detections].sort((a, b) => b.index - a.index)) {
-        const raw = det.raw.toLowerCase();
-        const secret = (det.secretToken || "").toLowerCase();
+        const raw = this.heuristics.normalizeHomoglyphs(det.raw).toLowerCase();
+        const secret = this.heuristics.normalizeHomoglyphs(det.secretToken || "").toLowerCase();
         const candidate = this.candidates.find(c => c.tag === det.tag);
         if (candidate && (!candidate.enabled || !this.activeCategories.has(candidate.category))) continue;
         if (kept.has(raw) || (secret && kept.has(secret))) continue;

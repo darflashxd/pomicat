@@ -1233,14 +1233,59 @@ class HeuristicsRedactor {
   }
 
   /**
+   * Removes invisible "ASCII smuggling" characters: Unicode tag characters (kept only inside a flag
+   * emoji such as England's) and bidi override/isolate controls. They have no business in chat text
+   * and can carry hidden instructions for an AI. This is the only change scan() makes to text
+   * outside a detection.
+   */
+  stripSmuggled(text) {
+    return String(text || "").replace(/(?<!\u{1F3F4}[\u{E0020}-\u{E007E}]*)[\u{E0000}-\u{E007F}]|[‪-‮⁦-⁩]/gu, "");
+  }
+
+  /**
+   * normalizeHomoglyphs() one code point at a time, remembering where each output character came
+   * from: start[i]/end[i] are the original text's offsets of the code point that produced output
+   * character i. scan() matches rules on the normalised text and uses this to replace exactly the
+   * matching original span, so text outside a match (Russian, Greek, emoji) is left as typed.
+   */
+  normalizeWithMap(text) {
+    const start = [];
+    const end = [];
+    let out = "";
+    for (let i = 0; i < text.length;) {
+      const cp = text.codePointAt(i);
+      const ch = String.fromCodePoint(cp);
+      // Printable ASCII never changes; only other characters go through the full normalisation
+      let piece = ch;
+      if (cp < 0x20 || cp >= 0x7f) {
+        this._normCache = this._normCache || new Map();
+        piece = this._normCache.get(ch);
+        if (piece === undefined) this._normCache.set(ch, (piece = this.normalizeHomoglyphs(ch)));
+      }
+      for (let k = 0; k < piece.length; k++) {
+        start.push(i);
+        end.push(i + ch.length);
+      }
+      out += piece;
+      i += ch.length;
+    }
+    return { text: out, start, end };
+  }
+
+  /**
    * Scans and redacts deterministic secrets and PII from input text.
    * Returns: { sanitizedText, detections: [{ type, matched, offset, length }] }
    */
   scan(text, { labelDetection } = {}) {
-    if (!text) return { sanitizedText: "", detections: [] };
-    // Pre-processing: Apply Homoglyph normalization & strip zero-width characters
-    text = this.normalizeHomoglyphs(text);
-    let sanitizedText = text;
+    if (!text) return { sanitizedText: "", detections: [], baseText: "" };
+    // Rules match on a normalised copy (look-alike letters, invisible characters, NFKC), so
+    // "аlice@example.com" with a Cyrillic а is still caught. The output is built from the original
+    // text (minus smuggling characters): detection offsets below are mapped back to it, and text
+    // outside a detection is not touched. baseText is the text those offsets refer to.
+    const baseText = this.stripSmuggled(text);
+    const norm = this.normalizeWithMap(baseText);
+    text = norm.text;
+    let sanitizedText = baseText;
     const detections = [];
 
     for (const pattern of this.patterns) {
@@ -1301,6 +1346,30 @@ class HeuristicsRedactor {
       }
     }
 
+    // Map each detection from the normalised text back to the original span it came from
+    for (const det of detections) {
+      if (!det.length) continue;
+      const from = norm.start[det.index];
+      const to = norm.end[det.index + det.length - 1];
+      if (from === undefined || to === undefined) continue;
+      det.normalizedRaw = det.raw;
+      // The secret part (e.g. the value after "password ") is mapped back too, when it is a plain
+      // substring of the match (card security codes are digit-stripped and stay as they are)
+      if (typeof det.secretToken === "string" && det.secretToken !== det.raw) {
+        const k = det.raw.indexOf(det.secretToken);
+        if (k >= 0 && det.secretToken.length) {
+          const s0 = norm.start[det.index + k];
+          const s1 = norm.end[det.index + k + det.secretToken.length - 1];
+          if (s0 !== undefined && s1 !== undefined) det.secretToken = baseText.slice(s0, s1);
+        }
+      } else if (det.secretToken === det.raw) {
+        det.secretToken = baseText.slice(from, to);
+      }
+      det.raw = baseText.slice(from, to);
+      det.index = from;
+      det.length = to - from;
+    }
+
     // Resolve overlapping detections: prefer larger spans (e.g. TERMINAL_PROMPT over inner user@host)
     const sortedByLength = [...detections].sort((a, b) => b.length - a.length);
     const nonOverlapping = [];
@@ -1340,7 +1409,8 @@ class HeuristicsRedactor {
 
     return {
       sanitizedText,
-      detections: nonOverlapping
+      detections: nonOverlapping,
+      baseText
     };
   }
 }

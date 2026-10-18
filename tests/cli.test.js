@@ -185,3 +185,28 @@ console.log("cli: address boundary checks passed");
   assert(![...prompt].some((c) => c.codePointAt(0) >= 0xE0000), "tag characters stripped from Continue");
 }
 console.log("cli: invisible character checks passed");
+
+// Only the matched parts change: Cyrillic/Greek/emoji/ligatures elsewhere stay exactly as typed,
+// while look-alike, full-width and invisible-character tricks are still caught (offset map)
+{
+  const H = require("../extension/engine/heuristics.js");
+  const h = new H();
+  const ru = h.scan("Привет, мой телефон +62 812 3456 7890, спасибо");
+  assert.strictEqual(ru.sanitizedText, "Привет, мой телефон [REDACTED_PHONE], спасибо");
+  assert(!/[a-z]/i.test(ru.sanitizedText.replace(/\[[^\]]*\]/g, "")), "no Latin look-alikes injected into Russian");
+  assert.strictEqual(h.scan("Γειά σου maria@example.gr ευχαριστώ").sanitizedText.split(" ")[0], "Γειά");
+  const homoglyph = h.scan("mail me at аlice@example.com");
+  assert(!homoglyph.sanitizedText.includes("lice@example"), "Cyrillic а email still caught");
+  assert.strictEqual(homoglyph.detections[0].raw, "аlice@example.com", "detection reports the span as typed");
+  const family = "👨‍👩‍👧";
+  assert(h.scan(`family ${family} NIK 3201012304950001`).sanitizedText.includes(family), "emoji joiners kept");
+  const lig = h.scan("ﬁle card 4111 1111 1111 1111 ﬁn");
+  assert(lig.sanitizedText.startsWith("ﬁle ") && lig.sanitizedText.endsWith(" ﬁn"), "ligatures outside a match kept");
+  assert(!h.scan("phone ０８１２３４５６７８９０ ok").sanitizedText.includes("０８１２"), "full-width digits still caught");
+  for (const d of h.scan("Привет 3201012304950001 и ﬁ 👨‍👩 4111 1111 1111 1111").detections) {
+    assert.strictEqual(h.scan("Привет 3201012304950001 и ﬁ 👨‍👩 4111 1111 1111 1111").baseText.slice(d.index, d.index + d.length), d.raw, "offsets point at the original");
+  }
+  const flag = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+  assert(h.scan(`England ${flag} fans`).sanitizedText.includes(flag), "flag emoji kept");
+}
+console.log("cli: original-text output checks passed");
