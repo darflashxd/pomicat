@@ -110,6 +110,8 @@ to pick a mode. Keep **Protect IDs + amounts** unless the test says otherwise.
 - [ ] In the answer, `[NIK_1]` / `[NAME_1]` show the real values in blue with a dashed underline;
       hovering says "Only on your screen. The AI received [NIK_1]."
 - [ ] Amounts in the answer show real computed numbers on your screen (e.g. $1,000 / $12,000)
+- [ ] Under your own message: "🔒 N values protected · show". Clicking lists `[NIK_1] = …` and
+      `<S1> = …`; your message itself keeps the placeholders, and the share dialog never shows the note
 
 **1b. Fiction is left alone**
 

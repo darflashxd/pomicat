@@ -727,6 +727,67 @@
   }
 
   /**
+   * Under your own messages: "🔒 2 values protected · show". The bubble itself keeps the
+   * placeholders (what the AI received; the site's edit/copy and our shares use them) and is never
+   * touched, since the sites redraw it. The note is a sibling with everything in a closed shadow
+   * root, so the site's scripts can't read the values, and getCleanNodeContent drops it.
+   */
+  const SENT_PLACEHOLDER = /\[[A-Z][A-Z_]*_\d+\]|<S\d+>/g;
+  function ownMessageBubbles() {
+    const deepseek = [...document.querySelectorAll("div.ds-message")]
+      .filter(el => !el.querySelector(".ds-assistant-message-main-content, div.ds-markdown"))
+      .map(el => el.querySelector(".ds-collapsible-text") || el);
+    // Innermost only: ChatGPT nests the bubble inside its role element
+    return [...document.querySelectorAll(USER_BUBBLE_SELECTOR), ...deepseek]
+      .filter(el => !el.querySelector(USER_BUBBLE_SELECTOR) && !isComposerOrSafeShareUI(el));
+  }
+  function addSentNotes() {
+    const vault = symbolicVault && symbolicVault.size() ? symbolicVault.getAll() : {};
+    const valueOf = (p) => idMap.byPlaceholder.get(p) ?? (vault[p] ? vault[p].raw : undefined);
+    if (!idMap.byPlaceholder.size && !Object.keys(vault).length) return;
+    for (const bubble of ownMessageBubbles()) {
+      const found = [...new Set((bubble.innerText || bubble.textContent || "").match(SENT_PLACEHOLDER) || [])]
+        .filter(p => valueOf(p) !== undefined);
+      const key = found.join("|");
+      const next = bubble.nextElementSibling;
+      const existing = next && next.classList.contains("ss-sent-note") ? next : null;
+      if (existing && existing.dataset.key === key) continue;
+      if (existing) existing.remove();
+      if (!found.length) continue;
+
+      const note = document.createElement("div");
+      note.className = "ss-sent-note";
+      note.dataset.key = key;
+      const root = note.attachShadow({ mode: "closed" });
+      const style = document.createElement("style");
+      style.textContent = ":host{display:block;width:100%;margin:4px 0 0;text-align:right;font:12px/1.5 system-ui,sans-serif;color:#8a8f98}" +
+        "button{all:unset;cursor:pointer}button:hover{text-decoration:underline}" +
+        "ul{list-style:none;margin:2px 0 0;padding:0}ul[hidden]{display:none}li{color:#4a90e2;word-break:break-all}";
+      const label = (open) => `🔒 ${found.length} value${found.length > 1 ? "s" : ""} protected · ${open ? "hide" : "show"}`;
+      const btn = document.createElement("button");
+      btn.textContent = label(false);
+      btn.title = "Only on your screen. The AI received the placeholders shown in your message.";
+      const list = document.createElement("ul");
+      list.hidden = true;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // Filled on first open, so the values aren't in the page until you ask for them
+        if (!list.childElementCount) {
+          for (const p of found) {
+            const li = document.createElement("li");
+            li.textContent = `${p} = ${valueOf(p)}`;
+            list.appendChild(li);
+          }
+        }
+        list.hidden = !list.hidden;
+        btn.textContent = label(!list.hidden);
+      });
+      root.append(style, btn, list);
+      bubble.after(note);
+    }
+  }
+
+  /**
    * Performs an active hydration pass over all visible assistant message nodes.
    * If shield is disabled, reverts any existing local compute spans back to original expressions.
    * Resolves KaTeX math annotations, tables, code, and text containers.
@@ -738,6 +799,7 @@
     // Values that were replaced before sending stay readable on your screen even after protection
     // is switched off (the map only holds what was actually replaced)
     restoreIdsOnScreen();
+    try { addSentNotes(); } catch (_) {} // a display extra: never let it stop the pass
 
     // If shield is disabled: un-hydrate all local compute spans so user sees raw symbols
     if (!isEnabled) {
@@ -892,13 +954,14 @@
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
     // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
-    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr], .katex, table, h1, h2, h3, pre")) {
+    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr], .ss-sent-note, .katex, table, h1, h2, h3, pre")) {
       return (containerEl.innerText || containerEl.textContent || "").trim();
     }
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
       // Find all hydrated local compute spans in the clone
+      clone.querySelectorAll(".ss-sent-note").forEach(n => n.remove()); // "🔒 2 values protected" is ours, not the chat
       const hydratedSpans = clone.querySelectorAll(".ss-local-compute, .ss-katex-hydrated, [data-expr]");
       hydratedSpans.forEach(span => {
         const origExpr = span.getAttribute("data-expr");
