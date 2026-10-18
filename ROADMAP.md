@@ -35,6 +35,14 @@ Done work is tracked in [TODO.md](TODO.md); this file is what's next.
 - [x] Before sending: off by default (opt-in), "Keep debug details" switch, public IPs hidden
       (also inside URLs), per-chat restore map, values stay visible after switching protection off.
 - [x] Site health check: warns when a chat site's layout changes and SafeShare can't read it.
+- [x] Final audit (18 Oct): no secrets in git history (only fictional test values); zip and npm
+      package contain only what they should; no dependencies; minimal permissions; fixed a path
+      traversal in the local relay (`/../viewer_redirect.js`).
+- [ ] Settings (protection mode, debug switch, categories) live in the chat site's localStorage, so
+      its scripts could switch protection off. Low risk (the site already sees typed text); move to
+      extension storage. · `me`
+- [ ] Firefox manifest has no `browser_specific_settings.gecko.id`; needed for an add-ons.mozilla.org
+      listing. · `me`
 - [x] Bugs found on real ChatGPT: formulas split across streamed spans, address rule running across
       sentences, `@` in prose redacted.
 
