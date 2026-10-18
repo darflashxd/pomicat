@@ -447,6 +447,7 @@
       bar.appendChild(indicator);
     }
 
+    try { syncSiteTheme(bar.parentElement); } catch (_) {}
     if (Number(indicator.dataset.errorUntil || 0) > Date.now()) return; // a held-message notice is showing
 
     if (!isEnabled) {
@@ -462,6 +463,24 @@
     indicator.textContent = count
       ? `🛡️ ${count} item${count > 1 ? "s" : ""} will be protected ▾`
       : `🛡️ ${mode === "all" ? "Protecting IDs + amounts" : "Protecting amounts"} ▾`;
+  }
+
+  /**
+   * Light or dark chat site, by the site's own theme (not the OS setting): the first solid
+   * background behind the chat box decides. Sets html[data-ss-theme]; modal.css has the light
+   * variants of the chip, its menu and the on-screen values.
+   */
+  function syncSiteTheme(fromEl) {
+    let rgb = null;
+    for (let el = fromEl; el && !rgb; el = el.parentElement) {
+      const n = (getComputedStyle(el).backgroundColor.match(/[\d.]+/g) || []).map(Number);
+      if (n.length >= 3 && (n.length < 4 || n[3] > 0.5)) rgb = n;
+    }
+    // Nothing painted: the page canvas, white unless the site asks for a dark color scheme
+    const light = rgb ? 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 140
+      : !/dark/.test(getComputedStyle(document.documentElement).colorScheme || "");
+    const theme = light ? "light" : "dark";
+    if (document.documentElement.dataset.ssTheme !== theme) document.documentElement.dataset.ssTheme = theme;
   }
 
   /** Small menu under the chip to pick the before-sending protection mode. */
