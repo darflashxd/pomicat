@@ -752,6 +752,7 @@
    * root, so the site's scripts can't read the values, and getCleanNodeContent drops it.
    */
   const SENT_PLACEHOLDER = /\[[A-Z][A-Z_]*_\d+\]|<S\d+>/g;
+  const sentNoteValues = new WeakMap(); // note -> its values, in memory only (never in the page)
   function ownMessageBubbles() {
     const deepseek = [...document.querySelectorAll("div.ds-message")]
       .filter(el => !el.querySelector(".ds-assistant-message-main-content, div.ds-markdown"))
@@ -763,26 +764,28 @@
   function addSentNotes() {
     const vault = symbolicVault && symbolicVault.size() ? symbolicVault.getAll() : {};
     const valueOf = (p) => idMap.byPlaceholder.get(p) ?? (vault[p] ? vault[p].raw : undefined);
-    if (!idMap.byPlaceholder.size && !Object.keys(vault).length) return;
+    // No early return on an empty map: notes whose values are gone (other chat) must be removed
     for (const bubble of ownMessageBubbles()) {
-      const found = [...new Set((bubble.innerText || bubble.textContent || "").match(SENT_PLACEHOLDER) || [])]
-        .filter(p => valueOf(p) !== undefined);
-      const key = found.join("|");
+      // Values are taken now, while known: looking them up on click could hit the map while a chat
+      // switch reloads it, and the note showed "[NAME_1] = undefined"
+      const pairs = [...new Set((bubble.innerText || bubble.textContent || "").match(SENT_PLACEHOLDER) || [])]
+        .map(p => [p, valueOf(p)]).filter(([, v]) => v !== undefined && v !== null && v !== "");
+      const key = JSON.stringify(pairs);
       const next = bubble.nextElementSibling;
       const existing = next && next.classList.contains("ss-sent-note") ? next : null;
-      if (existing && existing.dataset.key === key) continue;
+      if (existing && sentNoteValues.get(existing) === key) continue;
       if (existing) existing.remove();
-      if (!found.length) continue;
+      if (!pairs.length) continue;
 
       const note = document.createElement("div");
       note.className = "ss-sent-note";
-      note.dataset.key = key;
+      sentNoteValues.set(note, key);
       const root = note.attachShadow({ mode: "closed" });
       const style = document.createElement("style");
       style.textContent = ":host{display:block;width:100%;margin:4px 0 0;text-align:right;font:12px/1.5 system-ui,sans-serif;color:#8a8f98}" +
         "button{all:unset;cursor:pointer}button:hover{text-decoration:underline}" +
         "ul{list-style:none;margin:2px 0 0;padding:0}ul[hidden]{display:none}li{color:#4a90e2;word-break:break-all}";
-      const label = (open) => `🔒 ${found.length} value${found.length > 1 ? "s" : ""} protected · ${open ? "hide" : "show"}`;
+      const label = (open) => `🔒 ${pairs.length} value${pairs.length > 1 ? "s" : ""} protected · ${open ? "hide" : "show"}`;
       const btn = document.createElement("button");
       btn.textContent = label(false);
       btn.title = "Only on your screen. The AI received the placeholders shown in your message.";
@@ -792,9 +795,9 @@
         e.stopPropagation();
         // Filled on first open, so the values aren't in the page until you ask for them
         if (!list.childElementCount) {
-          for (const p of found) {
+          for (const [p, v] of pairs) {
             const li = document.createElement("li");
-            li.textContent = `${p} = ${valueOf(p)}`;
+            li.textContent = `${p} = ${v}`;
             list.appendChild(li);
           }
         }
