@@ -57,11 +57,13 @@ def main():
     from model_comparison import LABELS, minilm_encodings
     text='My name is Amelia Hartwell. My email is amelia@example.org.'
     bert=AutoTokenizer.from_pretrained(str(args.directory/'bert-small-int8'),local_files_only=True,trust_remote_code=False)(text,return_tensors='np')
-    mini=minilm_encodings([{'text':text}])[0][0]
+    from model_assets import minilm_assets
+    baseline=minilm_assets(args.directory)
+    mini=minilm_encodings([{'text':text}],baseline/'vocab.txt')[0][0]
     model=GLiNER.from_pretrained(str(args.directory/'gliner-edge-int8'),local_files_only=True,load_onnx_model=True,onnx_model_file='onnx/model_quint8.onnx')
     prepared=model.prepare_batch([text],LABELS)
     gliner=model.collate_batch(prepared['input_x'],prepared['entity_types'],model.create_collator())
-    paths={'minilm':ROOT/'extension/models/model_q4.onnx','bert-small-int8':args.directory/'bert-small-int8/model.quant.onnx','gliner-edge-int8':args.directory/'gliner-edge-int8/onnx/model_quint8.onnx'}
+    paths={'minilm':baseline/'model_q4.onnx','bert-small-int8':args.directory/'bert-small-int8/model.quant.onnx','gliner-edge-int8':args.directory/'gliner-edge-int8/onnx/model_quint8.onnx'}
     feeds={}; references={}
     opts=ort.SessionOptions();opts.intra_op_num_threads=1
     for name,path in paths.items():

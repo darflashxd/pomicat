@@ -22,3 +22,13 @@ else:raise AssertionError('Missing predictions accepted')
 corpus=Path(__file__).resolve().parents[2]/'tests/fixtures/model_comparison_en.jsonl'
 validate_corpus([json.loads(line) for line in corpus.read_text(encoding='utf-8').splitlines()])
 print('PASS: canonical labels, exact spans, partial coverage, corpus validation, missing predictions')
+from model_assets import minilm_assets
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    assets = minilm_assets(tmp)
+    assert len(json.loads((assets/'config.json').read_text())['id2label']) == 35
+    (assets/'config.json').write_text('{}')
+    try: minilm_assets(tmp)
+    except ValueError: pass
+    else: raise AssertionError('Corrupted baseline accepted')
+print('PASS: historical MiniLM identity and mismatched baseline rejected')

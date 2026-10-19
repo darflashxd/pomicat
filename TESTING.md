@@ -1,5 +1,24 @@
 # Manual test checklist (Chrome)
 
+## Model-upgrade correction checks
+
+`node tests/ner_decoder.test.js` exercises the actual decoder with controlled logits: English
+names containing `Di Yang`, repeated Indonesian marker words and mixed messages must never
+disable the full scan. Native PERSON/LOCATION labels remain intact. `ner_client.test.js` checks
+malformed/partial responses, transport failure and checked-empty results. The real Chrome/Firefox
+model harness runs mixed-message name coverage and checked-empty tests too.
+
+Model quality is English-focused. Removing the old language-word bypass can expose noisy
+non-English suggestions; this is not fixed by pretending those messages were checked with no hits.
+Historical baseline benchmark tools read MiniLM from git commit `fb35c63` into an external
+experiment folder and verify identity instead of relabelling the current BERT file as MiniLM.
+Run those tools from a repository with that commit available (full history, not a shallow clone).
+
+Chrome users loading the repository folder must reload the extension and refresh chat tabs after
+pulling. Firefox uses a built Firefox ZIP (its manifest is installed as manifest.json); `dist/` is
+ignored and is NOT downloaded by git pull. Build with Python or obtain a separately published
+release asset. Extension inference itself needs neither Python nor a separate model download.
+
 ## Credential boundary regression
 
 `node tests/credential_boundaries.test.js` checks exact original value spans, preserved surrounding

@@ -146,6 +146,14 @@ const Modal = require("../extension/ui/modal.js");
   get("btn-select-all-cands").click();
   assert(!reset.sanitizedTurns[0].content.includes("OddSecret42"));
   assert(!reset.sanitizedTurns[0].content.includes("Z8kL2mN7pQ4rS9tU6vW3xY"), "explicit protect-all still selects uncertain suggestions");
+  const categoryModal = new Modal();
+  for (const [label, category] of [['PERSON','PROFILE'],['LOCATION','PROFILE'],['EMAIL','PROFILE'],
+    ['BANK_ACCOUNT','FINANCIAL'],['PASSPORT','GOV_ID'],['IP_ADDRESS','SYSTEM'],['PASSWORD','CREDENTIALS']]) {
+    categoryModal.maybeCandidates = [{id:'maybe_category_'+label,raw:'FictionalValue'+label,replacement:'[REDACTED_POSSIBLE_SECRET_1]',
+      source:'model',modelLabel:label,reason:'Local model: '+label,risky:false,occurrences:[{turnIndex:0,start:0,end:1}]}];
+    categoryModal.syncMaybeCandidates();
+    assert.equal(categoryModal.candidates.find(c=>c.raw==='FictionalValue'+label).category, category);
+  }
   const badges = new Modal();
   badges.currentTurns = [
     { role: "user", content: "My salary is USD 5,000 per month." },

@@ -89,18 +89,19 @@ def decode(text, offsets, logits, mapping):
             spans.append(current)
     return spans
 
-def minilm_encodings(rows):
+def minilm_encodings(rows, vocab_path):
     # Exact production JS tokenizer; convert UTF-16 spans to Python code-point offsets.
     script = """
     const fs=require('fs'), WP=require('./extension/engine/wordpiece.js');
-    const vocab=new Map(fs.readFileSync('extension/models/vocab.txt','utf8').split(/\\r?\\n/).map((v,i)=>[v,i]));
-    const rows=JSON.parse(fs.readFileSync(0,'utf8'));
+    const input=JSON.parse(fs.readFileSync(0,'utf8'));
+    const vocab=new Map(fs.readFileSync(input.vocab,'utf8').split(/\\r?\\n/).map((v,i)=>[v,i]));
+    const rows=input.rows;
     console.log(JSON.stringify(rows.map(r=>WP.encode(r.text,vocab).map(e=>({
       input_ids:Array.from(e.inputIds,Number),attention_mask:Array.from(e.attentionMask,Number),token_type_ids:Array.from(e.tokenTypeIds,Number),
       offsets:e.tokenSpans.map(s=>[...r.text.slice(0,s.start)].length).map((s,i)=>[s,[...r.text.slice(0,e.tokenSpans[i].end)].length])
     })))));
     """
-    return json.loads(subprocess.run(['node','-e',script],input=json.dumps(rows),capture_output=True,text=True,encoding='utf-8',cwd=ROOT,check=True,timeout=30).stdout)
+    return json.loads(subprocess.run(['node','-e',script],input=json.dumps({'rows':rows,'vocab':str(vocab_path)}),capture_output=True,text=True,encoding='utf-8',cwd=ROOT,check=True,timeout=30).stdout)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -113,13 +114,15 @@ def main():
     corpus=ROOT/'tests/fixtures/model_comparison_en.jsonl'
     rows=[json.loads(line) for line in corpus.read_text(encoding='utf-8').splitlines()]
     validate_corpus(rows)
-    encodings=minilm_encodings(rows)
+    from model_assets import minilm_assets
+    baseline=minilm_assets(args.directory)
+    encodings=minilm_encodings(rows, baseline/'vocab.txt')
     report={'scope':'30 manually authored fictional EN development cases; no independent holdout; canonical label merge; no threshold tuning',
             'corpus_sha256':hashlib.sha256(corpus.read_bytes()).hexdigest(),
             'environment':{'python':platform.python_version(),'platform':platform.platform(),'packages':{p:importlib.metadata.version(p) for p in ['onnxruntime','transformers','gliner','numpy']}},'models':{}}
     opts=ort.SessionOptions(); opts.intra_op_num_threads=1; opts.inter_op_num_threads=1
     for name, model_path, config_path in [
-        ('minilm', ROOT/'extension/models/model_q4.onnx',ROOT/'extension/models/config.json'),
+        ('minilm', baseline/'model_q4.onnx',baseline/'config.json'),
         ('bert-small-int8',args.directory/'bert-small-int8/model.quant.onnx',args.directory/'bert-small-int8/config.json')]:
         start=time.perf_counter(); session=ort.InferenceSession(str(model_path),sess_options=opts,providers=['CPUExecutionProvider'])
         load_ms=(time.perf_counter()-start)*1000

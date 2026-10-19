@@ -1,10 +1,10 @@
 /**
- * SafeShare-AI — WordPiece tokenizer for the MiniLM NER model (offscreen.js), matching the
+ * SafeShare-AI — WordPiece tokenizer for uncased BERT-family NER models (offscreen.js), matching the
  * original Hugging Face BertTokenizer (uncased) the model was trained and benchmarked with:
  * drop control characters, split on whitespace, punctuation and CJK characters, lowercase,
  * strip accents ("José" -> "jose"), greedy longest-match WordPiece, words over 100 characters
  * -> [UNK]. Unlike the original it keeps character offsets into the original text.
- * Special ids follow vocab.txt: [PAD] 0, [UNK] 1, [CLS] 2, [SEP] 3.
+ * Special ids are read from vocab.txt (standard BERT or historical pruned MiniLM).
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();

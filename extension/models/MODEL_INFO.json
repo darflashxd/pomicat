@@ -1,0 +1,14 @@
+{
+  "repository": "gravitee-io/bert-small-pii-detection",
+  "revision": "f8c27a85c51c0168f07b9dcf00265bf0a4097939",
+  "upstream_file": "model.quant.onnx",
+  "bundled_file": "model_q4.onnx",
+  "quantization": "INT8",
+  "language_scope": "English-focused; other languages and mixed-language quality are not guaranteed",
+  "license": "Apache-2.0 (as declared by upstream)",
+  "weight_bytes": 28732710,
+  "weight_sha256": "b227845ff4989c9f7383874b841895dfbdb9a4d7a20ceb39c3f187271894bf2a",
+  "labels": 51,
+  "vocab_size": 30522,
+  "special_tokens": {"[PAD]": 0, "[UNK]": 100, "[CLS]": 101, "[SEP]": 102}
+}

@@ -1,5 +1,16 @@
 # English candidate comparison — development experiment
 
+## Current status after upgrade audit
+
+BERT-small was promoted in commit `47ede77`; tables below are historical experiment results,
+not a current statement that MiniLM still ships. The correction removes the whole-message
+language-word bypass, keeps PERSON/LOCATION labels, and validates checked/failed responses.
+Non-English suggestions can be noisy; deterministic rules are not complete multilingual coverage.
+The old coarse PERSON-to-GIVEN_NAME / LOCATION-to-CITY experiment adapter is no longer used.
+Baseline scripts now extract MiniLM assets from `fb35c63` into the external experiment folder;
+they never assume the mutable production `model_q4.onnx` is MiniLM. Full git history is required.
+`MODEL_INFO.json` identifies the bundled INT8 graph despite its legacy Q4 filename.
+
 Date: 2026-10-19. **Recommendation: advance BERT-small INT8 to a larger independent evaluation;
 do not replace the shipped MiniLM yet.** No production model/config/runtime was changed.
 

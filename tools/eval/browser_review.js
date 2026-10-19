@@ -71,6 +71,15 @@ async function checkBrowserReview() {
       coveredEntities,suggestions:modelAccepted.length,benignSuggestions:sample.entities.length ? null : modelAccepted.length});
   }
   const longText = 'My name is Amelia Hartwell. ' + 'Ordinary text about software testing and documentation. '.repeat(65) + 'My colleague is Clara Whitmore.';
+  for (const text of ['My wife is Amelia Hartwell. saya saya', 'My wife is Di Yang.']) {
+    const value = text.includes('Amelia') ? 'Amelia Hartwell' : 'Di Yang';
+    const response = await SafeShareNer.analyze(text, 60000, true);
+    const start = text.indexOf(value);
+    assert(response.success && response.state === 'checked', 'mixed-message check unavailable');
+    assert(response.spans.some(s => s.label === 'PERSON' && s.start <= start && s.end >= start + value.length), 'English name lost in mixed message');
+  }
+  const empty = await SafeShareNer.analyze('Please explain how password hashing works.', 60000, true);
+  assert(empty.success && empty.state === 'checked' && empty.spans.length === 0, 'empty check is not a checked empty result');
   const longStart = performance.now();
   const longResponse = await SafeShareNer.analyze(longText, 60000, false);
   assert(longResponse.success && Array.isArray(longResponse.spans), 'long-message inference failed');

@@ -200,7 +200,7 @@
       let addedCount = 0;
 
       const validNerSpans = nerSpans.filter((s) =>
-        ["GIVEN_NAME", "SURNAME", "STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(s.label)
+        ["PERSON", "LOCATION", "GIVEN_NAME", "SURNAME", "STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(s.label)
       );
 
       if (validNerSpans.length && spanArbiter) {
@@ -215,7 +215,7 @@
         // Join neighbouring pieces of one name/place ("Rina" + "Wijaya"), then keep only the
         // writer's own ("my wife Rina Wijaya", "saya tinggal di Bandung"). Celebrities, story
         // characters and places in essays go through unchanged.
-        const kindOf = (s) => (["GIVEN_NAME", "SURNAME"].includes(s.label) ? "PERSON" : "LOCATION");
+        const kindOf = (s) => (["PERSON", "GIVEN_NAME", "SURNAME"].includes(s.label) ? "PERSON" : "LOCATION");
         const merged = [];
         for (const s of (arbitrated.resolvedSpans || []).filter((s) => s.tier === 2 && s.start < s.end && s.end <= out.length)
           .sort((a, b) => a.start - b.start)) {

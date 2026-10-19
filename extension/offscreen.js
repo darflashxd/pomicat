@@ -18,10 +18,8 @@ let loadingPromise = null;
 // Tokenizer: engine/wordpiece.js (loaded before this file by offscreen.html)
 const { encode } = typeof SafeShareWordPiece !== "undefined" ? SafeShareWordPiece : require("./engine/wordpiece.js");
 
-// Canonical label normalization map for BERT-small PII categories
+// Compatibility aliases for structured labels; PERSON and LOCATION retain their meaning.
 const LABEL_CANONICAL_MAP = {
-  "PERSON": "GIVEN_NAME",
-  "LOCATION": "CITY",
   "EMAIL_ADDRESS": "EMAIL",
   "PHONE_NUMBER": "PHONE",
   "IBAN_CODE": "BANK_ACCOUNT",
@@ -32,26 +30,14 @@ const LABEL_CANONICAL_MAP = {
   "US_ITIN": "TAX_ID"
 };
 
-// Language guard: if text is pure Indonesian, BERT-small (trained on English PII) should not
-// trigger false positives on every Indonesian subword. Indonesian entities are cleanly handled
-// by Tier 1 Heuristics & Tier 2 Contextual rules.
-function isIndonesianProse(text) {
-  if (!text || typeof text !== "string") return false;
-  const idMarkers = /\b(?:yang|dan|di|ke|dari|ini|itu|untuk|dengan|pada|adalah|akan|juga|tidak|atau|saya|aku|kamu|anda|dia|mereka|kami|kita|gaji|bisa|sudah|tolong|mohon|kredensial|simpan|contoh)\b/i;
-  const matches = (text.match(new RegExp(idMarkers.source, "gi")) || []).length;
-  return matches >= 2;
-}
-
-function extractSpans(text, enc, logits, review = false) {
-  const numLabels = id2label ? Object.keys(id2label).length : 51;
+function extractSpans(text, enc, logits, review = false, labels = id2label) {
+  if (!labels || !Object.keys(labels).length) throw new Error("Missing model label configuration");
+  const numLabels = Object.keys(labels).length;
   const seqLen = enc.inputIds.length;
+  if (logits.length !== seqLen * numLabels) throw new Error("Model output shape does not match labels");
+  if (!Array.from(logits).every(Number.isFinite)) throw new Error("Invalid model output");
   const spans = [];
   let currentSpan = null;
-
-  // If pure Indonesian prose, skip English BERT inference to prevent subword false positive explosion
-  if (isIndonesianProse(text)) {
-    return [];
-  }
 
   for (let i = 1; i < seqLen - 1; i++) {
     let maxVal = -Infinity;
@@ -68,7 +54,8 @@ function extractSpans(text, enc, logits, review = false) {
     for (let c = 0; c < numLabels; c++) expSum += Math.exp(logits[i * numLabels + c] - maxVal);
     let prob = 1 / expSum;
 
-    const originalTag = id2label[String(maxIdx)];
+    if (!Number.isFinite(maxVal)) throw new Error("Invalid model output");
+    const originalTag = labels[String(maxIdx)];
     if (!originalTag || originalTag === "O") {
       if (currentSpan) {
         currentSpan.text = text.slice(currentSpan.start, currentSpan.end);
@@ -159,7 +146,7 @@ async function loadModel() {
     session = await ort.InferenceSession.create(modelRes, {
       executionProviders: ["wasm"]
     });
-    console.log("[SafeShare-AI Offscreen] ONNX MiniLM Q4 session initialized.");
+    console.log("[SafeShare-AI Offscreen] BERT-small INT8 session initialized (English-focused).");
     return session;
   } catch (err) {
     console.error("[SafeShare-AI Offscreen] Failed to load ONNX model:", err);
@@ -168,6 +155,7 @@ async function loadModel() {
 }
 
 async function runInference(text, review = false) {
+  if (typeof text !== "string" || text.length > 512 * 1024) throw new Error("Invalid inference text (max 512 KB)");
   if (!text || typeof text !== "string" || !text.trim()) {
     return [];
   }
@@ -242,6 +230,7 @@ if (nerExtApi && nerExtApi.runtime && nerExtApi.runtime.onMessage &&
         .then((spans) => {
           sendResponse({
             success: true,
+            state: "checked",
             spans,
             latencyMs: performance.now() - t0,
             isolated: true,
@@ -251,6 +240,7 @@ if (nerExtApi && nerExtApi.runtime && nerExtApi.runtime.onMessage &&
         .catch((err) => {
           sendResponse({
             success: false,
+            state: "failed",
             error: String(err),
             latencyMs: performance.now() - t0
           });

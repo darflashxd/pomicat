@@ -402,7 +402,12 @@ class SafeShareModal {
     this.candidates = this.candidates.filter(c => !c.id.startsWith("maybe_") || current.has(c.id));
     for (const m of this.maybeCandidates) {
       let mCat = "CREDENTIALS";
-      if (m.reason.includes("Local model: PERSON") || m.reason.includes("Local model: GIVEN_NAME") || m.reason.includes("Local model: SURNAME") || m.reason.includes("Local model: LOCATION") || m.reason.includes("Local model: CITY") || m.reason.includes("Local model: STREET")) {
+      if (m.source === "model") {
+        if (["PERSON","GIVEN_NAME","SURNAME","LOCATION","CITY","STATE","ZIP_CODE","STREET_NAME","BUILDING_NUMBER","SECONDARY_ADDRESS","EMAIL","PHONE","URL","AGE","DATE_TIME","TITLE","HONORIFIC","NRP","ORGANIZATION"].includes(m.modelLabel)) mCat = "PROFILE";
+        else if (["BANK_ACCOUNT","IBAN_CODE","CREDIT_CARD","FINANCIAL"].includes(m.modelLabel)) mCat = "FINANCIAL";
+        else if (["GOVERNMENT_ID","PASSPORT","DRIVERS_LICENSE","TAX_ID","US_LICENSE_PLATE"].includes(m.modelLabel)) mCat = "GOV_ID";
+        else if (["IP_ADDRESS","MAC_ADDRESS","IMEI"].includes(m.modelLabel)) mCat = "SYSTEM";
+      } else if (m.reason.includes("Local model: PERSON") || m.reason.includes("Local model: GIVEN_NAME") || m.reason.includes("Local model: SURNAME") || m.reason.includes("Local model: LOCATION") || m.reason.includes("Local model: CITY") || m.reason.includes("Local model: STREET")) {
         mCat = "PROFILE";
       } else if (m.reason.startsWith("Possible amount")) {
         mCat = "FINANCIAL";
@@ -1114,7 +1119,7 @@ class SafeShareModal {
       ? "Review text changed — run the local model again for the current preview" : this.modelState;
     list.innerHTML = "";
     if (!this.maybeCandidates.length) {
-      list.textContent = "No additional candidates found. This does not mean the conversation is free of sensitive data.";
+      list.textContent = "No additional candidates found. This does not mean the conversation is free of sensitive data. The local model is English-focused.";
       return;
     }
 

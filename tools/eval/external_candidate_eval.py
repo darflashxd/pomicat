@@ -57,7 +57,9 @@ def main():
           'warning':'external synthetic test split; prior published use and unknown training overlap; not unseen holdout'}
     (args.directory/'external-selection.json').write_text(json.dumps(lock,indent=2),encoding='utf-8')
     report={'selection':lock,'labels':sorted(set(GOLD_MAP.values())),'models':{}}
-    for name,model,config in [('minilm',ROOT/'extension/models/model_q4.onnx',ROOT/'extension/models/config.json'),
+    from model_assets import minilm_assets
+    baseline=minilm_assets(args.directory)
+    for name,model,config in [('minilm',baseline/'model_q4.onnx',baseline/'config.json'),
                               ('bert-small-int8',args.directory/'bert-small-int8/model.quant.onnx',args.directory/'bert-small-int8/config.json')]:
         process=psutil.Process();before=process.memory_info().rss
         opts=ort.SessionOptions();opts.intra_op_num_threads=1;opts.inter_op_num_threads=1
@@ -65,7 +67,7 @@ def main():
         load=(time.perf_counter()-t)*1000;loaded=process.memory_info().rss;peak=loaded
         mapping=json.loads(config.read_text())['id2label']
         if name=='minilm':
-            tok=BertWordPieceTokenizer(str(ROOT/'extension/models/vocab.txt'),lowercase=True,strip_accents=True)
+            tok=BertWordPieceTokenizer(str(baseline/'vocab.txt'),lowercase=True,strip_accents=True)
             # Reference tokenizer, not the production JS tokenizer; parity tested separately.
             tok.enable_truncation(max_length=128,stride=32)
         else:

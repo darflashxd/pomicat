@@ -37,7 +37,7 @@ async function getOrCreateOffscreenDocument() {
   creatingOffscreenPromise = chrome.offscreen.createDocument({
     url: "offscreen.html",
     reasons: ["WORKERS", "BLOBS"],
-    justification: "Run client-side local MiniLM Q4 ONNX NER inference with zero network access."
+    justification: "Run local BERT-small INT8 PII inference with zero network access."
   });
 
   try { await creatingOffscreenPromise; }
@@ -84,7 +84,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     // Firefox has a DOM background page: run the same local WASM runtime there.
     if (typeof runInference === "function") {
-      runInference(request.text, request.review === true).then(spans => sendResponse({ success: true, state: "ready", spans }))
+      runInference(request.text, request.review === true).then(spans => sendResponse({ success: true, state: "checked", spans }))
         .catch(err => sendResponse({ success: false, state: "failed", error: err.message }));
       return true;
     }

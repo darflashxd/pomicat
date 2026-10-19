@@ -5,6 +5,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { createHash } = require('node:crypto');
 const offscreen = require("../extension/offscreen.js");
 const { basicTokenize, wordPieces, encode } = require("../extension/engine/wordpiece.js");
 
@@ -45,10 +46,19 @@ function testOffscreenTokenizer() {
 
   // 4. With the shipped vocabulary
   const vocab = new Map();
+  const modelDir = path.join(__dirname, '../extension/models');
+  const info = JSON.parse(fs.readFileSync(path.join(modelDir, 'MODEL_INFO.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(modelDir, 'config.json'), 'utf8'));
+  const weights = fs.readFileSync(path.join(modelDir, info.bundled_file));
+  assert.equal(weights.length, info.weight_bytes);
+  assert.equal(createHash('sha256').update(weights).digest('hex'), info.weight_sha256);
+  assert.equal(Object.keys(config.id2label).length, info.labels);
   fs.readFileSync(path.join(__dirname, "../extension/models/vocab.txt"), "utf8").split(/\r?\n/).forEach((w, i) => w && vocab.set(w, i));
   const unkId = BigInt(vocab.get("[UNK]"));
   const clsId = BigInt(vocab.get("[CLS]"));
   const sepId = BigInt(vocab.get("[SEP]"));
+  assert.equal(vocab.size, info.vocab_size);
+  for (const [token, id] of Object.entries(info.special_tokens)) assert.equal(vocab.get(token), id);
   assert.deepStrictEqual(wordPieces("john", vocab), [BigInt(vocab.get("john"))]);
   assert.deepStrictEqual(wordPieces("x".repeat(101), vocab), [unkId], "over 100 characters -> [UNK]");
   assert.strictEqual(wordPieces("jose", vocab)[0] !== unkId || wordPieces("jose", vocab).length > 1, true, "accent-stripped name tokenizes");
