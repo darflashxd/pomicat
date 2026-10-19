@@ -1,5 +1,22 @@
 # Manual test checklist (Chrome)
 
+## English demonstration and local link release gate
+
+`node tools/attack_bench/english.js` prints the 160-case fictional English challenge without
+writing results. Add `--out <local-report.json>` for a detailed report. See
+`tools/attack_bench/ENGLISH_RESULTS.md` for denominators, false hypotheses and the deliberately
+reported base64 limitation. This is a CLI experiment, not a browser-model benchmark or holdout.
+
+`node tests/relay_lifecycle.test.js` starts an isolated local relay and checks actual encrypted
+roundtrip, concurrent burn reads (exactly one success), wrong/correct revoke tokens, POST-only
+revocation and expiry. It never contacts the public relay. Temporary storage is removed afterward.
+
+`python tools/eval/relay_browser.py` and `--browser firefox` exercise the hosted viewer with actual
+local ciphertext: no payload read before opening, ignored synthetic click, trusted click decryption,
+burn and revoke. Browser traffic stays local and uncaught page errors fail the test. This is not
+the extension-hosted viewer or a logged-in chat-site test. CLI and hosted viewer use production code;
+fixture checks of preview/encryption are separate. See `DEMO.md` for the English rehearsal.
+
 ## Share workflow lifecycle regressions
 
 `python tools/eval/credential_browser.py` (or `--browser firefox`) runs the production scripts

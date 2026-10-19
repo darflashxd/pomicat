@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');
+const {buildCases,independentAttack,encodedAttack,run}=require('../tools/attack_bench/english');
+assert.deepEqual(buildCases(),buildCases(),'corpus must be deterministic');
+assert.equal(buildCases().length,160);
+assert.deepEqual(independentAttack([{content:'Your savings are $1,000 per month at 20%.'}]),[5000]);
+assert.deepEqual(independentAttack([{content:'Your annual salary is $60,000.'}]),[5000]);
+assert.deepEqual(independentAttack([{content:'After saving 20%, you have $4,000 left each month.'}]),[5000]);
+assert.deepEqual(independentAttack([{content:'The database listens on port 5432.'}]),[]);
+assert.deepEqual(independentAttack([{content:'Your savings are [MASK] per month at 20%.'}]),[]);
+assert.deepEqual(encodedAttack([{content:'Encoded annual salary (base64): NjAwMDA='}]),[5000]);
+const report=run();
+const safe=report.rows.find(r=>r.redactor==='safeshare'&&r.attacker==='independent-relations');
+assert.equal(safe.groups.supported.directlyVisible,0);
+assert.equal(safe.groups.supported.top5RecoveredAfterMask,0);
+assert.equal(safe.groups.supported.safeNotesPreserved,100);
+assert.equal(safe.groups.supported.safePortsPreserved,100);
+assert.equal(report.rows.find(r=>r.redactor==='safeshare'&&r.attacker==='encoded-annual').groups['outside-scope'].cases,20,
+ 'unsupported cases must remain in the benchmark; a future defense may improve their results');
+assert(report.rows.find(r=>r.redactor==='entity-only'&&r.attacker==='independent-relations').groups.supported.top1RecoveredAfterMask>0);
+console.log('PASS: deterministic English corpus and independent relation attacker');

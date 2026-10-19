@@ -1,108 +1,111 @@
-# Booth demo (about 5 minutes, works offline)
+# English demo: review, attack, defend, share
 
-Everything below runs on the laptop. No wifi, no real chat site, no real personal data.
+About five minutes. Fictional data only. Keep an offline fallback; vendor sessions and conference
+Wi-Fi are not prerequisites for showing the arithmetic attack or local encrypted sharing.
 
-## Before the session
-
-```bash
-npm test                          # 28/28 should pass
-python relay/server_local.py      # leave running: relay + viewer on http://127.0.0.1:8787
-```
-
-Have open: a slide or screenshot of shared AI chat links showing up in search results (blur
-anything real), and a terminal in the repo root.
-
-## 1. The leak (30 s)
-
-"Share links from ChatGPT, Grok and others ended up in search engines in 2025. People pasted
-salaries, health details and keys into chats they thought were private."
-
-Show the slide.
-
-## 2. Redaction isn't enough (60 s)
+## Preparation
 
 ```bash
-cat examples/chat_naive_redacted.txt
+npm test
+python tools/eval/test_score.py
+python tools/build_extension.py
+python relay/server_local.py
 ```
 
-"The salary was redacted, the way most tools do it: find the entity, mask it. But the assistant's
-answer is still there."
+Leave the relay running on `http://127.0.0.1:8787`. Load the matching Chrome/Firefox package,
+reload the extension and refresh existing chat tabs. Model assets are bundled. Confirm the
+installed commit and model hash before rehearsing; don't quote a fixed suite count.
 
-## 3. The inversion attack (60 s)
+For the browser workflow, choose a fictional prepared chat on a site verified on that day.
+Keep **before-send protection Off**: Share Privately is the main feature. If using the local
+relay, configure the extension's relay override as described in TESTING.md. Starting a local
+server does not change the extension's default hosted destination.
+
+## 1. Show the sharing workflow (45 seconds)
+
+Open SafeShare on a short English chat. Check both user and assistant turns were extracted.
+Show automatic redactions, optional model suggestions, and a manual redaction of an unknown
+format. Explain: "The preview is what the recipient will receive. The model is English-focused;
+an empty scan is not proof of safety."
+
+If no logged-in site is available, use the local browser self-check:
 
 ```bash
-node bin/safeshare.js invert examples/chat_naive_redacted.txt
+python -m http.server 8791 --bind 127.0.0.1
 ```
 
-It prints `Rp 3.000.000` with three independent derivations (900k / 30%, 2.1M / 70%,
-10.8M / 12 / 30%). Then the English version:
+Open `/tests/fixtures/credential_review.html` on that server. Label this as a **fixture using
+production scripts and fake relay messaging**, not a live ChatGPT integration. It demonstrates
+review/payload equality; it does not create a recipient link.
+
+## 2. Explain the arithmetic leak (60 seconds)
+
+Open `examples/chat_naive_redacted_en.txt`:
+
+```text
+User: My salary is <SALARY> a month. If I save 20%, how much is that per month and per year?
+Assistant: Saving 20% means $1,000 per month, leaving $4,000 for expenses.
+           Over a year that adds up to $12,000.
+```
 
 ```bash
 node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
 ```
 
-"Three visible numbers agree on one hidden value. That's the secret."
+Leading result: `$5,000`, supported by the three visible calculations. Show that alternatives
+are also printed. Say: "The correct salary is the leading candidate in this constructed example.
+These are ranked hypotheses, not proof that every candidate is the user's private value."
 
-## 4. SafeShare blocks it (60 s)
+The command returns a nonzero status when it finds recovery candidates; that is expected here.
 
-```bash
-node bin/safeshare.js redact examples/chat_original.txt > /tmp/safe.txt
-cat /tmp/safe.txt
-node bin/safeshare.js invert /tmp/safe.txt
-```
-
-The derived amounts are gone too, the 30% ratio is kept because a ratio alone reveals nothing,
-and the attack prints `No hidden values recovered.`
-
-## 4a. Not just money (30 s)
+## 3. Redact the supported clues (45 seconds)
 
 ```bash
-node bin/safeshare.js invert examples/chat_birthdate_naive.txt
-node bin/safeshare.js redact examples/chat_birthdate_original.txt | node bin/safeshare.js invert
+node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+node bin/safeshare.js redact examples/chat_original_en.txt --numbers range
 ```
 
-"The birth date was redacted, but 'I am 28' and 'graduated in 2020 at 22' give the year back.
-SafeShare hides the ages too."
+The first command prints `No hidden values recovered.` Explain: "This attacker did not recover
+a value after the supported clues were removed. That is not a universal anonymity claim."
+Range mode retains a budget band, not the original exact salary. Deliberately revealing another
+amount can make a hidden value inferable again.
 
-## 4b. Keep it useful (30 s)
+## 4. Open a real local encrypted link (90 seconds)
 
 ```bash
-node bin/safeshare.js redact examples/chat_original.txt --numbers range
+node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 3600 --relay http://127.0.0.1:8787
 ```
 
-"You can still share a chat about your salary: it says Rp 2–5 juta, the derived numbers are
-gone, and the attack gets nothing."
+1. Open the printed link; the page must first show **Open conversation**.
+2. Click it and verify both redacted turns are readable.
+3. Reload the page and click Open again: ciphertext should be unavailable after the first read.
+4. For revocation, create a second share without `--burn`, run its printed revoke command, and
+   confirm it cannot be opened. Shell quoting differs on Windows; rehearse the exact command.
 
-## 5. Encrypted, burn-after-read link (60 s)
+Do not copy full links or revoke tokens into screenshots, public logs or bug reports. All content
+here is fictional, but the link still grants access. The fragment key is not sent in HTTP requests.
+Without the extension, the hosted page decrypts and its operator must be trusted. With the extension
+on a supported origin, decryption uses the extension viewer. The two trust paths are different.
+
+## 5. Show a limit, not a perfect score (40 seconds)
 
 ```bash
-node bin/safeshare.js share examples/chat_original.txt --burn --ttl 3600
+node tools/attack_bench/english.js
 ```
 
-Open the printed link in the browser and show the redacted chat. Point at the URL: "The key is
-after the #. Browsers never send that part to the server, so the relay only stores ciphertext."
+Point out both negative-control guesses and the encoded-annual cases. Numbers unrelated to a
+person can still produce a recovery hypothesis. Base64 annual values are outside the numeric
+defense in this experiment and remain recoverable by the separate decoder attacker.
 
-Reload the page: the link is gone (burned).
+"We defend supported transformations and provide review/manual redaction. We do not claim to
+recognize every secret, encoding or semantic inference. A recipient can keep a screenshot."
 
-## 6. The honest part (30 s)
+## Fallbacks and questions
 
-Open "Security" in the viewer. "Once text is on someone's screen they can screenshot it. We
-don't pretend otherwise. What we control is what's in the text and how long the link lives."
-
-## If someone asks
-
-- **"Does it use AI?"** The CLI is rules plus the inversion solver (we also trained a
-  DistilBERT model, F1 0.64, not shipped). The browser extension additionally runs a
-  local MiniLM Q4 NER model in-page for names and addresses (`MODELS_SETUP.md`,
-  `tools/eval/RESULTS_SOTA.md`).
-- **"How accurate is it?"** The CLI alone is weak on names (no NER). With `--presidio` it matches
-  Presidio on ai4privacy (0.78 vs 0.79) and still blocks the inversion attack. But redacting
-  every name rewrites 71% of real chats, so the default only redacts names tied to the user
-  (`tools/eval/RESULTS.md`).
-- **"Can I use it without the browser?"** `safeshare proxy` sits in front of any
-  OpenAI-compatible API and redacts messages before they leave.
-
-## Fallbacks
-
-- Relay won't start: steps 1 to 4 need only Node.
-- Port 8787 busy: set `SAFESHARE_HOST` or free the port; the CLI takes `--relay <url>`.
+- No network/login: use the fixture and CLI/local relay; state the limitation explicitly.
+- Relay unavailable: attack and redaction examples require only Node, no network or model.
+- Model unavailable: show the failure state, not a clean-result claim; rules/manual review remain.
+- Port busy: choose another local port with `SAFESHARE_PORT`; pass the same origin via `--relay`.
+- Model question: BERT-small INT8, bundled English-focused ONNX WASM; see MODELS_SETUP.md.
+- Accuracy question: distinguish model datasets, pipeline regressions, and attack experiments.
+  No single F1 measures the security of the complete sharing workflow.

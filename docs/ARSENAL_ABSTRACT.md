@@ -1,53 +1,59 @@
-# SafeShare: recovering redacted secrets from AI chats, and stopping it
+# SafeShare: inference-aware private sharing for AI conversations
 
-**Track:** pick the closest from the CFP form (AI/ML security or privacy)
-**License:** Apache 2.0, https://github.com/darflashxd/safeshare
+**Submission draft — presenter details and the exact form track still need confirmation.**
+**License:** Apache-2.0 · https://github.com/darflashxd/safeshare
 
-## Abstract (short)
+## Abstract
 
-In 2025, shared ChatGPT and Grok conversations were indexed by search engines, exposing
-salaries, health details and credentials. The usual fix is redaction: find the sensitive entity,
-mask it. SafeShare shows why that is not enough for AI chats. The assistant's answer is full of
-figures derived from what the user said (savings, yearly totals, ages, dates), and these give the
-hidden value back. `safeshare invert` takes a chat redacted by any tool and recovers hidden
-amounts by finding the one number several visible figures agree on, and hidden birth years from
-stated ages. SafeShare's redactor removes the secret together with the figures derivable from it (ratios,
-per-period amounts, projections, sums and differences),
-can show amounts as ranges so the chat stays useful, and shares the result as an end-to-end
-encrypted link that expires or burns after one read. It runs as a browser extension for ChatGPT,
-Claude and DeepSeek (with optional protection before sending), a CLI and an OpenAI-compatible proxy,
-and handles Indonesian and English formats.
+Sharing an AI conversation can expose more than the values a user types. An assistant may repeat
+those values, convert them to yearly totals, or calculate savings and remainders. Masking the
+original salary while retaining those figures can leave enough information to reconstruct it.
 
-## What we will show
+SafeShare is a review-and-sharing tool for AI conversations. Its main workflow, Share Privately,
+extracts user and assistant turns, combines deterministic rules with local English-focused NER
+suggestions, and lets the author inspect or manually redact the result before creating an encrypted,
+expiring or burn-after-read link. A supported-transform arithmetic defense targets numerical clues
+across turns, while `safeshare invert` demonstrates the attack by ranking candidate hidden values.
+The attack does not require an LLM or an external inference service.
 
-1. A naively redacted chat, and the salary recovered from it in one command; the same for a
-   hidden birth date.
-2. The same chats redacted by SafeShare: nothing recovered. Sharing a salary chat as
-   "Rp 2–5 juta" keeps it useful.
-3. An encrypted, burn-after-read share link served from a local relay, and before-sending
-   protection that keeps the salary from the model itself.
-4. Honest measurements:
-   - On held-out ai4privacy data, SafeShare + Presidio matches Presidio (token F1 0.78 vs 0.79),
-     but only SafeShare blocks `invert`: Presidio leaves the salary and every derived figure in
-     place.
-   - The benchmark misleads: redacting every name, as it rewards, rewrites 71% of 500 real
-     WildChat conversations; redacting only names tied to the user touches 9%.
-   - We looked for the inversion attack in 20,000 real WildChat conversations and found that
-     people there almost never share their own finances (0.05%), and nothing leaked in those
-     chats. We'll show what that means for the threat and the controlled benchmark that measures
-     it properly.
+The demonstration follows one fictional English conversation from entity-only masking, through
+arithmetic recovery and defense, to a recipient opening the reviewed ciphertext. We also show
+why a tool reporting no recovery is not proof of anonymity: unrelated figures can generate false
+hypotheses, and encoded or semantic clues may lie outside the supported numerical grammar.
 
-## Limits we will state
+SafeShare provides a browser extension for ChatGPT, Claude and DeepSeek, a rule-based CLI/library,
+and a text-redacting API proxy. Browser integrations require ongoing layout checks; the optional
+before-send shield is off by default and is not a barrier to site scripts reading the composer.
 
-Detection is rule-based in the CLI plus a local MiniLM Q4 NER model in the extension
-(see RELATED_WORK.md for prior art: PDF deredaction, LLM attribute inference, log
-redaction). Anyone holding the full link can read the share. The viewer's anti-copy features are deterrence
-only. Deciding whether a name or number belongs to the user is the open problem.
+## Live demonstration
 
-Full evaluation: tools/eval/RESULTS.md.
+1. Review both conversation roles and a manual redaction in Share Privately.
+2. Recover the correct top-ranked salary candidate from a constructed masked example, showing alternatives.
+3. Remove supported derived clues and rerun the attack; explain the scope of the negative result.
+4. Open a local encrypted link after an explicit click, demonstrate burn-after-read and revocation.
+5. Show a negative control and an encoded-data limitation rather than promising universal detection.
 
-<!-- Fill in before submitting: presenter names and bios. -->
+## Evaluation scope
 
-## Presenters
+Separate evidence is provided for detector models, workflow regressions and attack experiments.
+The English challenge uses fictional templated data and a separate explicit-relation attacker;
+it is not an independent holdout or a measurement of real-chat incident prevalence. Earlier
+CLI/Presidio/WildChat results and the external synthetic BERT comparison describe different
+configurations and are not a single product accuracy score.
 
-- Name, affiliation, one-line bio
+- English attack protocol/results: `tools/attack_bench/ENGLISH_RESULTS.md`
+- Model provenance and measurements: `MODELS_SETUP.md`, `tools/eval/MODEL_COMPARISON.md`
+- Runtime/workflow reproduction: `TESTING.md`, `DEMO.md`
+
+## Boundaries
+
+The defense covers selected arithmetic transformations, not arbitrary encodings, semantic inference
+or every sensitive-data type. Anyone holding a full usable link can decrypt and retain its content.
+The extension viewer avoids executing a relay-served decryptor; the hosted fallback still requires
+trust in its operator. Copy deterrence does not prevent screenshots. Local model suggestions are
+unverified, English-focused and can be wrong.
+
+## Presenters — complete before submitting
+
+- Name, affiliation, short bio: **pending project owner**.
+- Track, demo format, current event requirements: **confirm in the official submission form**.
