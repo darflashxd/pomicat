@@ -114,9 +114,32 @@ function letterLabel(n) {
 }
 
 // Shared by equivalence classes and solver tokens; never join separate amounts/ranges.
+function isEmbeddedFinancialSpan(text, start, end) {
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+  return /[\p{L}\p{N}_./]$|[\p{L}\p{N}_./]-$/u.test(before) ||
+    /^[\p{L}\p{N}_]|^-[\p{L}\p{N}_]|^[.,]\d/u.test(after) ||
+    (/^\/[\p{L}\p{N}_]/u.test(after) && !/^\/(?:month|mo|year|yr|bulan|tahun|day|hari|week|minggu|hour|jam)\b/i.test(after));
+}
+
 function parseFinancialAmount(raw) {
   if (typeof raw !== "string" || !raw.trim()) return 0;
   const clean = raw.trim().toLowerCase();
+  const spoken = /^(.*?)\s+(juta|miliar|ribu)(?:\s+rupiah)?$/.exec(clean);
+  if (spoken && !/\d/.test(spoken[1])) {
+    const digits = {nol:0,satu:1,dua:2,tiga:3,empat:4,lima:5,enam:6,tujuh:7,delapan:8,sembilan:9,sepuluh:10,sebelas:11};
+    const words = spoken[1].split(/\s+/);
+    let total = 0;
+    if (words[0] === 'seratus') { total = 100; words.shift(); }
+    else if (words[1] === 'ratus' && digits[words[0]] >= 2) total = digits[words.splice(0, 2)[0]] * 100;
+    let current = 0;
+    if (words.length === 1 && Object.hasOwn(digits, words[0])) current = digits[words[0]];
+    else if (words.length === 2 && words[1] === 'belas' && digits[words[0]] >= 2 && digits[words[0]] <= 9) current = 10 + digits[words[0]];
+    else if (words.length >= 2 && words.length <= 3 && words[1] === 'puluh' && digits[words[0]] >= 2 && digits[words[0]] <= 9 && (words.length === 2 || (digits[words[2]] >= 1 && digits[words[2]] <= 9))) current = digits[words[0]] * 10 + (digits[words[2]] || 0);
+    else if (words.length) return 0;
+    // ponytail: bounded integer ID amounts; fractions/multiple scale groups need a grammar parser.
+    return (total + current) * ({ribu:1e3,juta:1e6,miliar:1e9}[spoken[2]]);
+  }
   if (clean.includes("half a mil") && !/\d/.test(clean)) return 500000;
   const match = /\d(?:[\d.,'’ \u00a0\u202f]*\d)?/.exec(clean);
   if (!match) return 0;
@@ -219,6 +242,7 @@ class AdversaryOracleSolver {
         continue;
       }
 
+      if (isEmbeddedFinancialSpan(text, m.index, m.index + m[0].length)) continue;
       const afterText = text.substring(m.index + m[0].length);
       // Skip if followed by dot and digits (IP address check) or URL path (:5432/db), but allow financial time periods (/month, /year, /bulan)
       if (/^\.\d+/.test(afterText) || (/^\/[a-zA-Z0-9_]/.test(afterText) && !/^\/(?:month|mo|year|yr|bulan|thn|tahun|day|hari|hr|hour|jam|week|minggu)\b/i.test(afterText))) {
@@ -563,12 +587,12 @@ class ConsistentPseudonymizer {
     const variants = [];
     const escapedRaw = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Whole-token match: a short value like "pa" must not be replaced inside "spatial".
-    // Amounts keep the plain form so "Rp3.000.000" still matches "3.000.000".
-    variants.push(category === "SENSITIVE_FINANCIAL" ? escapedRaw : `(?<!\\w)${escapedRaw}(?!\\w)`);
+    // Attached currency prefixes are allowed, opaque tokens containing the same digits are not.
+    variants.push(category === "SENSITIVE_FINANCIAL"
+      ? `(?:(?<![\\w.,])|(?<=\\bRp)|(?<=\\bIDR)|(?<=\\bUSD))${escapedRaw}(?![\\w]|[.,]\\d)`
+      : `(?<!\\w)${escapedRaw}(?!\\w)`);
 
     if (category === "SENSITIVE_FINANCIAL") {
-      variants.push(`\\b${escapedRaw}\\b`);
-
       // Card number formats with spaces, hyphens, or no separators
       const cardDigits = raw.replace(/\D/g, "");
       if (cardDigits.length >= 15 && cardDigits.length <= 19) {
@@ -1026,7 +1050,8 @@ class ConsistentPseudonymizer {
           regexStr: v,
           replacement: pseudo,
           length: v.length,
-          isDerived: false
+          isDerived: false,
+          isFinancial: ent.category === "SENSITIVE_FINANCIAL"
         });
       }
     }
@@ -1213,6 +1238,7 @@ class ConsistentPseudonymizer {
             if (isInsideBracket(turn.content, offset, match.length)) {
               return match;
             }
+            if (rule.isFinancial && isEmbeddedFinancialSpan(turn.content, offset, offset + match.length)) return match;
             return rule.replacement;
           });
         }
@@ -1248,6 +1274,7 @@ class ConsistentPseudonymizer {
             if (solverHelper.isSafePublicSpan(turn.content, offset, offset + match.length)) {
               return match; // Safe public benchmark line, preserve!
             }
+            if (isEmbeddedFinancialSpan(turn.content, offset, offset + match.length)) return match;
             const cleanMatch = match.trim();
             if (isKeptAmount(cleanMatch)) {
               return match;

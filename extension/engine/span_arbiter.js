@@ -177,7 +177,9 @@ class PrioritySpanArbiter {
         // 3. BOUNDARY SNAPPING: If overlaps with Tier 1, let Tier 1 take absolute precedence
         let coveredByTier1 = false;
         for (const det of tier1Det) {
-          if (overlaps(cand.start, cand.end, det.start, det.end)) {
+          const start = det.start ?? det.index;
+          const end = det.end ?? (start + det.length);
+          if (overlaps(cand.start, cand.end, start, end)) {
             coveredByTier1 = true;
             vetoedSpans.push(Object.assign({}, cand, { reason: "COVERED_BY_DETERMINISTIC_TIER1", overlappedWith: det.label || det.type }));
             break;

@@ -41,6 +41,9 @@ def main():
         tmp = Path(tmp)
         ext = tmp / "extension"
         shutil.copytree(ROOT / "extension", ext)
+        if os.environ.get('SAFESHARE_CANDIDATE_DIR'):
+            from candidate_extension import prepare_candidate
+            print('Experimental adapter:', prepare_candidate(ext, os.environ['SAFESHARE_CANDIDATE_DIR']))
         manifest = json.loads((ext / "manifest.firefox.json").read_text(encoding="utf-8"))
         manifest["background"]["scripts"].append("ner_smoke.js")
         (ext / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")

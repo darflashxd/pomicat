@@ -7,6 +7,85 @@
 class HeuristicsRedactor {
   constructor() {
     this.patterns = [
+      {
+        id: "SPELLED_OTP", name: "Spelled authentication code", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b((?:kode\s+OTP(?:\s+saya)?|(?:my\s+)?OTP(?:\s+code)?(?:\s+is)?)\s*[:=]?\s*)((?:(?:zero|one|two|three|four|five|six|seven|eight|nine|nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)[ \t]+){3,7}(?:zero|one|two|three|four|five|six|seven|eight|nine|nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan))\b(?![ \t]+(?:zero|one|two|three|four|five|six|seven|eight|nine|nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan)\b)/gi,
+        replacement: "$1[REDACTED_OTP]"
+      },
+      {
+        id: "SPACED_EMAIL", name: "Letter-spaced email", category: "PROFILE", valueGroup: 2,
+        regex: /\b((?:email(?:\s+(?:is|saya))?|(?:send\s+it|kirim)\s+(?:to|ke))\s*[:=]?\s*)((?:[a-z0-9][ \t]+){2,}[a-z0-9][ \t]*@[ \t]*(?:[a-z0-9-][ \t]*)+\.[ \t]*(?:[a-z][ \t]+){1,11}[a-z])(?![a-z0-9])/gi,
+        replacement: "$1[REDACTED_EMAIL]"
+      },
+      {
+        id: "GROUPED_NIK", name: "Labelled grouped NIK / KTP", category: "GOV_ID", valueGroup: 2,
+        regex: /\b((?:NIK|KTP)(?:\s+(?:saya|aku))?\s*[:=]?\s*)([1-9](?:[ \t]?\d){15})(?![ \t]?\d)/gi,
+        validator: (raw) => /\d[ \t]+\d/.test(raw),
+        replacement: "$1[REDACTED_NIK]"
+      },
+      {
+        id: "AU_MOBILE", name: "Australian domestic mobile", category: "PROFILE", valueGroup: 1,
+        regex: /\b(04\d{2}[ \t-]?\d{3}[ \t-]?\d{3})(?!\d)/g,
+        replacement: "[REDACTED_PHONE]"
+      },
+      {
+        id: "INDIA_POSTAL_ADDRESS", name: "Indian postal address", category: "PROFILE", valueGroup: 2,
+        regex: /\b((?:my\s+address\s+is|I\s+live\s+at)\s+)((?:Flat|Unit|Apartment)\s+[\w-]+,\s*[^\r\n.!?]{1,100}?\b[1-9]\d{5})(?!\d)/gi,
+        replacement: "$1[REDACTED_ADDRESS]"
+      },
+      {
+        id: "ADDRESS_FIELD", name: "Unquoted address field", category: "PROFILE", valueGroup: 2,
+        // ponytail: bounded unquoted fields; quoted/XML addresses retain their existing recognizers.
+        regex: /\b(Address:\s*)(\d{1,6}\s+[^\r\n.!?]{5,120}?)(?=\s+(?:before|after|please)\b|[.!?](?:\s|$)|\r?\n|$)/gi,
+        replacement: "$1[REDACTED_ADDRESS]"
+      },
+      {
+        id: "COORDINATE_PAIR", name: "Personal coordinates", category: "PROFILE", valueGroup: 2,
+        regex: /((?:\b(?:coordinates|koordinat)(?:\s+(?:rumah|saya|are|is)){0,3}\s*[:=]?\s*|google\.com\/maps\/@))(-?\d{1,2}\.\d+\s*,\s*-?\d{1,3}\.\d+)(?!\d)/gi,
+        validator: (raw) => {
+          const pair = raw.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+          return pair && Math.abs(Number(pair[1])) <= 90 && Math.abs(Number(pair[2])) <= 180;
+        },
+        replacement: "$1[REDACTED_LOCATION]"
+      },
+      // Structured values own their complete span before generic number recognizers run.
+      {
+        id: "CREDENTIAL_VALUE", name: "Explicit credential value", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b((?:password\s+for\s+(?:my\s+)?(?:online\s+)?banking\s+is\s+|(?:x-api-key|aws_secret_access_key|aws\s+secret|jwt_secret)(?:\s*[:=]\s*|\s+))['"]?)(?![\[\s:=])([^\s'"\r\n]+)(?=\s|['"]|$)/gi,
+        replacement: "$1[REDACTED_SECRET]"
+      },
+      {
+        id: "AUTHENTICATION_CODE", name: "OTP / PIN / login code", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b((?:(?:kode[ \t]+)?OTP|PIN[ \t]+ATM|ATM[ \t]+PIN|Token[ \t]+2FA)(?:[ \t]+[\p{L}]{1,24}){0,3}[ \t]*[:=]?[ \t]*)(\d{4,8})(?!\d)/giu,
+        replacement: "$1[REDACTED_OTP]"
+      },
+      {
+        id: "LOGIN_CODE", name: "Login code", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b(Use\s+)(\d{4,8})(\s+as\s+your\s+(?:login|verification|security)\s+code)\b/gi,
+        replacement: "$1[REDACTED_OTP]$3"
+      },
+      {
+        id: "GROUPED_IBAN", name: "Formatted IBAN", category: "FINANCIAL", valueGroup: 2,
+        regex: /\b((?:IBAN(?:\s+is)?\s*[:=]?\s*)?)(DE\d{2}(?:[ \t]?\d){18}|GB\d{2}[ \t]?[A-Z]{4}(?:[ \t]?\d){14}|FR\d{2}(?:[ \t]?[A-Z0-9]){23}|NL\d{2}[ \t]?[A-Z]{4}(?:[ \t]?\d){10}|ES\d{2}(?:[ \t]?\d){20}|IT\d{2}[ \t]?[A-Z](?:[ \t]?[A-Z0-9]){22})(?![A-Z0-9])/gi,
+        // Explicitly labelled invalid test/account values remain sensitive; otherwise require MOD-97.
+        validator: (raw) => /^IBAN\b/i.test(raw) || this.validateIBAN(raw),
+        replacement: "$1[REDACTED_IBAN]"
+      },
+      {
+        id: "GROUPED_ACCOUNT", name: "Grouped bank account", category: "FINANCIAL", valueGroup: 2,
+        regex: /\b((?:rekening|account)(?:\s+(?:Mandiri|BCA|saya|aku|number|is)){0,3}\s*[:=]?\s*)(\d{3}-\d{2}-\d{7}-\d)(?!\d)/gi,
+        replacement: "$1[REDACTED_ACCOUNT]"
+      },
+      {
+        id: "BIRTH_YEAR", name: "Explicit birth year", category: "PROFILE", valueGroup: 2,
+        regex: /\b((?:born\s+in|birth\s+year\s+is|lahir\s+tahun)\s+)((?:19|20)\d{2})\b/gi,
+        replacement: "$1[REDACTED_DOB]"
+      },
+      {
+        id: "CLI_AUTH_ARGUMENT", name: "Command credential", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b((?:redis-cli\b[^\n|;]*?\s-a\s+|docker\s+login\b[^\n|;]*?\s(?:-p|--password)\s+|hydra\b[^\n|;]*?\s-p\s+|smbclient\b[^\n|;]*?\s-U\s+[^\s%]+%))('[^'\n]+'|"[^"\n]+"|[^\s'"\n]+)/g,
+        replacement: "$1[REDACTED_PASSWORD]"
+      },
       // 1. Indonesian KTP / NIK (16 digits)
       {
         id: "ID_NIK",
@@ -494,7 +573,7 @@ class HeuristicsRedactor {
         id: "ENV_CONFIG_SECRET",
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
-        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)(?!\$\{[^}\n]+\}|\$[A-Za-z_]\w*)([^\s\r\n'"]{8,120})/gi,
+        regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)(?!\$\{[^}\n]+\}|\$[A-Za-z_]\w*)([^\s\r\n'"]{8,})/gi,
         replacement: "$1[REDACTED_SECRET]"
       },
       // 10d-2. Passwords on the command line: mysql -pSECRET / --password=SECRET, sshpass -p SECRET
@@ -519,7 +598,7 @@ class HeuristicsRedactor {
         id: "YAML_CONFIG_SECRET",
         name: "YAML Config Secret Key",
         category: "CREDENTIALS",
-        regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,120})/gmi,
+        regex: /(^[ \t]*(?:password|passwd|secret|token|api_key|auth_token)\s*:\s*)([^\s\r\n'"]{6,})/gmi,
         replacement: "$1[REDACTED_SECRET]"
       },
       // One-time codes: "OTP 482913", "kode verifikasi: 4821", "verification code is 773190"
@@ -538,7 +617,7 @@ class HeuristicsRedactor {
         id: "CONVERSATIONAL_PASSWORD",
         name: "Password / Passcode Secret",
         category: "CREDENTIALS",
-        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,40}))|["']?(?:(?:(?:root|admin|database|db|wifi|temporary|temp|default|user)\s+)?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass))["']?\s*(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?([^\s\r\n'"]{5,40})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya)){0,3}\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))((?:(?<=(?:\bis|\badalah|\byaitu|\bialah|[:=])\s{1,3})|(?![a-z]+(?:-[a-z]+)+\b)(?=[^\s'"\[\]]*(?:\d|[^\w\s'"\[\]](?=[^\s'"\[\]]))))[^\s\r\n'"\[\]]{5,40})(?=\s|$|[)\]}>,;]))/gi,
+        regex: /(?:<password>([^<]+)<\/password>|(?:(?:56=PASS\^|PASS\^|PASS=|PWD=)([^\s|\r\n'"]{5,}))|["']?(?:(?:(?:root|admin|database|db|wifi|temporary|temp|default|user)\s+)?(?:password|passwd|passcode|kata_sandi|pw|pwd|pass))["']?\s*(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?([^\s\r\n'"]{5,})["']?|\b((?:(?:(?:my|the|our|temporary|temp|default|admin|root|wifi|staging|production|database|db)\s+)?(?:password|passwd|passcode|kata\s+sandi|kata_sandi|pw|pwd|pass)(?:\s+(?:for(?:\s+(?:my|the|our|your))?|to(?:\s+(?:the|my))?|of|in|on|at|my|the|our|your|email|account|user|login|username|staging|production|server|db|database|admin|root|akun|saya|ku|aku|gue|gw|kamu|mu|milik|wifi|hotspot|router|laptop|pc|komputer|hp|bank|m-?banking|atm|kartu|rekening|bca|mandiri|bri|bni|cimb|jenius|baru|lama|temp|temporary|default|adalah|is|yaitu|ialah|yakni|merupakan|berupa|nya)){0,3}\s*(?:adalah|is|yaitu|ialah|[:=])?\s+))((?:(?<=(?:\bis|\badalah|\byaitu|\bialah|[:=])\s{1,3})|(?![a-z]+(?:-[a-z]+)+\b)(?=[^\s'"\[\]]*(?:\d|[^\w\s'"\[\]](?=[^\s'"\[\]]))))[^\s\r\n'"\[\]]{5,})(?=\s|$|[)\]}>,;]))/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
           const lineStart = Math.max(0, text.lastIndexOf("\n", index));
@@ -1303,9 +1382,22 @@ class HeuristicsRedactor {
 
     for (const pattern of this.patterns) {
       let match;
-      const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+      // Capture indices are native in supported Chrome/Firefox and Node 18+.
+      const regex = new RegExp(pattern.regex.source, pattern.regex.flags.includes("d") ? pattern.regex.flags : pattern.regex.flags + "d");
       
       while ((match = regex.exec(text)) !== null) {
+        if (pattern.id === "ENGLISH_PHYSICAL_ADDRESS" && match[2]) {
+          const valueStart = match.indices[2][0];
+          const quoted = /['"]/.test(text[valueStart - 1] || "");
+          if (!quoted) {
+            const stop = /[.!?](?=\s|$)|\s+(?:before|after|please)\b/i.exec(match[2]);
+            if (stop) {
+              match[2] = match[2].slice(0, stop.index);
+              match.indices[2][1] = valueStart + stop.index;
+              match[0] = text.slice(match.index, valueStart + stop.index);
+            }
+          }
+        }
         const raw = match[0];
         if (pattern.id === "ENGLISH_PHYSICAL_ADDRESS" && /\[(?:have|enter|insert|your|REDACTED)[^\]]*\]/i.test(raw)) continue;
         if (pattern.validator && !pattern.validator(raw, match.index, text)) {
@@ -1328,15 +1420,20 @@ class HeuristicsRedactor {
         }
 
         let secretToken;
-        if (typeof pattern.extractToken === "function") {
+        let secretGroup = pattern.valueGroup;
+        if (pattern.valueGroup) {
+          secretToken = match[pattern.valueGroup];
+        } else if (typeof pattern.extractToken === "function") {
           secretToken = pattern.extractToken(match, raw);
         } else if (match.length > 2 && match[2]) {
           secretToken = match[2];
+          secretGroup = 2;
         } else {
           let lastG = null;
           for (let g = match.length - 1; g >= 1; g--) {
             if (match[g] !== undefined) {
               lastG = match[g];
+              secretGroup = g;
               break;
             }
           }
@@ -1345,7 +1442,11 @@ class HeuristicsRedactor {
         if (pattern.id === "CARD_SECURITY_CODE" && typeof secretToken === "string") {
           secretToken = secretToken.replace(/\D/g, "");
         }
+        if (/^\[(?:REDACTED_|[A-Z][A-Z0-9_]*_\d+\])/.test(secretToken || "")) continue;
 
+        // Never locate a capture with indexOf: its value may also occur in the label.
+        const valueGroup = secretGroup || match.findIndex((s, i) => i > 0 && s === secretToken);
+        const valueIndices = secretToken === raw ? match.indices[0] : match.indices[valueGroup];
         detections.push({
           type: pattern.id,
           name: pattern.name,
@@ -1354,7 +1455,11 @@ class HeuristicsRedactor {
           secretToken: secretToken,
           replacement: repl,
           index: match.index,
-          length: raw.length
+          length: raw.length,
+          valueStart: valueIndices ? valueIndices[0] : null,
+          valueEnd: valueIndices ? valueIndices[1] : null,
+          source: "heuristic",
+          reason: pattern.name
         });
       }
     }
@@ -1366,21 +1471,20 @@ class HeuristicsRedactor {
       const to = norm.end[det.index + det.length - 1];
       if (from === undefined || to === undefined) continue;
       det.normalizedRaw = det.raw;
+      if (det.valueStart !== null && det.valueEnd > det.valueStart) {
+        det.valueStart = norm.start[det.valueStart];
+        det.valueEnd = norm.end[det.valueEnd - 1];
+      }
       // The secret part (e.g. the value after "password ") is mapped back too, when it is a plain
       // substring of the match (card security codes are digit-stripped and stay as they are)
-      if (typeof det.secretToken === "string" && det.secretToken !== det.raw) {
-        const k = det.raw.indexOf(det.secretToken);
-        if (k >= 0 && det.secretToken.length) {
-          const s0 = norm.start[det.index + k];
-          const s1 = norm.end[det.index + k + det.secretToken.length - 1];
-          if (s0 !== undefined && s1 !== undefined) det.secretToken = baseText.slice(s0, s1);
-        }
-      } else if (det.secretToken === det.raw) {
-        det.secretToken = baseText.slice(from, to);
+      if (Number.isInteger(det.valueStart) && Number.isInteger(det.valueEnd)) {
+        det.secretToken = baseText.slice(det.valueStart, det.valueEnd);
       }
       det.raw = baseText.slice(from, to);
       det.index = from;
       det.length = to - from;
+      det.start = from;
+      det.end = to;
     }
 
     // Resolve overlapping detections: prefer larger spans (e.g. TERMINAL_PROMPT over inner user@host)
@@ -1401,6 +1505,20 @@ class HeuristicsRedactor {
       }
       if (!overlaps) {
         nonOverlapping.push(det);
+      } else if (Number.isInteger(det.valueStart) && Number.isInteger(det.valueEnd)) {
+        // A losing match may extend beyond the winner. Never silently leave its sensitive tail.
+        let uncovered = [[det.valueStart, det.valueEnd]];
+        for (const accepted of nonOverlapping) {
+          const s = accepted.index, e = s + accepted.length;
+          uncovered = uncovered.flatMap(([a, b]) => b <= s || a >= e ? [[a, b]] :
+            [[a, Math.min(b, s)], [Math.max(a, e), b]].filter(([x, y]) => x < y));
+        }
+        const tag = /\[(?:REDACTED|CONFIDENTIAL|INTERNAL)_[A-Z0-9_]+\]/.exec(det.replacement)?.[0] || '[REDACTED_SECRET]';
+        for (const [start, end] of uncovered) {
+          nonOverlapping.push({...det, index:start, length:end-start, start, end,
+            valueStart:start, valueEnd:end, raw:baseText.slice(start,end),
+            secretToken:baseText.slice(start,end), replacement:tag, reason:'Overlapping sensitive value remainder'});
+        }
       }
     }
 

@@ -37,7 +37,49 @@ async function checkBrowserReview() {
   const selected = modelCandidates[0];
   document.getElementById(selected.id).click();
   assert(!modal.sanitizedTurns.some(t => t.content.includes(selected.raw)), "model suggestion choice not applied");
-  const result = { checked: true, modelSuggestions: modelCandidates.length, badgeTargets: 3, noRealUpload: true };
+  // Inspector and suggestion checkbox must persist the same choice through a rebuild.
+  const inspector = document.querySelector(`.cand-toggle-input[data-cand-id="${selected.id}"]`);
+  assert(inspector, "missing model inspector toggle");
+  inspector.checked = false;
+  inspector.dispatchEvent(new Event("change", {bubbles:true}));
+  assert(modal.sanitizedTurns.some(t => t.content.includes(selected.raw)), "inspector choice lost during rebuild");
+  assert(modal.maybeChoices.get(selected.raw) === false, "inspector did not store explicit keep choice");
+  // Development diagnostic, NOT a holdout benchmark or calibrated accuracy claim.
+  const samples = [
+    {language:'EN',text:'My name is Amelia Hartwell.',entities:['Amelia','Hartwell']},
+    {language:'ID',text:'Nama saya Budi Santoso.',entities:['Budi','Santoso']},
+    {language:'ID',text:'Simpan kredensial asli di password manager. Ini contoh dalam bahasa Inggris.',entities:[]},
+    {language:'ID',text:'Gaji saya cukup untuk bulan ini, nggak perlu contoh tambahan.',entities:[]},
+    {language:'EN',text:'Use fail2ban and restart the database service.',entities:[]},
+    {language:'EN',text:'My colleague is Clara Whitmore.',entities:['Clara','Whitmore']},
+    {language:'EN',text:'Please explain how password hashing works.',entities:[]},
+    {language:'EN',text:'The connection uses port 5432 and HTTP status 503.',entities:[]},
+    {language:'EN',text:'Please suggest a stronger password without changing the application code.',entities:[]}
+  ];
+  const diagnostics = [];
+  for (const sample of samples) {
+    const response = await SafeShareNer.analyze(sample.text, 60000, true);
+    assert(response.success && Array.isArray(response.spans), 'model diagnostic unavailable');
+    const accepted = SafeShareMaybe.scan([{role:'user',content:sample.text}], response.spans.map(s=>({...s,turnIndex:0})));
+    const modelAccepted = accepted.filter(c=>c.reason.startsWith('Local model:'));
+    const exactHits = sample.entities.filter(value=>modelAccepted.some(c=>c.raw === value)).length;
+    const coveredEntities = sample.entities.filter(value=>{
+      const start = sample.text.indexOf(value), end = start + value.length;
+      return modelAccepted.some(c=>c.occurrences.some(o=>o.start <= start && o.end >= end));
+    }).length;
+    diagnostics.push({language:sample.language,expectedEntities:sample.entities.length,exactHits,
+      coveredEntities,suggestions:modelAccepted.length,benignSuggestions:sample.entities.length ? null : modelAccepted.length});
+  }
+  const longText = 'My name is Amelia Hartwell. ' + 'Ordinary text about software testing and documentation. '.repeat(65) + 'My colleague is Clara Whitmore.';
+  const longStart = performance.now();
+  const longResponse = await SafeShareNer.analyze(longText, 60000, false);
+  assert(longResponse.success && Array.isArray(longResponse.spans), 'long-message inference failed');
+  for (const value of ['Amelia','Hartwell','Clara','Whitmore']) {
+    const start=longText.indexOf(value), end=start+value.length;
+    assert(longResponse.spans.some(s=>s.start<=start && s.end>=end), 'long-message entity omitted: '+value);
+  }
+  const result = { checked: true, modelSuggestions: modelCandidates.length, badgeTargets: 3, noRealUpload: true, developmentDiagnostics:diagnostics,
+    longMessage:{characters:longText.length,entitiesCovered:4,elapsedMs:Math.round(performance.now()-longStart)} };
   modal.removeExisting();
   return result;
 }

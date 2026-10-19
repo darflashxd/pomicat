@@ -132,17 +132,14 @@
     const edits = [...detections].sort((a, b) => a.index - b.index).map((det) => {
       // Keep what the rule keeps around the value ("password ", "curl -u ", the closing quote in
       // PASSWORD='…'): only the part the rule changed becomes the placeholder
-      const rep = typeof det.replacement === "string" ? det.replacement : "";
-      let pre = 0;
-      while (pre < det.raw.length && pre < rep.length && det.raw[pre] === rep[pre]) pre++;
-      let suf = 0;
-      while (suf < det.raw.length - pre && suf < rep.length - pre &&
-        det.raw[det.raw.length - 1 - suf] === rep[rep.length - 1 - suf]) suf++;
-      const lead = det.raw.slice(0, pre);
-      const tail = det.raw.slice(det.raw.length - suf);
-      const value = det.raw.slice(pre, det.raw.length - suf) || det.raw;
-      const kept = value === det.raw ? ["", ""] : [lead, tail];
-      return { det, text: kept[0] + (dryRun ? "[ID]" : placeholderFor(value, idLabel(det))) + kept[1] };
+      if (Number.isInteger(det.valueStart) && Number.isInteger(det.valueEnd) && det.valueEnd > det.valueStart) {
+        const value = scan.baseText.slice(det.valueStart, det.valueEnd);
+        return { det, text: det.raw.slice(0, det.valueStart - det.index) +
+          (dryRun ? "[ID]" : placeholderFor(value, idLabel(det))) + det.raw.slice(det.valueEnd - det.index) };
+      }
+      // Missing capture metadata must never infer a secret boundary from a dummy replacement.
+      // Fail closed over the detected match; migrate such rules to explicit value captures.
+      return {det, text:dryRun ? "[ID]" : placeholderFor(det.raw, idLabel(det))};
     });
     for (const { det, text: replacement } of edits.reverse()) {
       out = out.slice(0, det.index) + replacement + out.slice(det.index + det.length);

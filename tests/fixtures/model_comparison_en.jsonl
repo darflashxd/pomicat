@@ -1,0 +1,30 @@
+{"id":"name-01","text":"My name is Amelia Hartwell.","entities":[["Amelia Hartwell","PERSON"]]}
+{"id":"name-02","text":"Please contact Clara Whitmore about the invoice.","entities":[["Clara Whitmore","PERSON"]]}
+{"id":"name-03","text":"My wife Eleanor Ashford will collect the parcel.","entities":[["Eleanor Ashford","PERSON"]]}
+{"id":"name-04","text":"The account holder is Nathaniel Brooks.","entities":[["Nathaniel Brooks","PERSON"]]}
+{"id":"name-05","text":"Hello 👋 My colleague is José Alvarez.","entities":[["José Alvarez","PERSON"]]}
+{"id":"contact-01","text":"Send the receipt to julia.bennett@example.org.","entities":[["julia.bennett@example.org","EMAIL"]]}
+{"id":"contact-02","text":"My email address is marcus_lee42@example.net.","entities":[["marcus_lee42@example.net","EMAIL"]]}
+{"id":"contact-03","text":"You can reach me at +1 415 555 0132.","entities":[["+1 415 555 0132","PHONE"]]}
+{"id":"contact-04","text":"My mobile number is +44 7700 900123.","entities":[["+44 7700 900123","PHONE"]]}
+{"id":"place-01","text":"I live in Springfield.","entities":[["Springfield","LOCATION"]]}
+{"id":"place-02","text":"My hometown is Edinburgh.","entities":[["Edinburgh","LOCATION"]]}
+{"id":"place-03","text":"I moved from Bristol to Manchester last year.","entities":[["Bristol","LOCATION"],["Manchester","LOCATION"]]}
+{"id":"place-04","text":"I live at 742 Evergreen Terrace, Springfield, OR 97477.","entities":[["742 Evergreen Terrace, Springfield, OR 97477","LOCATION"]]}
+{"id":"secret-01","text":"Password for my online banking is Tr0ub4dor&3","entities":[["Tr0ub4dor&3","PASSWORD"]]}
+{"id":"secret-02","text":"My email password is Winter2026!","entities":[["Winter2026!","PASSWORD"]]}
+{"id":"secret-03","text":"redis-cli -h 10.0.0.5 -a QuasarLamp782 ping","entities":[["10.0.0.5","IP"],["QuasarLamp782","PASSWORD"]]}
+{"id":"secret-04","text":"X-API-Key: 9f8e7d6c5b4a3210fedcba9876543210","entities":[["9f8e7d6c5b4a3210fedcba9876543210","SECRET"]]}
+{"id":"bank-01","text":"My IBAN is DE89 3704 0044 0532 0130 00.","entities":[["DE89 3704 0044 0532 0130 00","BANK"]]}
+{"id":"bank-02","text":"My bank IBAN is GB82 WEST 1234 5698 7654 32.","entities":[["GB82 WEST 1234 5698 7654 32","BANK"]]}
+{"id":"bank-03","text":"My account number is 1234567890.","entities":[["1234567890","BANK"]]}
+{"id":"safe-01","text":"Use fail2ban and restart the database service.","entities":[]}
+{"id":"safe-02","text":"Please explain how password hashing works.","entities":[]}
+{"id":"safe-03","text":"The connection uses port 5432 and HTTP status 503.","entities":[]}
+{"id":"safe-04","text":"Please suggest a stronger password without changing the application code.","entities":[]}
+{"id":"safe-05","text":"The identifier is abc-5000-def; do not change it.","entities":[]}
+{"id":"safe-06","text":"Docker publishes port 8080 using docker run -p 8080:80 image.","entities":[]}
+{"id":"safe-07","text":"Keep your credentials in a password manager, not in source code.","entities":[]}
+{"id":"safe-08","text":"This is a tutorial about asthma and depression, not my medical history.","entities":[]}
+{"id":"safe-09","text":"Return the placeholder <S100> unchanged and calculate 0.20 * <S100>.","entities":[]}
+{"id":"safe-10","text":"Read the release notes before updating the database schema.","entities":[]}

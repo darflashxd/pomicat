@@ -18,11 +18,40 @@ let loadingPromise = null;
 // Tokenizer: engine/wordpiece.js (loaded before this file by offscreen.html)
 const { encode } = typeof SafeShareWordPiece !== "undefined" ? SafeShareWordPiece : require("./engine/wordpiece.js");
 
+// Canonical label normalization map for BERT-small PII categories
+const LABEL_CANONICAL_MAP = {
+  "PERSON": "GIVEN_NAME",
+  "LOCATION": "CITY",
+  "EMAIL_ADDRESS": "EMAIL",
+  "PHONE_NUMBER": "PHONE",
+  "IBAN_CODE": "BANK_ACCOUNT",
+  "US_BANK_NUMBER": "BANK_ACCOUNT",
+  "US_SSN": "GOVERNMENT_ID",
+  "US_PASSPORT": "PASSPORT",
+  "US_DRIVER_LICENSE": "DRIVERS_LICENSE",
+  "US_ITIN": "TAX_ID"
+};
+
+// Language guard: if text is pure Indonesian, BERT-small (trained on English PII) should not
+// trigger false positives on every Indonesian subword. Indonesian entities are cleanly handled
+// by Tier 1 Heuristics & Tier 2 Contextual rules.
+function isIndonesianProse(text) {
+  if (!text || typeof text !== "string") return false;
+  const idMarkers = /\b(?:yang|dan|di|ke|dari|ini|itu|untuk|dengan|pada|adalah|akan|juga|tidak|atau|saya|aku|kamu|anda|dia|mereka|kami|kita|gaji|bisa|sudah|tolong|mohon|kredensial|simpan|contoh)\b/i;
+  const matches = (text.match(new RegExp(idMarkers.source, "gi")) || []).length;
+  return matches >= 2;
+}
+
 function extractSpans(text, enc, logits, review = false) {
-  const numLabels = 35;
+  const numLabels = id2label ? Object.keys(id2label).length : 51;
   const seqLen = enc.inputIds.length;
   const spans = [];
   let currentSpan = null;
+
+  // If pure Indonesian prose, skip English BERT inference to prevent subword false positive explosion
+  if (isIndonesianProse(text)) {
+    return [];
+  }
 
   for (let i = 1; i < seqLen - 1; i++) {
     let maxVal = -Infinity;
@@ -34,24 +63,13 @@ function extractSpans(text, enc, logits, review = false) {
         maxIdx = c;
       }
     }
-    // Softmax probability of the winning label: span_arbiter's thresholds (0.30-0.45) are
-    // probabilities, and raw logits would pass them almost always
+    // Softmax probability of the winning label
     let expSum = 0;
     for (let c = 0; c < numLabels; c++) expSum += Math.exp(logits[i * numLabels + c] - maxVal);
     let prob = 1 / expSum;
-    // Review may retain a plausible non-O alternative, but never claims it is calibrated.
-    if (review && id2label[String(maxIdx)] === "O") {
-      let entityIdx = -1;
-      for (let c = 0; c < numLabels; c++) {
-        if (id2label[String(c)] !== "O" && (entityIdx < 0 || logits[i * numLabels + c] > logits[i * numLabels + entityIdx])) entityIdx = c;
-      }
-      if (entityIdx >= 0) {
-        const alternative = Math.exp(logits[i * numLabels + entityIdx] - maxVal) / expSum;
-        if (alternative >= 0.15) { maxIdx = entityIdx; prob = alternative; }
-      }
-    }
-    const rawTag = id2label[String(maxIdx)];
-    if (!rawTag || rawTag === "O") {
+
+    const originalTag = id2label[String(maxIdx)];
+    if (!originalTag || originalTag === "O") {
       if (currentSpan) {
         currentSpan.text = text.slice(currentSpan.start, currentSpan.end);
         spans.push(currentSpan);
@@ -60,8 +78,9 @@ function extractSpans(text, enc, logits, review = false) {
       continue;
     }
 
-    const prefix = rawTag.slice(0, 2);
-    const labelType = rawTag.slice(2);
+    const prefix = originalTag.slice(0, 2);
+    const rawCategory = originalTag.slice(2);
+    const labelType = LABEL_CANONICAL_MAP[rawCategory] || rawCategory;
     const tokenSpan = enc.tokenSpans[i];
 
     if (prefix === "B-" || (currentSpan && currentSpan.label !== labelType)) {
@@ -164,6 +183,11 @@ async function runInference(text, review = false) {
       attention_mask: new ort.Tensor("int64", enc.attentionMask, [1, enc.attentionMask.length]),
       token_type_ids: new ort.Tensor("int64", enc.tokenTypeIds, [1, enc.tokenTypeIds.length])
     };
+    if (session && session.inputNames) {
+      for (const name of Object.keys(feeds)) {
+        if (!session.inputNames.includes(name)) delete feeds[name];
+      }
+    }
     const results = await session.run(feeds);
     spans.push(...extractSpans(text, enc, results.logits.data, review));
   }

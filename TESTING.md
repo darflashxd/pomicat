@@ -1,5 +1,52 @@
 # Manual test checklist (Chrome)
 
+## Credential boundary regression
+
+`node tests/credential_boundaries.test.js` checks exact original value spans, preserved surrounding
+text, and the production CLI on credential, grouped identifier, address and coordinate cases.
+`python tools/eval/credential_browser.py` runs the production content script and share preview
+three times in Playwright Chromium. It checks all/off/amounts modes, raw-text sharing, and DOM
+preview equality with the decrypted payload via fake relay messaging; no real shares are uploaded.
+It also runs the existing maybe/range/hydration-sanitizer browser fixtures.
+Requires Playwright and its Chromium browser. For interactive inspection, serve the repository
+and open `/tests/fixtures/credential_review.html`; the result must begin with `PASS:`.
+
+GitHub Actions is configured to run the Node suite and this browser regression separately;
+remote execution must be checked after push. These checks do not measure multilingual NER
+accuracy or verify logged-in vendor layouts. Bounded support now covers EN/ID digit-word OTP,
+anchored letter-spaced email, integer Indonesian amounts, and six grouped IBAN countries
+(DE/GB/FR/NL/ES/IT). This is not universal language or international identifier support.
+Contextual detection excludes hard-identifier spans in the original text before numeric analysis.
+Remaining work: comprehensive model holdout, full shared span arbitration/NER integration,
+broader address/ID/command grammars, and real-site lifecycle verification.
+
+Financial replacement tests include hyphen/slash/dot/Unicode identifiers containing a known
+salary. Every financial base/derived regex replacement is checked at its actual match boundary,
+not only at regex construction; solver numeric lexing uses the same boundary check. Heuristic
+overlap tests verify that losing candidates cannot silently expose their sensitive remainder.
+Browser fixture traffic is restricted to the temporary local server origin; external attempts fail.
+
+The Chrome/Firefox model harness also prints nine development diagnostics (not held-out accuracy),
+with additional EN names and benign security/technical sentences. Current runtime covers the two
+ID name components as one span and suggests an entity on one benign EN technical sentence. Do not
+interpret smoke success as a clean false-positive rate; model/thresholds remain unchanged pending
+a real holdout.
+
+## English-first positional evaluation
+
+`python tools/eval/test_score.py` checks the evaluator and runs the production heuristic scanner
+on `tests/fixtures/english_credentials.jsonl`, also loaded by the browser fixture. This is a
+development regression corpus, NOT a held-out benchmark. `run_safeshare.js --heuristics-trace`
+exports value-only edits, converting JavaScript UTF-16 positions to Python code-point offsets.
+Unsupported trace/context transformations fail instead of inventing positions.
+
+`score.py` rejects missing/duplicate/extra IDs and malformed or inconsistent edits. With edit
+traces it reports full-span recall, character coverage, partial spans, exact-span P/R and changed
+non-sensitive characters. The old value-absence/token-count scores remain labelled diagnostics
+for cross-tool compatibility: they can pass a partial mask and must not support security claims.
+Trace coverage does not prove resistance to arbitrary encoded re-emission or inference. Full
+CLI/model/solver edit provenance and an independently annotated holdout remain unfinished.
+
 ## Cross-browser local model and banking review
 
 Build fresh packages with `python tools/build_extension.py`. Chrome loads `extension/manifest.json`;

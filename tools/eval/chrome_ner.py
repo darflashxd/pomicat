@@ -12,6 +12,9 @@ base.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="safeshare-chrome-", dir=base) as tmp:
     ext = Path(tmp) / "extension"
     shutil.copytree(ROOT / "extension", ext)
+    if os.environ.get('SAFESHARE_CANDIDATE_DIR'):
+        from candidate_extension import prepare_candidate
+        print('Experimental adapter:', prepare_candidate(ext, os.environ['SAFESHARE_CANDIDATE_DIR']))
     scripts = ["engine/heuristics.js", "engine/contextual.js", "engine/pseudonymizer.js", "engine/policy.js", "engine/crypto.js",
                "engine/maybe.js", "engine/transcript.js", "engine/span_arbiter.js", "engine/ner_client.js", "ui/modal.js", "browser_review.js"]
     shutil.copyfile(ROOT / "tools/eval/browser_review.js", ext / "browser_review.js")

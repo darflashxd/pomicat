@@ -46,15 +46,18 @@ function testOffscreenTokenizer() {
   // 4. With the shipped vocabulary
   const vocab = new Map();
   fs.readFileSync(path.join(__dirname, "../extension/models/vocab.txt"), "utf8").split(/\r?\n/).forEach((w, i) => w && vocab.set(w, i));
+  const unkId = BigInt(vocab.get("[UNK]"));
+  const clsId = BigInt(vocab.get("[CLS]"));
+  const sepId = BigInt(vocab.get("[SEP]"));
   assert.deepStrictEqual(wordPieces("john", vocab), [BigInt(vocab.get("john"))]);
-  assert.deepStrictEqual(wordPieces("x".repeat(101), vocab), [1n], "over 100 characters -> [UNK]");
-  assert.strictEqual(wordPieces("jose", vocab)[0] !== 1n || wordPieces("jose", vocab).length > 1, true, "accent-stripped name tokenizes");
+  assert.deepStrictEqual(wordPieces("x".repeat(101), vocab), [unkId], "over 100 characters -> [UNK]");
+  assert.strictEqual(wordPieces("jose", vocab)[0] !== unkId || wordPieces("jose", vocab).length > 1, true, "accent-stripped name tokenizes");
 
   // 5. Long text: several overlapping windows of at most 128 ids, the last word still covered
   const long = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ") + " Rina";
   const wins = encode(long, vocab);
   assert(wins.length > 1, "long text is split into windows");
-  assert(wins.every((w) => w.inputIds.length <= 128 && w.inputIds[0] === 2n && w.inputIds[w.inputIds.length - 1] === 3n));
+  assert(wins.every((w) => w.inputIds.length <= 128 && w.inputIds[0] === clsId && w.inputIds[w.inputIds.length - 1] === sepId));
   assert(wins[wins.length - 1].tokenSpans.some((s) => long.slice(s.start, s.end) === "Rina"), "text past 128 pieces is checked");
   assert.strictEqual(encode("Hello Rina", vocab).length, 1);
 

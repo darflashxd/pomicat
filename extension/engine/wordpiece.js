@@ -10,7 +10,14 @@
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.SafeShareWordPiece = factory();
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const UNK = 1n, CLS = 2n, SEP = 3n;
+  // Special IDs follow vocab.txt: [PAD] 0, [UNK] vocab.get("[UNK]"), [CLS] vocab.get("[CLS]"), [SEP] vocab.get("[SEP]")
+  // Supports both older pruned MiniLM ([UNK]=1, [CLS]=2, [SEP]=3) and standard BERT ([UNK]=100, [CLS]=101, [SEP]=102)
+  function specialIds(vocab) {
+    const unk = vocab && vocab.has("[UNK]") ? BigInt(vocab.get("[UNK]")) : 100n;
+    const cls = vocab && vocab.has("[CLS]") ? BigInt(vocab.get("[CLS]")) : 101n;
+    const sep = vocab && vocab.has("[SEP]") ? BigInt(vocab.get("[SEP]")) : 102n;
+    return { unk, cls, sep };
+  }
   const MAX_WORD_CHARS = 100;
 
   const isWhitespace = (c) => /^[\s\p{Zs}]$/u.test(c);
@@ -63,8 +70,9 @@
 
   /** WordPiece ids for one word: [bigint] */
   function wordPieces(word, vocab) {
+    const unk = vocab && vocab.has("[UNK]") ? BigInt(vocab.get("[UNK]")) : 100n;
     const chars = [...word];
-    if (chars.length > MAX_WORD_CHARS) return [UNK];
+    if (chars.length > MAX_WORD_CHARS) return [unk];
     const ids = [];
     let start = 0;
     while (start < chars.length) {
@@ -77,7 +85,7 @@
           break;
         }
       }
-      if (id === null) return [UNK];
+      if (id === null) return [unk];
       ids.push(BigInt(id));
       start = end;
     }
@@ -91,6 +99,7 @@
    * Each window: { inputIds, attentionMask, tokenTypeIds, tokenSpans } (tokenSpans[i] = word of id i)
    */
   function encode(text, vocab, { maxLen = 128, overlap = 32 } = {}) {
+    const { cls, sep } = specialIds(vocab);
     const pieces = [];
     for (const w of basicTokenize(text)) {
       for (const id of wordPieces(w.text, vocab)) pieces.push({ id, span: w });
@@ -99,7 +108,7 @@
     const windows = [];
     for (let from = 0; from < pieces.length || (from === 0 && !windows.length); from += room - overlap) {
       const part = pieces.slice(from, from + room);
-      const ids = [CLS, ...part.map((p) => p.id), SEP];
+      const ids = [cls, ...part.map((p) => p.id), sep];
       windows.push({
         inputIds: new BigInt64Array(ids),
         attentionMask: new BigInt64Array(ids.length).fill(1n),

@@ -306,7 +306,7 @@ class SafeShareModal {
 
         <div class="safeshare-footer" id="safeshare-modal-footer">
           <div class="footer-left">
-            <button class="btn-text-subtle" id="btn-reset-default" title="Revert all custom toggles back to maximum protection">Reset to All Protected</button>
+            <button class="btn-text-subtle" id="btn-reset-default" title="Restore automatic protection; uncertain suggestions remain optional">Reset to Defaults</button>
           </div>
           <div class="footer-right">
             <button class="btn-secondary" id="btn-cancel">Cancel</button>
@@ -531,7 +531,7 @@ class SafeShareModal {
       }
 
       // Tier 2 (Contextual) pass
-      const cDetections = this.contextual.classifyTurn(hResult.sanitizedText, turnIdx);
+      const cDetections = this.contextual.classifyTurn(hResult.baseText, turnIdx, hResult.detections);
       this.rawContextualEntities.push(...cDetections);
 
       this.cachedTurnDetections.push({
@@ -1110,7 +1110,7 @@ class SafeShareModal {
     if (!list) return;
     const status = document.getElementById("safeshare-model-status");
     const missing = this.reviewBaseTurns?.some(t => !this.modelReview.has(t.content));
-    if (status) status.textContent = this.modelState.startsWith("Local model checked") && missing
+    if (status) status.textContent = /Local (?:AI )?model checked/.test(this.modelState) && missing
       ? "Review text changed — run the local model again for the current preview" : this.modelState;
     list.innerHTML = "";
     if (!this.maybeCandidates.length) {
@@ -1420,16 +1420,7 @@ class SafeShareModal {
         const inputEl = card.querySelector(".cand-toggle-input");
         const toggleHandler = (e) => {
           const nextState = inputEl.checked;
-          cand.enabled = nextState;
-          const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
-          this.candidates.forEach(other => {
-            const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
-            const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
-            const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
-            if (isSameRaw || isSameFinVal) {
-              other.enabled = nextState;
-            }
-          });
+          this.setCandidateEnabled(cand, nextState);
           if (nextState && !this.activeCategories.has(cand.category)) {
             this.activeCategories.add(cand.category);
             this.savePreferences();
@@ -1552,7 +1543,8 @@ class SafeShareModal {
     backdrop.querySelector("#btn-reset-default")?.addEventListener("click", () => {
       this.activeCategories = new Set(Object.keys(SS_CATEGORIES));
       for (const c of this.candidates) c.enabled = true;
-      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, true);
+      this.maybeChoices.clear();
+      for (const c of this.maybeCandidates) this.maybeChoices.set(c.raw, c.risky);
       for (const meta of this.customSelections.values()) meta.enabled = true;
       this.savePreferences();
       this.rebuildViews();

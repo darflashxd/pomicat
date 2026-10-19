@@ -46,6 +46,7 @@ class ContextualClassifier {
       /\b(?:meresepkan|diresepkan|diberi obat|memberi saya obat|minum obat|mengonsumsi|resep dokter|resep psikiater)\b/i,
       /\b(?:psikiater|psikolog|onkolog|dokter spesialis|dokter gigi|dokter kandungan)\b/i,
       /\b(?:prescribed|diagnosed|diagnosis|medication|psychiatrist|oncologist|suffering from)\b/i,
+      /\b(?:I\s+have|saya\s+(?:kena|punya|mengalami))\s+(?:asthma|asma|depression|depresi|epilepsy|epilepsi|diabetes|hipertensi|hypertension|high\s+blood\s+pressure)\b/i,
       /\b(?:kondisi|resep|obat|penyakit|diagnosis)\s+(?:saya|Anda|kamu|ku|mu)\b/i,
       /\b(?:proyek rahasia kita|nama sandi proyek|server internal kita|endpoint internal)\b/i,
       /\b(?:internal codename|our secret project|our internal database|our unannounced)\b/i,
@@ -120,7 +121,16 @@ class ContextualClassifier {
     });
   }
 
-  classifyTurn(turnText, turnIndex) {
+  classifyTurn(turnText, turnIndex, protectedDetections = []) {
+    // Analyze original coordinates without interpreting parts of already identified values as money.
+    // Preserve sentence punctuation and length; don't let replacement labels supply new context.
+    for (const det of [...protectedDetections].sort((a, b) => b.index - a.index)) {
+      if (!Number.isInteger(det.index) || !Number.isInteger(det.length) || det.index < 0 || det.index + det.length > turnText.length) {
+        throw new Error('Invalid protected detection bounds');
+      }
+      const part = turnText.slice(det.index, det.index + det.length).replace(/[^\r\n]/g, ' ');
+      turnText = turnText.slice(0, det.index) + part + turnText.slice(det.index + det.length);
+    }
     const detected = [];
     const sentences = turnText.split(/(?<=[.!?\n])\s+/);
 
@@ -144,6 +154,11 @@ class ContextualClassifier {
 
       // If personal context is active, extract the corresponding values
       if (isPersonal) {
+        // Keep the original wording; the amount parser resolves bounded Indonesian number words.
+        const spokenAmounts = sent.matchAll(/\b(?:nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|seratus|seribu)(?:\s+(?:nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|belas|puluh|ratus|seratus)){0,8}\s+(?:juta|miliar|ribu)(?:\s+rupiah)?\b/gi);
+        if (/\b(?:gaji|penghasilan|upah|pendapatan|bonus|tabungan)\b/i.test(sent)) {
+          for (const m of spokenAmounts) detected.push({turnIndex, raw:m[0], category:"SENSITIVE_FINANCIAL", sentence:sent, confidence:0.95});
+        }
         // Pre-compute phone number spans to prevent telephone numbers (e.g. 1-800-869-3557, 0812-3456-7890) from being parsed as financial amounts
         const phoneSpans = [];
         const phoneRx = /(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
@@ -202,9 +217,9 @@ class ContextualClassifier {
           if (/^401\s*k$/i.test(matchStr.trim()) || /\b401\(?k\)?\b/i.test(matchStr)) continue;
 
           // Skip if part of an IP address (e.g. 10.244.0.15) or network port (localhost:5432, 127.0.0.1:8080)
-          if (matchIndex > 0 && /[\w.:]/.test(sent[matchIndex - 1])) continue;
+          if (matchIndex > 0 && /[\p{L}\p{N}_.:]/u.test(sent[matchIndex - 1])) continue;
           const afterText = sent.substring(matchIndex + matchStr.length);
-          if (/^\.\d+/.test(afterText)) continue;
+          if (/^[\p{L}\p{N}_]|^[.,]\d+/u.test(afterText)) continue;
           // Skip if followed by URL path (e.g. :5432/sandbox_db), but allow financial time periods (/month, /year, /bulan)
           if (/^\/[a-zA-Z0-9_]/.test(afterText) && !/^\/(?:month|mo|year|yr|bulan|thn|tahun|day|hari|hr|hour|jam|week|minggu)\b/i.test(afterText)) continue;
 
@@ -214,7 +229,7 @@ class ContextualClassifier {
           // Skip if inside technical container / OS user / network port configs
           const lineStart = Math.max(0, sent.lastIndexOf("\n", matchIndex));
           const beforeInLine = sent.substring(lineStart, matchIndex);
-          if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*[:=]\s*$/i.test(beforeInLine)) continue;
+          if (/\b(?:runAsUser|runAsGroup|fsGroup|port|listen_port|containerPort|uid|gid)\s*(?:[:=]\s*)?$/i.test(beforeInLine)) continue;
 
           // Skip bare numbers without currency/unit that are part of hyphenated tokens (e.g. xoxb-123456-..., uuid-1234),
           // config assignments (KEY=1234), CLI flags (-p 5432, --port 8080), or inside code
@@ -282,7 +297,7 @@ class ContextualClassifier {
 
         // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics, trauma, oncology biologics)
         const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:childhood\s+trauma|suicidal\s+ideation|self-harm|ptsd)|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|bupropion|rituximab|venlafaxine|effexor|duloxetine|cymbalta|lisdexamfetamine|methotrexate|keytruda|pembrolizumab|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy|cisplatin|doxorubicin|paclitaxel|carboplatin|tamoxifen|imatinib|trastuzumab|nivolumab|ibrutinib|\b[a-zA-Z]{4,}(?:mab|tinib|zomib|xaban)\b)(?:\s*[\d.]+\s*(?:mg|mcg|ml|iv))?)/gi;
-        const healthMatches = sent.matchAll(healthRegex);
+        const healthMatches = sent.matchAll(new RegExp(healthRegex.source + '|\\b(?:asthma|asma|depression|epilepsy|epilepsi|hipertensi|hypertension|high\\s+blood\\s+pressure)\\b', 'gi'));
         for (const m of healthMatches) {
           detected.push({
             turnIndex,

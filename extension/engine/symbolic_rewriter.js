@@ -104,7 +104,7 @@ class SafeShareSymbolicRewriter {
     }
 
     const hResult = this.heuristics.scan(text);
-    const cDetections = this.contextual.classifyTurn(hResult.sanitizedText, 0);
+    const cDetections = this.contextual.classifyTurn(hResult.baseText, 0, hResult.detections);
 
     const detectedItems = [];
 

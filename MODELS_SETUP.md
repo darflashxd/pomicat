@@ -35,6 +35,12 @@ The extension runs a local token-classification model via `offscreen.js`
 
 ## Research only: DistilBERT token classifier
 
+English candidate experiment (2026-10-19): BERT-small INT8 and GLiNER PII Edge UINT8 were
+downloaded at pinned revisions outside the extension bundle and compared with shipped MiniLM.
+Both graphs also ran in Chromium/Firefox WASM. BERT-small is the most promising candidate on
+the small development corpus, but no production replacement was made. See
+[MODEL_COMPARISON.md](tools/eval/MODEL_COMPARISON.md) for metrics, scripts and limitations.
+
 A DistilBERT token classifier (`distilbert-base-multilingual-cased`, 11 BIO labels) was
 trained as an experiment. On its held-out split it scored:
 

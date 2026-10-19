@@ -118,7 +118,7 @@ function scanTurns(turns, policy) {
   const hits = [];
   turns.forEach((t, i) => {
     const h = heuristics.scan(t.content);
-    if (!trusted) hits.push(...filterContextual(contextual.classifyTurn(h.sanitizedText, i)));
+    if (!trusted) hits.push(...filterContextual(contextual.classifyTurn(h.baseText, i, h.detections)));
     intermediate.push({ role: t.role, content: h.sanitizedText });
   });
   return { intermediate, hits };

@@ -141,10 +141,11 @@ const Modal = require("../extension/ui/modal.js");
   assert(reset.sanitizedTurns[0].content.includes("OddSecret42"));
   get("btn-reset-default").click();
   assert(!reset.sanitizedTurns[0].content.includes("OddSecret42"));
-  assert(!reset.sanitizedTurns[0].content.includes("Z8kL2mN7pQ4rS9tU6vW3xY"));
+  assert(reset.sanitizedTurns[0].content.includes("Z8kL2mN7pQ4rS9tU6vW3xY"), "reset leaves uncertain suggestions optional");
   get("btn-deselect-all-cands").click();
   get("btn-select-all-cands").click();
   assert(!reset.sanitizedTurns[0].content.includes("OddSecret42"));
+  assert(!reset.sanitizedTurns[0].content.includes("Z8kL2mN7pQ4rS9tU6vW3xY"), "explicit protect-all still selects uncertain suggestions");
   const badges = new Modal();
   badges.currentTurns = [
     { role: "user", content: "My salary is USD 5,000 per month." },
