@@ -606,6 +606,15 @@
       if (!inputEl) return;
       const text = getInputText(inputEl);
       if (!text || !text.trim()) return;
+      const sourceUrl = location.href;
+      const sourceMode = getShieldMode();
+      const stillCurrent = expected => location.href === sourceUrl && getShieldMode() === sourceMode &&
+        inputEl.isConnected && findPromptInputElement() === inputEl && getInputText(inputEl) === expected;
+      const cancelPending = () => {
+        isRewriting = false;
+        const indicator = document.getElementById("safeshare-shield-indicator");
+        if (indicator) indicator.textContent = "Draft or chat changed — review and send again ▾";
+      };
 
       // Fail closed: if protection itself breaks, hold the message instead of letting the site send
       // it unprotected. Switching protection off (chip) sends as typed.
@@ -638,12 +647,12 @@
         // (The name model failing is handled inside as nerUnavailable; this is a real engine error)
         isRewriting = false;
         return holdOnError(err);
-      } finally {
-        isRewriting = false;
       }
+      if (!stillCurrent(text)) return cancelPending();
 
       if (rewritten && rewritten.isTransformed) {
-        setInputText(inputEl, rewritten.sanitizedPrompt);
+        try { setInputText(inputEl, rewritten.sanitizedPrompt); }
+        catch (err) { isRewriting = false; return holdOnError(err); }
         console.log("[SafeShare-AI] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
       }
       if (rewritten && rewritten.nerUnavailable) {
@@ -655,8 +664,11 @@
       }
 
       setTimeout(() => {
+        const expected = rewritten && rewritten.isTransformed ? rewritten.sanitizedPrompt : text;
+        if (!stillCurrent(expected)) return cancelPending();
         resubmitting = true;
-        try { resend(inputEl); } finally { setTimeout(() => (resubmitting = false), 350); }
+        try { resend(inputEl); }
+        finally { resubmitting = false; isRewriting = false; }
       }, rewritten && rewritten.isTransformed ? 120 : 10);
     };
 
@@ -675,6 +687,14 @@
       const btn = e.target && e.target.closest && e.target.closest(SEND_BUTTON_SELECTOR);
       if (!btn) return;
       guard(e, () => btn.click());
+    }, true);
+    window.addEventListener("submit", (e) => {
+      const input = findPromptInputElement();
+      if (!input || input.closest("form") !== e.target) return;
+      guard(e, () => {
+        if (e.submitter && e.submitter.isConnected) e.target.requestSubmit(e.submitter);
+        else e.target.requestSubmit();
+      });
     }, true);
   }
 
@@ -1096,7 +1116,11 @@
     const bubbles = Array.from(container.querySelectorAll(
       "[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']"
     )).filter(el => !isComposerOrSafeShareUI(el));
-    if (bubbles.length > 0) {
+    // Do not select a partial strategy when a mixed layout still has legacy-role messages.
+    const uncoveredRole = [...container.querySelectorAll("[data-message-author-role]")].some(el =>
+      !isComposerOrSafeShareUI(el) && !el.matches("[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']") &&
+      !el.querySelector("[data-user-message-bubble='true'], [data-markdown-text-style='assistant-message']"));
+    if (bubbles.length > 0 && !uncoveredRole) {
       // A reply can be split over several markdown blocks: join blocks of the same turn
       let lastKey = null;
       for (const el of bubbles) {
@@ -1343,15 +1367,15 @@
         console.log("[SafeShare-AI] Injected continuation prompt directly into active session.");
       } else {
         // On a share page there is no chat box: open the chat site and paste it there
-        const api = typeof browser !== "undefined" ? browser : chrome;
-        api.runtime.sendMessage({ action: "OPEN_CHAT_WITH_PROMPT", platform: event.data.platform, prompt: promptText });
+        const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+        if (api && api.runtime) api.runtime.sendMessage({ action: "OPEN_CHAT_WITH_PROMPT", platform: event.data.platform, prompt: promptText });
       }
     }
   });
 
   // Paste a continuation prompt left by the background worker (see OPEN_CHAT_WITH_PROMPT)
   (function deliverPendingContinuation() {
-    const api = typeof browser !== "undefined" ? browser : chrome;
+    const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
     if (!api || !api.storage || !api.storage.local) return;
     const hostFor = { ChatGPT: /chatgpt\.com|chat\.openai\.com/, Claude: /claude\.ai/, DeepSeek: /chat\.deepseek\.com/ };
     Promise.resolve(api.storage.local.get("safeshare_pending_continuation")).then((res) => {

@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><title>Model review lifecycle regression</title>
+<pre id="result">Running</pre><iframe id="chat" src="fake_chat.html" style="width:100%;height:500px"></iframe>
+<script>
+document.getElementById('chat').onload=async()=>{
+ const w=document.getElementById('chat').contentWindow,d=w.document;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));const assert=(ok,msg)=>{if(!ok)throw Error(msg);};
+ try{
+  const Modal=w.eval('SafeShareModal'),modal=new Modal();
+  let pending=[];w.SafeShareNer={analyze:()=>new Promise(resolve=>pending.push(resolve))};
+  modal.open([{role:'user',content:'A person mentioned is Amelia Hartwell.'},{role:'assistant',content:'Old answer.'}]);
+  const oldRun=modal.checkLocalModel();await wait(0);assert(pending.length===1,'old scan not started');
+  modal.removeExisting();
+  modal.open([{role:'user',content:'A person mentioned is Clara Whitmore.'}]);
+  const newRun=modal.checkLocalModel();await wait(0);assert(pending.length===2,'new scan not started');
+  pending[0]({success:true,spans:[{start:22,end:37,label:'PERSON',score:.95}]});await oldRun;
+  assert(pending.length===2,'closed scan continued to another old turn');
+  assert(modal.modelBusy,'closed scan unlocked new scan');
+  assert(![...modal.modelReview.keys()].some(x=>x.includes('Amelia')),'old results entered new modal');
+  pending[1]({success:true,spans:[]});await newRun;
+  assert(!modal.modelBusy&&modal.modelState.includes('checked'),'new scan did not finish');
+  assert(!d.getElementById('btn-encrypt-publish').disabled,'publish remained locked');
+  modal.removeExisting();
+  modal.open([{role:'user',content:'Confidential phrase Blue Harbor. My salary is USD 5000.'}]);
+  const changedRun=modal.checkLocalModel();await wait(0);
+  const amount=modal.candidates.find(c=>c.isAmount);assert(amount,'amount candidate unavailable');
+  modal.setCandidateEnabled(amount,false);modal.rebuildViews();
+  modal.addCustomSelection('Blue Harbor');
+  pending[2]({success:true,spans:[]});await changedRun;
+  assert(d.getElementById('safeshare-model-status').textContent.includes('text changed'),'stale snapshot claimed current preview checked');
+  assert(!modal.sanitizedTurns[0].content.includes('Blue Harbor'),'late scan reversed manual choice');
+  w.SafeShareNer={analyze:async()=>({success:false,error:'Expected offline failure'})};
+  await modal.checkLocalModel();
+  assert(!modal.modelBusy&&modal.modelState.includes('unavailable'),'failed model reported clean');
+  assert(!d.getElementById('btn-encrypt-publish').disabled,'failure kept controls locked');
+  modal.removeExisting();modal.open([{role:'user',content:'Old publication text.'}]);
+  let finishEncrypt, uploads=0;
+  const encryptGate=new Promise(resolve=>{finishEncrypt=resolve;});
+  modal.crypto.encrypt=async()=>{await encryptGate;return {shareId:'fictional',ciphertext:'fictional',fullShareUrl:'https://example.invalid/'};};
+  w.browser={storage:{local:{get:async()=>({})}},runtime:{sendMessage:async()=>{uploads++;return {success:true};}}};
+  d.getElementById('btn-encrypt-publish').click();await wait(0);
+  assert(modal.publishing,'publication did not start');
+  modal.removeExisting();modal.open([{role:'user',content:'New review text.'}]);
+  finishEncrypt();await wait(50);
+  assert(uploads===0,'closed publication uploaded after encryption');
+  assert(d.getElementById('diff-box-orig').textContent.includes('New review text.'),'old publication changed new modal: '+d.getElementById('diff-box-orig').textContent);
+  assert(!modal.publishing&&!d.getElementById('btn-encrypt-publish').disabled,'old publication corrupted new controls');
+  document.getElementById('result').textContent='PASS: closed/reopened scan, late result isolation, changed preview, manual choice, model failure, closed publication isolation. No uploads.';
+ }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
+};
+</script>

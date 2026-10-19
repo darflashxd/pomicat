@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Extraction integrity regression</title>
+<pre id="result">Running</pre><iframe id="chat" src="fake_chat.html" style="width:100%;height:650px"></iframe>
+<script>
+document.getElementById('chat').onload=async()=>{
+ const w=document.getElementById('chat').contentWindow,d=w.document;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ const assert=(ok,msg)=>{if(!ok)throw Error(msg);};
+ try{
+  for(let i=0;i<100&&!d.getElementById('safeshare-action-pill');i++)await wait(20);
+  const thread=d.getElementById('thread');
+  thread.innerHTML='<div data-message-author-role="user"><div data-user-message-bubble="true">First question untouched</div></div>'+
+   '<div data-message-author-role="assistant"><div class="markdown"><h2>Analysis heading</h2><p>First answer untouched</p><table><tr><th>Item</th><th>Result</th></tr><tr><td>Alpha</td><td>Beta</td></tr></table><pre><code>port = 8080</code></pre></div></div>'+
+   '<div data-message-author-role="user">Second question untouched</div><div data-message-author-role="assistant"><p>Second answer untouched</p></div>';
+  d.getElementById('prompt-textarea').innerText='DRAFT NEVER SHARE';
+  w.confirm=()=>{throw Error('Extractor lost a role');};
+  d.getElementById('safeshare-action-pill').click();await wait(150);
+  let orig=d.getElementById('diff-box-orig');assert(orig,'modal unavailable');
+  const text=orig.innerText;
+  const expected=['First question untouched','First answer untouched','Second question untouched','Second answer untouched'];
+  let previous=-1;for(const value of expected){const index=text.indexOf(value);assert(index>previous,'turn missing/out of order: '+value);previous=index;}
+  assert(!text.includes('DRAFT NEVER SHARE'),'composer leaked into share');
+  for(const value of ['Analysis heading','Alpha','Beta','port = 8080'])assert(text.includes(value),'format content lost: '+value);
+  assert(orig.querySelectorAll('.turn-block').length===4,'duplicate or missing turns');
+  d.getElementById('safeshare-close-btn').click();
+  thread.innerHTML='<div data-chatgpt-search-unit-key="user-one"><div data-user-message-bubble="true">Modern question</div></div>'+
+    '<div data-chatgpt-search-unit-key="answer-one"><div data-markdown-text-style="assistant-message"><p>Answer part one</p></div><div data-markdown-text-style="assistant-message"><p>Answer part two</p></div></div>';
+  d.getElementById('safeshare-action-pill').click();await wait(100);
+  orig=d.getElementById('diff-box-orig');
+  assert(orig.querySelectorAll('.turn-block').length===2,'split modern answer not joined');
+  assert(orig.innerText.includes('Answer part one')&&orig.innerText.includes('Answer part two'),'modern answer content lost');
+  document.getElementById('result').textContent='PASS: mixed/modern layouts, ordered roles, split answer, heading/table/code, composer exclusion. No uploads.';
+ }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
+};
+</script>

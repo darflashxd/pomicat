@@ -27,6 +27,8 @@ jobs:
       - run: pip install playwright==1.56.0
       - run: python -m playwright install --with-deps chromium
       - run: python tools/eval/credential_browser.py
+      - run: python -m playwright install --with-deps firefox
+      - run: python tools/eval/credential_browser.py --browser firefox
   model-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 15

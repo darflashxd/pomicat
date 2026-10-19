@@ -64,18 +64,27 @@
     encrypted = await encrypt(payload);
     return encrypted;
   };
-  let uploads = 0;
+  let uploads = 0, revokes = 0, finishRevoke;
+  const revokeGate = new Promise(resolve => { finishRevoke = resolve; });
+  modal.lastShare = {relayUrl:'http://127.0.0.1',shareId:'fictional-old',token:'fictional'};
   window.browser = {
     storage: { local: { get: async () => ({}) } },
-    runtime: { sendMessage: async () => { uploads++; return { success: true, data: { revoke_token: "fake" } }; } }
+    runtime: { sendMessage: async request => {
+      if(request.action==='REVOKE_SHARE'){revokes++;await revokeGate;return {success:true};}
+      uploads++; return { success: true, data: { revoke_token: "fake" } };
+    } }
   };
   window.fetch = () => { throw new Error("Real network forbidden in this self-check"); };
+  window.confirm = () => true;
   document.getElementById("btn-encrypt-publish").click();
+  window.confirm = realConfirm;
   assert(modal.publishing, "publication locks immediately");
+  document.getElementById('btn-encrypt-publish').dispatchEvent(new Event('click'));
+  assert(revokes===1,'repeat publish during revoke started another publication');
   assert([...document.querySelectorAll("#safeshare-modal-backdrop button, #safeshare-modal-backdrop input, #safeshare-modal-backdrop select")].every(el => el.disabled), "all real controls disabled");
   document.querySelector("#diff-box-sanitized .ss-badge").click();
   assert(same(preview(), expected), "badges cannot change the preview during encryption");
-  release();
+  finishRevoke();release();
   // Yield until the real async encryption/publication handler finishes (bounded).
   for (let i = 0; i < 100 && modal.publishing; i++) await new Promise(resolve => setTimeout(resolve, 20));
   assert(encrypted && !modal.publishing && uploads === 1, "one completed fake upload");

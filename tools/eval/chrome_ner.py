@@ -11,7 +11,7 @@ base = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Temp" / "o
 base.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="safeshare-chrome-", dir=base) as tmp:
     ext = Path(tmp) / "extension"
-    shutil.copytree(ROOT / "extension", ext)
+    shutil.copytree(Path(os.environ.get('SAFESHARE_EXTENSION_DIR', ROOT / 'extension')), ext)
     if os.environ.get('SAFESHARE_CANDIDATE_DIR'):
         from candidate_extension import prepare_candidate
         print('Experimental adapter:', prepare_candidate(ext, os.environ['SAFESHARE_CANDIDATE_DIR']))

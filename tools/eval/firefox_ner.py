@@ -40,11 +40,15 @@ def main():
     with tempfile.TemporaryDirectory(prefix="safeshare-firefox-", dir=base) as tmp:
         tmp = Path(tmp)
         ext = tmp / "extension"
-        shutil.copytree(ROOT / "extension", ext)
+        shutil.copytree(Path(os.environ.get('SAFESHARE_EXTENSION_DIR', ROOT / 'extension')), ext)
         if os.environ.get('SAFESHARE_CANDIDATE_DIR'):
             from candidate_extension import prepare_candidate
             print('Experimental adapter:', prepare_candidate(ext, os.environ['SAFESHARE_CANDIDATE_DIR']))
-        manifest = json.loads((ext / "manifest.firefox.json").read_text(encoding="utf-8"))
+        manifest_path = ext / "manifest.firefox.json"
+        if not manifest_path.exists(): manifest_path = ext / "manifest.json"  # Extracted Firefox package.
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if 'scripts' not in manifest.get('background', {}):
+            raise ValueError('Firefox test requires Firefox manifest/package, not Chromium service worker manifest')
         manifest["background"]["scripts"].append("ner_smoke.js")
         (ext / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (ext / "ner_smoke.js").write_text("""

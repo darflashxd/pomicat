@@ -1,5 +1,33 @@
 # Manual test checklist (Chrome)
 
+## Share workflow lifecycle regressions
+
+`python tools/eval/credential_browser.py` (or `--browser firefox`) runs the production scripts
+against local fixtures. All fixture traffic is restricted to the local origin; uncaught page
+JavaScript errors fail the run. Additional fixtures:
+
+- `submit_lifecycle.html`: pending NER plus rapid clicks, edited draft, navigation, replay-delay
+  double click, immediate next draft, and native form submission. A changed composer/chat/mode cancels the pending send;
+  users must review and send again. The draft is not overwritten by the old result.
+- `extraction_integrity.html`: mixed legacy/modern role layouts, ordered turns, multi-block
+  answers, headings/tables/code and composer exclusion. This does not prove all historical or
+  virtualized turns are present in a vendor site's DOM.
+- `model_lifecycle.html`: old scans cannot continue after close/reopen, late responses cannot
+  populate new review state, changed scan text is marked stale, manual choices survive, and model
+  failures unlock controls without claiming a clean result. Closing during encryption cancels
+  the subsequent upload. An already in-flight network upload cannot be recalled by closing UI.
+- `maybe_review.html`: publication locks/snapshots before awaiting earlier-link revocation;
+  repeat clicks during that wait cannot publish twice. DOM preview equals decrypted turns.
+
+Live vendor checks attempted on 2026-10-20: Claude/DeepSeek required login; ChatGPT was logged
+out and SafeShare was not installed in the interactive browser. No vendor prompts were sent and
+these sites are NOT considered end-to-end verified by the fixture results.
+
+To test a built/extracted package instead of the source extension, set
+`SAFESHARE_EXTENSION_DIR` to that package's directory before running `chrome_ner.py` or
+`firefox_ner.py`. The Firefox harness rejects a Chromium manifest. Clear the variable afterward
+to return to source testing. These harnesses use temporary profiles and never upload shares.
+
 ## Model-upgrade correction checks
 
 `node tests/ner_decoder.test.js` exercises the actual decoder with controlled logits: English

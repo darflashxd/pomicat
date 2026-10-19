@@ -338,6 +338,7 @@ class SafeShareModal {
     this.modelRun = null;
     this.modelBusy = false;
     this.maybeIdentities.clear();
+    this.publishing = false; // Old async handlers are generation-guarded before touching new state.
     this.customSelections.clear();
     if (this.selectionCleanup) this.selectionCleanup();
     const existing = document.getElementById("safeshare-modal-backdrop");
@@ -1471,6 +1472,7 @@ class SafeShareModal {
       for (const turn of snapshot) {
         if (this.modelReview.has(turn.content)) continue;
         const result = await api.analyze(turn.content, 60000, true);
+        if (this.modelRun !== run || generation !== this.reviewGeneration || !this.currentTurns.length) return;
         if (!result.success || !Array.isArray(result.spans)) throw new Error(result.error || "Invalid local model response");
         const protectedSpans = arbiter ? arbiter.extractProtectedSpans(turn.content) : [];
         const spans = result.spans.filter(s => !protectedSpans.some(p => s.start < p.end && s.end > p.start));
@@ -1478,7 +1480,8 @@ class SafeShareModal {
         this.modelReview.set(turn.content, spans);
       }
       if (generation === this.reviewGeneration) {
-        this.modelState = "✓ Local AI model checked";
+        const changed = this.reviewBaseTurns.some(t => !this.modelReview.has(t.content));
+        this.modelState = changed ? "Review text changed — run the local model again for the current preview" : "✓ Local AI model checked";
         if (button) button.textContent = "✓ Local model checked (Click to re-scan)";
       }
     } catch (_) {
@@ -1563,20 +1566,12 @@ class SafeShareModal {
       const attack = this.attackCheck(this.sanitizedTurns || []);
       if (attack.leaks && !window.confirm(`The attack check still recovers ${attack.leaks} hidden value(s) from this share (see "Attack check"). Create the link anyway?`)) return;
       // Re-sharing after changing choices: the earlier link still shows the earlier version
-      if (this.lastShare && window.confirm("You already created a link from this chat. Revoke that earlier link? (Recommended if you hid something you had missed.)")) {
-        const { relayUrl: prevRelay, shareId: prevId, token: prevToken } = this.lastShare;
-        this.lastShare = null;
-        this.forgetOwnOriginals(prevId);
-        try {
-          const api = typeof browser !== "undefined" ? browser : chrome;
-          const res = await api.runtime.sendMessage({ action: "REVOKE_SHARE", relayUrl: prevRelay, shareId: prevId, token: prevToken });
-          if (!(res && res.success)) window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
-        } catch (_) {
-          window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
-        }
-      }
+      const previousShare = this.lastShare && window.confirm("You already created a link from this chat. Revoke that earlier link? (Recommended if you hid something you had missed.)") ? { ...this.lastShare } : null;
       // Snapshot only public fields; never share solverLeaks, original values or detector metadata.
       const turns = this.sanitizedTurns.map(({ role, content }) => ({ role, content }));
+      const ttl = backdrop.querySelector("#safeshare-ttl").value;
+      const generation = this.reviewGeneration;
+      const stillOpen = () => generation === this.reviewGeneration && backdrop.isConnected !== false;
       const btn = backdrop.querySelector("#btn-encrypt-publish");
       this.publishing = true;
       const controls = [...backdrop.querySelectorAll("button, input, select")].map(el => [el, el.disabled]);
@@ -1585,7 +1580,20 @@ class SafeShareModal {
       btn.disabled = true;
 
       try {
-        const ttl = document.getElementById("safeshare-ttl").value;
+        if (previousShare) {
+          const { relayUrl, shareId, token } = previousShare;
+          try {
+            const api = typeof browser !== "undefined" ? browser : chrome;
+            const res = await api.runtime.sendMessage({ action: "REVOKE_SHARE", relayUrl, shareId, token });
+            if (res && res.success) {
+              this.lastShare = null;
+              this.forgetOwnOriginals(shareId);
+            } else window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
+          } catch (_) {
+            window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
+          }
+        }
+        if (!stillOpen()) return;
         const payload = {
           turns,
           timestamp: new Date().toISOString(),
@@ -1601,6 +1609,7 @@ class SafeShareModal {
         } catch (_) {}
 
         const encResult = await this.crypto.encrypt(payload);
+        if (!stillOpen()) return;
         let finalShareUrl = encResult.fullShareUrl;
 
         // Upload ciphertext to relay server via background script
@@ -1616,6 +1625,7 @@ class SafeShareModal {
 
         // Auto-retry wake-up loop for privileged background script
         for (let attempt = 0; attempt < 3; attempt++) {
+          if (!stillOpen()) return;
           try {
             let response = null;
             if (typeof browser !== "undefined" && browser.runtime && browser.runtime.sendMessage) {
@@ -1659,6 +1669,7 @@ class SafeShareModal {
 
         // Direct edge fetch fallback
         if (!uploaded) {
+          if (!stillOpen()) return;
           try {
             const uploadRes = await fetch(`${relayUrl}/api/share`, {
               method: "POST",
@@ -1677,6 +1688,7 @@ class SafeShareModal {
         if (!uploaded) {
           throw new Error("Unable to upload encrypted payload to Cloudflare Edge. Please verify your connection.");
         }
+        if (!stillOpen()) return; // An in-flight upload may finish, but must never alter another modal.
 
         // Switch to Result View
         document.getElementById("safeshare-review-view").style.display = "none";
@@ -1703,6 +1715,7 @@ class SafeShareModal {
           this.lastShare = { relayUrl, shareId: encResult.shareId, token: revokeToken };
           // Only you, opening this link inside your extension, can show the originals again
           await this.saveOwnOriginals(encResult, turns);
+          if (!stillOpen()) return;
           revokeBtn.style.display = "";
           revokeBtn.onclick = async () => {
             const api = typeof browser !== "undefined" ? browser : chrome;
@@ -1718,12 +1731,15 @@ class SafeShareModal {
           };
         }
       } catch (err) {
+        if (!stillOpen()) return;
         console.error("[SafeShare] Encryption error:", err);
         btn.innerText = "Error Encrypting";
         btn.disabled = false;
       } finally {
-        this.publishing = false;
-        controls.forEach(([el, disabled]) => { el.disabled = disabled; });
+        if (generation === this.reviewGeneration) {
+          this.publishing = false;
+          controls.forEach(([el, disabled]) => { el.disabled = disabled; });
+        }
       }
     });
 
