@@ -1,290 +1,352 @@
 # SafeShare
 
-Redaction leaks. SafeShare finds what the redaction left behind.
+**Review and privately share AI conversations, with checks for sensitive data and arithmetic recovery of redacted values.**
 
-When you share an AI chat, removing the obvious secret is not enough. If you redact your salary
-but the assistant's answer still says "saving 30% gives Rp 900.000 a month, Rp 10.800.000 a
-year", anyone can work the salary back out: 10.800.000 / 12 / 30% = 3.000.000.
+SafeShare's main workflow is **Share Privately**: review a conversation, redact sensitive spans
+and supported numerical clues, then publish an encrypted link with expiry, optional burn-after-read,
+and revocation. The browser extension integrates with ChatGPT, Claude, and DeepSeek. A CLI and
+text-redacting API proxy are also included.
 
-SafeShare is three things:
+The research question is straightforward: **what can a reader recover after the obvious secret
+has been removed?** An assistant's savings calculation, annual total, or stated age can reveal
+information that entity-only redaction leaves behind.
 
-1. **An inversion attack** (`safeshare invert`) that recovers hidden numbers from chats that were
-   already redacted by any tool.
-2. **A redactor** that removes personal data and the derived numbers that would give it away,
-   for ChatGPT, Claude and DeepSeek (browser extension) or any text (CLI, proxy).
-3. **An encrypted share link.** The chat is encrypted in your browser with AES-256-GCM, and the
-   key stays in the URL `#fragment`, which browsers do not send to the server. Links expire,
-   can burn after one read, and can be revoked.
+> Research software, not a guarantee of anonymity. Review the output before publishing.
+> Detection can miss sensitive information or flag harmless text. A successful attack check
+> means the supported attack found a clue; an empty result does not prove the chat is safe.
 
-![demo](docs/demo.gif)
+![SafeShare demonstration](docs/demo.gif)
 
-## Try the attack
+[Quick start](#quick-start-share-privately) · [Reproduce the attack](#reproduce-the-attack) ·
+[Security model](#security-model) · [Evaluation](#evaluation-and-reproducibility) ·
+[Testing](TESTING.md) · [Deployment](DEPLOY.md)
 
-```bash
-git clone https://github.com/darflashxd/safeshare && cd safeshare
-node bin/safeshare.js invert examples/chat_naive_redacted.txt
-```
+## Quick start: Share Privately
 
-```
-Most likely hidden value: Rp 3.000.000 (agreed by 3 visible numbers)
-    Rp 900.000 / 30%
-    Rp 2.100.000 / (100% - 30%)
-    Rp 10.800.000 / 12 / 30%
-```
-
-Then redact with SafeShare and attack again:
+### Chrome, Edge, and Brave
 
 ```bash
-node bin/safeshare.js redact examples/chat_original.txt | node bin/safeshare.js invert
-# No hidden values recovered.
+git clone https://github.com/darflashxd/safeshare.git
+cd safeshare
 ```
 
-The attack looks for one value that several visible numbers agree on, using ratios found in the
-text and common periods (months, weeks, quarters, years), and ranks candidates by how simple the
-explanation is. It does the same for dates: a hidden birth date comes back from "I am 28" or
-"I graduated in 2020 at 22" (`examples/chat_birthdate_naive.txt`). Use it on synthetic data or
-data you own.
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Select **Load unpacked** and choose the repository's `extension/` folder.
+3. Open or refresh ChatGPT, Claude, or DeepSeek, then select **SafeShare**.
+4. Review the extracted user and assistant turns. Inspect redactions and **Maybe sensitive**
+   suggestions; add manual redactions for anything the detectors missed.
+5. Choose the reader profile, amount handling, expiry, and burn-after-read setting, then create
+   the link. Anyone receiving the **complete link, including its fragment**, can open it.
 
-How often this happens in real chats is still open: in 20,000 WildChat conversations, people
-almost never shared their own finances, and nothing leaked in the few that did
-([details](tools/eval/RESULTS.md#6-does-the-inversion-attack-happen-in-real-chats-2026-10-11)).
+The model, vocabulary, and ONNX WASM runtime are bundled in the repository. **Running the browser
+extension requires no Python, model download, or inference API key.** Creating and opening relay
+shares requires a reachable relay; local detection and model inference run on your device.
 
-## How redaction works
+Existing unpacked installations: run `git pull origin main`, reload SafeShare in the extensions
+page, and refresh your chat tabs. Pulling source does not reload code already running in a tab.
 
-| Layer | What it does | Code |
+### Firefox
+
+Use a Firefox package from [Releases](https://github.com/darflashxd/safeshare/releases) if one is
+published, or build the packages locally with Python 3:
+
+```bash
+python tools/build_extension.py
+```
+
+Extract `dist/SafeShare-<version>-firefox.zip`. Open
+`about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**, and choose the extracted
+`manifest.json`. Temporary add-ons must be reloaded after a browser restart. The repository's
+`extension/manifest.json` is for Chromium, not Firefox.
+
+The build also produces a Chrome ZIP and `dist/SHA256SUMS`. **`dist/` is ignored by Git:** a clone
+or pull contains the bundled model and source, not locally generated release ZIPs. See
+[TESTING.md](TESTING.md) for cross-browser checks.
+
+### Optional protection before sending
+
+The chip above the composer controls a separate, opt-in feature. Its default is **Off (send as typed)**.
+
+| Mode | Intended behavior |
+|---|---|
+| Off | Send the prompt as typed; Share Privately remains available. |
+| Protect amounts only | Replace supported personal amounts with symbolic parameters such as `<S1>` and `<S2>`. |
+| Protect IDs + amounts | Also replace supported identifiers and credentials; use the local model for names and places tied to the writer when available. |
+
+Supported formulas in AI replies can be evaluated locally against the symbolic values. This is
+not a general computer algebra system, and arbitrary model-generated formulas may be unsupported.
+Original-value restoration depends on the browser session mappings remaining available.
+
+**Before-send protection is not a barrier against the chat site's JavaScript reading the composer
+while you type.** It changes what is submitted, not what the page could already observe.
+
+## Reproduce the attack
+
+Requirements: Node.js 18 or newer. These examples use fictional data and need neither a model
+nor a relay.
+
+```text
+User: My salary is <SALARY> a month. If I save 20%, how much is that per month and per year?
+Assistant: Saving 20% means $1,000 per month, leaving $4,000 for expenses.
+           Over a year that adds up to $12,000.
+```
+
+Removing the salary does not remove the arithmetic clue: `$1,000 / 0.20 = $5,000`.
+
+```bash
+node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
+```
+
+Leading result (the tool also prints alternative candidates):
+
+```text
+Most likely hidden value: $5,000 (agreed by 3 visible numbers)
+    $1,000 / 20%
+    $4,000 / (100% - 20%)
+    $12,000 / 12 / 20%
+```
+
+Redact the original conversation with SafeShare, then run the same attack:
+
+```bash
+node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+```
+
+```text
+No hidden values recovered.
+```
+
+`invert` ranks candidate amounts using visible ratios and common periods. It also checks supported
+age/birth-year and date clues; see [the birth-date example](examples/chat_birthdate_naive.txt).
+These are bounded heuristics, not proof of the original value or an exhaustive inference attack.
+Use the tool only on synthetic data or data you are authorized to examine.
+
+## Capabilities and scope
+
+| Component | Purpose | Important boundary |
 |---|---|---|
-| Pattern rules | Regex plus checksums: Indonesian NIK/NPWP/BPJS, cards (Luhn), IBAN, API keys, DB URIs, JWTs, seed phrases, shell prompts and home paths, 20+ national IDs | `extension/engine/heuristics.js` |
-| Contextual rules | Separates "my salary" / "gaji saya" from "the average salary" / "rata-rata gaji". Rule-based, no ML model. | `extension/engine/contextual.js` |
-| Inversion defense | Normalises numbers across formats (`10,8 juta`, `10.8M`, `Rp 10.800.000`), then removes visible numbers derivable from a redacted one through the supported arithmetic (ratios, per-period amounts, projections, sums and differences). Ratios such as 30% are kept, because on their own they reveal nothing. | `extension/engine/pseudonymizer.js` |
+| Browser extension | Conversation extraction, interactive review, manual redaction, encrypted sharing, optional before-send protection | ChatGPT/Claude/DeepSeek layouts change; inspect the extracted turns and health warnings. |
+| Local NER | Additional PII suggestions and writer-linked name/place detection | BERT-small INT8, English-focused; scores are not calibrated probabilities. |
+| CLI and library | Redact transcripts, test arithmetic recovery, create encrypted shares | Built-in rules, not the browser's NER model; optional Presidio integration. |
+| API proxy | Redact supported text request fields before forwarding to an LLM API | Not a universal DLP gateway; images/files are not redacted and responses are not restored. |
+| Relay and viewer | Store ciphertext and open expiring or revocable shares | A full share link is a bearer capability; hosted decryption trusts the serving host. |
 
-Redacted values become consistent placeholders (`[REDACTED_FINANCIAL_1]`) across the whole
-conversation, so the chat still reads naturally.
+Rules recognize supported credential, contact, banking, government-ID, location, and contextual
+personal-data patterns. Checksums and context help distinguish values, but coverage is not universal.
+The inversion defense additionally targets supported ratios, per-period amounts, projections,
+sums, and differences across turns. It does not model every possible inference.
 
-## Threat model
+Review suggestions are **unverified candidates**, not confirmation that a credential works.
+Some start selected through explicit credential context or the review's hand-set scoring policy.
+Inspect their state instead of relying on badge color. **Reset to Defaults** restores the default
+policy; **Protect All** explicitly selects uncertain suggestions too.
 
-| Who | What they can do | What SafeShare does |
-|---|---|---|
-| Search engines and crawlers (Google dorking) | Index any share page they find a link to | The server and the page only hold ciphertext; the key is in the `#` part of the link, which browsers never send. `noindex` headers on every response. |
-| Scrapers guessing links | Try share IDs in bulk | IDs are random UUIDs (122 bits), and reads are rate-limited per IP. |
-| Anyone who gets the full link (forwarded, pasted in a public channel) | Read the shared chat | Redaction before sharing, so there is little to read; burn after one view, expiry, and revoke limit how long it's readable. |
-| A reader doing arithmetic on the shared chat | Recover a redacted amount from the numbers around it | The inversion defense removes figures derivable through the supported arithmetic; `invert` checks the result. |
-| The relay operator (Cloudflare, or whoever deploys it) | See ciphertext, IP addresses, timing, sizes | Can't read content. Metadata is visible. |
-| The AI vendor | See whatever you send it | Before-sending protection replaces IDs and amounts (`<S1>`) while you chat; names are still sent. |
+## How it works
 
-**Out of scope:** malware or a compromised browser on your machine, a recipient who screenshots
-the page, and what the vendor already received before you installed SafeShare. The viewer's
-anti-copy features are deterrence only, not protection.
-
-### "Didn't the vendors fix this?"
-
-After shared chats showed up in search results in 2025, vendors removed "make discoverable"
-options and added `noindex`. That stops search listings, but a vendor share link is still a page
-that serves the whole plaintext chat to anyone holding the link, stored by the vendor and usually
-without expiry. Shared links get forwarded, pasted into public channels and archived. SafeShare
-removes the personal details (including derivable numbers) before anything is shared, encrypts so
-the host can't read it, and lets links expire.
-
-## Measured accuracy
-
-Full method and per-label numbers: [tools/eval/RESULTS.md](tools/eval/RESULTS.md).
-
-| | ai4privacy token F1 | real chats touched (WildChat) | hidden salary recoverable |
-|---|---|---|---|
-| SafeShare alone | 0.21 | 7.8% | no |
-| SafeShare + Presidio, `names: personal` (default) | 0.31 | 8.8% | no |
-| SafeShare + Presidio, `names: all` + dates | 0.78 | 71% | no |
-| Presidio alone | 0.79 | – | yes |
-
-- **Alone, SafeShare CLI is not a general PII detector.** It is rule-based and has no
-  named-entity recognition; the browser extension adds a local MiniLM Q4 NER model
-  (14 MB, runs in-page) for names and addresses, arbitrated against technical spans.
-  With `--presidio` the CLI uses Presidio for names, places, phones and IDs, and with
-  every name and date turned on it matches Presidio (0.78 vs 0.79) while also blocking
-  the inversion attack. The extension's MiniLM alone scores token F1 0.85 on ai4privacy
-  (`tools/eval/RESULTS_SOTA.md`). That is the raw model on a benchmark: in a chat the extension
-  uses it before sending (opt-in, writer's own names and places only) and, when you click it, as
-  unchecked suggestions in the share dialog. The "0% false positives" there is on a technical hard-negative set
-  only, not real chats.
-- **Benchmarks and real chats disagree about names.** ai4privacy labels every name as PII; real
-  chats are full of names that aren't the user's (celebrities, story characters, authors). Turning
-  all names on touches 71% of real conversations. The default, `names: personal`, only redacts a
-  name or place tied to the user ("my wife Rina", "I live in Bandung") and touches 8.8%.
-- Deciding whether a name or number belongs to the user is the part that needs a trained
-  model; the `names: personal` rules are the stopgap.
-- The test suite in `tests/` is a regression suite written alongside the rules, not an accuracy
-  measurement.
-
-## Limits
-
-- Detection is rule-based plus a local NER model in the extension (MiniLM Q4; see
-  [MODELS_SETUP.md](MODELS_SETUP.md)). Phrasing the rules don't cover will be missed; the
-  NER covers names/addresses but not dates. A DistilBERT classifier was also trained as an
-  experiment and scored F1 0.64 on held-out data, so it isn't shipped.
-- Social-media handles in casual phrasing ("follow me at @name") are not caught.
-- The chat site sees what you type before you press send: protection before sending rewrites the
-  message on send, but the site's own scripts (analytics, session replay) can read the text box
-  while you type. Values shown again on your screen are kept from the site's scripts for IDs,
-  names and places (closed shadow DOM), but restored amounts are ordinary page text. Other
-  extensions that can read all sites can read everything too.
-- The real values behind placeholders are kept only in the browser's session storage for the
-  extension. Closing the browser, or reloading or updating the extension, clears them: messages
-  sent before that keep showing `[NIK_1]` / `<S1>`, and the AI never had the values. This is
-  deliberate (nothing written to disk). After an update, tabs that were already open show
-  "SafeShare was updated: refresh this tab"; they still protect what you send until refreshed.
-- Share links open inside the extension when it's installed, so the relay can't change the page
-  that holds the key. Without the extension, the relay's page decrypts the chat, and you trust
-  whoever runs the relay not to change it (`dist/SHA256SUMS` lists the page's files for
-  comparison).
-- Anyone holding the full link can read the share. The viewer's anti-copy features (glyph
-  scrambling, zero-width watermark, DevTools check) are deterrence only: a screenshot defeats them.
-- Not covered yet: text inside images, cookies in pasted HAR files, combinations of
-  quasi-identifiers (job + city + company size).
-
-## Install
-
-### Browser extension (Chrome, Edge, Brave, Firefox)
-
-Download the zip from [Releases](https://github.com/darflashxd/safeshare/releases), or use
-the `extension/` folder directly.
-
-- **Chrome / Edge / Brave:** open `chrome://extensions`, turn on Developer mode, click
-  "Load unpacked" and choose the `extension/` folder (or an unzipped Chrome release zip).
-- **Firefox:** use the Firefox release zip (it has Firefox's manifest). Unzip it, open
-  `about:debugging#/runtime/this-firefox`, click "Load Temporary Add-on" and choose its
-  `manifest.json`. The `extension/` folder itself is set up for Chrome.
-
-Open chatgpt.com, claude.ai or chat.deepseek.com and click the SafeShare button to review the
-redactions and create a link.
-
-The share dialog also lists **Maybe sensitive** credential suggestions. Values assigned to a
-credential-like key start checked for both reader profiles; random-looking strings without that
-context start unchecked. Each suggestion gets a context score (0–1: where it came from, how
-random it looks, whether a word like "token" or "password" sits just before it, minus points
-near "example"/"placeholder"); the list is sorted by it, the top 5 are shown, and a score of 0.75
-or more starts checked. The weights are hand-set until labelled data exists. Unchecking every
-suggestion at once asks first if any look like credentials, and creating a second link from the
-same chat offers to revoke the first. Each choice applies to exact occurrences across both roles. Suggestions
-are local and unverified, not proof a credential works or that all secrets were found. No candidate
-values or choices are saved. The encrypted turns contain only the reviewed roles and text, never
-internal detection metadata. Click **Check names and other PII with local model** to add local
-MiniLM suggestions on Chrome or Firefox. Model suggestions start unchecked; their experimental
-scores are not calibrated probabilities. A visible status distinguishes a checked review from a
-failed/unrun model check. CLI and proxy do not use this model.
-
-### CLI and library (Node 18+, no dependencies)
-
-```bash
-node bin/safeshare.js redact chat.txt
-node bin/safeshare.js invert redacted.txt        # exit code 2 if something was recovered
-node bin/safeshare.js share chat.txt --burn --ttl 3600 --relay http://127.0.0.1:8787
+```text
+Conversation extraction
+    Rules + contextual detection + local model suggestions
+    Supported cross-turn inference checks
+    User review and manual redactions
+    Snapshot of reviewed roles and text
+    Client-side AES-256-GCM encryption
+    Ciphertext upload to relay
+    Decryption in the extension viewer or hosted fallback
 ```
 
-`npm link` (or `npm i -g .`) installs it as `safeshare`.
+| Area | Implementation |
+|---|---|
+| Deterministic patterns and value boundaries | [heuristics.js](extension/engine/heuristics.js) |
+| Personal/public context | [contextual.js](extension/engine/contextual.js) |
+| Repeated values and numerical derivations | [pseudonymizer.js](extension/engine/pseudonymizer.js) |
+| Model inference | [offscreen.js](extension/offscreen.js), Chrome offscreen document / Firefox background page |
+| Review and publication | [modal.js](extension/ui/modal.js) |
+| Client-side encryption | [crypto.js](extension/engine/crypto.js) |
+| Cloudflare relay | [worker.js](relay/worker.js), D1 storage |
+
+The encryption key is carried in the URL `#fragment`, which browsers do not include in HTTP
+requests. The relay API receives ciphertext, not the reviewed plaintext or the fragment key.
+Expiry, burn-after-read, and revocation are enforced by the relay; they cannot recall a copy
+already retained by a recipient.
+
+## Security model
+
+| Actor or risk | Protection | Residual risk |
+|---|---|---|
+| Reader inferring a hidden amount | Redaction of supported numerical clues; attack check on the reviewed text | Unknown transformations, semantic clues, and deliberately revealed values may still expose information. |
+| Person holding a full share link | Expiry, optional burn-after-read, revocation | The holder can decrypt while the link is usable and keep a copy. |
+| Relay operator | Client-side encryption; extension-hosted viewer avoids executing a relay-served decryptor | IPs, timing, share IDs, and sizes remain visible. A modified hosted fallback can steal its key/plaintext. |
+| Search engines and link previews | Ciphertext API, indexing directives, user-initiated opening | `noindex` is not access control. Click-to-open reduces accidental consumption, not all automated access. |
+| Chat provider | Optional rewrite at submission | Typed text is visible to the page before submission; the provider retains anything already received. |
+| Changed chat-site layout | Extraction health checks and review UI | Missing turns or submit-hook changes still require real-site testing. |
+
+With SafeShare installed on a supported relay origin, share links are routed to the extension's
+own viewer. Without it, recipients use the hosted viewer and must trust its operator. CSP is
+defense in depth, not protection against a host that controls both the page and its headers.
+
+### Known limitations
+
+- Phrasing and formats outside the detectors' coverage can be missed. English is the local model's
+  focus; non-English and mixed-language quality is not assured. No language-word shortcut disables
+  the full scan, and an empty successful scan means **checked**, not **safe**.
+- The CLI/proxy do not run the bundled browser model. Personal-name rules alone are not general NER.
+- Text in images, arbitrary attachments, and every field in pasted logs/HAR files are not covered.
+- Quasi-identifiers and semantic re-identification are not comprehensively prevented.
+- Restored amounts are ordinary page text and may be read by site scripts. Closed-shadow rendering
+  for some other restored values is not a security boundary against a compromised browser or
+  another privileged extension. Session mappings can disappear after browser/extension lifecycle
+  changes; SafeShare cannot reconstruct originals that were not sent to the AI.
+- The optional sharer-originals feature stores a separate encrypted restoration copy on the
+  creator's device; ordinary recipients do not receive that private mapping. See [the changelog](CHANGELOG.md).
+- Copy deterrence is not copy protection. Screenshots, photographs, or an authorized reader's own
+  tools can retain displayed content. Burn-after-read does not stop this.
+- Malware, a compromised browser/extension, and compromised distribution accounts are outside the
+  protection provided by redaction and link encryption.
+
+If a live credential has already been sent to a service, rotate or revoke it. Redacting a later
+share does not remove it from the original service or from copies already made.
+
+## Evaluation and reproducibility
+
+**Regression success is not a detection-accuracy measurement.** Model-only, pipeline, and attack
+results answer different questions and must not be combined into one security score.
+
+| Evidence | What it measures | Qualification |
+|---|---|---|
+| [Candidate model comparison](tools/eval/MODEL_COMPARISON.md) | MiniLM, BERT-small INT8, and GLiNER experiments; native/WASM measurements | Small development set plus external synthetic data; not a guaranteed unseen holdout. |
+| BERT external EN experiment | Exact-span F1 0.952 on 500 Gretel documents / 963 canonical name, location, email, and phone entities | Common-label model evaluation, not all PII or the production pipeline. Thirteen entities were only partially covered. Dataset overlap with training is unknown. |
+| [Earlier CLI/Presidio evaluation](tools/eval/RESULTS.md) | Historical detector utility and inference experiments | Different configurations and metrics; not the current browser model's score. |
+| [Attack benchmark](tools/attack_bench/RESULTS.md) | Arithmetic recovery from 40 fictional templated chats | Tests supported transformations, not arbitrary AI output or real-world prevalence. |
+| [Regression and browser checks](TESTING.md) | Known bugs, UI choices, runtime execution, preview/payload consistency | A model loading successfully does not establish held-out precision or recall. |
+
+The earlier WildChat investigation found few personal-finance disclosures and no demonstrated
+inversion incident in that sample. It does not establish that the attack is common in real chats;
+see [the evaluation report](tools/eval/RESULTS.md).
+
+The bundled model is `gravitee-io/bert-small-pii-detection` INT8, with 51 BIO labels and a
+30,522-token vocabulary. Weights are approximately 28.7 MB. The legacy filename
+`model_q4.onnx` does **not** indicate the current quantization format. Revision, SHA-256, and
+language scope are recorded in [MODEL_INFO.json](extension/models/MODEL_INFO.json) and
+[MODELS_SETUP.md](MODELS_SETUP.md). Benchmark latency depends on the input, hardware, and runtime;
+short pre-tokenized kernel timings are not end-to-end share-review latency.
+
+## CLI, library, and proxy
+
+Node.js 18+, no third-party runtime dependencies for the built-in CLI path:
+
+```bash
+node bin/safeshare.js redact examples/chat_original_en.txt
+node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
+node bin/safeshare.js redact examples/chat_original_en.txt --numbers range
+```
 
 Input is plain text with `User:` / `Assistant:` lines, or a JSON array of `{role, content}`.
+`npm link` installs the `safeshare` command from your checkout. The library exports
+`redactTurns` and `invert` through `require("safeshare-ai")` after local installation.
 
-```js
-const { redactTurns, invert } = require("safeshare-ai"); // after npm install <path-to-repo>
-```
+| Reader profile | Intended policy |
+|---|---|
+| `--profile public` (default) | Remove detected identifiers, personal details, supported personal amounts, and derivable numerical clues. |
+| `--profile trusted` | Keep personal amounts/names according to the profile; still remove supported hard identifiers and credentials. |
 
-### Proxy for LLM APIs
+`--numbers range` generalizes eligible personal amounts. Revealing an exact amount or using a
+more permissive profile can make another hidden value inferable. Always review the result.
+
+### API proxy
 
 ```bash
 node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com
-# then point your SDK at http://127.0.0.1:8788/v1
 ```
 
-The proxy redacts message text for OpenAI Chat Completions (`/chat/completions`), OpenAI
-Responses (`/responses`: `input`, `instructions`, and tool outputs) and Anthropic Messages (`/messages`:
-`messages`, `system`). Requests without a body (e.g. `GET /v1/models`) pass through. Any other
-request with a body (embeddings, legacy completions, files, ...) is refused with a 403 rather
-than forwarded unredacted. Only text parts are redacted (not images or files), and responses
-are not restored.
+Point your client at `http://127.0.0.1:8788/v1` and supply the authentication needed by your
+upstream provider. Supported text request formats include OpenAI Chat Completions, OpenAI
+Responses, and Anthropic Messages. Unsupported body-bearing endpoints are refused; unsupported
+tool or multimodal structures can also be rejected instead of forwarded without protection.
+Responses are not restored. Use fictional requests when testing a live provider.
 
-### Who will read it, and how to show amounts
+### Optional Presidio integration and policy
 
-| | `--profile public` (default) | `--profile trusted` |
-|---|---|---|
-| Keys, IDs, cards, contacts | removed | removed |
-| Your own amounts and anything derived from them | removed (or a range) | kept |
-| Your name, family, places tied to you | removed | kept |
-
-`--numbers range` shows your own amounts as a band instead of a placeholder: "Gaji saya
-Rp 3.000.000" becomes "Gaji saya Rp 2–5 juta". Derived figures stay removed, and the range is
-only used if `invert` can't recover the original from it. The extension has the same two
-choices ("Reader" and "Amounts") in the share dialog.
-
-### Advanced (CLI only): Presidio for names, places and IDs
-
-SafeShare works without this. It's an optional extra for the CLI and proxy when you also want
-general name and address detection, and it's what the evaluation numbers above use.
+The CLI/proxy can use a separately running Presidio analyzer:
 
 ```bash
-pip install presidio-analyzer && python -m spacy download en_core_web_lg
-python tools/presidio_server.py                      # or the official presidio-analyzer Docker image
 node bin/safeshare.js redact chat.txt --presidio http://127.0.0.1:5002
 ```
 
-In a policy file: `"presidio": { "url": "...", "names": "personal" | "all", "skip": ["DATE_TIME", "NRP", "URL"] }`.
-Presidio's default model is English, so Indonesian names are only caught by SafeShare's own
-rules ("nama saya …"). The browser extension can't use Presidio (it's Python); a small name
-model running inside the browser is on the roadmap instead.
-
-### Policy file
+Start an analyzer first; [tools/presidio_server.py](tools/presidio_server.py) is the project's
+optional server entry point and requires Presidio plus its NLP model. Unlike bundled browser
+inference, this sends text to the configured analyzer, so use a trusted endpoint.
 
 ```json
 {
   "profile": "public",
   "numbers": "range",
-  "presidio": "http://127.0.0.1:5002",
-  "preset": "pci",
   "disable": ["SYSTEM"],
-  "allow": ["support@acme.com", "/^ACME-INTERNAL-\\d+$/"],
-  "rules": [{ "id": "ACME_TICKET", "pattern": "ACME-\\d{6}", "replacement": "[TICKET]" }]
+  "allow": ["support@example.org"],
+  "rules": [{"id": "TICKET", "pattern": "ACME-\\d{6}", "replacement": "[TICKET]"}]
 }
 ```
 
-Pass it with `--policy policy.json` to `redact`, `share` or `proxy`. Presets (`pci`, `hipaa`,
-`gdpr`) limit redaction to the relevant categories. They help with scoping; they are not
-compliance certifications.
+Pass with `--policy policy.json`. Allowlisting, disabled categories, and custom rules change
+what remains visible. Presets named `pci`, `hipaa`, or `gdpr` are category filters, **not compliance
+certifications**.
 
-## Relay
+## Relay and self-hosting
 
-The relay stores ciphertext only.
-
-- **Local / offline:** `python relay/server_local.py` serves the API and the viewer on
-  `http://127.0.0.1:8787`.
-- **Cloudflare:** step-by-step in [DEPLOY.md](DEPLOY.md) (free plan, about 15 minutes).
-
-API: `POST /api/share` `{id (UUID), ciphertext, ttl, burn_on_read}` returns a `revoke_token`.
-`GET /api/share/:id` returns the ciphertext. `POST /api/revoke/:id` `{token}` deletes the share.
-
-Limits: shares up to 512 KB, 10 uploads and 60 reads per minute per IP (both relays), and
-expired shares are deleted daily.
-
-## Development
+For a local demonstration, start the relay in one terminal:
 
 ```bash
-npm test                                   # all tests in tests/
-python data/generate_dataset.py            # regenerate the synthetic training data (seeded)
-python tools/build_extension.py            # dist/SafeShare-<version>-chrome.zip and -firefox.zip
-python tools/make_demo_gif.py              # docs/demo.gif (start relay/server_local.py first for the share step)
+python relay/server_local.py
 ```
 
-```
-bin/        CLI, library entry point, proxy
-extension/  browser extension (engine/, ui/)
-extension/viewer/  share-link page (served by the relay, and opened inside the extension)
-relay/      Cloudflare Worker, D1 schema, local Python relay
-examples/   synthetic chats for the demo
-tests/      regression tests
-tools/      evaluation harness (tools/eval), benchmarks, demo scripts
-training/   DistilBERT experiment (not shipped)
-docs/       Arsenal abstract; docs/archive has older notes
+Then create a fictional share in another terminal:
+
+```bash
+node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 3600 --relay http://127.0.0.1:8787
 ```
 
-See [DEMO.md](DEMO.md) for the booth walkthrough.
+This uploads an encrypted test share to your local relay. The CLI prints the link and a revocation
+command. Treat the fragment key and revocation token as secrets; do not include real links in bug
+reports. The browser extension defaults to the project's hosted relay; running a local server
+does not automatically change that setting.
 
-## License
+Cloudflare Worker/D1 deployment, schema upgrades, relay restrictions, and custom-host changes:
+[DEPLOY.md](DEPLOY.md). API entry points are `POST /api/share`, `GET /api/share/:id`, and
+`POST /api/revoke/:id`. Re-deploying hosted assets is separate from pushing Git commits.
 
-Apache 2.0
+## Development and testing
+
+```bash
+npm test
+python tools/eval/test_score.py
+python tools/build_extension.py
+```
+
+Browser harnesses require their documented test dependencies; they are not requirements for
+using the installed extension:
+
+```bash
+python tools/eval/credential_browser.py
+python tools/eval/chrome_ner.py
+python tools/eval/firefox_ner.py
+```
+
+Use fictional data. Include the browser/OS, extension commit, active mode, minimal reproduction,
+and expected behavior when reporting a bug. Do not publish passwords, full share links, tokens,
+or private transcripts. Repository issues are not a confidential reporting channel.
+
+| Resource | Contents |
+|---|---|
+| [TESTING.md](TESTING.md) | Regression commands, browser fixtures, limitations, installation checks |
+| [MODELS_SETUP.md](MODELS_SETUP.md) | Model provenance, runtime, and research-only models |
+| [DEPLOY.md](DEPLOY.md) | Local/Cloudflare relay setup and upgrades |
+| [DEMO.md](DEMO.md) | Demonstration walkthrough |
+| [CHANGELOG.md](CHANGELOG.md) | Changes and security corrections |
+| [ROADMAP.md](ROADMAP.md) | Open work and research questions |
+
+## License and attribution
+
+SafeShare source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
+published by [Gravitee](https://huggingface.co/gravitee-io/bert-small-pii-detection) under
+Apache-2.0 as declared upstream. Bundled runtimes and optional dependencies retain their own
+licenses; see their upstream distributions and the model documentation. Cite the exact SafeShare
+commit, model revision, dataset, and evaluation configuration when reporting research results.
