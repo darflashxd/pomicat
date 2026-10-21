@@ -1081,6 +1081,15 @@
 #safeshare-maybe-items { max-height: 240px; overflow-y: auto; margin: 10px 0; }
 #safeshare-maybe-items label { display: flex; align-items: flex-start; gap: 8px; padding: 2px 0; overflow-wrap: anywhere; }
 #safeshare-maybe-items input { flex-shrink: 0; margin-top: 3px; cursor: pointer; }
+.maybe-item-card > .maybe-item-text { min-width: 0; flex: 1; }
+#safeshare-maybe-items .maybe-value { display: block; font-weight: 600; user-select: text; }
+.maybe-description { display: block; font-size: 12px; opacity: .8; margin-top: 3px; }
+.maybe-context { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 12px; margin: 8px 0; max-height: 140px; overflow: auto; }
+.maybe-item-text summary, #safeshare-attack-results summary { cursor: pointer; font-size: 12px; margin-top: 8px; }
+@media (max-width: 600px) {
+  .maybe-item-card { flex-wrap: wrap; }
+  .maybe-item-card > .btn-maybe-quick { margin-left: 24px; }
+}
 
 /* Quick Action Toolbar inside Maybe Review */
 .maybe-quick-toolbar {

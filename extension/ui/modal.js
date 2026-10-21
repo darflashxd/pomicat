@@ -245,7 +245,7 @@ class SafeShareModal {
           </div>
 
           <section id="safeshare-attack-check" aria-live="polite">
-            <div class="attack-check-title">Attack check on what you're about to share</div>
+            <div class="attack-check-title">Privacy check</div>
             <div id="safeshare-attack-results"></div>
           </section>
 
@@ -1086,7 +1086,13 @@ class SafeShareModal {
   renderAttackCheck() {
     const box = typeof document !== "undefined" && document.getElementById("safeshare-attack-results");
     if (!box) return;
-    const r = this.attackCheck(this.sanitizedTurns || []);
+    let r;
+    try { r = this.attackCheck(this.sanitizedTurns || []); }
+    catch (_) {
+      this.lastAttack = null;
+      box.textContent = "Privacy check unavailable. Review the shared text carefully.";
+      return;
+    }
     this.lastAttack = r;
     box.textContent = "";
     const row = (ok, text) => {
@@ -1098,17 +1104,24 @@ class SafeShareModal {
     const money = (f) => `${f.currency || ""} ${Math.round(f.value).toLocaleString("en-US")}`.trim();
     if (r.amounts.length) {
       for (const f of r.amounts) row(false, `Hidden amount recoverable: ${money(f)} (agreed by ${f.support} visible numbers). Hide the amounts it is derived from, or use "Amounts: Remove".`);
-    } else row(true, "No hidden amount can be worked back from the visible numbers.");
+    }
     if (r.births.length) row(false, `Hidden birth date, but the birth year is ${r.births[0].year} (from stated ages).`);
-    else row(true, "No birth year can be worked out from stated ages.");
     if (r.dates.length) for (const d of r.dates) row(false, `Hidden date narrowed to ${d.candidates.length} possible day(s) by ${d.clues.join(", ")}.`);
-    else row(true, "No hidden date can be narrowed down from nearby clues.");
     if (r.combos.length) for (const c of r.combos) row(false, `Message ${c.turn} combines ${c.kinds.join(", ")}${c.unique ? ' and "the only"' : ""}: together these may point at one person.`);
-    else row(true, "No message combines enough details to point at one person.");
+    if (!r.amounts.length && !r.births.length && !r.dates.length && !r.combos.length) {
+      const summary = document.createElement("div");
+      summary.textContent = "No additional risks found by the available checks.";
+      box.appendChild(summary);
+    }
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "About this check";
+    details.appendChild(summary);
     const note = document.createElement("div");
     note.className = "attack-note";
-    note.textContent = "Covers the attacks SafeShare knows; it can't prove nothing else is inferable.";
-    box.appendChild(note);
+    note.textContent = "Checks supported patterns in amounts, ages, dates and identifying details. Other ways to infer sensitive information may be missed.";
+    details.appendChild(note);
+    box.appendChild(details);
   }
 
   renderMaybeItems() {
@@ -1165,7 +1178,7 @@ class SafeShareModal {
     for (const candidate of visible) {
       const isRedacted = this.activeCategories.has(candidate.category) && (this.maybeChoices.get(candidate.raw) ?? candidate.risky);
 
-      const label = document.createElement("label");
+      const label = document.createElement("div");
       label.className = "maybe-item-card" + (isRedacted ? " is-redacted" : "");
 
       const check = document.createElement("input");
@@ -1179,7 +1192,8 @@ class SafeShareModal {
       });
       check.id = candidate.id;
 
-      const shown = candidate.raw.length > 36 ? candidate.raw.slice(0, 20) + "…" + candidate.raw.slice(-8) : candidate.raw;
+      const characters = Array.from(candidate.raw);
+      const shown = characters.length > 80 ? characters.slice(0, 56).join("") + "…" + characters.slice(-16).join("") : candidate.raw;
       const first = candidate.occurrences[0];
       const content = this.reviewBaseTurns[first.turnIndex].content;
       const context = (start, end) => {
@@ -1194,13 +1208,50 @@ class SafeShareModal {
         }
         return value;
       };
-      const snippet = context(Math.max(0, first.start - 35), first.start) + shown + context(first.end, first.end + 35);
+      // Prefer the source line; bound long prose at whitespace instead of cutting words.
+      let start = Math.max(content.lastIndexOf("\n", first.start - 1) + 1, first.start - 90);
+      let end = Math.min(content.indexOf("\n", first.end) < 0 ? content.length : content.indexOf("\n", first.end), first.end + 90);
+      if (start > 0 && !/\s/.test(content[start - 1])) {
+        while (start < first.start && !/\s/.test(content[start])) start++;
+      }
+      while (end < content.length && end > first.end && !/\s/.test(content[end])) end--;
+      const snippet = (start > 0 ? "… " : "") + context(start, first.start) + shown + context(first.end, end) + (end < content.length ? " …" : "");
 
-      const text = document.createElement("span");
+      const text = document.createElement("div");
       text.className = "maybe-item-text";
-      const score = typeof candidate.score === "number"
-        ? ` · score ${candidate.score.toFixed(2)}${candidate.why && candidate.why.length ? ` (${candidate.why.join(", ")})` : ""}` : "";
-      text.textContent = `${shown} — ${candidate.reason}${score} (${candidate.occurrences.length} occurrence(s)). Context: ${snippet}`;
+      const title = document.createElement("label");
+      title.htmlFor = candidate.id;
+      title.className = "maybe-value";
+      title.textContent = shown;
+      check.setAttribute("aria-label", `Hide all occurrences of ${shown}`);
+      const reason = document.createElement("span");
+      reason.className = "maybe-description";
+      const assignment = /Value assigned to (.+)/i.exec(candidate.reason || "");
+      const field = assignment?.[1].replace(/[_-]+/g, " ");
+      reason.textContent = field ? `Possible ${field}` : candidate.source === "model"
+        ? `Possible ${(candidate.modelLabel || "personal information").toLowerCase().replace(/_/g, " ")}`
+        : /^Possible amount/i.test(candidate.reason || "") ? "Possible amount" : "Possibly sensitive value";
+      const state = document.createElement("span");
+      state.className = "maybe-description";
+      state.textContent = `Found ${candidate.occurrences.length === 1 ? "once" : `${candidate.occurrences.length} times`} · ${isRedacted ? "Hidden" : "Visible"} in shared copy`;
+      const excerpt = document.createElement("pre");
+      excerpt.className = "maybe-context";
+      excerpt.textContent = snippet.trim();
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Details";
+      const explanation = document.createElement("div");
+      explanation.className = "maybe-context";
+      explanation.textContent = `${candidate.reason || "Flagged for review"}${candidate.why?.length ? `. ${candidate.why.join(", ")}` : ""}${typeof candidate.score === "number" ? `. Detection score: ${candidate.score.toFixed(2)}. This is not a probability that the value is sensitive.` : ""}`;
+      details.appendChild(summary);
+      details.appendChild(explanation);
+      if (characters.length > 80) {
+        const full = document.createElement("pre");
+        full.className = "maybe-context";
+        full.textContent = candidate.raw;
+        details.appendChild(full);
+      }
+      for (const child of [title, reason, state, excerpt, details]) text.appendChild(child);
 
       const actBtn = document.createElement("button");
       actBtn.type = "button";
@@ -1223,7 +1274,7 @@ class SafeShareModal {
       more.type = "button";
       more.id = "btn-maybe-show-more";
       more.className = "btn-drawer-action btn-maybe-bulk";
-      more.textContent = this.maybeShowAll ? "Show fewer" : `Show ${this.maybeCandidates.length - visible.length} more (lower scores)`;
+      more.textContent = this.maybeShowAll ? "Show fewer" : `Show ${this.maybeCandidates.length - visible.length} more suggestions`;
       more.addEventListener("click", (e) => {
         if (e?.preventDefault) e.preventDefault();
         this.maybeShowAll = !this.maybeShowAll;
