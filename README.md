@@ -1,4 +1,4 @@
-# SafeShare
+# safeshare
 
 **Review and privately share AI conversations, with checks for sensitive data and arithmetic recovery of redacted values.**
 
