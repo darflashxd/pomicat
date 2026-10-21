@@ -658,7 +658,7 @@ class SafeShareLocalCompute {
     });
 
     // Phase 2: Process multi-term arithmetic formulas (including Unicode operators and nested parentheses)
-    const multiTermRx = /(?:\(\s*)*(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:\([ \t]*)?)+(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)(?:\s*\))*(?:[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?|[()]|\s+)+)*(?:\^\{[^{}]+\}|\^[0-9]+)?(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
+    const multiTermRx = /(?:\(\s*)*(?:(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:\([ \t]*)?)+(?:[-+]\s*)?(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?)(?:\s*\))*(?:[ \t]*(?:[-+*\/^%−–—×·]|\\times\b|\\cdot\b)[ \t]*(?:[-+]\s*)?(?:<S\d+>|\\langle\s*S\d+\s*\\rangle|⟨S\d+⟩|&lt;S\d+&gt;|<s\d+>|\d+(?:[.,]\d+)?%?|[()]|\s+)+)*(?:\^\{[^{}]+\}|\^[0-9]+)?(?:\/(?:month|mo|year|yr|bulan|thn|day|hari|week|minggu|hr|jam)\b)?/gi;
 
     hydratedText = replaceOutsideSpans(hydratedText, multiTermRx, (fullMatch, ...args) => {
       const offset = typeof args[args.length - 2] === "number" ? args[args.length - 2] : args[args.length - 3];

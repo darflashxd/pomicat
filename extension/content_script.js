@@ -393,6 +393,8 @@
       document.execCommand("selectAll", false, null);
       ok = document.execCommand("insertText", false, newText);
     }
+    // Chromium can duplicate blank lines during insertText; use native innerText for that case.
+    if (ok && getInputText(el) !== newText) ok = false;
     if (!ok) {
       el.innerText = newText;
       el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -903,7 +905,8 @@
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
-      "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer'])"
+      "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer']), " +
+      "[data-message-author-role='assistant'] h1, [data-message-author-role='assistant'] h2, [data-message-author-role='assistant'] h3, [data-message-author-role='assistant'] div.markdown:not(:has(p, li, table, div, h1, h2, h3, pre))"
     );
 
     leafNodes.forEach((node) => {

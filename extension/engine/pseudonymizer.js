@@ -158,7 +158,7 @@ function parseFinancialAmount(raw) {
     if (integer.includes(number[i]) || !/^\d+$/.test(fraction)) return 0;
   }
   if (!/^\d+$/.test(integer) && !/^[1-9]\d{0,2}([.,' ])\d{3}(?:\1\d{3})*$/.test(integer)) return 0;
-  const unit = /^\s*(miliar|milyar|billions?|ember|crores?|juta|jt|jeti|jetong|millions?|lakhs?|lpa|rb|ribu|thousands?|racks|bands|[bmk])(?![a-z])/i.exec(after);
+  const unit = /^\s*(miliar|milyar|billions?|ember|crores?|juta|jt|jeti|jetong|millions?|lakhs?|lpa|rb|ribu|thousands?|grand|racks|bands|[bmk])(?![a-z])/i.exec(after);
   const u = unit ? unit[1] : "";
   const scale = /^(?:miliar|milyar|billion|ember|b$)/.test(u) ? 1e9 :
     /^crore/.test(u) ? 1e7 : /^(?:juta|jt|jeti|jetong|million|m$)/.test(u) ? 1e6 :
@@ -228,6 +228,7 @@ class AdversaryOracleSolver {
     while ((m = rx.exec(text)) !== null) {
       const raw = m[0].trim();
       if (!raw) continue;
+      if (/^(?:401|403|457)$/.test(raw) && /^\([a-z]\)/i.test(text.slice(m.index + m[0].length))) continue;
 
       // Skip if inside a telephone number or physical address
       if (phoneSpans.some(([s, e]) => m.index >= s && (m.index + m[0].length) <= e)) {
@@ -1062,6 +1063,20 @@ class ConsistentPseudonymizer {
     for (const hd of heuristicDetections) {
       if (hd && hd.raw) {
         const ruleStart = heuristicRules.length;
+        if (hd.category === "CREDENTIALS") {
+          const values = [];
+          const token = hd.secretToken || hd.raw;
+          const uri = /:\/\/[^\s]*?:([^@\s]+)@/.exec(token);
+          if (uri) {
+            values.push(uri[1]);
+            try { values.push(decodeURIComponent(uri[1])); } catch (_) {}
+          }
+          if (hd.type === "CLI_BASIC_AUTH") values.push(token.slice(token.indexOf(":") + 1));
+          if (/PASSWORD|SECRET|CREDENTIAL/.test(hd.type) && token.length >= 8) values.push(token.replace(/[.,;]+$/, ""));
+          for (const value of new Set(values.filter(v => v.length >= 8))) {
+            heuristicRules.push({regexStr: `(?<![\\p{L}\\p{N}_])${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}_])`, replacement: "[REDACTED_SECRET]", length: value.length, isDerived: false});
+          }
+        }
         const hEsc = hd.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         heuristicRules.push({
           regexStr: `\\b${hEsc}\\b`,

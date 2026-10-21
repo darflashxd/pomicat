@@ -1,5 +1,21 @@
 # Manual test checklist (Chrome)
 
+## Release regression additions (2026-10-21)
+
+`manual_redact.test.js` covers URI-password echoes, prose-punctuation echoes, embedded
+punctuation selections, adjacent salary corrections (including a financial assistant reply),
+English earnings/slang, EIN/Medicare label variants, dot-grouped cards and public/MAC controls.
+`local_compute_stress.test.js` checks unary negative multiplication. `submit_lifecycle.html`
+also verifies a multiline English earnings prompt is protected and replayed once.
+These are development regressions, not evidence of arbitrary paraphrase or formula coverage.
+
+Local release check on 2026-10-21 (base `ce6f4b4` plus uncommitted remediation):
+Node 46/46, evaluator self-checks, Chromium/Firefox fixture suites and local relay browser
+lifecycles passed (Playwright Firefox 142). Fresh 2.4.0 ZIPs were built; extracted Chrome and Firefox packages passed actual
+ONNX/WASM inference and share-dialog smoke checks (Chromium 141, installed Firefox 158).
+Firefox harness now requests graceful shutdown before cleaning its temporary profile.
+These results do not verify logged-in vendor layouts, remote CI or remote relay deployment.
+
 ## English demonstration and local link release gate
 
 `node tools/attack_bench/english.js` prints the 160-case fictional English challenge without

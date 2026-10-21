@@ -35,6 +35,8 @@ document.getElementById('chat').onload = async () => {
     assert(sends===1 && !w.__sent.includes('FinalSecret44'),'replay gap duplicate or secret leak');
     type('My password is NextSecret45');d.getElementById('send').click();finish();await wait(200);
     assert(sends===2 && !w.__sent.includes('NextSecret45'),'recent replay bypassed next draft');
+    type('I earn $12,500 monthly.');d.getElementById('send').click();finish();await wait(200);
+    assert(sends===3&&!w.__sent.includes('12,500')&&w.__sent.includes('<S'),'multiline financial replay failed or leaked');
     let submissions=0;
     const form=d.getElementById('f');
     form.addEventListener('submit',e=>{e.preventDefault();submissions++;w.__formSent=input.innerText;input.innerText='';});

@@ -136,7 +136,7 @@ class HeuristicsRedactor {
         id: "US_EIN",
         name: "US Employer Identification Number (EIN)",
         category: "GOV_ID",
-        regex: /\b((?:ein|fein|tax\s+id)\s*[:=\-]?\s*)(\d{2}-\d{7})\b/gi,
+        regex: /\b((?:ein|fein|tax\s+id)\s*(?:is\b|[:=\-])?\s*)(\d{2}-\d{7})\b/gi,
         replacement: "$1[REDACTED_EIN]"
       },
       // 1d. ABA Bank Routing Transit Number (9 digits with checksum)
@@ -179,7 +179,7 @@ class HeuristicsRedactor {
         id: "CREDIT_CARD",
         name: "Credit Card",
         category: "FINANCIAL",
-        regex: /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{12,19}\b/g,
+        regex: /\b(?:\d{4}[ .-]?){3}\d{4}\b|\b3[47]\d{2}[ -]\d{6}[ -]\d{5}\b|\b\d{12,19}\b/g,
         validator: (raw, index, text) => {
           // Digits inside a DOI or URL path are identifiers, not cards
           if (text && /(?:doi\.org\/|\b10\.\d{4,9}\/|https?:\/\/)\S*$/i.test(text.substring(Math.max(0, index - 120), index))) return false;
@@ -549,7 +549,7 @@ class HeuristicsRedactor {
         id: "DATABASE_URI",
         name: "Database Credentials URI",
         category: "CREDENTIALS",
-        regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)(?::\/\/|%3A%2F%2F)[^:\s]+:[^@\s]+@[^\s/:]+(?::\d+)?\/[^\s]*/gi,
+        regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)(?::\/\/|%3A%2F%2F)[^:\s'"]*:[^@\s'"]+@[^\s/:'"]+(?::\d+)?(?:\/[^\s'"]*)?/gi,
         replacement: "postgresql://postgres:placeholder_password@localhost:5432/sandbox_db"
       },
       // 10b. CLI Curl / Basic Auth Credentials (-u user:password)
@@ -1061,7 +1061,7 @@ class HeuristicsRedactor {
         id: "AU_MEDICARE",
         name: "Australian Medicare Number",
         category: "HEALTH",
-        regex: /\b((?:(?:medicare(?:\s+number)?)\s*(?:is|\s*[:=\-~])?\s*))([2-6]\d{3}\s*\d{5}\s*\d{1,2})\b/gi,
+        regex: /\b((?:(?:medicare(?:\s+(?:number|card))?)\s*(?:is|\s*[:=\-~])?\s*))([2-6]\d{3}\s*\d{5}\s*\d{1,2})\b/gi,
         replacement: "$1[REDACTED_HEALTH_ID]"
       },
       // 16z-6. Mexican CURP (18 characters)

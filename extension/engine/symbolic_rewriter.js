@@ -84,7 +84,7 @@ class SafeShareSymbolicRewriter {
     const afterTokens = afterSlice ? afterSlice.split(/\s+/).slice(0, maxTokenDistance).join(" ") : "";
     const windowContext = `${beforeTokens} ${afterTokens}`;
 
-    const triggerRx = /\b(?:salary|gaji|income|revenue|valuation|arr|mrr|ebitda|burn|runway|bonus|severance|debt|equity|safe|investment|funding|spend|spending|budget|cost|fee|rent|sewa|cicilan|tabungan|payout|compensation|deductible|mortgage|loan|pay)\b/i;
+    const triggerRx = /\b(?:salary|gaji|income|earn|make|pocket|pull in|clearing|revenue|valuation|arr|mrr|ebitda|burn|runway|bonus|severance|debt|equity|safe|investment|funding|spend|spending|budget|cost|fee|rent|sewa|cicilan|tabungan|payout|compensation|deductible|mortgage|loan|pay)\b/i;
 
     const Contextual = this.contextual && this.contextual.constructor;
     return triggerRx.test(windowContext) ||
@@ -112,7 +112,7 @@ class SafeShareSymbolicRewriter {
     for (const det of cDetections) {
       if (det.category === "SENSITIVE_FINANCIAL") {
         const val = this.pseudonymizer.parseFinancialValue(det.raw);
-        if (!isNaN(val) && val >= 100) {
+        if (Number.isFinite(val) && Math.abs(val) >= 100) {
           if (this.isWithinDependencyDistance(text, det.raw, 12)) {
             detectedItems.push({
               raw: det.raw,

@@ -141,13 +141,20 @@ def main():
                 raise RuntimeError("Real Firefox model smoke failed")
         finally:
             if connection:
+                try:
+                    command(3, "Marionette:Quit", {"flags": ["eAttemptQuit"]})
+                except (OSError, RuntimeError):
+                    pass  # Firefox can close the transport before sending its reply.
                 connection.close()
-            process.terminate()
             try:
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
             server.shutdown()
 
 

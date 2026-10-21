@@ -18,6 +18,7 @@ function runStressSuite() {
   console.log("================================================================================");
 
   const lc = new SafeShareLocalCompute();
+  assert.equal(lc.hydrateText('<S1> * -0.20', {'<S1>':{value:10000,currency:'USD'}}, true).evaluations[0].val, -2000);
   const vault = {
     "<S1>": { value: 20000000, currency: "IDR", raw: "Rp 20.000.000" },
     "<S2>": { value: 5000000, currency: "IDR", raw: "Rp 5.000.000" },

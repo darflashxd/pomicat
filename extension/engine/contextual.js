@@ -30,7 +30,7 @@ class ContextualClassifier {
       /\b(?:my|your|our|i|we)?\s*(?:\w+\s+){0,3}(?:monthly\s+base|annual\s+base|base\s+salary|gross\s+salary|gross\s+income|net\s+income|housing\s+allowance|relocation\s+stipend|stipend|remuneration|compensation\s+package)\b/i,
       /\b(?:base|base\s+pay|base\s+salary|salary|gaji|income|allowance|bonus)\s*(?:is|was|of|sebesar|adalah|[:=])?\s*(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD|AUD|CAD|JPY|¥|HKD|NZD|MYR|₹|INR)?\s*[\d.,]+/i,
       /\b(?:cpf|superannuation|pension)\b/i,
-      /\b(?:i owe|i make|you make|you earn|earning|making)\b/i,
+      /\b(?:i owe|i make|i earn|you make|you earn|earning|making|i pocket|i pull in|clearing)\b/i,
       /\b(?:personal\s+debt|credit\s+card\s+debt|mortgage|student\s+loan|debt|loans)\b/i,
       /\b(?:my|your|saya|Anda)\s+(?:\w+\s+){0,2}(?:base\s+salary|annual\s+salary|monthly\s+salary|monthly\s+income|annual\s+income|gross\s+income|net\s+income|take-home\s+pay|hourly\s+rate)\b/i,
       /\b(?:i|we|my)\s+(?:\w+\s+){0,2}(?:save|saving|invest|investing)\b/i,
@@ -122,6 +122,9 @@ class ContextualClassifier {
   }
 
   classifyTurn(turnText, turnIndex, protectedDetections = []) {
+    if (turnIndex === 0) this.lastFinancialTurn = null;
+    // ponytail: only adjacent financial corrections inherit context; broader dialogue needs explicit topic tracking.
+    const correction = Number.isInteger(this.lastFinancialTurn) && turnIndex > this.lastFinancialTurn && turnIndex - this.lastFinancialTurn <= 2 && /^\s*(?:sorry\s+typo|correction\s*:|actually\s+it|wait,?\s+it|no,?.*correct\s+amount)/i.test(turnText);
     // Analyze original coordinates without interpreting parts of already identified values as money.
     // Preserve sentence punctuation and length; don't let replacement labels supply new context.
     for (const det of [...protectedDetections].sort((a, b) => b.index - a.index)) {
@@ -136,7 +139,8 @@ class ContextualClassifier {
 
     for (const sent of sentences) {
       // A typo in the money word, or "my/I" plus an explicit currency, still makes it personal
-      let isPersonal = this.personalAnchors.some(rx => rx.test(sent)) ||
+      const rentTotal = /\btotal move-in cost\b/i.test(sent) && /\bdeposit of \d+(?:\.\d+)?x rent\b/i.test(turnText);
+      let isPersonal = correction || rentTotal || this.personalAnchors.some(rx => rx.test(sent)) ||
         (/\b(?:my|our|saya|aku|gue|gw|kami)\b/i.test(sent) && EXPLICIT_CURRENCY.test(sent));
       if (!isPersonal && /\d/.test(sent)) {
         const fixed = ContextualClassifier.fixMoneyTypos(sent);
@@ -154,6 +158,9 @@ class ContextualClassifier {
 
       // If personal context is active, extract the corresponding values
       if (isPersonal) {
+        for (const m of sent.matchAll(/\b\d+(?:\.\d+)?\s+grand\b/gi)) {
+          detected.push({turnIndex, raw:m[0], category:"SENSITIVE_FINANCIAL", sentence:sent, confidence:0.95});
+        }
         // Keep the original wording; the amount parser resolves bounded Indonesian number words.
         const spokenAmounts = sent.matchAll(/\b(?:nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|seratus|seribu)(?:\s+(?:nol|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|belas|puluh|ratus|seratus)){0,8}\s+(?:juta|miliar|ribu)(?:\s+rupiah)?\b/gi);
         if (/\b(?:gaji|penghasilan|upah|pendapatan|bonus|tabungan)\b/i.test(sent)) {
@@ -395,6 +402,7 @@ class ContextualClassifier {
       }
     }
 
+    if (detected.some(d => d.category === "SENSITIVE_FINANCIAL")) this.lastFinancialTurn = turnIndex;
     return detected;
   }
 }

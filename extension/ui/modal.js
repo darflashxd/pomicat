@@ -856,7 +856,7 @@ class SafeShareModal {
       // map each hit back to the span as typed, so look-alike or full-width text is hidden too
       const norm = this.heuristics.normalizeWithMap(content);
       const spans = custom.flatMap(c => [...norm.text.matchAll(new RegExp(
-        `(?<![\\p{L}\\p{N}_])${this.escapeRegExp(this.heuristics.normalizeHomoglyphs(c.raw))}(?![\\p{L}\\p{N}_])`, "giu"))]
+        `${/^[\p{L}\p{N}_]/u.test(c.raw) ? "(?<![\\p{L}\\p{N}_])" : ""}${this.escapeRegExp(this.heuristics.normalizeHomoglyphs(c.raw))}${/[\p{L}\p{N}_]$/u.test(c.raw) ? "(?![\\p{L}\\p{N}_])" : ""}`, "giu"))]
         .filter(m => m[0].length)
         .map(m => ({ start: norm.start[m.index], end: norm.end[m.index + m[0].length - 1], replacement: c.tag })))
         .sort((a, b) => a.start - b.start || b.end - a.end);

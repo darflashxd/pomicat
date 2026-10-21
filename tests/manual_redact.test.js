@@ -66,6 +66,46 @@ const Modal = require("../extension/ui/modal.js");
 
 (async () => {
   const modal = new Modal();
+  for (const [source, echo, secret] of [
+    ["export DATABASE_URL='postgres://user:StageSecurePass2026!@db.example:5432/app'", "Use StageSecurePass2026! at runtime", "StageSecurePass2026!"],
+    ["My password is SuperSecretPassword123.", "Use SuperSecretPassword123 next time", "SuperSecretPassword123"]
+  ]) {
+    const check = new Modal();
+    check.currentTurns = [{role:"user",content:source},{role:"assistant",content:echo}];
+    check.runPipeline();
+    assert(!check.sanitizedTurns.some(t => t.content.includes(secret)), "credential echo survived");
+  }
+  const selection = new Modal();
+  selection.currentTurns = [{role:"user",content:"foo(secret)bar"}];
+  selection.runPipeline();
+  selection.addCustomSelection("(secret)");
+  assert(!selection.sanitizedTurns[0].content.includes("secret"));
+  const correction = new Modal();
+  correction.currentTurns = [{role:"user",content:"My salary is $150,000."},{role:"assistant",content:"Understood."},{role:"user",content:"Sorry typo, I meant $160,000."}];
+  correction.runPipeline();
+  assert(!correction.sanitizedTurns[2].content.includes("160,000"));
+  correction.currentTurns[1].content = 'Your monthly gross is $12,500.';
+  correction.runPipeline();
+  assert(!correction.sanitizedTurns[2].content.includes('160,000'), 'financial assistant reply must not erase correction context');
+  const rent = new Modal();
+  rent.currentTurns = [{role:"user",content:"My monthly rent is $2,400."},{role:"assistant",content:"The landlord requires first month plus security deposit of 1.5x rent ($3,600). Total move-in cost is $6,000."}];
+  rent.runPipeline();
+  assert(!rent.sanitizedTurns[1].content.includes("6,000"));
+  const scanner = new HeuristicsRedactor();
+  assert(!scanner.scan('Company EIN is 12-3456789.').sanitizedText.includes('12-3456789'));
+  assert(!scanner.scan('Medicare card 2123 45670 1.').sanitizedText.includes('2123 45670 1'));
+  assert(!scanner.scan('Card: 4532.0150.1234.5678').sanitizedText.includes('5678'));
+  assert.equal(scanner.scan('MAC: abcd.ef01.2345').sanitizedText, 'MAC: [REDACTED_MAC_ADDRESS]');
+  for (const phrase of ['I earn $12,500 monthly.', 'I pocket 8500 bucks each month.', 'I pull in 12 grand a month.']) {
+    const check = new Modal();
+    check.currentTurns = [{role:'user',content:phrase}];
+    check.runPipeline();
+    assert(check.sanitizedTurns[0].content.includes('[REDACTED_FINANCIAL_'));
+  }
+  const publicControl = new Modal();
+  publicControl.currentTurns = [{role:'user',content:'The public average salary is $50,000.'}];
+  publicControl.runPipeline();
+  assert(publicControl.sanitizedTurns[0].content.includes('$50,000'));
   modal.currentTurns = [
     { role: "user", content: "We are deploying AlphaPrime and ClusterOmega across regions." },
     { role: "assistant", content: "Understood. For AlphaPrime and ClusterOmega, configure replication." }
