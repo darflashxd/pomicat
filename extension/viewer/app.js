@@ -326,13 +326,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.className = "btn-platform";
         btn.id = "btn-own-originals";
         let showing = false;
-        btn.textContent = "Show my original values (only on this device)";
+        btn.textContent = "Show originals saved in this browser";
+        const remaining = withOriginals.some(turn => /\[(?:REDACTED|CONFIDENTIAL|HR|User)_[A-Z0-9_]+\]|<S\d+>/i.test(turn.content.replace(/\uE000[^\uE001]*\uE001/g, "")));
+        const note = document.createElement("span");
+        note.textContent = "Some original values are unavailable.";
+        note.hidden = true;
+        note.setAttribute("role", "status");
         btn.addEventListener("click", () => {
           showing = !showing;
           renderTurns(showing ? withOriginals : decryptedData.turns);
-          btn.textContent = showing ? "Hide my original values" : "Show my original values (only on this device)";
+          btn.textContent = showing ? "Hide my original values" : "Show originals saved in this browser";
+          note.hidden = !showing || !remaining;
         });
         (document.querySelector(".chat-header-meta") || messagesContainer.parentElement).appendChild(btn);
+        btn.after(note);
       }
     } catch (_) {
       // Different browser, expired, or not the sharer: nothing to show

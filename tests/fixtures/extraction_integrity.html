@@ -12,8 +12,8 @@ document.getElementById('chat').onload=async()=>{
    '<div data-message-author-role="assistant"><div class="markdown"><h2>Analysis heading</h2><p>First answer untouched</p><table><tr><th>Item</th><th>Result</th></tr><tr><td>Alpha</td><td>Beta</td></tr></table><pre><code>port = 8080</code></pre></div></div>'+
    '<div data-message-author-role="user">Second question untouched</div><div data-message-author-role="assistant"><p>Second answer untouched</p></div>';
   d.getElementById('prompt-textarea').innerText='DRAFT NEVER SHARE';
-  w.confirm=()=>{throw Error('Extractor lost a role');};
-  d.getElementById('safeshare-action-pill').click();await wait(150);
+   w.confirm=message=>{if(message.includes('could not verify'))return true;throw Error('Extractor lost a role');};
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<200&&!d.getElementById('diff-box-orig');i++)await wait(25);
   let orig=d.getElementById('diff-box-orig');assert(orig,'modal unavailable');
   const text=orig.innerText;
   const expected=['First question untouched','First answer untouched','Second question untouched','Second answer untouched'];
@@ -24,10 +24,19 @@ document.getElementById('chat').onload=async()=>{
   d.getElementById('safeshare-close-btn').click();
   thread.innerHTML='<div data-chatgpt-search-unit-key="user-one"><div data-user-message-bubble="true">Modern question</div></div>'+
     '<div data-chatgpt-search-unit-key="answer-one"><div data-markdown-text-style="assistant-message"><p>Answer part one</p></div><div data-markdown-text-style="assistant-message"><p>Answer part two</p></div></div>';
-  d.getElementById('safeshare-action-pill').click();await wait(100);
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<200&&!d.getElementById('diff-box-orig');i++)await wait(25);
   orig=d.getElementById('diff-box-orig');
   assert(orig.querySelectorAll('.turn-block').length===2,'split modern answer not joined');
-  assert(orig.innerText.includes('Answer part one')&&orig.innerText.includes('Answer part two'),'modern answer content lost');
+   assert(orig.innerText.includes('Answer part one')&&orig.innerText.includes('Answer part two'),'modern answer content lost');
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div data-message-author-role="user">Question <span hidden>complete hidden tail</span><button aria-expanded="false">Show more</button></div><div data-message-author-role="assistant">Same answer</div><div data-message-author-role="assistant">Same answer</div>';
+   const expand=thread.querySelector('button');expand.onclick=()=>{thread.querySelector('span').hidden=false;expand.setAttribute('aria-expanded','true');};
+   w.confirm=()=>true;
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<200&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.innerText.includes('complete hidden tail'),'collapsed tail missing');
+   assert(!orig.innerText.includes('Show more'),'expand control leaked');
+   assert(orig.querySelectorAll('.turn-block').length===3,'legitimate identical turns removed');
   document.getElementById('result').textContent='PASS: mixed/modern layouts, ordered roles, split answer, heading/table/code, composer exclusion. No uploads.';
  }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
 };

@@ -287,9 +287,23 @@
       pill.style.background = "rgba(24, 24, 27, 0.92)";
     });
 
-    pill.addEventListener("click", () => {
+    pill.addEventListener("click", async () => {
+      if (pill.dataset.preparing === "true") return;
       handleSessionRouteChange();
-      const turns = extractConversationTurns();
+      pill.dataset.preparing = "true";
+      const label = pill.textContent;
+      pill.textContent = "Preparing conversation…";
+      let prepared;
+      try { prepared = await prepareConversation(); }
+      catch (error) {
+        if (error.name !== "AbortError") alert("SafeShare: Could not prepare this conversation. Please try again.");
+        return;
+      } finally {
+        delete pill.dataset.preparing;
+        pill.textContent = label;
+      }
+      const { turns, uncertain } = prepared;
+      if (uncertain && !window.confirm("SafeShare could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
       if (turns.length === 0) {
         alert("SafeShare: No active conversation found in the current chat window.");
         return;
@@ -997,13 +1011,10 @@
    */
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
-    // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
-    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr], .ss-sent-note, .katex, table, h1, h2, h3, pre")) {
-      return (containerEl.innerText || containerEl.textContent || "").trim();
-    }
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
+      clone.querySelectorAll("[hidden], [aria-hidden='true'], [role='button']:not([data-expr]), button, script, style").forEach(n => n.remove());
       // Find all hydrated local compute spans in the clone
       clone.querySelectorAll(".ss-sent-note").forEach(n => n.remove()); // "🔒 2 values protected" is ours, not the chat
       const hydratedSpans = clone.querySelectorAll(".ss-local-compute, .ss-katex-hydrated, [data-expr]");
@@ -1016,9 +1027,9 @@
         }
       });
       const cleanText = SafeShareTranscript.extract(clone);
-      return cleanText.trim() || (containerEl.innerText || containerEl.textContent || "").trim();
+      return cleanText.trim();
     } catch (_) {
-      return (containerEl.innerText || containerEl.textContent || "").trim();
+      return ""; // Never fall back to raw text containing UI or locally revealed values.
     }
   }
 
@@ -1095,8 +1106,6 @@
     for (const t of turns) {
       const content = t.content.replace(/\s*\[(?:PRIVACY PROTOCOL|PROTOKOL PRIVASI):[^\]]*\]\s*/g, "\n").trim();
       if (!content) continue;
-      const prev = out[out.length - 1];
-      if (prev && prev.role === t.role && prev.content === content) continue;
       out.push({ role: t.role, content });
     }
     return out;
@@ -1110,6 +1119,78 @@
       turns = extractTurnsFromContainer(document.body);
     }
     return turns;
+  }
+
+  async function prepareConversation() {
+    const url = location.href;
+    const root = getActiveConversationRoot();
+    const input = findPromptInputElement();
+    let scroller = input;
+    while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+    scroller ||= [...root.querySelectorAll("div")].find(el => el.scrollHeight > el.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(el).overflowY));
+    scroller ||= document.scrollingElement;
+    const initial = scroller.scrollTop;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel preparation";
+    cancel.style.cssText = "position:fixed;bottom:80px;right:24px;z-index:2147483647;padding:12px;background:#27272a;color:white;border:1px solid #aaa;border-radius:8px";
+    let cancelled = false;
+    cancel.addEventListener("click", () => { cancelled = true; });
+    document.body.appendChild(cancel);
+    const check = () => { if (cancelled || location.href !== url) throw new DOMException("Preparation cancelled", "AbortError"); };
+    const wait = () => new Promise(resolve => setTimeout(resolve, 150));
+    const messages = new Map();
+    let uncertain = false;
+    let anonymous = false;
+    const collect = () => {
+      const seen = new Set();
+      const nodes = root.querySelectorAll("[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], .font-claude-response, .font-claude-message, .ds-message");
+      for (const node of nodes) {
+        if (isComposerOrSafeShareUI(node)) continue;
+        const unit = node.closest("[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-']");
+        if (!unit) { anonymous = true; continue; }
+        if (seen.has(unit)) continue;
+        seen.add(unit);
+        const key = unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-testid");
+        const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !node.querySelector(".ds-markdown") ? "user" : "assistant");
+        const content = getCleanNodeContent(unit);
+        if (content) messages.set(key, { role, content });
+      }
+    };
+    const expand = async () => {
+      for (const button of root.querySelectorAll("button[aria-expanded='false'], [role='button'][aria-expanded='false']")) {
+        if (!button.closest("[data-message-author-role], [data-user-message-bubble='true'], [data-testid='user-message'], .ds-message")) continue;
+        if (!/^(show more|read more|expand)$/i.test((button.innerText || button.getAttribute("aria-label") || "").trim())) continue;
+        check(); button.click(); await wait();
+      }
+    };
+    try {
+      check();
+      await expand();
+      // Scan from top down so insertion order follows the active conversation.
+      scroller.scrollTop = 0;
+      await wait();
+      const deadline = Date.now() + 15000;
+      let settled = 0;
+      while (Date.now() < deadline) {
+        check(); await expand(); collect();
+        const before = scroller.scrollTop;
+        scroller.scrollTop += Math.max(200, scroller.clientHeight * 0.75);
+        await wait();
+        if (scroller.scrollTop === before) {
+          if (++settled >= 3) break;
+        } else settled = 0;
+      }
+      check(); collect();
+      // DOM exhaustion is not proof that server-side history was fully loaded.
+      uncertain = settled < 3 || anonymous || initial > 0 || scroller.scrollHeight > scroller.clientHeight + 20;
+      // Without stable message IDs, never merge by text: identical turns can be legitimate.
+      const turns = messages.size && !anonymous ? tidyTurns([...messages.values()]) : extractConversationTurns();
+      return { turns, uncertain };
+    } finally {
+      cancel.remove();
+      if (location.href === url) scroller.scrollTop = initial;
+    }
   }
 
   function extractTurnsFromContainer(container) {

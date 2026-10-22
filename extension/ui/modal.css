@@ -1131,6 +1131,9 @@
   border-color: rgba(16, 185, 129, 0.35);
   background: rgba(16, 185, 129, 0.05);
 }
+
+#safeshare-preview-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ss-preview-highlight { outline: 3px solid #fbbf24; outline-offset: 3px; background: #422006 !important; }
 .maybe-item-label {
   display: flex;
   align-items: flex-start;

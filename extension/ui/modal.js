@@ -239,6 +239,7 @@ class SafeShareModal {
                 </div>
                 <span class="hint-badge">💡 Click any badge to toggle</span>
               </div>
+              <nav id="safeshare-preview-nav" aria-label="Hidden items"></nav>
               <div class="diff-box diff-box-interactive" id="diff-box-sanitized"></div>
               <p class="ss-review-warning">Ranges are approximate, not exact equations. Revealing amounts can expose other hidden values through arithmetic. Review before sharing.</p>
             </div>
@@ -250,7 +251,7 @@ class SafeShareModal {
 
           <details id="safeshare-maybe-review" open>
             <summary>Review suggestions</summary>
-            <p>Model scores are not certainty. Checked values are hidden wherever matched.</p>
+            <p>Model scores are not certainty. Redacted values are hidden wherever matched.</p>
             <div class="maybe-model-bar">
               <button type="button" id="safeshare-model-check">Click to re-scan</button>
               <span id="safeshare-model-status" role="status" aria-live="polite"></span>
@@ -981,6 +982,7 @@ class SafeShareModal {
           }
         });
       });
+      this.renderPreviewNavigation();
     }
 
     // 2. Tally candidate counts and active protected counts per category
@@ -1169,12 +1171,14 @@ class SafeShareModal {
       const label = document.createElement("div");
       label.className = "maybe-item-card" + (isRedacted ? " is-redacted" : "");
 
-      const check = document.createElement("input");
-      check.type = "checkbox";
-      check.checked = isRedacted;
-      check.addEventListener("change", () => {
+      const check = document.createElement("button");
+      check.type = "button";
+      check.className = "btn-maybe-quick";
+      check.textContent = isRedacted ? "Redacted · Undo" : "Redact this";
+      check.setAttribute("aria-pressed", String(Boolean(isRedacted)));
+      check.addEventListener("click", () => {
         if (this.publishing) return;
-        this.maybeChoices.set(candidate.raw, check.checked);
+        this.maybeChoices.set(candidate.raw, !isRedacted);
         this.rebuildViews();
         document.getElementById(candidate.id)?.focus();
       });
@@ -1213,11 +1217,10 @@ class SafeShareModal {
 
       const text = document.createElement("div");
       text.className = "maybe-item-text";
-      const title = document.createElement("label");
-      title.htmlFor = candidate.id;
+      const title = document.createElement("span");
       title.className = "maybe-value";
       title.textContent = shown;
-      check.setAttribute("aria-label", `Hide all occurrences of ${shown}`);
+      check.setAttribute("aria-label", `${isRedacted ? "Keep visible" : "Redact"} all occurrences of ${shown}`);
       const reason = document.createElement("span");
       reason.className = "maybe-description";
       const assignment = /Value assigned to (.+)/i.exec(candidate.reason || "");
@@ -1250,9 +1253,26 @@ class SafeShareModal {
         details.appendChild(full);
       }
       for (const child of [title, reason, details]) text.appendChild(child);
+      const locate = document.createElement("button");
+      locate.type = "button";
+      locate.className = "btn-drawer-action";
+      locate.textContent = "Show in preview";
+      const locations = document.createElement("span");
+      locations.setAttribute("aria-live", "polite");
+      locate.addEventListener("click", () => {
+        const matching = this.candidates.filter(c => c.id === candidate.id || c.raw === candidate.raw);
+        const badges = [...(document.getElementById("diff-box-sanitized")?.querySelectorAll(".ss-badge") || [])]
+          .filter(b => matching.some(c => c.id === b.getAttribute("data-cand-id")));
+        const index = (Number(locate.dataset.index ?? -1) + 1) % (badges.length || 1);
+        locate.dataset.index = String(index);
+        locations.textContent = badges.length ? ` ${index + 1} of ${badges.length}` : " Location unavailable";
+        if (badges.length) this.focusPreviewBadge(badges[index]);
+      });
+      text.appendChild(locate);
+      text.appendChild(locations);
 
-      label.appendChild(check);
       label.appendChild(text);
+      label.appendChild(check);
       list.appendChild(label);
     }
     if (visible.length < this.maybeCandidates.length || this.maybeShowAll) {
@@ -1306,7 +1326,20 @@ class SafeShareModal {
         pos = end;
         prevEnd = tagEnd;
       }
-      return out;
+      // Recover only unambiguous, exact replacements when alignment above stopped early
+      // (ranges, adjacent placeholders, or dummy credential URLs).
+      for (const candidate of this.candidates) {
+        const replacement = candidate.replacement || candidate.tag;
+        if (!replacement || !candidate.raw || replacement === candidate.raw || new RegExp(TAG.source).test(candidate.raw) || !orig.includes(candidate.raw)) continue;
+        if (this.candidates.some(other => other !== candidate && (other.replacement || other.tag) === replacement && other.raw !== candidate.raw)) continue;
+        let start = shared.content.indexOf(replacement);
+        while (start >= 0) {
+          const end = start + replacement.length;
+          if (!out.some(item => start < item.e && end > item.s)) out.push({ s: start, e: end, o: candidate.raw });
+          start = shared.content.indexOf(replacement, end);
+        }
+      }
+      return out.sort((a, b) => a.s - b.s);
     });
   }
 
@@ -1488,6 +1521,48 @@ class SafeShareModal {
     if (drawerEl && savedScrollTop > 0) {
       drawerEl.scrollTop = savedScrollTop;
     }
+  }
+
+  focusPreviewBadge(badge) {
+    const preview = document.getElementById("diff-box-sanitized");
+    if (!preview || !badge) return;
+    preview.querySelectorAll(".ss-preview-highlight").forEach(el => el.classList.remove("ss-preview-highlight"));
+    const box = badge.getBoundingClientRect();
+    const panel = preview.getBoundingClientRect();
+    preview.scrollTop += box.top - panel.top - preview.clientHeight / 2 + box.height / 2;
+    badge.classList.add("ss-preview-highlight");
+    // Focus must not activate the badge's redaction toggle.
+    badge.focus({ preventScroll: true });
+    setTimeout(() => badge.classList.remove("ss-preview-highlight"), 2000);
+  }
+
+  renderPreviewNavigation() {
+    const nav = document.getElementById("safeshare-preview-nav");
+    const preview = document.getElementById("diff-box-sanitized");
+    if (!nav || !preview) return;
+    const badges = [...preview.querySelectorAll(".ss-badge-redacted, .ss-placeholder")];
+    nav.innerHTML = "";
+    let index = -1;
+    const status = document.createElement("span");
+    status.setAttribute("aria-live", "polite");
+    status.textContent = `Hidden items · ${badges.length}`;
+    for (const [name, step] of [["Previous hidden item", -1], ["Next hidden item", 1]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn-drawer-action";
+      button.textContent = step < 0 ? "‹" : "›";
+      button.setAttribute("aria-label", name);
+      button.disabled = !badges.length;
+      button.addEventListener("click", () => {
+        index = index < 0 ? (step > 0 ? 0 : badges.length - 1) : (index + step + badges.length) % badges.length;
+        status.textContent = `Hidden items · ${index + 1} of ${badges.length}`;
+        const badge = badges[index];
+        if (!badge.hasAttribute("tabindex")) badge.setAttribute("tabindex", "-1");
+        this.focusPreviewBadge(badge);
+      });
+      nav.appendChild(button);
+    }
+    nav.appendChild(status);
   }
 
   async checkLocalModel(background = false) {

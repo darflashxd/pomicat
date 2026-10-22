@@ -67,6 +67,10 @@ const Modal = require("../extension/ui/modal.js");
 (async () => {
   const modal = new Modal();
   const originals = new Modal();
+  const partial = new Modal();
+  partial.currentTurns = [{ role: "user", content: "Salary $7850; bill $925." }];
+  partial.candidates = [{ raw: "$925", replacement: "[REDACTED_FINANCIAL_6]" }];
+  assert.deepEqual(partial.ownOriginals([{ role: "user", content: "Salary $7k–$8k; bill [REDACTED_FINANCIAL_6]." }])[0].map(item => item.o), ["$925"], "exact candidate restores original after changed prefix");
   originals.currentTurns = [{ role: "user", content: "Email [EMAIL_1]; amount <S1>; name Avery." }];
   assert.deepEqual(originals.ownOriginals([{ role: "user", content: "Email [EMAIL_1]; amount <S1>; name [User_A]." }]),
     [[{ s: 35, e: 43, o: "Avery" }]], "existing placeholders must not be saved as originals");
