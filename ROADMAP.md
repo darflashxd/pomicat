@@ -149,10 +149,12 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
       and measure the real path. · `me` 🔎
       Softmax and tokenizer done (see co-developer question 3); a measurement of the real path
       and an id-for-id check against the HF tokenizer still to do.
-- [ ] **Where does the MiniLM model come from?** No source, training data or licence documented.
-      Its labels resemble ai4privacy's; if it was trained on ai4privacy, "0.85 on ai4privacy,
-      beats Presidio" is tested on its own training distribution. Document origin + licence and
-      add an out-of-distribution test (WildChat false positives, Indonesian text). · `friend` + `me`
+- [x] **Model source and licence.** MiniLM was replaced by BERT-small INT8 in `47ede77`;
+      `extension/models/MODEL_INFO.json` records the repository (gravitee-io/bert-small-pii-detection),
+      revision, Apache-2.0 licence and weight hash.
+- [ ] **Model training data.** Not documented upstream. If it overlaps ai4privacy, scores on
+      ai4privacy measure its own training distribution: keep the out-of-distribution checks
+      (WildChat false positives, Indonesian text) as the headline numbers. · `friend` + `me`
 - [ ] **Before-sending fails open for names.** NER times out after 400 ms
       (`content_script.js:71-91`) and the message goes out with rules only. Decide: wait longer,
       block with a notice, or say so in the UI. Firefox has no offscreen documents

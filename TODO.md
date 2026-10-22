@@ -49,9 +49,9 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 
 ## Left for you
 - [ ] Friend: redeploy the relay after this (viewer moved to `extension/viewer/`, `wrangler.toml` updated; CSP headers)
-- [ ] Friend: exact Hugging Face link + licence + training data of the MiniLM model (answered "Hugging Face"; details still needed)
+- [x] Model link + licence: MiniLM replaced by BERT-small INT8 (`47ede77`), recorded in `extension/models/MODEL_INFO.json`; training data still undocumented (ROADMAP)
 - [ ] Friend: answer ROADMAP "From the co-developer" question 4 (Firefox); 2 and 3 answered and fixed
-- [ ] Friend: send `training/model_output/minilm_q4/tokenizer.json` (or the HF link) for an id-for-id tokenizer check
+- [x] ~~MiniLM tokenizer check~~ obsolete: the shipped model is now BERT-small with the standard BERT vocab
 - [x] Git workflow agreed with friend (no `reset --hard` over others' work; pull/rebase before push)
 - [ ] `git push` once P0 is in
 - [ ] Friend deploys with `DEPLOY.md` (incl. `ALTER TABLE`)

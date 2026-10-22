@@ -5,7 +5,7 @@
  * Resolves Priority Spans:
  *   Tier 0 (Protected / Veto): Developer tokens, code blocks, CVE, RFC, DNS, IP/CIDR, SQL
  *   Tier 1 (Deterministic PII): Luhn CC, SSN, NINO, SIN, NRIC, IBAN, Email, E.164 Phone
- *   Tier 2 (Open-Domain NER): MiniLM Q4 Transformer (Names, Streets, Cities)
+ *   Tier 2 (Open-Domain NER): BERT-small INT8, gravitee-io/bert-small-pii-detection (names, places)
  *
  */
 

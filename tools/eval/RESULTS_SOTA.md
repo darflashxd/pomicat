@@ -13,7 +13,7 @@ at all. See "Four different numbers" below.
 
 | Model | Recall | F1 | Notes |
 |---|---|---|---|
-| MiniLM Q4, shipped (35 PII labels) | **0.808** | **0.848** | Above Presidio (0.79); weak on DATE/TIME (covered by the Tier-1 ID_DOB_BARE rule) |
+| MiniLM Q4, shipped until `47ede77` (35 PII labels) | **0.808** | **0.848** | Above Presidio (0.79); weak on DATE/TIME (covered by the Tier-1 ID_DOB_BARE rule) |
 | MiniLM Q4 + Tier-0 arbiter (after the GIT_HASH-must-have-a-letter fix) | 0.797 | 0.834 | CARD 0 → 0.975, SSN → 0.806 |
 | MiniLM Q4 + Tier-0 arbiter (before that fix) | 0.759 | 0.816 | Thresholds + veto removed CARD/SSN (left to Tier-1) |
 | Tier-1 rules + MiniLM (union) | **0.811** | — | Combined recall, best of both per label |
