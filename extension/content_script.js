@@ -903,6 +903,8 @@
       "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] div.math, " +
       "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] div.markdown > div, [data-message-author-role='assistant'] .math-inline, [data-message-author-role='assistant'] .math-display, " +
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
+      // Claude's answers (Oct 2026) are .font-claude-response; IDs were restored there but sums weren't
+      ".font-claude-response p, .font-claude-response li, .font-claude-response td, .font-claude-response th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
       "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer']), " +
@@ -920,7 +922,7 @@
       if (isStreamingActive) {
         const table = node.closest("table");
         if (table) {
-          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, div.ds-markdown, .chat-message-assistant");
+          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, div.ds-markdown, .chat-message-assistant");
           if (assistantContainer && assistantContainer.lastElementChild === table) return;
         }
         const block = node.closest("p, li, td, th") || node;
