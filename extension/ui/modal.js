@@ -245,15 +245,14 @@ class SafeShareModal {
           </div>
 
           <section id="safeshare-attack-check" aria-live="polite">
-            <div class="attack-check-title">Privacy check</div>
             <div id="safeshare-attack-results"></div>
           </section>
 
           <details id="safeshare-maybe-review" open>
-            <summary>Maybe sensitive — review before sharing</summary>
-            <p>These are unverified suggestions, not a guarantee that every secret was found. Checked values are hidden in every occurrence.</p>
+            <summary>Review suggestions</summary>
+            <p>Model scores are not certainty. Checked values are hidden wherever matched.</p>
             <div class="maybe-model-bar">
-              <button type="button" id="safeshare-model-check">Check names and other PII with local model</button>
+              <button type="button" id="safeshare-model-check">Click to re-scan</button>
               <span id="safeshare-model-status" role="status" aria-live="polite"></span>
             </div>
             <div id="safeshare-maybe-items"></div>
@@ -1090,6 +1089,7 @@ class SafeShareModal {
     try { r = this.attackCheck(this.sanitizedTurns || []); }
     catch (_) {
       this.lastAttack = null;
+      box.hidden = false;
       box.textContent = "Privacy check unavailable. Review the shared text carefully.";
       return;
     }
@@ -1108,20 +1108,7 @@ class SafeShareModal {
     if (r.births.length) row(false, `Hidden birth date, but the birth year is ${r.births[0].year} (from stated ages).`);
     if (r.dates.length) for (const d of r.dates) row(false, `Hidden date narrowed to ${d.candidates.length} possible day(s) by ${d.clues.join(", ")}.`);
     if (r.combos.length) for (const c of r.combos) row(false, `Message ${c.turn} combines ${c.kinds.join(", ")}${c.unique ? ' and "the only"' : ""}: together these may point at one person.`);
-    if (!r.amounts.length && !r.births.length && !r.dates.length && !r.combos.length) {
-      const summary = document.createElement("div");
-      summary.textContent = "No additional risks found by the available checks.";
-      box.appendChild(summary);
-    }
-    const details = document.createElement("details");
-    const summary = document.createElement("summary");
-    summary.textContent = "About this check";
-    details.appendChild(summary);
-    const note = document.createElement("div");
-    note.className = "attack-note";
-    note.textContent = "Checks supported patterns in amounts, ages, dates and identifying details. Other ways to infer sensitive information may be missed.";
-    details.appendChild(note);
-    box.appendChild(details);
+    box.hidden = !box.childElementCount;
   }
 
   renderMaybeItems() {
@@ -1129,11 +1116,12 @@ class SafeShareModal {
     if (!list) return;
     const status = document.getElementById("safeshare-model-status");
     const missing = this.reviewBaseTurns?.some(t => !this.modelReview.has(t.content));
-    if (status) status.textContent = /Local (?:AI )?model checked/.test(this.modelState) && missing
-      ? "Review text changed — run the local model again for the current preview" : this.modelState;
+    if (status) status.textContent = /unavailable|skipped/i.test(this.modelState)
+      ? "Scan unavailable. Review manually." : !this.modelBusy && missing && /checked/i.test(this.modelState)
+        ? "Text changed. Re-scan to update suggestions." : "";
     list.innerHTML = "";
     if (!this.maybeCandidates.length) {
-      list.textContent = "No additional candidates found. This does not mean the conversation is free of sensitive data. The local model is English-focused.";
+      list.textContent = "No suggestions to review.";
       return;
     }
 
@@ -1144,7 +1132,7 @@ class SafeShareModal {
     btnAll.type = "button";
     btnAll.id = "btn-maybe-protect-all";
     btnAll.className = "btn-drawer-action btn-maybe-bulk";
-    btnAll.textContent = "🛡️ Redact All Suggestions";
+    btnAll.textContent = "Hide all";
     btnAll.addEventListener("click", (e) => {
       if (this.publishing) return;
       if (e?.preventDefault) e.preventDefault();
@@ -1156,7 +1144,7 @@ class SafeShareModal {
     btnNone.type = "button";
     btnNone.id = "btn-maybe-unprotect-all";
     btnNone.className = "btn-drawer-action btn-maybe-bulk";
-    btnNone.textContent = "Keep All Unmasked";
+    btnNone.textContent = "Keep all";
     btnNone.addEventListener("click", (e) => {
       if (this.publishing) return;
       if (e?.preventDefault) e.preventDefault();
@@ -1200,8 +1188,14 @@ class SafeShareModal {
         let value = content.slice(start, end);
         const spans = this.maybeCandidates.flatMap(c => c.occurrences)
           .filter(o => o.turnIndex === first.turnIndex && o.start < end && o.end > start)
-          .sort((a, b) => b.start - a.start);
-        for (const o of spans) {
+          .sort((a, b) => a.start - b.start);
+        const merged = [];
+        for (const span of spans) {
+          const previous = merged[merged.length - 1];
+          if (previous && span.start <= previous.end) previous.end = Math.max(previous.end, span.end);
+          else merged.push({ ...span });
+        }
+        for (const o of merged.reverse()) {
           const from = Math.max(start, o.start) - start;
           const to = Math.min(end, o.end) - start;
           value = value.slice(0, from) + "[POSSIBLE_SECRET]" + value.slice(to);
@@ -1231,6 +1225,8 @@ class SafeShareModal {
       reason.textContent = field ? `Possible ${field}` : candidate.source === "model"
         ? `Possible ${(candidate.modelLabel || "personal information").toLowerCase().replace(/_/g, " ")}`
         : /^Possible amount/i.test(candidate.reason || "") ? "Possible amount" : "Possibly sensitive value";
+      reason.textContent += candidate.source === "model" && Number.isFinite(candidate.modelScore)
+        ? ` · Model score ${Math.round(candidate.modelScore * 100)}%` : " · Rule-based";
       const state = document.createElement("span");
       state.className = "maybe-description";
       state.textContent = `Found ${candidate.occurrences.length === 1 ? "once" : `${candidate.occurrences.length} times`} · ${isRedacted ? "Hidden" : "Visible"} in shared copy`;
@@ -1244,6 +1240,8 @@ class SafeShareModal {
       explanation.className = "maybe-context";
       explanation.textContent = `${candidate.reason || "Flagged for review"}${candidate.why?.length ? `. ${candidate.why.join(", ")}` : ""}${typeof candidate.score === "number" ? `. Detection score: ${candidate.score.toFixed(2)}. This is not a probability that the value is sensitive.` : ""}`;
       details.appendChild(summary);
+      details.appendChild(state);
+      details.appendChild(excerpt);
       details.appendChild(explanation);
       if (characters.length > 80) {
         const full = document.createElement("pre");
@@ -1251,22 +1249,10 @@ class SafeShareModal {
         full.textContent = candidate.raw;
         details.appendChild(full);
       }
-      for (const child of [title, reason, state, excerpt, details]) text.appendChild(child);
-
-      const actBtn = document.createElement("button");
-      actBtn.type = "button";
-      actBtn.className = "btn-maybe-quick " + (isRedacted ? "btn-maybe-redacted" : "btn-maybe-unmasked");
-      actBtn.textContent = isRedacted ? "✓ Redacted" : "🛡️ Redact this";
-      actBtn.title = isRedacted ? "Click to keep visible in share" : "Click to redact across all occurrences";
-      actBtn.addEventListener("click", (e) => {
-        if (this.publishing) return;
-        if (e?.preventDefault) e.preventDefault();
-        check.click();
-      });
+      for (const child of [title, reason, details]) text.appendChild(child);
 
       label.appendChild(check);
       label.appendChild(text);
-      label.appendChild(actBtn);
       list.appendChild(label);
     }
     if (visible.length < this.maybeCandidates.length || this.maybeShowAll) {
@@ -1315,7 +1301,8 @@ class SafeShareModal {
         if (!after && k + 1 < tags.length) break; // two tags side by side: can't tell where one ends
         const end = k + 1 < tags.length ? orig.indexOf(after, start) : orig.length - after.length;
         if (end <= start || end - start > 300 || (k + 1 === tags.length && !orig.endsWith(after))) break;
-        out.push({ s: tags[k].index, e: tagEnd, o: orig.slice(start, end) });
+        const original = orig.slice(start, end);
+        if (!new RegExp(TAG.source).test(original)) out.push({ s: tags[k].index, e: tagEnd, o: original });
         pos = end;
         prevEnd = tagEnd;
       }
@@ -1505,6 +1492,7 @@ class SafeShareModal {
 
   async checkLocalModel(background = false) {
     if (this.publishing || this.modelBusy || !this.currentTurns.length) return;
+    if (!background) this.modelReview.clear();
     const run = {};
     this.modelRun = run;
     this.modelBusy = true;
@@ -1513,7 +1501,7 @@ class SafeShareModal {
     const publish = document.getElementById("btn-encrypt-publish");
     if (button) button.disabled = true;
     if (publish) publish.disabled = true;
-    if (button) button.textContent = "⏳ Scanning with local model…";
+    if (button) button.textContent = "Scanning…";
     this.modelState = "Scanning names & PII with local AI model…";
     this.renderMaybeItems();
     const snapshot = this.reviewBaseTurns.map(t => ({ ...t }));
@@ -1533,12 +1521,12 @@ class SafeShareModal {
       if (generation === this.reviewGeneration) {
         const changed = this.reviewBaseTurns.some(t => !this.modelReview.has(t.content));
         this.modelState = changed ? "Review text changed — run the local model again for the current preview" : "✓ Local AI model checked";
-        if (button) button.textContent = "✓ Local model checked (Click to re-scan)";
+        if (button) button.textContent = "Click to re-scan";
       }
     } catch (_) {
       if (generation === this.reviewGeneration) {
         this.modelState = "Rules active (local model skipped or unavailable)";
-        if (button) button.textContent = "Check names and other PII with local model";
+        if (button) button.textContent = "Click to re-scan";
       }
     } finally {
       if (this.modelRun === run) {

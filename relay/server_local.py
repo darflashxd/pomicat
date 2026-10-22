@@ -117,6 +117,17 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         clean_path = self.path.split("?")[0].split("#")[0]
+        if clean_path.startswith("/api/revoke/"):
+            self._send_cors(405)
+            return
+        if clean_path.startswith("/api/share/"):
+            share_id = clean_path[len("/api/share/"):].strip()
+            # Metadata checks must never consume a burn share or increment its views.
+            with STORAGE_LOCK:
+                item = STORAGE.get(share_id)
+                status = 200 if item and time.time() <= item["expires_at"] else 404
+            self._send_cors(status)
+            return
         if clean_path.endswith(".css"):
             self._send_cors(200, "text/css")
         elif clean_path.endswith(".js"):
@@ -198,9 +209,9 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                     "burn_on_read": is_burn
                 }).encode())
                 print(f"[+] Stored encrypted payload for ID: {share_id} (Burn: {is_burn})")
-            except Exception as e:
+            except Exception:
                 self._send_cors(400)
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(json.dumps({"error": "Invalid share request: expected JSON object and valid TTL"}).encode())
         elif self.path.startswith("/api/revoke/"):
             share_id = self.path.replace("/api/revoke/", "").strip()
             length = int(self.headers.get("Content-Length", 0))

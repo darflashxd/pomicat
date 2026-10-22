@@ -497,6 +497,21 @@ body {
   font-family: inherit;
 }
 
+#crawler-lock-screen .btn-open-conversation {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 280px);
+  min-height: 48px;
+  margin: 24px auto 0;
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+#crawler-lock-screen .btn-open-conversation:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
 .btn-platform:hover {
   background: #27272a;
   border-color: var(--border-hover);
