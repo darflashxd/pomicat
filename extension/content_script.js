@@ -719,7 +719,22 @@
   const escapeHtml = (s) => SafeShareLocalCompute.escapeHtml(s);
 
   const MESSAGE_SELECTOR = "[data-markdown-text-style='assistant-message'], [data-message-author-role='assistant'], " +
-    ".font-claude-message, .font-claude-response, div.ds-markdown";
+    ".font-claude-message, .font-claude-response, [data-perf-reply-text], [data-testid='assistant-message'] [data-cds='Prose'], div.ds-markdown";
+
+  // Claude (Oct 2026): a fresh answer carries [data-perf-reply-text]; once the chat is reloaded that
+  // attribute is gone and only the message row ([data-testid='assistant-message'],
+  // [data-cds='AssistantMessage']) remains. Read the visible prose, never the row: its h3.sr-only
+  // repeats the answer as "Claude responded: ...".
+  const CLAUDE_ROW_SELECTOR = "[data-testid='assistant-message'], [data-cds='AssistantMessage']";
+  function claudeAnswerBody(node) {
+    if (!node || !node.matches(CLAUDE_ROW_SELECTOR)) return null;
+    const selector = "[data-cds='Prose'], .standard-markdown, [data-perf-reply-text], .font-claude-response, .font-claude-message";
+    const body = document.createElement("div");
+    for (const part of node.querySelectorAll(selector)) {
+      if (!part.parentElement?.closest(selector)) body.appendChild(part.cloneNode(true));
+    }
+    return body;
+  }
 
   /**
    * Shows the shield's numbered placeholders ([NIK_1], [NAME_2]) as the real values, on this
@@ -919,6 +934,8 @@
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       // Claude's answers (Oct 2026) are .font-claude-response; IDs were restored there but sums weren't
       ".font-claude-response p, .font-claude-response li, .font-claude-response td, .font-claude-response th, " +
+      "[data-perf-reply-text] p, [data-perf-reply-text] li, [data-perf-reply-text] td, [data-perf-reply-text] th, " +
+      "[data-testid='assistant-message'] [data-cds='Prose'] p, [data-testid='assistant-message'] [data-cds='Prose'] li, [data-testid='assistant-message'] [data-cds='Prose'] td, [data-testid='assistant-message'] [data-cds='Prose'] th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
       "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer']), " +
@@ -936,7 +953,7 @@
       if (isStreamingActive) {
         const table = node.closest("table");
         if (table) {
-          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, div.ds-markdown, .chat-message-assistant");
+          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, [data-perf-reply-text], [data-testid='assistant-message'] [data-cds='Prose'], div.ds-markdown, .chat-message-assistant");
           if (assistantContainer && assistantContainer.lastElementChild === table) return;
         }
         const block = node.closest("p, li, td, th") || node;
@@ -1135,8 +1152,8 @@
   async function prepareConversation() {
     const url = location.href;
     const root = getActiveConversationRoot();
-    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], .font-claude-response, .font-claude-message, .ds-message";
-    const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-']";
+    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-perf-reply-text], .ds-message";
+    const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-'], [data-turn-key]";
     // Start at a message, not the composer: the composer can have its own scroll area.
     let scroller = root.querySelector(messageSelector);
     while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
@@ -1177,10 +1194,13 @@
         !isComposerOrSafeShareUI(node) && !node.parentElement?.closest(messageSelector));
       for (const node of nodes) {
         const unit = node.closest(idSelector);
-        const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !node.querySelector(".ds-markdown") ? "user" : "assistant");
-        const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-testid"));
+        const deepseekAnswer = node.matches(".ds-message")
+          ? node.querySelector(".ds-assistant-message-main-content") : null;
+        if (node.matches(".ds-message") && !deepseekAnswer && !node.querySelector(".ds-collapsible-text")) { uncertain = true; continue; }
+        const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !deepseekAnswer ? "user" : "assistant");
+        const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-turn-key") || unit.getAttribute("data-testid"));
         const key = identity ? `${role}:${identity}` : null;
-        const content = getCleanNodeContent(node);
+        const content = getCleanNodeContent(claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node);
         if (!content) continue;
         const previous = snapshot[snapshot.length - 1];
         // Split assistant markdown blocks may belong to one message; never read their shared wrapper.
@@ -1336,12 +1356,13 @@
 
     // Strategy 2: Claude DOM Pattern
     const claudeUserNodes = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message']");
-    const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+    const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude'], [data-perf-reply-text], [data-testid='assistant-message']");
     if (claudeUserNodes.length > 0 || claudeAsstNodes.length > 0) {
-      const allClaude = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
-      Array.from(allClaude).filter(el => !isComposerOrSafeShareUI(el)).forEach((el) => {
+      const claudeSelector = "[data-testid='user-message'], [data-testid='assistant-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude'], [data-perf-reply-text]";
+      const allClaude = container.querySelectorAll(claudeSelector);
+      Array.from(allClaude).filter(el => !isComposerOrSafeShareUI(el) && !el.parentElement?.closest(claudeSelector)).forEach((el) => {
         const isUser = el.getAttribute("data-testid") === "user-message" || (el.className && el.className.includes("user-message"));
-        const textContent = getCleanNodeContent(el);
+        const textContent = getCleanNodeContent(claudeAnswerBody(el) || el);
         if (textContent) {
           turns.push({
             role: isUser ? "user" : "assistant",
@@ -1358,13 +1379,13 @@
     const dsMessages = Array.from(container.querySelectorAll("div.ds-message")).filter(el => !isComposerOrSafeShareUI(el));
     if (dsMessages.length > 0) {
       for (const el of dsMessages) {
-        const answer = el.querySelector(".ds-assistant-message-main-content") || el.querySelector("div.ds-markdown");
+        const answer = el.querySelector(".ds-assistant-message-main-content");
+        if (!answer && !el.querySelector(".ds-collapsible-text")) continue;
         const source = answer || el.querySelector(".ds-collapsible-text") || el;
         const textContent = getCleanNodeContent(source);
         if (textContent) turns.push({ role: answer ? "assistant" : "user", content: textContent });
       }
-      if (turns.some(t => t.role === "user") && turns.some(t => t.role === "assistant")) return turns;
-      turns.length = 0; // partial read: let the older strategies try
+      return turns; // Do not fall back to generic markdown: it can contain unfinished reasoning.
     }
 
     // Strategy 3: DeepSeek & generic markdown message turns

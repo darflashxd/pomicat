@@ -63,7 +63,31 @@ document.getElementById('chat').onload=async()=>{
    assert((orig.innerText.match(/\[Attachment omitted\]/g)||[]).length===2,'attachment markers missing or avatar counted');
    assert(!/PRIVATE_|data:image/.test(orig.innerText),'attachment metadata leaked');
    assert(orig.innerText.includes('Please review.'),'attachment caption lost');
-   document.getElementById('result').textContent='PASS: extraction, slow/plain expand, virtual history, roles, attachments without metadata, formatting. No uploads.';
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div data-testid="user-message">CLAUDE_QUESTION</div><div data-perf-reply-text class="standard-markdown"><p>CLAUDE_FINAL</p></div>';
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===2&&orig.innerText.includes('CLAUDE_FINAL'),'new Claude answer layout lost');
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div class="ds-message"><div class="ds-collapsible-text">DEEPSEEK_QUESTION</div></div><div class="ds-message"><div class="reasoning">PRIVATE_REASONING_CANARY</div><div class="ds-assistant-message-main-content"><div class="ds-markdown">DEEPSEEK_FINAL</div></div></div>';
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===2&&orig.innerText.includes('DEEPSEEK_FINAL'),'DeepSeek final answer lost');
+   assert(!orig.innerText.includes('PRIVATE_REASONING_CANARY'),'DeepSeek reasoning included');
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div data-testid="user-message" data-turn-key="u1">RELOADED_QUESTION</div><div data-testid="assistant-message" data-turn-key="a1"><h3 class="sr-only">Claude responded: MIRROR_CANARY</h3><div data-cds="Prose"><div class="standard-markdown"><p>RELOADED_ANSWER</p></div></div><div data-cds="Prose"><p>SECOND_PART <span data-expr="%3CS1%3E">LOCAL_VALUE_CANARY</span></p></div></div><div data-testid="assistant-message" data-turn-key="a2"><div data-cds="Prose"><p>RELOADED_ANSWER</p></div></div>';
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===3,'reloaded Claude turns lost or duplicated');
+   assert((orig.innerText.match(/RELOADED_ANSWER/g)||[]).length===2,'identical Claude answers merged');
+   assert(orig.innerText.includes('SECOND_PART')&&orig.innerText.includes('<S1>'),'Claude prose or placeholder lost');
+   assert(!/MIRROR_CANARY|LOCAL_VALUE_CANARY|Claude responded:/.test(orig.innerText),'Claude mirror or revealed value leaked');
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div class="ds-message"><div class="ds-collapsible-text">THINKING_QUESTION</div></div><div class="ds-message"><div class="ds-markdown">REASONING_ONLY_CANARY</div></div>';
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===1&&!orig.innerText.includes('REASONING_ONLY_CANARY'),'unfinished reasoning included');
+   document.getElementById('result').textContent='PASS: extraction, expand, virtual history, attachments, Claude reload/multiple prose/placeholders, DeepSeek final-only and reasoning-only. No uploads.';
  }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
 };
 </script>
