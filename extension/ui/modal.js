@@ -1330,7 +1330,7 @@ class SafeShareModal {
       // (ranges, adjacent placeholders, or dummy credential URLs).
       for (const candidate of this.candidates) {
         const replacement = candidate.replacement || candidate.tag;
-        if (!replacement || !candidate.raw || replacement === candidate.raw || new RegExp(TAG.source).test(candidate.raw) || !orig.includes(candidate.raw)) continue;
+        if (!replacement || !candidate.raw || replacement === candidate.raw || new RegExp(TAG.source).test(candidate.raw) || !orig.includes(candidate.raw) || orig.includes(replacement)) continue;
         if (this.candidates.some(other => other !== candidate && (other.replacement || other.tag) === replacement && other.raw !== candidate.raw)) continue;
         let start = shared.content.indexOf(replacement);
         while (start >= 0) {

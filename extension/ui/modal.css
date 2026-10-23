@@ -1173,14 +1173,20 @@
   line-height: 1.4;
 }
 .btn-maybe-quick {
+  min-height: 40px;
+  background: #27272a;
+  color: #f4f4f5;
+  border: 1px solid #71717a;
+  border-radius: 6px;
+  cursor: pointer;
   flex-shrink: 0;
   padding: 5px 12px;
   font-size: 11px;
   font-weight: 600;
-  border-radius: 6px;
-  cursor: pointer;
   transition: all 0.15s ease;
 }
+.btn-maybe-quick:hover { background: #3f3f46; }
+.btn-maybe-quick:focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
 .btn-maybe-unmasked {
   background: rgba(244, 63, 94, 0.12);
   color: #fb7185;

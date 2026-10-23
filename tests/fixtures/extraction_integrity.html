@@ -37,7 +37,33 @@ document.getElementById('chat').onload=async()=>{
    assert(orig.innerText.includes('complete hidden tail'),'collapsed tail missing');
    assert(!orig.innerText.includes('Show more'),'expand control leaked');
    assert(orig.querySelectorAll('.turn-block').length===3,'legitimate identical turns removed');
-  document.getElementById('result').textContent='PASS: mixed/modern layouts, ordered roles, split answer, heading/table/code, composer exclusion. No uploads.';
+   d.getElementById('safeshare-close-btn').click();
+   thread.innerHTML='<div data-message-id="shared-wrapper"><div data-message-author-role="user">Question <span hidden>slow complete tail</span><button>Show more</button></div><div data-message-author-role="assistant">Separate answer</div></div>';
+   thread.querySelector('button').onclick=()=>setTimeout(()=>{thread.querySelector('span').hidden=false;thread.querySelector('button').remove();},1200);
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.innerText.includes('slow complete tail'),'slow expand without aria-expanded lost');
+   assert(orig.querySelectorAll('.turn-block').length===2,'shared wrapper merged roles');
+   d.getElementById('safeshare-close-btn').click();
+   thread.style.cssText='height:180px;overflow-y:auto';
+   thread.innerHTML='<div style="height:900px;position:relative"><div id="windowed"></div></div>';
+   const render=()=>{const n=Math.min(3,Math.floor(thread.scrollTop/180));d.getElementById('windowed').innerHTML=[n,n+1].map(i=>'<div style="position:absolute;top:'+i*180+'px" data-message-author-role="'+(i%2?'assistant':'user')+'">WINDOW_MESSAGE_'+i+'</div>').join('');};
+   thread.addEventListener('scroll',render);render();
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<700&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===5,'virtual messages without IDs lost or duplicated');
+   for(let i=0;i<5;i++)assert(orig.innerText.includes('WINDOW_MESSAGE_'+i),'missing virtual turn '+i);
+   assert(thread.scrollTop===0,'scroll position not restored');
+   d.getElementById('safeshare-close-btn').click();
+   thread.style.cssText='';
+   thread.innerHTML='<div data-message-id="image-only" data-message-author-role="user"><button><img alt="PRIVATE_FILENAME.png" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></button></div><div data-message-id="image-answer" data-message-author-role="assistant">Image answer</div><div data-message-id="text-image" data-message-author-role="user">Please review.<div data-testid="attachment-card">PRIVATE_FILENAME.pdf<img alt="PRIVATE_DESCRIPTION" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></div></div><div data-message-id="avatar" data-message-author-role="assistant"><span class="avatar"><img alt="avatar"></span>Final answer</div>';
+   d.getElementById('safeshare-action-pill').click();for(let i=0;i<300&&!d.getElementById('diff-box-orig');i++)await wait(25);
+   orig=d.getElementById('diff-box-orig');
+   assert(orig.querySelectorAll('.turn-block').length===4,'attachment-only user message lost');
+   assert((orig.innerText.match(/\[Attachment omitted\]/g)||[]).length===2,'attachment markers missing or avatar counted');
+   assert(!/PRIVATE_|data:image/.test(orig.innerText),'attachment metadata leaked');
+   assert(orig.innerText.includes('Please review.'),'attachment caption lost');
+   document.getElementById('result').textContent='PASS: extraction, slow/plain expand, virtual history, roles, attachments without metadata, formatting. No uploads.';
  }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
 };
 </script>

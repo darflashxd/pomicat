@@ -1014,6 +1014,17 @@
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
+      // Attachments stay omitted, but their message must not disappear from the transcript.
+      // Never extract filenames, alt text, media URLs or OCR from these elements.
+      const attachments = [...clone.querySelectorAll("img, video, audio, [data-testid*='attachment'], [data-testid*='file-upload']")]
+        .filter(node => !node.closest("[hidden], [aria-hidden='true'], [data-testid*='avatar'], [class*='avatar'], .ss-sent-note") &&
+          !(node.tagName === "IMG" && ((node.getAttribute("width") && Number(node.getAttribute("width")) <= 32) || /^(?:avatar|icon)$/i.test(node.getAttribute("alt") || ""))));
+      const attachmentRoots = attachments.map(node => node.closest("[data-testid*='attachment'], [data-testid*='file-upload']") || node.closest("button, [role='button']") || node);
+      for (const node of new Set(attachmentRoots)) {
+        if (node.parentNode && !attachmentRoots.some(other => other !== node && other.contains(node))) {
+          node.replaceWith(document.createTextNode("\n[Attachment omitted]\n"));
+        }
+      }
       clone.querySelectorAll("[hidden], [aria-hidden='true'], [role='button']:not([data-expr]), button, script, style").forEach(n => n.remove());
       // Find all hydrated local compute spans in the clone
       clone.querySelectorAll(".ss-sent-note").forEach(n => n.remove()); // "🔒 2 values protected" is ours, not the chat
@@ -1124,10 +1135,11 @@
   async function prepareConversation() {
     const url = location.href;
     const root = getActiveConversationRoot();
-    const input = findPromptInputElement();
-    let scroller = input;
+    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], .font-claude-response, .font-claude-message, .ds-message";
+    const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-']";
+    // Start at a message, not the composer: the composer can have its own scroll area.
+    let scroller = root.querySelector(messageSelector);
     while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
-    scroller ||= [...root.querySelectorAll("div")].find(el => el.scrollHeight > el.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(el).overflowY));
     scroller ||= document.scrollingElement;
     const initial = scroller.scrollTop;
     const cancel = document.createElement("button");
@@ -1137,45 +1149,108 @@
     let cancelled = false;
     cancel.addEventListener("click", () => { cancelled = true; });
     document.body.appendChild(cancel);
-    const check = () => { if (cancelled || location.href !== url) throw new DOMException("Preparation cancelled", "AbortError"); };
-    const wait = () => new Promise(resolve => setTimeout(resolve, 150));
-    const messages = new Map();
+    const deadline = Date.now() + 15000;
+    const check = () => { if (cancelled || location.href !== url || !root.isConnected) throw new DOMException("Preparation cancelled", "AbortError"); };
+    // Quiet DOM is a bounded wait, not proof that the site's server history is complete.
+    const wait = (minimum = 150, target = root, ready = () => true, action = null) => new Promise((resolve, reject) => {
+      const started = Date.now();
+      let changed = started;
+      const observer = new MutationObserver(() => { changed = Date.now(); });
+      observer.observe(target, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["hidden", "aria-expanded", "aria-busy", "class", "style"] });
+      const timer = setInterval(() => {
+        try { check(); } catch (error) { observer.disconnect(); clearInterval(timer); reject(error); return; }
+        const now = Date.now();
+        if (now >= deadline || now - started >= 3000 || (now - started >= minimum && now - changed >= 100 && ready())) {
+          observer.disconnect(); clearInterval(timer); resolve();
+        }
+      }, 50);
+      // Observe before clicking: an instant expansion must not be missed.
+      try { if (action) action(); }
+      catch (error) { observer.disconnect(); clearInterval(timer); reject(error); }
+    });
+    const messages = [];
     let uncertain = false;
-    let anonymous = false;
+    const same = (a, b) => a.key && b.key ? a.key === b.key : a.role === b.role && a.content === b.content;
     const collect = () => {
-      const seen = new Set();
-      const nodes = root.querySelectorAll("[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], .font-claude-response, .font-claude-message, .ds-message");
+      const snapshot = [];
+      const nodes = [...root.querySelectorAll(messageSelector)].filter(node =>
+        !isComposerOrSafeShareUI(node) && !node.parentElement?.closest(messageSelector));
       for (const node of nodes) {
-        if (isComposerOrSafeShareUI(node)) continue;
-        const unit = node.closest("[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-']");
-        if (!unit) { anonymous = true; continue; }
-        if (seen.has(unit)) continue;
-        seen.add(unit);
-        const key = unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-testid");
+        const unit = node.closest(idSelector);
         const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !node.querySelector(".ds-markdown") ? "user" : "assistant");
-        const content = getCleanNodeContent(unit);
-        if (content) messages.set(key, { role, content });
+        const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-testid"));
+        const key = identity ? `${role}:${identity}` : null;
+        const content = getCleanNodeContent(node);
+        if (!content) continue;
+        const previous = snapshot[snapshot.length - 1];
+        // Split assistant markdown blocks may belong to one message; never read their shared wrapper.
+        if (key && previous?.key === key && role === "assistant") previous.content += "\n\n" + content;
+        else snapshot.push({ key, role, content });
       }
+      if (!snapshot.length) return;
+      if (!messages.length) { messages.push(...snapshot); return; }
+      // Forward scroll keeps an overlap. Match ordered sequences, never deduplicate by text globally.
+      let overlap = Math.min(messages.length, snapshot.length);
+      while (overlap && !messages.slice(-overlap).every((item, i) => same(item, snapshot[i]))) overlap--;
+      if (!overlap) {
+        const index = snapshot[0].key ? messages.findIndex(item => item.key === snapshot[0].key) : -1;
+        if (index >= 0 && snapshot.every((item, i) => messages[index + i] && same(messages[index + i], item))) {
+          snapshot.forEach((item, i) => { messages[index + i] = item; });
+          return;
+        }
+        uncertain = true; // no reliable overlap: retain observations, disclose possible gaps/duplicates
+      } else {
+        if (snapshot.slice(0, overlap).some(item => !item.key)) uncertain = true;
+        snapshot.slice(0, overlap).forEach((item, i) => { messages[messages.length - overlap + i] = item; });
+      }
+      messages.push(...snapshot.slice(overlap));
     };
+    const expanded = new WeakSet();
     const expand = async () => {
-      for (const button of root.querySelectorAll("button[aria-expanded='false'], [role='button'][aria-expanded='false']")) {
-        if (!button.closest("[data-message-author-role], [data-user-message-bubble='true'], [data-testid='user-message'], .ds-message")) continue;
+      for (const button of root.querySelectorAll("button, [role='button']")) {
+        if (Date.now() >= deadline) { uncertain = true; return; }
+        if (expanded.has(button) || button.disabled || button.getAttribute("aria-expanded") === "true" || !isVisibleElement(button)) continue;
+        if (!button.closest(messageSelector)) continue;
         if (!/^(show more|read more|expand)$/i.test((button.innerText || button.getAttribute("aria-label") || "").trim())) continue;
-        check(); button.click(); await wait();
+        check(); expanded.add(button);
+        const message = button.closest(messageSelector);
+        const before = getCleanNodeContent(message);
+        await wait(150, message, () => {
+          const changed = getCleanNodeContent(message) !== before;
+          const pending = message.querySelector("[hidden], [aria-busy='true']");
+          // An attribute toggle alone is not evidence that delayed text arrived.
+          return changed && !pending;
+        }, () => button.click());
+        if (getCleanNodeContent(message) === before || message.querySelector("[hidden], [aria-busy='true']")) uncertain = true;
+        if (button.isConnected && button.getAttribute("aria-expanded") === "false") uncertain = true;
       }
     };
     try {
       check();
-      await expand();
+      if (scroller.scrollHeight <= scroller.clientHeight + 20) {
+        await expand();
+        check(); collect();
+        const grew = scroller.scrollHeight > scroller.clientHeight + 20;
+        if (!grew) return {
+          turns: tidyTurns(messages.length ? messages : extractRawTurns()),
+          uncertain: uncertain || Date.now() >= deadline || Boolean(root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']"))
+        };
+        messages.length = 0; // expansion changed layout; recollect in top-to-bottom order
+      }
       // Scan from top down so insertion order follows the active conversation.
-      scroller.scrollTop = 0;
-      await wait();
-      const deadline = Date.now() + 15000;
+      let topSettled = 0;
+      while (Date.now() < deadline && topSettled < 2) {
+        check();
+        const height = scroller.scrollHeight;
+        scroller.scrollTop = 0;
+        await wait();
+        topSettled = scroller.scrollTop === 0 && scroller.scrollHeight === height ? topSettled + 1 : 0;
+      }
       let settled = 0;
       while (Date.now() < deadline) {
         check(); await expand(); collect();
         const before = scroller.scrollTop;
-        scroller.scrollTop += Math.max(200, scroller.clientHeight * 0.75);
+        scroller.scrollTop += Math.max(1, scroller.clientHeight * 0.5);
         await wait();
         if (scroller.scrollTop === before) {
           if (++settled >= 3) break;
@@ -1183,9 +1258,10 @@
       }
       check(); collect();
       // DOM exhaustion is not proof that server-side history was fully loaded.
-      uncertain = settled < 3 || anonymous || initial > 0 || scroller.scrollHeight > scroller.clientHeight + 20;
-      // Without stable message IDs, never merge by text: identical turns can be legitimate.
-      const turns = messages.size && !anonymous ? tidyTurns([...messages.values()]) : extractConversationTurns();
+      uncertain ||= settled < 3 || topSettled < 2 || scroller.scrollHeight > scroller.clientHeight + 20;
+      if (root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']")) uncertain = true;
+      // ponytail: DOM scans cannot prove server history exhaustion; scrollable chats stay unverified.
+      const turns = messages.length ? tidyTurns(messages) : extractConversationTurns();
       return { turns, uncertain };
     } finally {
       cancel.remove();
