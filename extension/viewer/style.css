@@ -1,7 +1,7 @@
 /* SafeShare-AI — Modern Calm Security UI (21st / Linear aesthetic) */
 :root {
-  --bg-canvas: #09090b;
-  --bg-surface: #121215;
+  --bg-canvas: #151719;
+  --bg-surface: #1d2023;
   --bg-surface-hover: #18181c;
   --bg-surface-elevated: #1f1f24;
   --bg-bubble-user: #1a1a20;
@@ -12,11 +12,11 @@
   --border-active: rgba(255, 255, 255, 0.22);
   
   --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
+  --text-secondary: #b8c0c9;
+  --text-tertiary: #a8b1bc;
   --text-inverse: #09090b;
   
-  --accent-emerald: #10b981;
+  --accent-emerald: #a3c5d8;
   --accent-emerald-subtle: rgba(16, 185, 129, 0.12);
   --accent-blue: #3b82f6;
   --accent-blue-subtle: rgba(59, 130, 246, 0.12);
@@ -43,7 +43,7 @@ body {
   background-color: var(--bg-canvas);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -59,9 +59,7 @@ body {
 /* Header */
 .top-nav {
   padding: 12px 24px;
-  background: rgba(9, 9, 11, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-canvas);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
@@ -81,7 +79,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  background: #18181b;
+  background: var(--bg-surface-elevated);
   border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -316,7 +314,7 @@ body {
 }
 
 .chat-bubble-user .bubble-avatar {
-  background: #27272a;
+  background: var(--bg-surface-elevated);
   color: var(--text-primary);
 }
 
@@ -361,7 +359,7 @@ body {
 }
 
 .bubble-content pre {
-  background: #0f0f12;
+  background: var(--bg-canvas);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
@@ -472,7 +470,7 @@ body {
   cursor: pointer;
   width: 14px;
   height: 14px;
-  accent-color: #10b981;
+  accent-color: var(--accent-emerald);
 }
 
 .platform-btn-group {
@@ -513,7 +511,7 @@ body {
 }
 
 .btn-platform:hover {
-  background: #27272a;
+  background: var(--bg-surface-elevated);
   border-color: var(--border-hover);
   transform: translateY(-1px);
 }
@@ -675,3 +673,24 @@ mark.ss-own-original {
   padding: 0 2px;
 }
 #btn-own-originals { margin-left: auto; }
+
+button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent-emerald); outline-offset: 3px;
+}
+button { min-height: 40px; }
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-canvas: #f6f7f9; --bg-surface: #ffffff; --bg-surface-hover: #eef1f4;
+    --bg-surface-elevated: #e9edf1; --bg-bubble-user: #eef1f4; --bg-bubble-assistant: #ffffff;
+    --text-primary: #20252b; --text-secondary: #59636e; --text-tertiary: #59636e; --text-inverse: #ffffff;
+    --border-subtle: #d0d7df; --border-hover: #8795a4; --border-active: #59636e;
+    --accent-emerald: #315e75; --accent-blue: #245a8a;
+    --shadow-card: 0 4px 20px rgba(32,37,43,.06);
+    --shadow-elevated: 0 12px 32px rgba(32,37,43,.12);
+  }
+  mark.ss-own-original { color: #245a8a; }
+}
+.messages-stream { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

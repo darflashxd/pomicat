@@ -172,10 +172,12 @@ class SafeShareModal {
           <span id="stat-contextual" style="display:none;">0</span>
         </div>
 
+        <details class="ss-protection-settings">
+        <summary>Protection settings <span id="ss-policy-summary">Categories, reader and amounts</span></summary>
         <!-- Customizable Policy & Category Control Bar -->
         <div class="safeshare-policy-bar">
           <div class="policy-bar-left">
-            <span class="policy-label">Policy Categories:</span>
+              <span class="policy-label">Hide:</span>
             <div class="policy-pills-list" id="policy-pills-list"></div>
           </div>
           <div class="policy-mode-group">
@@ -191,7 +193,6 @@ class SafeShareModal {
             </select>
           </div>
           <button class="btn-toggle-inspector" id="btn-toggle-inspector" title="Customize detected items individually">
-            <span class="inspector-gear-icon">⚙️</span>
             <span id="inspector-btn-text">Customize Items</span>
             <span class="inspector-arrow-icon" id="inspector-arrow-icon">▼</span>
           </button>
@@ -212,8 +213,10 @@ class SafeShareModal {
           <div class="inspector-items-container" id="inspector-items-container"></div>
         </div>
 
+        </details>
         <div class="safeshare-body" id="safeshare-review-view">
           <!-- Direct Side-by-Side Comparison Grid -->
+          <label class="ss-compare-control"><input type="checkbox" id="ss-compare-original" checked> Compare with original</label>
           <div class="direct-comparison-grid">
             <div class="comparison-col">
               <div class="comparison-col-header">
@@ -223,7 +226,7 @@ class SafeShareModal {
                     <line x1="12" y1="8" x2="12" y2="12"/>
                     <line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
-                  <span>Original (Raw Input)</span>
+                   <span>Original</span>
                 </div>
               </div>
               <div class="diff-box" id="diff-box-orig"></div>
@@ -235,9 +238,9 @@ class SafeShareModal {
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
-                  <span>Share preview — review before publishing</span>
+                   <span>What others will see</span>
                 </div>
-                <span class="hint-badge">💡 Click any badge to toggle</span>
+                <span class="hint-badge">Select a hidden item to review it</span>
               </div>
               <nav id="safeshare-preview-nav" aria-label="Hidden items"></nav>
               <div class="diff-box diff-box-interactive" id="diff-box-sanitized"></div>
@@ -1615,6 +1618,15 @@ class SafeShareModal {
   }
 
   bindEvents(backdrop) {
+    const compare = backdrop.querySelector("#ss-compare-original");
+    compare?.addEventListener("change", () => {
+      backdrop.querySelector(".direct-comparison-grid").classList.toggle("ss-preview-only", !compare.checked);
+    });
+    const updatePolicySummary = () => {
+      const reader = backdrop.querySelector("#safeshare-profile");
+      const amounts = backdrop.querySelector("#safeshare-numbers");
+      backdrop.querySelector("#ss-policy-summary").textContent = `${reader.value === "trusted" ? "Someone I trust" : "Anyone with the link"} · Amounts: ${amounts.value === "range" ? "Show as range" : "Remove"}`;
+    };
     backdrop.querySelector("#safeshare-model-check")?.addEventListener("click", () => {
       this.checkLocalModel(false);
     });
@@ -1629,8 +1641,10 @@ class SafeShareModal {
         this[key] = sel.value;
         if (this.settings) this.settings.set(storageKey, sel.value);
         this.rebuildViews();
+        updatePolicySummary();
       });
     }
+    updatePolicySummary();
 
     // Toggle Inspector Drawer
     const toggleInspectorBtn = backdrop.querySelector("#btn-toggle-inspector");
