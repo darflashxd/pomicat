@@ -1164,7 +1164,9 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
   background: rgba(16, 185, 129, 0.05);
 }
 
-#safeshare-preview-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+/* Under the preview, bottom right: above it, it pushed the preview below the original */
+#safeshare-preview-nav { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--ss-text-secondary); }
+#safeshare-preview-nav .btn-drawer-action { padding: 2px 8px; font-size: 12px; line-height: 1.4; }
 .ss-preview-highlight { outline: 3px solid #fbbf24; outline-offset: 3px; background: #422006 !important; }
 .maybe-item-label {
   display: flex;

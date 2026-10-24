@@ -242,8 +242,8 @@ class SafeShareModal {
                 </div>
                 <span class="hint-badge">Select a hidden item to review it</span>
               </div>
-              <nav id="safeshare-preview-nav" aria-label="Hidden items"></nav>
               <div class="diff-box diff-box-interactive" id="diff-box-sanitized"></div>
+              <nav id="safeshare-preview-nav" aria-label="Hidden items"></nav>
               <p class="ss-review-warning">Ranges are approximate, not exact equations. Revealing amounts can expose other hidden values through arithmetic. Review before sharing.</p>
             </div>
           </div>
