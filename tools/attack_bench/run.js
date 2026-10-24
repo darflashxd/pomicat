@@ -18,6 +18,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { createHash } = require("crypto");
 const { redact } = require("../../bin/safeshare.js");
 const { invert } = require("../../extension/engine/policy.js");
 const { chatText, buildPrompt, parseLlmAnswer, withinTolerance } = require("./llm.js");
@@ -341,7 +342,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
         const text = chatText(all[i]);
         const visible = text.includes(fmt(cases[i].salary, cases[i].lang));
         if (visible) { exposed++; continue; }
-        const result = await attack(all[i], { redactor: rname, caseIndex: i, caseId: cases[i].id, cacheKey: `${aname}|${rname}|${i}` });
+        const result = await attack(all[i], { redactor: rname, caseIndex: i, caseId: cases[i].id, cacheKey: `${aname}|${createHash("sha256").update(text).digest("hex")}` });
         const kind = result && result.kind ? result.kind : "invalid";
         rs[kind] = (rs[kind] || 0) + 1;
         if (withinTolerance(result && result.value, cases[i].salary)) recovered++;
