@@ -1,49 +1,69 @@
 # Can an LLM recover a hidden salary from a redacted chat?
 
-**Against the LLM attacker (deepseek-v4-pro): naive redaction leaked 100%, Presidio left 100% of salaries visible, and SafeShare held at 0%.**
+**Three LLM attackers from two vendors, in English and Indonesian: naive redaction leaked 100% every
+time, Presidio 100%, and SafeShare 0%.**
 
-40 fictional English chats: each states a monthly salary, and the assistant replies with figures derived from it.
-Each redactor hides what it hides; the LLM attacker then reads the redacted chat and tries to recover the salary.
+40 fictional chats per run: each states a monthly salary, and the assistant replies with 1–3
+figures derived from it ("save 20% → $1,000 a month"). Each redactor hides what it hides; the LLM
+attacker then reads the redacted chat and tries to recover the salary.
 
-| Redaction | Salary leaked to the LLM |
-|---|---|
-| naive — hides only the stated salary | **100%** |
-| Presidio — generic PII tool | **100%** |
-| SafeShare — hides the amounts too | **0%** |
+| Salary leaked to the LLM | Naive (hides only the salary) | Presidio (generic PII tool) | SafeShare |
+|---|---|---|---|
+| DeepSeek V4 Pro · English | **100%** | **100%** (left visible) | **0%** |
+| Claude Sonnet 5.5 · English | **100%** | **100%** (left visible) | **0%** |
+| Claude Haiku 5.5 · English | **100%** | **100%** (left visible) | **0%** |
+| Claude Sonnet 5.5 · Indonesian (Rupiah) | **100%** | **100%** (13% visible + 88% recovered) | **0%** |
 
 **What this means**
 
-- **Naive redaction is broken.** Hiding only the salary leaves the derived figures visible ("save 20% → $1,000/month"), so the LLM works the salary back out every time.
-- **Presidio does not cover amounts.** A widely-used PII tool leaves the salary fully visible because its default recognizers target names, emails, phones and cards — not financial figures.
-- **SafeShare held.** Hiding the amounts too left the LLM nothing to invert, so it recovered nothing.
-
-For reference, a rule-based arithmetic attacker already recovers 53% from naive redaction — the LLM is the stronger attacker.
+- **Naive redaction is broken.** Hiding only the salary leaves the derived figures visible, and every
+  model worked the salary back out, every time, in both languages. Even a single figure ("Saving 25%
+  gives $600") is enough for an LLM; the rule-based attacker needs two and recovers 53%.
+- **A generic PII tool doesn't help.** Presidio's default recognizers leave English amounts as they
+  are. On Rupiah it did hide 87% of the stated salaries, but the LLM recovered 88% of those from the
+  savings figures Presidio left in the reply: still 100% leaked.
+- **SafeShare held.** It hides the derived amounts too, so the attacker sees one percentage and
+  placeholders. Every model answered "not enough information" (0 recovered out of 160 SafeShare chats).
 
 ### How it was measured
-- 40 fictional English chats, fixed seed, templated replies.
-- "Recovered" = the attacker's answer is within 1% of the true salary; "leaked" = left visible or recovered.
-- Attacker model: `9router/ds/deepseek-v4-pro`, one chat per call in a fresh session, empty folder, no tools, no ground truth in the prompt.
-- Run through the OpenCode CLI (version `opencode v2.1.4`).
+- 40 fictional chats per run, fixed seed (`tools/attack_bench/run.js`), templated replies.
+- "Recovered" = the attacker's answer is within 1% of the true salary; "leaked" = left visible or
+  recovered. Chats where the salary is still visible are not sent to the model.
+- One chat per call in a fresh session, empty folder, no tools, no ground truth in the prompt; every
+  call returned a parseable answer (no invalid replies in any run).
+- DeepSeek V4 Pro (`9router/ds/deepseek-v4-pro`) through the OpenCode CLI (`opencode v2.1.4`).
+- Claude Sonnet 5.5 and Haiku 5.5 through the Claude Code CLI (`2.1.310`, `claude -p` on a Claude
+  account, no API key; tools, MCP servers and session saving off), 25 Oct 2026.
 - Fictional data only; inference on the model provider's service.
 
 ### Limits
-- One attacker model only (the roadmap targets 2–3 models).
-- Templated replies, not real model output.
-- Only salary/amounts; simple arithmetic cases.
-- Not a proof of safety in general.
+- Templated replies, not real model output; only salaries and simple arithmetic.
+- Three models, two vendors; no OpenAI or Google model yet.
+- Shows that the attack works and that SafeShare's defence holds on these cases, not how often real
+  chats leak. Not a proof of safety in general.
 
 ### Reproduce
-    node tools/attack_bench/run.js --cases 40 --lang en --llm-cli --llm-model 9router/ds/deepseek-v4-pro --out tools/attack_bench/RESULTS_LLM.md
-Raw transcript: `C:/Users/tanto/AppData/Local/Temp/ss-llm-en.jsonl` (local only).
+    node tools/attack_bench/run.js --cases 40 --lang en --llm-cli --llm-model 9router/ds/deepseek-v4-pro
+    node tools/attack_bench/run.js --cases 40 --lang en --llm-claude --llm-model claude-sonnet-5-5
+    node tools/attack_bench/run.js --cases 40 --lang en --llm-claude --llm-model claude-haiku-5-5
+    node tools/attack_bench/run.js --cases 40 --lang id --llm-claude --llm-model claude-sonnet-5-5
+Add `--out <file>` to keep each run's report. Raw transcripts stay local (`--llm-log`).
 
 ### Full results
-| Redactor | Attacker | Salary left visible | Recovered from the rest | Total leaked |
-|---|---|---|---|---|
-| none | arithmetic | 100% | 0% | **100%** |
-| none | llm:9router/ds/deepseek-v4-pro | 100% | 0% | **100%** |
-| naive | arithmetic | 0% | 53% | **53%** |
-| naive | llm:9router/ds/deepseek-v4-pro | 0% | 100% | **100%** |
-| presidio | arithmetic | 100% | 0% | **100%** |
-| presidio | llm:9router/ds/deepseek-v4-pro | 100% | 0% | **100%** |
-| safeshare | arithmetic | 0% | 0% | **0%** |
-| safeshare | llm:9router/ds/deepseek-v4-pro | 0% | 0% | **0%** |
+| Language | Redactor | Attacker | Salary left visible | Recovered from the rest | Total leaked |
+|---|---|---|---|---|---|
+| English | naive | arithmetic | 0% | 53% | **53%** |
+| English | naive | DeepSeek V4 Pro | 0% | 100% | **100%** |
+| English | naive | Claude Sonnet 5.5 | 0% | 100% | **100%** |
+| English | naive | Claude Haiku 5.5 | 0% | 100% | **100%** |
+| English | presidio | any | 100% | 0% | **100%** |
+| English | safeshare | arithmetic | 0% | 0% | **0%** |
+| English | safeshare | DeepSeek V4 Pro | 0% | 0% | **0%** |
+| English | safeshare | Claude Sonnet 5.5 | 0% | 0% | **0%** |
+| English | safeshare | Claude Haiku 5.5 | 0% | 0% | **0%** |
+| Indonesian | naive | arithmetic | 0% | 53% | **53%** |
+| Indonesian | naive | Claude Sonnet 5.5 | 0% | 100% | **100%** |
+| Indonesian | presidio | arithmetic | 13% | 8% | **20%** |
+| Indonesian | presidio | Claude Sonnet 5.5 | 13% | 88% | **100%** |
+| Indonesian | safeshare | arithmetic | 0% | 0% | **0%** |
+| Indonesian | safeshare | Claude Sonnet 5.5 | 0% | 0% | **0%** |
