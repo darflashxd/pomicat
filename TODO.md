@@ -58,7 +58,7 @@ conference 2–3 Mar 2027, Singapore. Presenters must be available both days.
 - [ ] TESTING.md on ChatGPT, Claude, DeepSeek; friends test the zip
 - [ ] Friends fill `tools/eval/data/label_sheet.csv` + `LABELLING.md` (sheet stays private)
 - [ ] API key(s) for InversionBench and training labels
-- [ ] Confirm CFP dates and form fields; presenter bios in `docs/ARSENAL_ABSTRACT.md`; demo video; submit
+- [ ] Confirm CFP dates and form fields; presenter bios in the abstract (local `docs/ARSENAL_ABSTRACT.md`, not in the repo); demo video; submit
 
 ## Worth doing before the talk
 See ROADMAP.md §1–§6: in-extension decryption, new inferences (dates, combinations of details,

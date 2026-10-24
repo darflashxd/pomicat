@@ -326,13 +326,13 @@ of tools*, not a vulnerability or CVE.
 ## 6. Submission and booth
 
 - [x] Reframe the abstract: "redaction is broken for AI chats", extension-first, with the LLM
-      attacker, arithmetic and dates results (`docs/ARSENAL_ABSTRACT.md`, 24 Oct). · `me`
+      attacker, arithmetic and dates results (local `docs/ARSENAL_ABSTRACT.md`, not in the repo; 24 Oct). · `me`
 - [x] Friend deploys the relay with [DEPLOY.md](DEPLOY.md) (incl. `ALTER TABLE`). · `friend`
       Live and serving CSP on share pages (checked 24 Oct), but the viewer is the ~20 Oct build:
       redeploy after the next push so the 21–24 Oct viewer changes go live.
 - [ ] Run [TESTING.md](TESTING.md) on ChatGPT, Claude and DeepSeek against the live relay. · `you`
 - [ ] 2–3 minute demo video. · `you`
-- [ ] Presenter names and bios in `docs/ARSENAL_ABSTRACT.md`; push; Release with checksums;
+- [ ] Presenter names and bios in the abstract (local `docs/ARSENAL_ABSTRACT.md`); push; Release with checksums;
       submit. · `you` · **by 2 Nov**
 - [x] Extension icon (16/48/128). · `me`
 - [ ] "Paste a redacted chat, we'll try to break it" booth page, fully in-browser. · `me` · March

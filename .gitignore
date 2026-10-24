@@ -89,3 +89,6 @@ tools/sota/results_raw/
 # 16 MB XLM-R tokenizer blob (re-fetch from HF id in model_card.json instead)
 training/model_output/mminilmv2-sota/tokenizer.json
 training/model_output/mminilmv2-smoke/
+
+# Submission drafts (kept locally, not part of the product)
+docs/ARSENAL_ABSTRACT.md
