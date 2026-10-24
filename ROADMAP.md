@@ -281,7 +281,11 @@ Detailed steps, owners and needs: [docs/ATTACK_BENCH_PLAN.md](docs/ATTACK_BENCH_
 - [x] Harness `tools/attack_bench/run.js`: 40 fictional chats, redactors none / naive / Presidio /
       SafeShare, arithmetic attacker. Baseline: naive 53% leaked, Presidio 60%, SafeShare 0%
       (`tools/attack_bench/RESULTS.md`). · `me`
-- [ ] LLM attacker (`--llm`), 2–3 models · `me` · **needs API key + budget + your OK**
+- [ ] LLM attacker (`--llm` API / `--llm-cli` local CLI), 2–3 models · `me`
+  - [x] One model: DeepSeek V4 Pro (`9router/ds/deepseek-v4-pro`) via `--llm-cli`, no
+        OpenAI/Anthropic key. 40 English chats: naive 100% leaked, Presidio 100% left
+        visible, SafeShare 0% (`tools/attack_bench/RESULTS_LLM.md`).
+  - [ ] Two more models.
 
 - [ ] ~300 fictional personal prompts (ID + EN): salaries, loans, ages, travel dates, doses,
       combinations of details. · `me`

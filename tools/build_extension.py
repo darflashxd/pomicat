@@ -31,9 +31,20 @@ os.makedirs(DIST, exist_ok=True)
 for target, manifest in MANIFESTS.items():
     out = os.path.join(DIST, f"SafeShare-{version}-{target}.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(os.path.join(ROOT, "LICENSE"), "LICENSE")
         z.write(os.path.join(EXT, manifest), "manifest.json")
         for path, rel in files():
             z.write(path, rel)
+    with zipfile.ZipFile(out) as z:
+        for source, member in [(os.path.join(ROOT, "LICENSE"), "LICENSE"),
+                               (os.path.join(EXT, "THIRD_PARTY_NOTICES.md"), "THIRD_PARTY_NOTICES.md")]:
+            with open(source, "rb") as f:
+                if z.read(member) != f.read():
+                    raise ValueError(f"License packaging mismatch: {member}")
+        for name in ["Apache-2.0.txt", "ONNX-Runtime-MIT.txt", "ONNX-Runtime-ThirdPartyNotices.txt"]:
+            with open(os.path.join(EXT, "licenses", name), "rb") as f:
+                if z.read("licenses/" + name) != f.read():
+                    raise ValueError(f"License packaging mismatch: {name}")
     print(f"{out} ({os.path.getsize(out) // 1024} KB)")
 
 

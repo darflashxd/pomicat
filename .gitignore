@@ -11,6 +11,7 @@ graphify-out/
 .claude/
 CLAUDE.md
 CLAUDE.local.md
+.playwright-mcp/
 
 # 2. Python Environments & Caches
 venv/
@@ -67,6 +68,7 @@ Thumbs.db
 .opencode/
 *.swp
 *.swo
+ide_keighton.txt
 
 # 8. Generated data and build outputs
 # Regenerate with: python data/generate_dataset.py (seeded, byte-identical output)
@@ -86,3 +88,4 @@ training/model_zoo/
 tools/sota/results_raw/
 # 16 MB XLM-R tokenizer blob (re-fetch from HF id in model_card.json instead)
 training/model_output/mminilmv2-sota/tokenizer.json
+training/model_output/mminilmv2-smoke/

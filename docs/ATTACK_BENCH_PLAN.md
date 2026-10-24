@@ -26,11 +26,17 @@ results: [`tools/attack_bench/RESULTS.md`](../tools/attack_bench/RESULTS.md).
 |---|---|---|---|
 | 2.1 | Set an API key and model in the environment, never in a file or in chat: `setx OPENAI_API_KEY "…"` / `setx ANTHROPIC_API_KEY "…"` and `setx LLM_MODEL "…"`, then a new terminal | key, budget cap (estimate under US$5 for everything below) | `you` |
 | 2.2 | OK to send the **fictional** test chats to the chosen providers | your yes | `you` |
-| 2.3 | Run `node tools/attack_bench/run.js --llm` for each model (2–3 models) | 2.1, 2.2 | `me` |
+| 2.3 | Run `node tools/attack_bench/run.js --llm` (API) or `--llm-cli --llm-model <model>` (local OpenCode CLI, no key) for each model (2–3 models) | 2.1, 2.2 | `me` |
 | 2.4 | Replace templated assistant replies with **real replies** from the same models (ask each model the user's question, keep its answer), then redact and attack those | 2.1, 2.2 | `me` |
 | 2.5 | Widen the cases: loans, rent splits, ages/birth years, travel dates, combinations of details (ROADMAP §3: ~300 prompts) | – | `me` |
 | 2.6 | Report per redactor × attacker × inference type, with how many chats and the exact model versions | 2.3–2.5 | `me` |
 | 2.7 | One headline number for the abstract ("an LLM recovers X% of hidden salaries from naive redaction, Y% from Presidio, Z% after SafeShare") | 2.6 | `me` + `you` |
+
+**Progress 2026-10-24:** one model done via `--llm-cli` (no API key): DeepSeek V4 Pro
+(`9router/ds/deepseek-v4-pro`) across 40 English chats — naive 100% leaked, Presidio 100% left
+visible, SafeShare 0% (`tools/attack_bench/RESULTS_LLM.md`). Presidio was run in a local
+`.venv-eval` (presidio-analyzer + en_core_web_lg). The API path (`--llm`) still needs a key.
+Remaining: 2.3 second/third model, 2.4 real replies, 2.5 wider cases, 2.6 full report.
 
 Honesty rules: fictional data only; say the replies were real model output (2.4) or templated;
 publish the script and seed so anyone can rerun it; don't extrapolate to "all chats".

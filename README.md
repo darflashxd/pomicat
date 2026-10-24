@@ -348,5 +348,7 @@ or private transcripts. Repository issues are not a confidential reporting chann
 SafeShare source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
 published by [Gravitee](https://huggingface.co/gravitee-io/bert-small-pii-detection) under
 Apache-2.0 as declared upstream. Bundled runtimes and optional dependencies retain their own
-licenses; see their upstream distributions and the model documentation. Cite the exact SafeShare
+licenses; see [bundled attribution and license texts](extension/THIRD_PARTY_NOTICES.md).
+Chrome/Firefox ZIPs include the project license and bundled third-party notices.
+Cite the exact SafeShare
 commit, model revision, dataset, and evaluation configuration when reporting research results.
