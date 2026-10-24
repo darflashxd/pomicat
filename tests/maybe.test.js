@@ -109,6 +109,66 @@ const Modal = require("../extension/ui/modal.js");
   assert(!JSON.stringify(modal.sanitizedTurns).includes("solverLeaks"), "private detector metadata stripped");
   assert(!modal.sanitizedTurns[0].content.includes("аlice@example.com"), "homoglyph remains hidden");
   assert.equal(global.SafeSharePolicy.invert(modal.sanitizedTurns.map(t => t.content).join("\n")).length, 0);
+
+  // End to end through the share path: a multi-turn salary chat, then the attack on what would be
+  // shared. Derived amounts are spread over several turns (attack C); nothing may be recoverable.
+  const salaryChat = new Modal();
+  salaryChat.currentTurns = [
+    { role: "user", content: "Gaji saya Rp 15.000.000 per bulan. Bantu buat anggaran." },
+    { role: "assistant", content: "Tabungan 20% = Rp 3.000.000 per bulan, atau Rp 36.000.000 setahun." },
+    { role: "user", content: "Sewa saya Rp 4.500.000 per bulan." },
+    { role: "assistant", content: "Sisa setelah sewa dan tabungan: Rp 7.500.000 per bulan, yaitu 50% dari gaji." }
+  ];
+  salaryChat.runPipeline();
+  salaryChat.rebuildViews();
+  const sharedText = salaryChat.sanitizedTurns.map(t => t.content).join("\n");
+  assert(!/15\.000\.000|3\.000\.000|36\.000\.000|7\.500\.000/.test(sharedText), `amounts left in the share: ${sharedText}`);
+  assert(!global.SafeSharePolicy.invert(sharedText).some(f => Math.round(f.value) === 15000000), "salary recoverable from the share");
+  assert.equal(salaryChat.attackCheck(salaryChat.sanitizedTurns).leaks, 0, "share dialog's own attack check finds a leak");
+
+  // Dates benchmark (tools/eval/RESULTS.md §8): 40 fictional birth dates (EN + ID) with a weekday
+  // and a "day after the Nth" clue. Naive redaction hides only the date; the share dialog's output
+  // must leave the date attack nothing to narrow.
+  const now = new Date(Date.UTC(2026, 9, 24));
+  const EN_DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const ID_DAY = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const EN_MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const ID_MON = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const ord = (n) => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+  let naivePinned = 0, sharePinned = 0;
+  for (let i = 0; i < 40; i++) {
+    const d = new Date(now.getTime() + (i * 17 - 300) * 86400000);
+    const before = new Date(d.getTime() - 86400000);
+    const en = i % 2 === 0;
+    const date = `${d.getUTCDate()} ${(en ? EN_MON : ID_MON)[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    const text = en
+      ? `My birthday is ${date}. It was a ${EN_DAY[d.getUTCDay()]}, the day after my sister's on the ${ord(before.getUTCDate())}.`
+      : `Tanggal lahir saya ${date}. Hari ${ID_DAY[d.getUTCDay()]}, sehari setelah ulang tahun adik saya tanggal ${before.getUTCDate()}.`;
+    const truth = d.toISOString().slice(0, 10);
+    const pins = (t) => global.SafeSharePolicy.inferDates(t, { now }).some(x => x.candidates.includes(truth) && x.candidates.length <= 4);
+    if (pins(text.replace(date, "[REDACTED_DATE]"))) naivePinned++;
+    const share = new Modal();
+    share.currentTurns = [{ role: "user", content: text }];
+    share.runPipeline();
+    share.rebuildViews();
+    if (pins(share.sanitizedTurns[0].content) || share.sanitizedTurns[0].content.includes(date)) sharePinned++;
+  }
+  assert.equal(naivePinned, 40, `naive redaction: date narrowed to <= 4 days in ${naivePinned}/40`);
+  assert.equal(sharePinned, 0, `share dialog: date narrowed in ${sharePinned}/40`);
+  console.log(`maybe: dates benchmark: naive narrowed ${naivePinned}/40 to <= 4 days, share ${sharePinned}/40`);
+
+  // Look-alike characters (fullwidth digits, Cyrillic letters) through the share path: phone, NIK, key
+  const lookalike = new Modal();
+  lookalike.currentTurns = [{ role: "user", content:
+    "Telepon +６２ ８１２-３４５６-７８９０, NIK ３２０１２３４５６７８９０１２３, key sk-proj-АbCdEf1234567890GhIjKlMnOpQrStUv" }];
+  lookalike.runPipeline();
+  lookalike.rebuildViews();
+  const lookalikeOut = lookalike.sanitizedTurns[0].content;
+  const ascii = lookalikeOut.normalize("NFKC");
+  for (const [what, leaked] of [["phone", /812.?3456.?7890/], ["NIK", /3201234567890123/], ["key", /GhIjKlMnOpQrStUv/]]) {
+    assert(!leaked.test(ascii), `look-alike ${what} left in the share: ${lookalikeOut}`);
+  }
+
   modal.maybeChoices.set("OddSecret42", false);
   modal.rebuildViews();
   assert(modal.sanitizedTurns.some(t => t.content.includes("OddSecret42")), "explicit keep survives safety scan");
