@@ -1264,8 +1264,15 @@ class SafeShareModal {
       locations.setAttribute("aria-live", "polite");
       locate.addEventListener("click", () => {
         const matching = this.candidates.filter(c => c.id === candidate.id || c.raw === candidate.raw);
-        const badges = [...(document.getElementById("diff-box-sanitized")?.querySelectorAll(".ss-badge") || [])]
-          .filter(b => matching.some(c => c.id === b.getAttribute("data-cand-id")));
+        // Kept values are marked case-insensitively, so "Ghidra" also marks "ghidra" under its own
+        // id: match the marked text too, or the second one showed "Location unavailable"
+        const want = String(candidate.raw).toLowerCase();
+        let badges = [...(document.getElementById("diff-box-sanitized")?.querySelectorAll(".ss-badge") || [])]
+          .filter(b => matching.some(c => c.id === b.getAttribute("data-cand-id")) ||
+            (b.classList.contains("ss-badge-unmasked") && (b.firstChild?.textContent || "").toLowerCase() === want));
+        // Same spelling first: "ghidra" goes to "ghidra", not to "Ghidra"
+        const exact = badges.filter(b => (b.firstChild?.textContent || "") === candidate.raw);
+        if (exact.length) badges = exact;
         const index = (Number(locate.dataset.index ?? -1) + 1) % (badges.length || 1);
         locate.dataset.index = String(index);
         locations.textContent = badges.length ? ` ${index + 1} of ${badges.length}` : " Location unavailable";
@@ -1530,9 +1537,18 @@ class SafeShareModal {
     const preview = document.getElementById("diff-box-sanitized");
     if (!preview || !badge) return;
     preview.querySelectorAll(".ss-preview-highlight").forEach(el => el.classList.remove("ss-preview-highlight"));
+    // From the suggestions list the preview is usually scrolled out of the dialog: bring it
+    // back into view by scrolling the dialog's own body (never the chat page behind it)
+    const body = document.getElementById("safeshare-review-view");
+    if (body && body.getBoundingClientRect) {
+      const p = preview.getBoundingClientRect();
+      const b = body.getBoundingClientRect();
+      if (p.top < b.top || p.bottom > b.bottom) body.scrollTop += p.top - b.top - 12;
+    }
     const box = badge.getBoundingClientRect();
     const panel = preview.getBoundingClientRect();
     preview.scrollTop += box.top - panel.top - preview.clientHeight / 2 + box.height / 2;
+    // The original pane follows through the scroll sync (bindEvents)
     badge.classList.add("ss-preview-highlight");
     // Focus must not activate the badge's redaction toggle.
     badge.focus({ preventScroll: true });
@@ -1618,9 +1634,37 @@ class SafeShareModal {
   }
 
   bindEvents(backdrop) {
+    // Original and preview scroll together, message by message: the same message stays side by
+    // side even where hiding a value makes one side shorter
+    const orig = backdrop.querySelector("#diff-box-orig");
+    const preview = backdrop.querySelector("#diff-box-sanitized");
+    let echo = null; // the pane we just scrolled ourselves; its next scroll event is ours
+    const follow = (from, to) => () => {
+      if (echo === from) { echo = null; return; }
+      if (!from || !to || !to.offsetParent) return; // original hidden (compare off)
+      const a = [...from.querySelectorAll(":scope > .turn-block")];
+      const b = [...to.querySelectorAll(":scope > .turn-block")];
+      let target;
+      if (from.scrollTop + from.clientHeight >= from.scrollHeight - 2) target = to.scrollHeight;
+      else if (a.length && a.length === b.length) {
+        const top = (box, el) => el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+        let i = 0;
+        while (i + 1 < a.length && top(from, a[i + 1]) <= from.scrollTop) i++;
+        const frac = (from.scrollTop - top(from, a[i])) / Math.max(1, a[i].offsetHeight);
+        target = top(to, b[i]) + frac * b[i].offsetHeight;
+      } else {
+        target = from.scrollTop / Math.max(1, from.scrollHeight - from.clientHeight) * (to.scrollHeight - to.clientHeight);
+      }
+      const before = to.scrollTop;
+      to.scrollTop = target;
+      if (to.scrollTop !== before) echo = to;
+    };
+    orig?.addEventListener("scroll", follow(orig, preview), { passive: true });
+    preview?.addEventListener("scroll", follow(preview, orig), { passive: true });
     const compare = backdrop.querySelector("#ss-compare-original");
     compare?.addEventListener("change", () => {
       backdrop.querySelector(".direct-comparison-grid").classList.toggle("ss-preview-only", !compare.checked);
+      if (compare.checked) follow(preview, orig)();
     });
     const updatePolicySummary = () => {
       const reader = backdrop.querySelector("#safeshare-profile");
