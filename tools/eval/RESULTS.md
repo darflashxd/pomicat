@@ -136,6 +136,25 @@ A redacted birth date is undone by "I am 28" (plus the current year) or "I gradu
 → 1998 or 1997), and SafeShare hides stated ages whenever it hides a birth date
 (`tests/birthyear.test.js`). Ages alone are left as they are.
 
+## 8. A third inference: a hidden date from weekday and day clues (2026-10-24)
+
+"My birthday is [REDACTED_DATE]. It was a Tuesday, the day after my sister's on the 14th" leaves
+few dates: `inferDates` (in `invert`) lists every day within a year either side that fits the
+weekday, the offset and the visible day number. SafeShare hides those clues whenever it hides a
+date (`[REDACTED_WEEKDAY]`, `[REDACTED_OFFSET]`, `[REDACTED_DAY]`).
+
+40 fictional birth dates (half English, half Indonesian), each with a weekday and a "day after the
+Nth" clue, measured through the extension's share dialog:
+
+| Redaction | Hidden date narrowed to ≤ 4 days |
+|---|---|
+| Naive (only the date replaced) | 40 / 40 (2 to 4 candidates, always including the true date) |
+| SafeShare share dialog | 0 / 40 |
+
+Reproduced by `npm test` (`tests/maybe.test.js`, "dates benchmark"). Only birth dates count as
+personal: an appointment date is not hidden, so its clues are left as they are. The attack finds the
+day and month within a two-year window; the year has to come from elsewhere (see §7).
+
 ## What this means for the project
 
 SafeShare's value is the inversion defense, not entity detection. The natural setup is to run a

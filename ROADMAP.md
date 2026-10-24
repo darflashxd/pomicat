@@ -66,8 +66,11 @@ that every real chat leaks.)
 
 - [x] Split the filter: one for the composer / SafeShare UI, a separate one for message
       extraction. User and assistant turns must both come through, in order. · `me`
-- [ ] Tests on ChatGPT 2026 and Claude DOM fixtures: both roles extracted, in order. · `me`
-- [ ] End-to-end test: full salary conversation → share output → `invert` recovers nothing. · `me`
+- [x] Tests on ChatGPT 2026 and Claude DOM fixtures: both roles extracted, in order. · `me`
+      Covered by `tests/fixtures/extraction_integrity.html` (friend).
+- [x] End-to-end test: full salary conversation → share output → `invert` recovers nothing. · `me`
+      `tests/maybe.test.js`: 4-turn Indonesian chat through the share dialog; `invert` and the
+      dialog's attack check find nothing (24 Oct).
 
 ### P0.2 Homoglyph text is re-exposed when the share result is built ✅
 `heuristics.scan()` normalises look-alike characters (`heuristics.js:1157-1162`) and detects on
@@ -82,7 +85,8 @@ Reproduced: `mail me at аlice@example.com` (Cyrillic `а`) → scan output
 
 - [x] Apply the same normalisation when building the final output, or map detections back to
       original offsets. · `me`
-- [ ] Tests: homoglyph email, phone, key and NIK through the full share path. · `me`
+- [x] Tests: homoglyph email, phone, key and NIK through the full share path. · `me`
+      `tests/maybe.test.js`: Cyrillic email; fullwidth phone and NIK; Cyrillic-letter key (24 Oct).
 - [x] Re-scan the final share text right before encrypting, as a last check. · `me`
 
 ### P0.3 npm package can't load ✅
@@ -262,7 +266,7 @@ to an unlocked device.
 
 Each needs an attack (in `invert`), a defence, tests and a benchmark row, like the birth-year one.
 
-- [x] **A. Dates** (before 2 Nov; `inferDates`, `tests/inference.test.js`; benchmark row still to add): "[REDACTED_DATE] is a Tuesday, the day after my birthday on the
+- [x] **A. Dates** (before 2 Nov; `inferDates`, `tests/inference.test.js`; benchmark: `tools/eval/RESULTS.md` §8, naive 40/40 narrowed, share dialog 0/40): "[REDACTED_DATE] is a Tuesday, the day after my birthday on the
       14th" → candidate dates in a ±12-month window; defence hides weekdays, day numbers and
       offsets near a hidden date. · `me`
 - [ ] **B. Combinations of details** (prototype before 2 Nov): "only female cardiologist at a
@@ -321,9 +325,11 @@ of tools*, not a vulnerability or CVE.
 
 ## 6. Submission and booth
 
-- [ ] Reframe the abstract: "redaction is broken for AI chats" (any redactor), 2025 indexing as
-      the motivating example. **Only after P0 and the claim fixes.** · `me` · before 2 Nov
-- [ ] Friend deploys the relay with [DEPLOY.md](DEPLOY.md) (incl. `ALTER TABLE`). · `friend`
+- [x] Reframe the abstract: "redaction is broken for AI chats", extension-first, with the LLM
+      attacker, arithmetic and dates results (`docs/ARSENAL_ABSTRACT.md`, 24 Oct). · `me`
+- [x] Friend deploys the relay with [DEPLOY.md](DEPLOY.md) (incl. `ALTER TABLE`). · `friend`
+      Live and serving CSP on share pages (checked 24 Oct), but the viewer is the ~20 Oct build:
+      redeploy after the next push so the 21–24 Oct viewer changes go live.
 - [ ] Run [TESTING.md](TESTING.md) on ChatGPT, Claude and DeepSeek against the live relay. · `you`
 - [ ] 2–3 minute demo video. · `you`
 - [ ] Presenter names and bios in `docs/ARSENAL_ABSTRACT.md`; push; Release with checksums;
