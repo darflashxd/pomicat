@@ -71,3 +71,10 @@ python training/export_onnx.py                # optional: training/model_output/
 
 The generated data and the weights are not committed. The data script is seeded and produces
 byte-identical files on every run.
+# Redistribution notices
+
+Bundled runtime/model attribution and full license texts are in
+[`extension/THIRD_PARTY_NOTICES.md`](extension/THIRD_PARTY_NOTICES.md) and
+`extension/licenses/`. Release ZIPs also include the project's root `LICENSE`.
+The runtime JS/MJS/WASM match the npm 1.30.0 distribution; only the JS filename
+was changed. These notices do not establish rights to upstream training data.
