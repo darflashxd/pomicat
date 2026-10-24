@@ -20,6 +20,10 @@ const modelInput = turns("Amelia Hartwell discussed lunch.");
 const modelCandidates = Maybe.scan(modelInput, [{ turnIndex: 0, start: 0, end: 15, label: "PERSON", score: 0.28 }]);
 assert.equal(modelCandidates.length, 1);
 assert.equal(modelCandidates[0].risky, false);
+assert.equal(modelCandidates[0].modelScore, 0.28, "retain raw model score separately from ranking score");
+for (const raw of ["#", "password", "token"]) {
+  assert.deepEqual(Maybe.scan(turns(raw), [{ turnIndex: 0, start: 0, end: raw.length, label: "PASSWORD", score: 0.9 }]), [], "ignore punctuation and credential field labels");
+}
 assert.deepEqual(Maybe.apply(modelInput, modelCandidates, new Map()), modelInput);
 assert(!Maybe.apply(modelInput, modelCandidates, new Map([["Amelia Hartwell", true]]))[0].content.includes("Amelia"));
 // The model tags field labels and our own name as entities (live DeepSeek, Oct 2026); names still go through
@@ -174,13 +178,27 @@ const Modal = require("../extension/ui/modal.js");
   snippets.currentTurns = turns("access_token: OddSecret42 next_token: AnotherPrivate43");
   snippets.runPipeline();
   const rows = get("safeshare-maybe-items").children.slice(-2);
-  const card = rows[0].children[1];
-  const snippet = card.children[3].textContent;
+   const card = rows[0].children[0];
+   const detail = card.children[2];
+   const snippet = detail.children[2].textContent;
   assert(snippet.includes("[POSSIBLE_SECRET]"), "nearby candidate masked in snippet");
   assert(!snippet.includes("AnotherPrivate43"), "other raw candidates not exposed in context");
-  assert.equal(card.children[1].textContent, "Possible access token");
-  assert(card.children[2].textContent.includes("Hidden in shared copy"));
-  assert.equal(card.children[4].children[0].textContent, "Details");
+   assert.equal(card.children[1].textContent, "Possible access token · Rule-based");
+   assert(detail.children[1].textContent.includes("Hidden in shared copy"));
+   assert.equal(detail.children[0].textContent, "Details");
+   assert.equal(rows[0].children[1].textContent, "Redacted · Undo", "explicit redaction action stays visible");
+   assert.equal(rows[0].children[1].type, "button");
+   assert.equal(card.children[3].textContent, "Show in preview");
+   const previewPanel = get("diff-box-sanitized");
+   previewPanel.scrollTop = 0;
+   previewPanel.clientHeight = 200;
+   previewPanel.getBoundingClientRect = () => ({ top: 100 });
+   let focused = false;
+   const target = { getBoundingClientRect: () => ({ top: 500, height: 20 }),
+     classList: { add() {}, remove() {} }, focus(options) { focused = options.preventScroll; } };
+   snippets.focusPreviewBadge(target);
+   assert.equal(previewPanel.scrollTop, 310, "scroll only the preview to center the occurrence");
+   assert(focused, "focus target without page scrolling or activating redaction");
   const trusted = new Modal();
   trusted.profile = "trusted";
   trusted.currentTurns = turns("access_token: OddSecret42");

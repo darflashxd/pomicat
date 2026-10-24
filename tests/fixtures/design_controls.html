@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>SafeShare design controls</title>
+<pre id="result">Running</pre><iframe id="chat" src="fake_chat.html" style="width:100%;height:760px;border:0"></iframe>
+<script>
+document.getElementById('chat').onload=async()=>{
+ const frame=document.getElementById('chat'),w=frame.contentWindow,d=w.document;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ const assert=(ok,message)=>{if(!ok)throw Error(message);};
+ try {
+  for(let i=0;i<100&&!d.getElementById('safeshare-action-pill');i++)await wait(30);
+  d.getElementById('thread').innerHTML='<div data-message-author-role="user">Fictional contact: avery@example.test.</div><div data-message-author-role="assistant">Review before sharing.</div>';
+  w.confirm=()=>true;
+  d.getElementById('safeshare-action-pill').click();
+  for(let i=0;i<300&&!d.getElementById('ss-compare-original');i++)await wait(30);
+  const compare=d.getElementById('ss-compare-original'),original=d.getElementById('diff-box-orig');
+  const before=original.textContent;
+  compare.click();
+  assert(w.getComputedStyle(original.parentElement).display==='none','compare did not hide original');
+  compare.click();
+  assert(w.getComputedStyle(original.parentElement).display!=='none'&&original.textContent===before,'compare lost original');
+  d.querySelector('.ss-protection-settings summary').click();
+  const reader=d.getElementById('safeshare-profile');reader.value='trusted';reader.dispatchEvent(new w.Event('change'));
+  assert(d.getElementById('ss-policy-summary').textContent.includes('Someone I trust'),'reader summary stale');
+  reader.value='public';reader.dispatchEvent(new w.Event('change'));
+  for(const width of [360,768,1280]) {
+   frame.style.width=width+'px';await wait(60);
+   const rect=d.getElementById('safeshare-modal-card').getBoundingClientRect();
+   assert(rect.left>=-1&&rect.right<=d.documentElement.clientWidth+1,'modal overflows at '+width);
+  }
+  for(const theme of ['light','dark']) {
+   d.documentElement.dataset.ssTheme=theme;
+   assert(w.getComputedStyle(d.getElementById('safeshare-modal-card')).backgroundColor!=='rgba(0, 0, 0, 0)','missing surface');
+  }
+  document.getElementById('result').textContent='PASS: compare preserves content, policy summary, responsive modal bounds, theme surfaces. No uploads.';
+ }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
+};
+</script>

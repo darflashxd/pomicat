@@ -287,9 +287,23 @@
       pill.style.background = "rgba(24, 24, 27, 0.92)";
     });
 
-    pill.addEventListener("click", () => {
+    pill.addEventListener("click", async () => {
+      if (pill.dataset.preparing === "true") return;
       handleSessionRouteChange();
-      const turns = extractConversationTurns();
+      pill.dataset.preparing = "true";
+      const label = pill.textContent;
+      pill.textContent = "Preparing conversation…";
+      let prepared;
+      try { prepared = await prepareConversation(); }
+      catch (error) {
+        if (error.name !== "AbortError") alert("SafeShare: Could not prepare this conversation. Please try again.");
+        return;
+      } finally {
+        delete pill.dataset.preparing;
+        pill.textContent = label;
+      }
+      const { turns, uncertain } = prepared;
+      if (uncertain && !window.confirm("SafeShare could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
       if (turns.length === 0) {
         alert("SafeShare: No active conversation found in the current chat window.");
         return;
@@ -705,7 +719,22 @@
   const escapeHtml = (s) => SafeShareLocalCompute.escapeHtml(s);
 
   const MESSAGE_SELECTOR = "[data-markdown-text-style='assistant-message'], [data-message-author-role='assistant'], " +
-    ".font-claude-message, .font-claude-response, div.ds-markdown";
+    ".font-claude-message, .font-claude-response, [data-perf-reply-text], [data-testid='assistant-message'] [data-cds='Prose'], div.ds-markdown";
+
+  // Claude (Oct 2026): a fresh answer carries [data-perf-reply-text]; once the chat is reloaded that
+  // attribute is gone and only the message row ([data-testid='assistant-message'],
+  // [data-cds='AssistantMessage']) remains. Read the visible prose, never the row: its h3.sr-only
+  // repeats the answer as "Claude responded: ...".
+  const CLAUDE_ROW_SELECTOR = "[data-testid='assistant-message'], [data-cds='AssistantMessage']";
+  function claudeAnswerBody(node) {
+    if (!node || !node.matches(CLAUDE_ROW_SELECTOR)) return null;
+    const selector = "[data-cds='Prose'], .standard-markdown, [data-perf-reply-text], .font-claude-response, .font-claude-message";
+    const body = document.createElement("div");
+    for (const part of node.querySelectorAll(selector)) {
+      if (!part.parentElement?.closest(selector)) body.appendChild(part.cloneNode(true));
+    }
+    return body;
+  }
 
   /**
    * Shows the shield's numbered placeholders ([NIK_1], [NAME_2]) as the real values, on this
@@ -905,6 +934,8 @@
       ".font-claude-message p, .font-claude-message li, .font-claude-message td, .font-claude-message th, " +
       // Claude's answers (Oct 2026) are .font-claude-response; IDs were restored there but sums weren't
       ".font-claude-response p, .font-claude-response li, .font-claude-response td, .font-claude-response th, " +
+      "[data-perf-reply-text] p, [data-perf-reply-text] li, [data-perf-reply-text] td, [data-perf-reply-text] th, " +
+      "[data-testid='assistant-message'] [data-cds='Prose'] p, [data-testid='assistant-message'] [data-cds='Prose'] li, [data-testid='assistant-message'] [data-cds='Prose'] td, [data-testid='assistant-message'] [data-cds='Prose'] th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
       "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer']), " +
@@ -922,7 +953,7 @@
       if (isStreamingActive) {
         const table = node.closest("table");
         if (table) {
-          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, div.ds-markdown, .chat-message-assistant");
+          const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, [data-perf-reply-text], [data-testid='assistant-message'] [data-cds='Prose'], div.ds-markdown, .chat-message-assistant");
           if (assistantContainer && assistantContainer.lastElementChild === table) return;
         }
         const block = node.closest("p, li, td, th") || node;
@@ -997,13 +1028,21 @@
    */
   function getCleanNodeContent(containerEl) {
     if (!containerEl) return "";
-    // If no local compute badges exist, read layout text directly from the attached DOM node (fast & accurate)
-    if (!containerEl.querySelector(".ss-local-compute, .ss-katex-hydrated, [data-expr], .ss-sent-note, .katex, table, h1, h2, h3, pre")) {
-      return (containerEl.innerText || containerEl.textContent || "").trim();
-    }
     try {
       // Clone container to avoid mutating the user's active reading view
       const clone = containerEl.cloneNode(true);
+      // Attachments stay omitted, but their message must not disappear from the transcript.
+      // Never extract filenames, alt text, media URLs or OCR from these elements.
+      const attachments = [...clone.querySelectorAll("img, video, audio, [data-testid*='attachment'], [data-testid*='file-upload']")]
+        .filter(node => !node.closest("[hidden], [aria-hidden='true'], [data-testid*='avatar'], [class*='avatar'], .ss-sent-note") &&
+          !(node.tagName === "IMG" && ((node.getAttribute("width") && Number(node.getAttribute("width")) <= 32) || /^(?:avatar|icon)$/i.test(node.getAttribute("alt") || ""))));
+      const attachmentRoots = attachments.map(node => node.closest("[data-testid*='attachment'], [data-testid*='file-upload']") || node.closest("button, [role='button']") || node);
+      for (const node of new Set(attachmentRoots)) {
+        if (node.parentNode && !attachmentRoots.some(other => other !== node && other.contains(node))) {
+          node.replaceWith(document.createTextNode("\n[Attachment omitted]\n"));
+        }
+      }
+      clone.querySelectorAll("[hidden], [aria-hidden='true'], [role='button']:not([data-expr]), button, script, style").forEach(n => n.remove());
       // Find all hydrated local compute spans in the clone
       clone.querySelectorAll(".ss-sent-note").forEach(n => n.remove()); // "🔒 2 values protected" is ours, not the chat
       const hydratedSpans = clone.querySelectorAll(".ss-local-compute, .ss-katex-hydrated, [data-expr]");
@@ -1016,9 +1055,9 @@
         }
       });
       const cleanText = SafeShareTranscript.extract(clone);
-      return cleanText.trim() || (containerEl.innerText || containerEl.textContent || "").trim();
+      return cleanText.trim();
     } catch (_) {
-      return (containerEl.innerText || containerEl.textContent || "").trim();
+      return ""; // Never fall back to raw text containing UI or locally revealed values.
     }
   }
 
@@ -1095,8 +1134,6 @@
     for (const t of turns) {
       const content = t.content.replace(/\s*\[(?:PRIVACY PROTOCOL|PROTOKOL PRIVASI):[^\]]*\]\s*/g, "\n").trim();
       if (!content) continue;
-      const prev = out[out.length - 1];
-      if (prev && prev.role === t.role && prev.content === content) continue;
       out.push({ role: t.role, content });
     }
     return out;
@@ -1110,6 +1147,146 @@
       turns = extractTurnsFromContainer(document.body);
     }
     return turns;
+  }
+
+  async function prepareConversation() {
+    const url = location.href;
+    const root = getActiveConversationRoot();
+    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-perf-reply-text], .ds-message";
+    const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-'], [data-turn-key]";
+    // Start at a message, not the composer: the composer can have its own scroll area.
+    let scroller = root.querySelector(messageSelector);
+    while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+    scroller ||= document.scrollingElement;
+    const initial = scroller.scrollTop;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel preparation";
+    cancel.style.cssText = "position:fixed;bottom:80px;right:24px;z-index:2147483647;padding:12px;background:#27272a;color:white;border:1px solid #aaa;border-radius:8px";
+    let cancelled = false;
+    cancel.addEventListener("click", () => { cancelled = true; });
+    document.body.appendChild(cancel);
+    const deadline = Date.now() + 15000;
+    const check = () => { if (cancelled || location.href !== url || !root.isConnected) throw new DOMException("Preparation cancelled", "AbortError"); };
+    // Quiet DOM is a bounded wait, not proof that the site's server history is complete.
+    const wait = (minimum = 150, target = root, ready = () => true, action = null) => new Promise((resolve, reject) => {
+      const started = Date.now();
+      let changed = started;
+      const observer = new MutationObserver(() => { changed = Date.now(); });
+      observer.observe(target, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["hidden", "aria-expanded", "aria-busy", "class", "style"] });
+      const timer = setInterval(() => {
+        try { check(); } catch (error) { observer.disconnect(); clearInterval(timer); reject(error); return; }
+        const now = Date.now();
+        if (now >= deadline || now - started >= 3000 || (now - started >= minimum && now - changed >= 100 && ready())) {
+          observer.disconnect(); clearInterval(timer); resolve();
+        }
+      }, 50);
+      // Observe before clicking: an instant expansion must not be missed.
+      try { if (action) action(); }
+      catch (error) { observer.disconnect(); clearInterval(timer); reject(error); }
+    });
+    const messages = [];
+    let uncertain = false;
+    const same = (a, b) => a.key && b.key ? a.key === b.key : a.role === b.role && a.content === b.content;
+    const collect = () => {
+      const snapshot = [];
+      const nodes = [...root.querySelectorAll(messageSelector)].filter(node =>
+        !isComposerOrSafeShareUI(node) && !node.parentElement?.closest(messageSelector));
+      for (const node of nodes) {
+        const unit = node.closest(idSelector);
+        const deepseekAnswer = node.matches(".ds-message")
+          ? node.querySelector(".ds-assistant-message-main-content") : null;
+        if (node.matches(".ds-message") && !deepseekAnswer && !node.querySelector(".ds-collapsible-text")) { uncertain = true; continue; }
+        const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !deepseekAnswer ? "user" : "assistant");
+        const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-turn-key") || unit.getAttribute("data-testid"));
+        const key = identity ? `${role}:${identity}` : null;
+        const content = getCleanNodeContent(claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node);
+        if (!content) continue;
+        const previous = snapshot[snapshot.length - 1];
+        // Split assistant markdown blocks may belong to one message; never read their shared wrapper.
+        if (key && previous?.key === key && role === "assistant") previous.content += "\n\n" + content;
+        else snapshot.push({ key, role, content });
+      }
+      if (!snapshot.length) return;
+      if (!messages.length) { messages.push(...snapshot); return; }
+      // Forward scroll keeps an overlap. Match ordered sequences, never deduplicate by text globally.
+      let overlap = Math.min(messages.length, snapshot.length);
+      while (overlap && !messages.slice(-overlap).every((item, i) => same(item, snapshot[i]))) overlap--;
+      if (!overlap) {
+        const index = snapshot[0].key ? messages.findIndex(item => item.key === snapshot[0].key) : -1;
+        if (index >= 0 && snapshot.every((item, i) => messages[index + i] && same(messages[index + i], item))) {
+          snapshot.forEach((item, i) => { messages[index + i] = item; });
+          return;
+        }
+        uncertain = true; // no reliable overlap: retain observations, disclose possible gaps/duplicates
+      } else {
+        if (snapshot.slice(0, overlap).some(item => !item.key)) uncertain = true;
+        snapshot.slice(0, overlap).forEach((item, i) => { messages[messages.length - overlap + i] = item; });
+      }
+      messages.push(...snapshot.slice(overlap));
+    };
+    const expanded = new WeakSet();
+    const expand = async () => {
+      for (const button of root.querySelectorAll("button, [role='button']")) {
+        if (Date.now() >= deadline) { uncertain = true; return; }
+        if (expanded.has(button) || button.disabled || button.getAttribute("aria-expanded") === "true" || !isVisibleElement(button)) continue;
+        if (!button.closest(messageSelector)) continue;
+        if (!/^(show more|read more|expand)$/i.test((button.innerText || button.getAttribute("aria-label") || "").trim())) continue;
+        check(); expanded.add(button);
+        const message = button.closest(messageSelector);
+        const before = getCleanNodeContent(message);
+        await wait(150, message, () => {
+          const changed = getCleanNodeContent(message) !== before;
+          const pending = message.querySelector("[hidden], [aria-busy='true']");
+          // An attribute toggle alone is not evidence that delayed text arrived.
+          return changed && !pending;
+        }, () => button.click());
+        if (getCleanNodeContent(message) === before || message.querySelector("[hidden], [aria-busy='true']")) uncertain = true;
+        if (button.isConnected && button.getAttribute("aria-expanded") === "false") uncertain = true;
+      }
+    };
+    try {
+      check();
+      if (scroller.scrollHeight <= scroller.clientHeight + 20) {
+        await expand();
+        check(); collect();
+        const grew = scroller.scrollHeight > scroller.clientHeight + 20;
+        if (!grew) return {
+          turns: tidyTurns(messages.length ? messages : extractRawTurns()),
+          uncertain: uncertain || Date.now() >= deadline || Boolean(root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']"))
+        };
+        messages.length = 0; // expansion changed layout; recollect in top-to-bottom order
+      }
+      // Scan from top down so insertion order follows the active conversation.
+      let topSettled = 0;
+      while (Date.now() < deadline && topSettled < 2) {
+        check();
+        const height = scroller.scrollHeight;
+        scroller.scrollTop = 0;
+        await wait();
+        topSettled = scroller.scrollTop === 0 && scroller.scrollHeight === height ? topSettled + 1 : 0;
+      }
+      let settled = 0;
+      while (Date.now() < deadline) {
+        check(); await expand(); collect();
+        const before = scroller.scrollTop;
+        scroller.scrollTop += Math.max(1, scroller.clientHeight * 0.5);
+        await wait();
+        if (scroller.scrollTop === before) {
+          if (++settled >= 3) break;
+        } else settled = 0;
+      }
+      check(); collect();
+      // DOM exhaustion is not proof that server-side history was fully loaded.
+      uncertain ||= settled < 3 || topSettled < 2 || scroller.scrollHeight > scroller.clientHeight + 20;
+      if (root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']")) uncertain = true;
+      // ponytail: DOM scans cannot prove server history exhaustion; scrollable chats stay unverified.
+      const turns = messages.length ? tidyTurns(messages) : extractConversationTurns();
+      return { turns, uncertain };
+    } finally {
+      cancel.remove();
+      if (location.href === url) scroller.scrollTop = initial;
+    }
   }
 
   function extractTurnsFromContainer(container) {
@@ -1179,12 +1356,13 @@
 
     // Strategy 2: Claude DOM Pattern
     const claudeUserNodes = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message']");
-    const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
+    const claudeAsstNodes = container.querySelectorAll(".font-claude-message, div[class*='standard-message'], div[class*='font-claude'], [data-perf-reply-text], [data-testid='assistant-message']");
     if (claudeUserNodes.length > 0 || claudeAsstNodes.length > 0) {
-      const allClaude = container.querySelectorAll("[data-testid='user-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude']");
-      Array.from(allClaude).filter(el => !isComposerOrSafeShareUI(el)).forEach((el) => {
+      const claudeSelector = "[data-testid='user-message'], [data-testid='assistant-message'], div[class*='user-message'], .font-claude-message, div[class*='standard-message'], div[class*='font-claude'], [data-perf-reply-text]";
+      const allClaude = container.querySelectorAll(claudeSelector);
+      Array.from(allClaude).filter(el => !isComposerOrSafeShareUI(el) && !el.parentElement?.closest(claudeSelector)).forEach((el) => {
         const isUser = el.getAttribute("data-testid") === "user-message" || (el.className && el.className.includes("user-message"));
-        const textContent = getCleanNodeContent(el);
+        const textContent = getCleanNodeContent(claudeAnswerBody(el) || el);
         if (textContent) {
           turns.push({
             role: isUser ? "user" : "assistant",
@@ -1201,13 +1379,13 @@
     const dsMessages = Array.from(container.querySelectorAll("div.ds-message")).filter(el => !isComposerOrSafeShareUI(el));
     if (dsMessages.length > 0) {
       for (const el of dsMessages) {
-        const answer = el.querySelector(".ds-assistant-message-main-content") || el.querySelector("div.ds-markdown");
+        const answer = el.querySelector(".ds-assistant-message-main-content");
+        if (!answer && !el.querySelector(".ds-collapsible-text")) continue;
         const source = answer || el.querySelector(".ds-collapsible-text") || el;
         const textContent = getCleanNodeContent(source);
         if (textContent) turns.push({ role: answer ? "assistant" : "user", content: textContent });
       }
-      if (turns.some(t => t.role === "user") && turns.some(t => t.role === "assistant")) return turns;
-      turns.length = 0; // partial read: let the older strategies try
+      return turns; // Do not fall back to generic markdown: it can contain unfinished reasoning.
     }
 
     // Strategy 3: DeepSeek & generic markdown message turns

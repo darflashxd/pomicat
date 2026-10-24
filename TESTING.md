@@ -185,7 +185,7 @@ exact amount intentionally can make another hidden amount inferable.
 Everything runs on your laptop with fake data. Tick each box; if something fails, note the site,
 the test number and what you saw (a screenshot helps).
 
-Automated tests cover the engine, relay, CLI and proxy: `npm test` should end with `35/35 passed`.
+Automated tests cover the engine, relay, CLI and proxy: the current working-tree run ends with `47/47 passed` (the count includes the local license test).
 This list covers what needs a real browser and your logged-in chat accounts.
 
 ## 0. Setup (once, ~5 min)
@@ -344,8 +344,20 @@ node bin/safeshare.js redact examples/chat_original.txt | node bin/safeshare.js 
 
 `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick `manifest.json` inside the
 unzipped `dist/SafeShare-<version>-firefox.zip` (build it with `python tools/build_extension.py`).
-Repeat 1a and section 3. Expected difference: no name model in Firefox, so names in 1a are sent
-as typed and the chip says "Sent without the name/place check".
+Repeat 1a and section 3. Firefox supports the local name model; real-extension review showed
+"Local AI model checked". Do not expect names to be skipped solely because this is Firefox.
+
+### Verified follow-up checks
+
+- `[UNIT]` Originals regression excludes existing placeholders while preserving real originals.
+- `[UNIT]` Local relay HEAD reports share status without consuming burn shares; malformed JSON/TTL returns a stable error.
+- `[REAL-EXT]` Isolated Firefox: publish, extension-viewer decrypt, originals, revoke and ZIP install passed.
+- `[REAL-EXT]` Security modal has dialog semantics, focuses its close button, and returns focus to Security on close.
+- Firefox viewer inspection used a temporary profile with `-remote-allow-system-access` and
+  `extensions.webextensions.remote=false`. Privileged-script clicks are not evidence for the synthetic-click gate.
+- `[BLOCKED]` Firefox before-send On remains unverified because the harness could not locate its menu option.
+- ChatGPT first-message note disappearance remains open; its route migration already exists and needs fresh live reproduction.
+- Escape/Tab focus handling and revised decrypt errors still need dedicated browser verification.
 
 ## Report back
 

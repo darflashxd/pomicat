@@ -54,7 +54,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const memoryZeroizer = ZeroizerEngine ? new ZeroizerEngine({
     shareId: shareId,
-    relayUrl: window.SAFESHARE_RELAY_URL || window.location.origin
+    relayUrl: window.SAFESHARE_RELAY_URL || window.location.origin,
+    // Keep the fragment so refresh/history can reopen unexpired, non-burn links.
+    // URL fragments are not sent to the relay; do not persist keys in web storage.
+    autoShredUrlKey: false
   }) : null;
 
   let watermarkedTurns = [];
@@ -124,11 +127,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // burn-after-reading link that would use up the one view. Fetch only after a real click.
     await new Promise((resolve) => {
       lockScreen.style.display = "block";
-      lockScreen.querySelector("p").innerText = "This conversation is end-to-end encrypted. Opening it may use up its only view.";
+      lockScreen.querySelector("p").innerText = "This conversation is end-to-end encrypted. Single-view links are consumed when opened; timed links can be reopened until they expire or are revoked.";
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "btn-platform";
-      btn.style.marginTop = "16px";
+      btn.className = "btn-platform btn-open-conversation";
       btn.textContent = "Open conversation";
       btn.addEventListener("click", (e) => {
         if (!e.isTrusted) return;
@@ -139,6 +141,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       lockScreen.appendChild(btn);
     });
 
+    let decryptStarted = false;
     try {
       const relayHost = window.SAFESHARE_RELAY_URL || window.location.origin;
       const res = await fetch(`${relayHost}/api/share/${shareId}`);
@@ -154,6 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const { ciphertext } = await res.json();
+      decryptStarted = true;
       decryptedData = await cryptoEngine.decrypt(ciphertext, hashKey);
     } catch (err) {
       console.error("[SafeShare Viewer] Relay decryption error:", err);
@@ -162,8 +166,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Shredded";
         lockScreen.querySelector("p").innerText = "This link has passed its expiration deadline or has been shredded after read (Burn-After-Reading).";
       } else {
-        lockScreen.querySelector("h2").innerText = "Decryption Failed";
-        lockScreen.querySelector("p").innerText = "The link may have expired or the relay server is currently offline.";
+        lockScreen.querySelector("h2").innerText = decryptStarted ? "Decryption Failed" : "Could Not Load Conversation";
+        lockScreen.querySelector("p").innerText = decryptStarted
+          ? "The key may be incorrect or the encrypted data could not be verified. No conversation was opened."
+          : "The relay could not provide the conversation. Check your connection and try again.";
       }
       return;
     }
@@ -188,22 +194,48 @@ document.addEventListener("DOMContentLoaded", async () => {
   const secModal = document.getElementById("security-modal");
   const closeSecModal = document.getElementById("btn-close-security-modal");
   const footerSecLink = document.getElementById("link-security-footer");
+  let securityTrigger = null;
+  const openSecurity = (trigger) => {
+    securityTrigger = trigger;
+    secModal.style.display = "flex";
+    (closeSecModal || secModal).focus();
+  };
+  const closeSecurity = () => {
+    secModal.style.display = "none";
+    if (securityTrigger && securityTrigger.isConnected) securityTrigger.focus();
+  };
 
   if (secBtn && secModal) {
-    secBtn.addEventListener("click", () => { secModal.style.display = "flex"; });
+    secBtn.addEventListener("click", () => openSecurity(secBtn));
   }
   if (footerSecLink && secModal) {
     footerSecLink.addEventListener("click", (e) => {
       e.preventDefault();
-      secModal.style.display = "flex";
+      openSecurity(footerSecLink);
     });
   }
   if (closeSecModal && secModal) {
-    closeSecModal.addEventListener("click", () => { secModal.style.display = "none"; });
+    closeSecModal.addEventListener("click", closeSecurity);
   }
   if (secModal) {
     secModal.addEventListener("click", (e) => {
-      if (e.target === secModal) secModal.style.display = "none";
+      if (e.target === secModal) closeSecurity();
+    });
+    secModal.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeSecurity();
+      } else if (e.key === "Tab") {
+        const focusable = [...secModal.querySelectorAll('a[href], button:not([disabled]), [tabindex="0"]')]
+          .filter(el => el.getClientRects().length);
+        const first = focusable[0] || secModal;
+        const last = focusable[focusable.length - 1] || secModal;
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === secModal)) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || document.activeElement === secModal)) {
+          e.preventDefault(); first.focus();
+        }
+      }
     });
   }
 
@@ -294,13 +326,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.className = "btn-platform";
         btn.id = "btn-own-originals";
         let showing = false;
-        btn.textContent = "Show my original values (only on this device)";
+        btn.textContent = "Show originals saved in this browser";
+        const remaining = withOriginals.some(turn => /\[(?:REDACTED|CONFIDENTIAL|HR|User)_[A-Z0-9_]+\]|<S\d+>/i.test(turn.content.replace(/\uE000[^\uE001]*\uE001/g, "")));
+        const note = document.createElement("span");
+        note.textContent = "Some original values are unavailable.";
+        note.hidden = true;
+        note.setAttribute("role", "status");
         btn.addEventListener("click", () => {
           showing = !showing;
           renderTurns(showing ? withOriginals : decryptedData.turns);
-          btn.textContent = showing ? "Hide my original values" : "Show my original values (only on this device)";
+          btn.textContent = showing ? "Hide my original values" : "Show originals saved in this browser";
+          note.hidden = !showing || !remaining;
         });
         (document.querySelector(".chat-header-meta") || messagesContainer.parentElement).appendChild(btn);
+        btn.after(note);
       }
     } catch (_) {
       // Different browser, expired, or not the sharer: nothing to show

@@ -108,7 +108,7 @@
         const { score, why } = contextScore(raw, text, start, source, modelScore);
         const old = candidates.get(raw);
         if (old && old.score >= score && (old.risky || !risky)) return;
-        candidates.set(raw, { raw, risky: risky || score >= 0.75 || Boolean(old && old.risky), reason, score, why, source, modelLabel });
+        candidates.set(raw, { raw, risky: risky || score >= 0.75 || Boolean(old && old.risky), reason, score, why, source, modelScore, modelLabel });
       };
       for (const span of modelSpans.filter(s => s.turnIndex === turnIndex)) {
         if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end <= span.start || span.end > text.length ||
@@ -116,7 +116,7 @@
         const spanText = text.slice(span.start, span.end).trim();
         // Field labels, and our own symbols the AI repeats bare ("0.25 * S1", "NIK_1"): the model
         // tagged S1 as a ZIP code on DeepSeek
-        if (LABEL_WORDS.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
+        if (!/[\p{L}\p{N}]/u.test(spanText) || LABEL_WORDS.test(spanText) || /^(?:password|passwd|pwd|secret|token|credential)s?$/i.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
         add(text.slice(span.start, span.end), span.start, false, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score, span.label);
       }
       // A credential assignment matters even for a low-entropy human password. '=' alone does not.

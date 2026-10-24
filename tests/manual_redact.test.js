@@ -66,6 +66,18 @@ const Modal = require("../extension/ui/modal.js");
 
 (async () => {
   const modal = new Modal();
+  const originals = new Modal();
+  const literal = new Modal();
+  literal.currentTurns = [{ role: "user", content: "Alice wrote the literal [User_A]." }];
+  literal.candidates = [{ raw: "Alice", replacement: "[User_A]" }];
+  assert.deepEqual(literal.ownOriginals([{ role: "user", content: "[User_A] wrote the literal [User_A]." }])[0].map(item => item.o), ["Alice"], "literal source placeholders must not be restored by fallback");
+  const partial = new Modal();
+  partial.currentTurns = [{ role: "user", content: "Salary $7850; bill $925." }];
+  partial.candidates = [{ raw: "$925", replacement: "[REDACTED_FINANCIAL_6]" }];
+  assert.deepEqual(partial.ownOriginals([{ role: "user", content: "Salary $7k–$8k; bill [REDACTED_FINANCIAL_6]." }])[0].map(item => item.o), ["$925"], "exact candidate restores original after changed prefix");
+  originals.currentTurns = [{ role: "user", content: "Email [EMAIL_1]; amount <S1>; name Avery." }];
+  assert.deepEqual(originals.ownOriginals([{ role: "user", content: "Email [EMAIL_1]; amount <S1>; name [User_A]." }]),
+    [[{ s: 35, e: 43, o: "Avery" }]], "existing placeholders must not be saved as originals");
   for (const [source, echo, secret] of [
     ["export DATABASE_URL='postgres://user:StageSecurePass2026!@db.example:5432/app'", "Use StageSecurePass2026! at runtime", "StageSecurePass2026!"],
     ["My password is SuperSecretPassword123.", "Use SuperSecretPassword123 next time", "SuperSecretPassword123"]

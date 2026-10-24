@@ -20,14 +20,28 @@ const Crypto=require('../extension/engine/crypto');
    const res=await fetch(base+'/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:enc.shareId,ciphertext:enc.ciphertext,ttl,burn_on_read:burn})});
    assert.equal(res.status,201);return {...enc,turns,meta:await res.json()};
   }
-  const normal=await create();
+   const normal=await create(false,86400);
+   assert.equal(normal.meta.burn_on_read,false,'24-hour option must not enable burn');
   const html=await fetch(normal.fullShareUrl);assert.equal(html.status,200);
   assert(html.headers.get('content-security-policy').includes("script-src 'self'"));
-  const js=await (await fetch(base+'/app.js')).text();assert(js.includes('e.isTrusted'),'viewer lacks trusted click gate');
+   const js=await (await fetch(base+'/app.js')).text();assert(js.includes('e.isTrusted'),'viewer lacks trusted click gate');
+   const {readFileSync}=require('node:fs');
+   const vm=require('node:vm');
+   const viewer=readFileSync(path.join(__dirname,'../extension/viewer/app.js'),'utf8');
+   const options=viewer.match(/new ZeroizerEngine\((\{[\s\S]*?\})\)/)[1];
+   const Zeroizer=require('../extension/viewer/engine/memory_zeroizer');
+   let replaced=false;
+   const previousWindow=global.window;
+   global.window={location:{hash:'#fictional-key'},history:{replaceState(){replaced=true;}},addEventListener(){}};
+   try{
+    new Zeroizer(vm.runInNewContext('('+options+')',{shareId:normal.shareId,window:{SAFESHARE_RELAY_URL:base,location:{origin:base}}})).start();
+    assert.equal(replaced,false,'viewer must retain fragment for refresh without storing key');
+   }finally{global.window=previousWindow;}
   let res=await fetch(base+'/api/share/'+normal.shareId);assert.equal(res.status,200);
   const decoded=await crypto.decrypt((await res.json()).ciphertext,normal.key);assert.deepEqual(decoded.turns,normal.turns);
   assert.equal((await fetch(base+'/api/share/'+normal.shareId)).status,200,'normal share consumed');
-  const burn=await create(true);
+   const burn=await create(true);
+   assert.equal((await fetch(base+'/api/share/'+burn.shareId,{method:'HEAD'})).status,200);
   await fetch(burn.fullShareUrl); // HTML retrieval must not consume ciphertext.
   const statuses=await Promise.all(Array.from({length:6},()=>fetch(base+'/api/share/'+burn.shareId).then(r=>r.status)));
   assert.equal(statuses.filter(s=>s===200).length,1,'burn yielded multiple successful readers');
@@ -36,10 +50,17 @@ const Crypto=require('../extension/engine/crypto');
   assert.equal((await fetch(base+'/api/revoke/'+normal.shareId)).status,405);
   assert.equal((await revoke('wrong-fictional-token')).status,404);
   assert.equal((await fetch(base+'/api/share/'+normal.shareId)).status,200,'wrong token revoked share');
-  assert.equal((await revoke(normal.meta.revoke_token)).status,200);
+   assert.equal((await revoke(normal.meta.revoke_token)).status,200);
+   assert.equal((await fetch(base+'/api/share/'+normal.shareId,{method:'HEAD'})).status,404);
   assert.equal((await fetch(base+'/api/share/'+normal.shareId)).status,404);
   // Local-only short TTL. Do not use this to claim remote TTL validation parity.
-  const expired=await create(false,1);await new Promise(r=>setTimeout(r,1100));
+   const expired=await create(false,1);await new Promise(r=>setTimeout(r,1100));
+   assert.equal((await fetch(base+'/api/share/'+expired.shareId,{method:'HEAD'})).status,404);
+   for(const body of ['{', JSON.stringify({id:randomUUID(),ciphertext:'fictional',ttl:'invalid'})]){
+    const invalid=await fetch(base+'/api/share',{method:'POST',body});
+    assert.equal(invalid.status,400);
+    assert.equal((await invalid.json()).error,'Invalid share request: expected JSON object and valid TTL');
+   }
   assert.equal((await fetch(base+'/api/share/'+expired.shareId)).status,404);
   assert.equal((await fetch(base+'/api/share/'+randomUUID())).status,404);
   console.log('PASS: local encrypted roundtrip, HTML click gate, one-success burn race, revoke tokens, expiry');

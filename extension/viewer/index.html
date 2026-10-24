@@ -121,14 +121,14 @@
     </main>
 
     <!-- Progressive Disclosure: Security Details Dialog -->
-    <div id="security-modal" class="dialog-backdrop" style="display: none;">
+    <div id="security-modal" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="security-modal-title" tabindex="-1" style="display: none;">
       <div class="dialog-card fade-in">
         <div class="dialog-header">
           <div class="dialog-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            <span>What this page does and does not protect</span>
+            <span id="security-modal-title">What this page does and does not protect</span>
           </div>
           <button id="btn-close-security-modal" class="dialog-close" aria-label="Close dialog">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
