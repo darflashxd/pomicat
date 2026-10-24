@@ -9,7 +9,9 @@
 //            .venv-eval with presidio + en_core_web_lg) · SafeShare (bin/safeshare.js redact)
 // Attackers: arithmetic (policy.invert, no key needed) · LLM API (--llm; one of:
 //            OPENAI_API_KEY + LLM_MODEL, ANTHROPIC_API_KEY + LLM_MODEL) · LLM through the local
-//            OpenCode CLI (--llm-cli; default model opencode/deepseek-v4.1-flash-free, no API key).
+//            OpenCode CLI (--llm-cli; default model opencode/deepseek-v4.1-flash-free, no API key) ·
+//            LLM through the Claude Code CLI (--llm-claude; your own `claude` login, no API key;
+//            default model claude-sonnet-5-5, change with --llm-model).
 //            Keys are read from the environment only, never written anywhere. Only fictional chats
 //            are sent. The --llm-cli path runs one chat per fresh session in an empty temp folder.
 const fs = require("fs");
@@ -25,14 +27,16 @@ const opt = (name, def) => (args.includes(name) ? args[args.indexOf(name) + 1] :
 const N = Number(opt("--cases", 40));
 const OUT = opt("--out", path.join(__dirname, "RESULTS.md"));
 const USE_LLM = args.includes("--llm");
-const USE_LLM_CLI = args.includes("--llm-cli");
+const USE_LLM_CLAUDE = args.includes("--llm-claude");
+const USE_LLM_CLI = args.includes("--llm-cli") || USE_LLM_CLAUDE;
 const API_MODEL = process.env.LLM_MODEL;
-const CLI_MODEL = opt("--llm-model", "opencode/deepseek-v4.1-flash-free");
+const CLI_MODEL = opt("--llm-model", USE_LLM_CLAUDE ? "claude-sonnet-5-5" : "opencode/deepseek-v4.1-flash-free");
 const LLM_TIMEOUT = Number(opt("--llm-timeout", 120000));
 const LLM_RETRIES = Number(opt("--llm-retries", 2));
 const LLM_LOG = opt("--llm-log", path.join(os.tmpdir(), `safeshare-llm-${process.pid}.jsonl`));
 const LLM_DELAY = Number(opt("--llm-delay", 2500));
 const LLM_CACHE = opt("--llm-cache", path.join(os.tmpdir(), "safeshare-llm-cache.json"));
+const CLI_NAME = USE_LLM_CLAUDE ? "Claude Code CLI" : "OpenCode CLI";
 const LANG = opt("--lang", "mixed");
 
 // Deterministic fictional cases -------------------------------------------------------------
@@ -162,6 +166,35 @@ function deleteSession(cli, sessionID, cwd) {
   spawnSync(cli, ["session", "delete", sessionID], { cwd, encoding: "utf8", timeout: 15000 });
 }
 
+// One attacker call through a CLI: returns the process result and { text, sessionID, tool, error }
+function openCodeInvoke(cli, model, cwd, timeout) {
+  return (prompt, env) => {
+    const r = spawnSync(cli, ["run", "--agent", "plan", "--model", model, "--format", "json", "--title", "ss-attack", prompt],
+      { cwd, encoding: "utf8", timeout, maxBuffer: 1 << 20, env });
+    const out = parseCliOutput(r.stdout);
+    deleteSession(cli, out.sessionID, cwd);
+    return { r, out };
+  };
+}
+
+// Claude Code (`claude -p`) on your own login: no tools, no MCP servers, nothing saved, prompt on stdin
+function claudeInvoke(model, cwd, timeout) {
+  const win = process.platform === "win32";
+  const args = ["-p", "--model", model, "--output-format", "json", "--tools", win ? '""' : "",
+    "--no-session-persistence", "--strict-mcp-config", "--disable-slash-commands"];
+  return (prompt, env) => {
+    const r = spawnSync(win ? "claude.cmd" : "claude", args,
+      { cwd, input: prompt, encoding: "utf8", timeout, maxBuffer: 1 << 20, env, shell: win });
+    let out = { text: "", sessionID: null, tool: false, error: null };
+    try {
+      const j = JSON.parse(String(r.stdout || "").trim().split(/\r?\n/).pop());
+      out = { text: j.is_error ? "" : String(j.result || ""), sessionID: null, tool: (j.num_turns || 1) > 1,
+        error: j.is_error ? String(j.result || j.terminal_reason || "error") : null };
+    } catch {}
+    return { r, out };
+  };
+}
+
 function appendLog(file, entry) {
   try { fs.appendFileSync(file, JSON.stringify(entry) + "\n"); } catch {}
 }
@@ -175,7 +208,7 @@ function isTransient(text) {
 }
 
 function isFatal(text) {
-  return /\b(?:free usage limit|usage limit reached|retryafterms|subscribe|connect a provider|no longer available|model not available|model not found|invalid api key|unauthori[sz]ed|authentication|no credits|insufficient balance)\b/i.test(String(text));
+  return /\b(?:free usage limit|usage limit reached|retryafterms|subscribe|connect a provider|no longer available|model not available|model not found|invalid api key|unauthori[sz]ed|authenticat(?:e|ion)|oauth|not logged in|no credits|insufficient balance)\b/i.test(String(text));
 }
 
 function describeError(r, out) {
@@ -202,7 +235,7 @@ function saveCache(file, cache) {
   try { fs.writeFileSync(file, JSON.stringify(cache, null, 2)); } catch {}
 }
 
-function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache, cacheFile }) {
+function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile }) {
   return async (turns, meta = {}) => {
     const key = meta.cacheKey;
     if (cache && key && cache[key] && cache[key].kind !== "invalid") return cache[key];
@@ -214,11 +247,7 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
       const env = { ...process.env };
       delete env.OPENAI_API_KEY;
       delete env.ANTHROPIC_API_KEY;
-      const r = spawnSync(cli, [
-        "run", "--agent", "plan", "--model", model, "--format", "json", "--title", "ss-attack", prompt
-      ], { cwd, encoding: "utf8", timeout, maxBuffer: 1 << 20, env });
-      const out = parseCliOutput(r.stdout);
-      deleteSession(cli, out.sessionID, cwd);
+      const { r, out } = invoke(prompt, env);
       const errText = describeError(r, out);
       const fatal = isFatal(errText);
       if (r.error) {
@@ -251,8 +280,8 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
 
 // Run --------------------------------------------------------------------------------------
 (async () => {
-  if (USE_LLM && USE_LLM_CLI) {
-    console.error("Use either --llm (API) or --llm-cli (local OpenCode CLI), not both.");
+  if ([USE_LLM, args.includes("--llm-cli"), USE_LLM_CLAUDE].filter(Boolean).length > 1) {
+    console.error("Use one of --llm (API), --llm-cli (OpenCode CLI) or --llm-claude (Claude Code CLI).");
     process.exit(1);
   }
   if (USE_LLM && !(API_MODEL && (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY))) {
@@ -261,7 +290,17 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
   }
 
   let cli = null, cliVer = null, workDir = null;
-  if (USE_LLM_CLI) {
+  if (USE_LLM_CLAUDE) {
+    const v = spawnSync(process.platform === "win32" ? "claude.cmd" : "claude", ["--version"],
+      { encoding: "utf8", timeout: 30000, shell: process.platform === "win32" });
+    if (v.status !== 0) {
+      console.error("--llm-claude could not run `claude`. Install Claude Code and sign in (`claude auth login`).");
+      process.exit(1);
+    }
+    cliVer = String(v.stdout || "").trim().split(/\r?\n/)[0];
+    workDir = fs.mkdtempSync(path.join(os.tmpdir(), "safeshare-llm-attack-"));
+    process.on("exit", () => { if (workDir) { try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {} } });
+  } else if (USE_LLM_CLI) {
     cli = findOpenCodeCli();
     if (!cli) {
       console.error("--llm-cli could not find the OpenCode CLI. Set OPENCODE_CLI to opencode-cli.exe or opencode.");
@@ -285,7 +324,10 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
   const llmCache = USE_LLM_CLI ? loadCache(LLM_CACHE) : null;
   const attackers = { arithmetic };
   if (USE_LLM) attackers[`llm:${API_MODEL}`] = llmApi;
-  if (USE_LLM_CLI) attackers[`llm:${CLI_MODEL}`] = makeCliAttacker({ cli, model: CLI_MODEL, cwd: workDir, timeout: LLM_TIMEOUT, retries: LLM_RETRIES, log: LLM_LOG, delay: LLM_DELAY, cache: llmCache, cacheFile: LLM_CACHE });
+  if (USE_LLM_CLI) {
+    const invoke = USE_LLM_CLAUDE ? claudeInvoke(CLI_MODEL, workDir, LLM_TIMEOUT) : openCodeInvoke(cli, CLI_MODEL, workDir, LLM_TIMEOUT);
+    attackers[`llm:${CLI_MODEL}`] = makeCliAttacker({ invoke, model: CLI_MODEL, retries: LLM_RETRIES, log: LLM_LOG, delay: LLM_DELAY, cache: llmCache, cacheFile: LLM_CACHE });
+  }
 
   const rows = [];
   let aborted = false;
@@ -299,7 +341,7 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
         const text = chatText(all[i]);
         const visible = text.includes(fmt(cases[i].salary, cases[i].lang));
         if (visible) { exposed++; continue; }
-        const result = await attack(all[i], { redactor: rname, caseIndex: i, caseId: cases[i].id, cacheKey: `${rname}|${i}` });
+        const result = await attack(all[i], { redactor: rname, caseIndex: i, caseId: cases[i].id, cacheKey: `${aname}|${rname}|${i}` });
         const kind = result && result.kind ? result.kind : "invalid";
         rs[kind] = (rs[kind] || 0) + 1;
         if (withinTolerance(result && result.value, cases[i].salary)) recovered++;
@@ -332,7 +374,7 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
   const langLabel = LANG === "mixed" ? "half Indonesian, half English" : LANG === "id" ? "Indonesian" : "English";
   const isLlm = !!(USE_LLM || USE_LLM_CLI);
   const modelLabel = USE_LLM_CLI ? CLI_MODEL : API_MODEL;
-  const modelShort = modelLabel.split("/").pop();
+  const modelShort = (modelLabel || "").split("/").pop(); // arithmetic-only runs have no model
   const llmRow = (redactor) => rows.find((r) => r.redactor === redactor && r.attacker.startsWith("llm"));
   const arithRow = (redactor) => rows.find((r) => r.redactor === redactor && r.attacker === "arithmetic");
 
@@ -369,7 +411,7 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
       }
     }
     const repro = USE_LLM_CLI
-      ? `node tools/attack_bench/run.js --cases ${N} --lang ${LANG} --llm-cli --llm-model ${modelLabel}`
+      ? `node tools/attack_bench/run.js --cases ${N} --lang ${LANG} ${USE_LLM_CLAUDE ? "--llm-claude" : "--llm-cli"} --llm-model ${modelLabel}`
       : `node tools/attack_bench/run.js --cases ${N} --lang ${LANG} --llm  # needs LLM_MODEL + API key`;
     md = [
       "# Can an LLM recover a hidden salary from a redacted chat?",
@@ -380,7 +422,7 @@ function makeCliAttacker({ cli, model, cwd, timeout, retries, log, delay, cache,
       "- \"Recovered\" = the attacker's answer is within 1% of the true salary; \"leaked\" = left visible or recovered.",
       ...(USE_LLM_CLI ? [
         `- Attacker model: \`${modelLabel}\`, one chat per call in a fresh session, empty folder, no tools, no ground truth in the prompt.`,
-        `- Run through the OpenCode CLI (version \`${cliVer}\`).`,
+        `- Run through the ${CLI_NAME} (version \`${cliVer}\`).`,
         "- Fictional data only; inference on the model provider's service.",
       ] : []),
       ...(USE_LLM ? [`- Attacker model: \`${modelLabel}\` via the provider API.`] : []),
