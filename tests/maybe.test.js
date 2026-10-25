@@ -38,6 +38,15 @@ for (const [text, raw] of [["my slry is 70000", "70000"], ["my slaary is 70.000.
 }
 for (const text of ["version 2.4.0.1 on port 8080", "person 5521 in line", "I have 3000 steps today", "It was built in 1998 and has 2500 rows",
   "Room 4410 is free", "we drove 1200 km", "token_budget=320000", "my salary is <S1>"]) assert.deepEqual(scan(text), [], text);
+// Pre-ticked model suggestions (RedacBench personal texts, tools/eval/RESULTS.md §9): a confident name,
+// a full name at lower confidence, a long digit ID, a street address. Weak or non-name ones stay unticked.
+const pre = "Neha Sharma met Sagar Ram at 12 Oak Street; roll 999893751750; Acme Corp; maybe Rina.";
+const at = (w, label, score) => ({ turnIndex: 0, start: pre.indexOf(w), end: pre.indexOf(w) + w.length, label, score });
+const ticked = Object.fromEntries(Maybe.scan(turns(pre), [at("Neha Sharma", "PERSON", 0.8), at("Sagar Ram", "PERSON", 0.4),
+  at("12 Oak Street", "LOCATION", 0.5), at("999893751750", "PHONE", 0.33), at("Acme Corp", "ORGANIZATION", 0.9), at("Rina", "PERSON", 0.4)])
+  .map(c => [c.raw, c.risky]));
+assert.deepEqual(ticked, { "Neha Sharma": true, "Sagar Ram": true, "12 Oak Street": true, "999893751750": true, "Acme Corp": false, "Rina": false }, JSON.stringify(ticked));
+
 // Our own symbols repeated bare by the AI are not suggestions, and never hidden inside <S1>
 const symText = "my slary is <S1>. Housing: 0.25 * S1, then NIK_1";
 const symSpan = (w, from = 0) => ({ turnIndex: 0, start: symText.indexOf(w, from), end: symText.indexOf(w, from) + w.length, label: "ZIP_CODE", score: 0.23 });

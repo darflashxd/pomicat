@@ -286,6 +286,16 @@ Please analyze the code.`;
   }
   console.log("  [✓] Personal health / identity / work-dispute statements flagged; general questions not");
 
+  // Labelled ID numbers (RedacBench name + ID pairs): hidden; short numbers and NIM keep their own handling
+  for (const text of ["NAME: Ignacia Hernandez No. : 932353568953", "Interviewer Pin No. is 982645662261.", "Her roll number is 932353568953.", "Employee No.: 1234-5678"]) {
+    assert(heuristics.scan(text).detections.some(d => d.type === "LABELLED_PERSONAL_ID"), `labelled ID missed: ${text}`);
+  }
+  for (const text of ["See No. 5 on the list", "Room no. 12", "I scored 12345 points"]) {
+    assert(!heuristics.scan(text).detections.some(d => d.type === "LABELLED_PERSONAL_ID"), `false ID: ${text}`);
+  }
+  assert(heuristics.scan("NIM 2101234567").detections.some(d => d.type === "STUDENT_ID"), "NIM keeps its own rule");
+  console.log("  [✓] Labelled ID numbers hidden; short numbers and NIM unaffected");
+
   console.log("\n================================================================================");
   console.log("  ALL PRE-INFERENCE TESTS PASSED: SHIELD LAYER FULLY VERIFIED (100%)");
   console.log("================================================================================");

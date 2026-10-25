@@ -27,6 +27,11 @@
   // name), so "Rina" or "NIK 3201…" still go through.
   const LABEL_WORDS = /^(?:[Ss]afe[Ss]hare(?:-AI)?|NIK|NPWP|KTP|KK|SIM|BPJS|NIP|NISN|NIB|SSN|NINO|IBAN|SWIFT|BIC|CVV|CVC|OTP|PIN|API|URL|IP|ID|[Ee]-?mail)$/;
   const DAMPING_WORD =/\b(?:example|sample|dummy|placeholder|contoh)\b/i;
+  // ponytail: hand-set cut-offs on uncalibrated model scores (chosen on RedacBench's personal texts,
+  // tools/eval/RESULTS.md §9); calibrate on labelled data. A full-name shape lowers the bar.
+  const CONFIDENT_NAME = 0.6;
+  const CONFIDENT_FULL_NAME = 0.35;
+  const ID_LABELS = /^(?:PHONE|PASSPORT|BANK_ACCOUNT|CREDIT_CARD|GOVERNMENT_ID|TAX_ID|DRIVERS_LICENSE|US_LICENSE_PLATE|FINANCIAL|NRP)$/;
   function contextScore(raw, text, start, source, modelScore = 0) {
     const why = [];
     let score = source === "assignment" ? 0.55 : source === "model" ? 0.5 * modelScore : 0.3;
@@ -117,7 +122,17 @@
         // Field labels, and our own symbols the AI repeats bare ("0.25 * S1", "NIK_1"): the model
         // tagged S1 as a ZIP code on DeepSeek
         if (!/[\p{L}\p{N}]/u.test(spanText) || LABEL_WORDS.test(spanText) || /^(?:password|passwd|pwd|secret|token|credential)s?$/i.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
-        add(text.slice(span.start, span.end), span.start, false, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score, span.label);
+        // A person's name the model is confident about is pre-ticked (hidden unless you untick it):
+        // left unticked, RedacBench's personal texts kept most names (see tools/eval/RESULTS.md §9)
+        const spanRaw = text.slice(span.start, span.end);
+        const fullName = /^\p{Lu}[\p{Ll}'-]+(?:\s\p{Lu}[\p{Ll}'-]+){1,2}$/u.test(spanRaw); // "Sagar Ram", "Neha Sharma"
+        const confidentName = /^(?:PERSON|GIVEN_NAME|SURNAME)$/.test(span.label) &&
+          (span.score >= CONFIDENT_NAME || (fullName && span.score >= CONFIDENT_FULL_NAME)) ||
+          // a long digit string the model reads as an ID of some kind (its exact label is unreliable)
+          (ID_LABELS.test(span.label) && (spanRaw.match(/\d/g) || []).length >= 9 && /^[\d\s().+-]+$/.test(spanRaw)) ||
+          // a place with a house number: a street address, not a city
+          (span.label === "LOCATION" && /\d/.test(spanRaw) && /\p{L}{3,}/u.test(spanRaw));
+        add(text.slice(span.start, span.end), span.start, confidentName, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score, span.label);
       }
       // A credential assignment matters even for a low-entropy human password. '=' alone does not.
       const assignments = /(?<![\w.-])([\w.-]{0,96}(?:password|passwd|pwd|secret|token|api[_-]?key|credential)[\w.-]{0,32})["']?\s*(?:=|:|\bis\b)\s*(?:"([^"\r\n]{6,})"|'([^'\r\n]{6,})'|([^\s"'`,;<>]{6,}))/gi;

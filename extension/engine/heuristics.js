@@ -238,6 +238,19 @@ class HeuristicsRedactor {
         },
         replacement: "$1[REDACTED_RECORD_ID]"
       },
+      // 2d-bis. Personal ID numbers after a label ("Roll No. 932353568953", "Pin No. is 9826…", "NAME: …
+      // No. : 9323…", "Student ID 20231045"): RedacBench's name + ID pairs leaked through every rule
+      {
+        id: "LABELLED_PERSONAL_ID",
+        name: "Labelled ID number",
+        category: "GOV_ID",
+        regex: /\b((?:(?:roll|registration|reg|employee|staff|member|pin|identity|identification|id|serial|matriculation)\s*(?:no\.?|number|nr\.?|#|id)|no\.)\s*(?:is\s+|[:#=]\s*)?)(\d(?:[\d -]{4,20})\d)\b/gi,
+        validator: (raw) => {
+          const value = (raw.match(/(\d[\d -]*\d)\s*$/) || [""])[0].replace(/\D/g, "");
+          return value.length >= 6 && value.length <= 16;
+        },
+        replacement: "$1[REDACTED_ID]"
+      },
       // 2e. Standalone Bank Account Prefix Identifiers (e.g. WF-990218374, SOFI-99821174, AETNA-8849201)
       {
         id: "PREFIXED_BANK_LOAN_ID",
