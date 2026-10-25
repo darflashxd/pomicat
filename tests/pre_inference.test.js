@@ -273,6 +273,19 @@ Please analyze the code.`;
   }
   console.log("  [✓] 16-digit amounts are amounts, not NIKs; real NIKs still caught");
 
+  // Sensitive topics about the writer (Casper's third layer): flagged before sending, not replaced.
+  // General questions about the same topics are not about the writer and stay unflagged.
+  const topicsOf = (t) => [...new Set(new ContextualClassifier().classifyTurn(t, 0).map(d => d.category))];
+  for (const [text, cat] of [["I was diagnosed with depression and my psychiatrist prescribed sertraline.", "SENSITIVE_HEALTH"],
+    ["I am pregnant and worried about my job.", "SENSITIVE_HEALTH"], ["Saya muslim dan sedang hamil 3 bulan.", "SENSITIVE_USER"],
+    ["I am gay and my family does not know yet.", "SENSITIVE_USER"], ["My manager put me on a PIP and I think it is harassment.", "SENSITIVE_LEGAL_HR"]]) {
+    assert(topicsOf(text).includes(cat), `${text}: ${cat} not flagged (${topicsOf(text)})`);
+  }
+  for (const text of ["What are the symptoms of diabetes?", "Explain how sertraline works.", "Is pregnancy covered by insurance in general?"]) {
+    assert.deepEqual(topicsOf(text), [], `general question flagged: ${text}`);
+  }
+  console.log("  [✓] Personal health / identity / work-dispute statements flagged; general questions not");
+
   console.log("\n================================================================================");
   console.log("  ALL PRE-INFERENCE TESTS PASSED: SHIELD LAYER FULLY VERIFIED (100%)");
   console.log("================================================================================");

@@ -463,9 +463,18 @@
     try { syncSiteTheme(bar.parentElement); } catch (_) {}
     if (Number(indicator.dataset.errorUntil || 0) > Date.now()) return; // a held-message notice is showing
 
+    // Sensitive topics about the writer (health, religion or orientation, a work dispute) are not
+    // replaced, since the AI needs the words to help, but the chip says they go out as typed.
+    // Shown with protection on or off.
+    const topics = sensitiveTopics(getInputText(inputEl));
+    const topicNote = topics.length ? ` · ⚠️ ${topics.join(", ")} sent as typed` : "";
+    indicator.title = topics.length
+      ? `This message says something personal about your ${topics.join(" and ")}. SafeShare doesn't replace it (the AI needs it to help); remove it if you'd rather not send it.`
+      : "SafeShare: what to protect before sending (click to change)";
+
     if (!isEnabled) {
       indicator.className = "shield-disabled";
-      indicator.textContent = "🛡️ Protection off ▾";
+      indicator.textContent = `🛡️ Protection off${topicNote} ▾`;
       return;
     }
 
@@ -473,9 +482,20 @@
     let count = 0;
     try { count = shieldRewrite(getInputText(inputEl), { dryRun: true }).count; } catch (_) {}
     indicator.className = "shield-active";
-    indicator.textContent = count
-      ? `🛡️ ${count} item${count > 1 ? "s" : ""} will be protected ▾`
-      : `🛡️ ${mode === "all" ? "Protecting IDs + amounts" : "Protecting amounts"} ▾`;
+    indicator.textContent = (count
+      ? `🛡️ ${count} item${count > 1 ? "s" : ""} will be protected`
+      : `🛡️ ${mode === "all" ? "Protecting IDs + amounts" : "Protecting amounts"}`) + `${topicNote} ▾`;
+  }
+
+  const TOPIC_LABEL = { SENSITIVE_HEALTH: "health", SENSITIVE_USER: "religion or identity", SENSITIVE_LEGAL_HR: "work dispute" };
+  function sensitiveTopics(text) {
+    const contextual = symbolicRewriter && symbolicRewriter.contextual;
+    if (!contextual || !text || !text.trim()) return [];
+    try {
+      return [...new Set(contextual.classifyTurn(text, 0).map(d => TOPIC_LABEL[d.category]).filter(Boolean))];
+    } catch (_) {
+      return [];
+    }
   }
 
   /**

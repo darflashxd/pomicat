@@ -21,6 +21,8 @@ class ContextualClassifier {
   constructor() {
     // Contextual trigger patterns (1st & 2nd person, Casual, Advice, & Elliptical)
     this.personalAnchors = [
+      // The writer's own condition ("I'm pregnant", "saya sedang hamil", "I have diabetes")
+      /\b(?:i\s*['’]?m|i\s+am|i\s+have|i\s+was|saya|aku)\s+(?:\w+\s+){0,2}(?:pregnant|hamil|diabetic|diabetes|bipolar|schizophreni[ac]|skizofrenia|depresi|hiv(?:[- ]positive)?)\b/i,
       /\b(?:gaji|penghasilan|upah|bonus|take home pay|thp|kompensasi|uang saku|pendapatan|tunjangan|remunerasi)(?:\s+\w+)?\s*(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku)?\b/i,
       /\b(?:gajiku|penghasilanku|upahku|gajimu|penghasilanmu)\b/i,
       /\b(?:gaji|penghasilan|kompensasi|upah|pendapatan)\s+(?:saya|Anda|kamu|gw|gue|ku|mu)\b/i,
@@ -304,7 +306,7 @@ class ContextualClassifier {
 
         // Comprehensive Health check (Active & passive, cancer, diabetes, HIV lab biomarkers, psychotropics, trauma, oncology biologics)
         const healthRegex = /(?:(?:(?:limfosit\s+)?CD4\b[^\n,.]*?\b\d+\s*cells\s*\/\s*u[lL]|HIV(?:-1)?\s+[^\n,.]*?Viral\s+Load\s+[^\n,.]*?[\d.,]+\s*copies\s*\/\s*m[lL])|(?:(?:[a-zA-Z]+\s+)?(?:cancer|adenocarcinoma|carcinoma|melanoma|sarcoma|lymphoma|leukemia|leukimia)|kanker\s+[^\s,.]+)(?:\s+(?:stadium|stage)\s+(?:IV|I{1,3}|\d)[a-c]?)?|(?:Stage\s+(?:IV|I{1,3}|\d)\s+[a-zA-Z]+(?:\s+with\s+[a-zA-Z\s]+)?)|(?:diabetes(?:\s+melitus)?(?:\s+tipe\s+\d+)?|hepatitis\s+[a-c])|hiv(?:\s*positif)?|positif\s*hiv|tested\s+positive\s+for\s+hiv|skizofrenia|schizophrenia|paranoid\s+schizophrenia|bipolar(?:\s+(?:affective\s+disorder|II|I|[12]|episode\s+\w+))?|depresi(?:\s*(?:klinis|berat|mayor))?|Major\s+Depressive\s+Disorder|adult\s+adhd|adhd|gangguan\s*kecemasan(?:\s*menyeluruh)?|anxiety(?:\s*disorder)?|F31\.\d+|(?:childhood\s+trauma|suicidal\s+ideation|self-harm|ptsd)|(?:lexapro|escitalopram|sertraline|zoloft|wellbutrin(?:\s+xl)?|bupropion|rituximab|venlafaxine|effexor|duloxetine|cymbalta|lisdexamfetamine|methotrexate|keytruda|pembrolizumab|alprazolam|xanax|klonopin|clonazepam|adderall(?:\s+xr)?|ritalin|vyvanse|prozac|fluoxetine|valium|diazepam|metformin|lipitor|atorvastatin|risperidone|lithium(?:\s+carbonate)?|clozapine|quetiapine|seroquel|lantus(?:\s+insulin)?|biktarvy|cisplatin|doxorubicin|paclitaxel|carboplatin|tamoxifen|imatinib|trastuzumab|nivolumab|ibrutinib|\b[a-zA-Z]{4,}(?:mab|tinib|zomib|xaban)\b)(?:\s*[\d.]+\s*(?:mg|mcg|ml|iv))?)/gi;
-        const healthMatches = sent.matchAll(new RegExp(healthRegex.source + '|\\b(?:asthma|asma|depression|epilepsy|epilepsi|hipertensi|hypertension|high\\s+blood\\s+pressure)\\b', 'gi'));
+        const healthMatches = sent.matchAll(new RegExp(healthRegex.source + '|\\b(?:asthma|asma|depression|depresi|epilepsy|epilepsi|hipertensi|hypertension|high\\s+blood\\s+pressure|pregnant|pregnancy|hamil|diabetes|diabetic|anxiety\\s+disorder|bipolar|schizophrenia|skizofrenia|HIV(?:[- ]positive)?)\\b', 'gi'));
         for (const m of healthMatches) {
           detected.push({
             turnIndex,
@@ -389,7 +391,7 @@ class ContextualClassifier {
         }
 
         // Special Category Demographics / Sexual Orientation / Religious Affiliation in 1st person
-        const demoMatches = sent.matchAll(/\b(?:bisexual(?:\s+female|\s+male)?|homosexual|transgender|asexual|pansexual|non-binary|gay|lesbian|penganut\s+[A-Za-z]+|attending\s+[A-Z][a-zA-Z\s]+(?:Islamic|Baptist|Catholic|Methodist|Lutheran|Orthodox|Jewish|Synagogue|Mosque|Temple|Pesantren))\b/gi);
+        const demoMatches = sent.matchAll(/\b(?:bisexual(?:\s+female|\s+male)?|homosexual|transgender|asexual|pansexual|non-binary|gay|lesbian|penganut\s+[A-Za-z]+|(?<=\b(?:i\s+am\s+(?:a\s+)?|i['’]m\s+(?:a\s+)?|saya\s+(?:seorang\s+)?|aku\s+))(?:muslim|christian|catholic|hindu|buddhist|jewish|atheist|kristen|katolik|buddha|konghucu|ateis)|attending\s+[A-Z][a-zA-Z\s]+(?:Islamic|Baptist|Catholic|Methodist|Lutheran|Orthodox|Jewish|Synagogue|Mosque|Temple|Pesantren))\b/gi);
         for (const m of demoMatches) {
           detected.push({
             turnIndex,
