@@ -40,6 +40,28 @@ const Crypto=require('../extension/engine/crypto');
   let res=await fetch(base+'/api/share/'+normal.shareId);assert.equal(res.status,200);
   const decoded=await crypto.decrypt((await res.json()).ciphertext,normal.key);assert.deepEqual(decoded.turns,normal.turns);
   assert.equal((await fetch(base+'/api/share/'+normal.shareId)).status,200,'normal share consumed');
+  // Crawlers (the 2025 problem: shared ChatGPT chats indexed by Google). A crawler that finds a
+  // SafeShare link gets the URL without its #fragment, so neither the page, the API nor the relay's
+  // storage ever holds the plaintext or the key, and both responses say noindex.
+  {
+   const canary='Rina from Bekasi earns Rp 15.000.000 (crawler canary)';
+   const enc=await crypto.encrypt({turns:[{role:'user',content:canary}],ttl:3600});
+   assert.equal((await fetch(base+'/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:enc.shareId,ciphertext:enc.ciphertext,ttl:3600})})).status,201);
+   const [beforeHash,afterHash]=enc.fullShareUrl.split('#');
+   assert(afterHash&&afterHash.includes(enc.key)&&!beforeHash.includes(enc.key),'key must live only after #');
+   const bot={headers:{'User-Agent':'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'}};
+   const page=await fetch(enc.fullShareUrl,bot);const pageText=await page.text();
+   assert(!pageText.includes('Rina')&&!pageText.includes(enc.key),'viewer page exposed plaintext or key to a crawler');
+   assert(/<meta name="robots" content="noindex/.test(pageText),'viewer page lacks noindex');
+   const api=await fetch(base+'/api/share/'+enc.shareId,bot);const apiText=await api.text();
+   assert(/noindex/.test(api.headers.get('x-robots-tag')||''),'API lacks X-Robots-Tag noindex');
+   assert(!apiText.includes('Rina')&&!apiText.includes(enc.key)&&JSON.parse(apiText).ciphertext,'API exposed plaintext or key');
+   const stored=readFileSync(path.join(dir,'storage.json'),'utf8');
+   assert(!stored.includes('Rina')&&!stored.includes(enc.key),'relay storage holds plaintext or key');
+   await assert.rejects(()=>crypto.decrypt(JSON.parse(apiText).ciphertext,normal.key),'ciphertext opened without its key');
+   // Positive control: the content is really there, only for whoever holds the #key
+   assert.equal((await crypto.decrypt(JSON.parse(apiText).ciphertext,enc.key)).turns[0].content,canary);
+  }
    const burn=await create(true);
    assert.equal((await fetch(base+'/api/share/'+burn.shareId,{method:'HEAD'})).status,200);
   await fetch(burn.fullShareUrl); // HTML retrieval must not consume ciphertext.
@@ -63,6 +85,6 @@ const Crypto=require('../extension/engine/crypto');
    }
    assert.equal((await fetch(base+'/api/share/'+bounded.shareId)).status,200);
   assert.equal((await fetch(base+'/api/share/'+randomUUID())).status,404);
-  console.log('PASS: local encrypted roundtrip, HTML click gate, one-success burn race, revoke tokens, expiry');
+  console.log('PASS: local encrypted roundtrip, crawler sees no plaintext/key + noindex, HTML click gate, one-success burn race, revoke tokens, expiry');
  }finally{relay.kill();await new Promise(r=>relay.once('exit',r));rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
