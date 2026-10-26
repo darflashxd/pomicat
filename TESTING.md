@@ -343,7 +343,7 @@ Back in the 1a share dialog (chip-Off chat), choose **Expires after: 24 hours** 
 
 Burn-after-reading: make a new link with **Burn after 1 view**.
 
-- [ ] First open + click: the chat shows. Reload: "Link Expired or Shredded"
+- [ ] First open + click: the chat shows. Reload: "Link Expired or Revoked"
 
 ## 4. Continue in a new chat
 

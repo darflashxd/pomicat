@@ -94,7 +94,7 @@ def main():
                     page.goto(burn['fullShareUrl'])  # Full original link, not the fragment-stripped URL.
                     page.reload()  # Fragment-only navigation does not rerun the viewer.
                     page.get_by_role('button', name='Open conversation', exact=True).click()
-                    page.get_by_role('heading', name='⏱️ Link Expired or Shredded').wait_for()
+                    page.get_by_role('heading', name='⏱️ Link Expired or Revoked').wait_for()
 
                     page.goto(normal['fullShareUrl'])
                     page.get_by_role('button', name='Open conversation', exact=True).click()
@@ -106,7 +106,7 @@ def main():
                     page.goto(normal['fullShareUrl'])
                     page.reload()
                     page.get_by_role('button', name='Open conversation', exact=True).click()
-                    page.get_by_role('heading', name='⏱️ Link Expired or Shredded').wait_for()
+                    page.get_by_role('heading', name='⏱️ Link Expired or Revoked').wait_for()
                     assert not blocked, 'Unexpected external request blocked'
                     assert not errors, errors
                     print(f'PASS {args.browser}: hosted local viewer, no pre-click read, untrusted click ignored, decrypted redacted turns, burn, revoke. No public relay used.')
