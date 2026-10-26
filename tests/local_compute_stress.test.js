@@ -19,6 +19,11 @@ function runStressSuite() {
 
   const lc = new SafeShareLocalCompute();
   assert.equal(lc.hydrateText('<S1> * -0.20', {'<S1>':{value:10000,currency:'USD'}}, true).evaluations[0].val, -2000);
+
+  // ChatGPT renders symbols inside \texttt{...} (live KaTeX annotation, Oct 2026).
+  const katexText = lc.hydrateText("0.25 \\times \\texttt{<S1>}", { "<S1>": { value: 4800, currency: "USD" } }, true);
+  assert.equal(katexText.evaluations[0].val, 1200, `\\texttt{<S1>} must hydrate, got: ${katexText.hydratedText}`);
+  assert(katexText.hydratedText.includes("$1,200"), `Must show $1,200, got: ${katexText.hydratedText}`);
   const vault = {
     "<S1>": { value: 20000000, currency: "IDR", raw: "Rp 20.000.000" },
     "<S2>": { value: 5000000, currency: "IDR", raw: "Rp 5.000.000" },

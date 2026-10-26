@@ -11,12 +11,29 @@
   const loadedVersion = runtimeApi && runtimeApi.runtime && runtimeApi.runtime.getManifest ? runtimeApi.runtime.getManifest().version : "dev";
   console.log(`[SafeShare-AI] Extension content script active (v${loadedVersion}).`);
 
+  // The chat id is the last path segment after the site's marker. ChatGPT (Oct 2026) can hand out
+  // ids such as "local-chatgpt:<uuid>", so the whole segment is taken and decoded rather than
+  // stopping at the colon (that would make every chat share one vault entry).
+  const chatIdOf = typeof SafeShareChatId !== "undefined"
+    ? SafeShareChatId.of
+    : (url) => {
+      const m = (url || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([^/?#]+)/);
+      if (!m) return null;
+      try { return decodeURIComponent(m[1]); } catch (_) { return m[1]; }
+    };
+  const isTemporaryChatId = typeof SafeShareChatId !== "undefined"
+    ? SafeShareChatId.isTemporary
+    : (id) => typeof id === "string" && /^local-/i.test(id);
+
   // Ephemeral engines initialized in content script context
   const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault() : null;
   if (symbolicVault && typeof location !== "undefined") {
-    const initMatch = (location.href || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/);
-    if (initMatch && initMatch[1]) {
-      symbolicVault.loadFromSession(initMatch[1]);
+    const initId = chatIdOf(location.href);
+    if (initId) {
+      // A chat started on "/" gets its /c/<id> URL after the first send. If the site reloads the
+      // page there, the mapping may still be filed under "new": move it before reading this chat.
+      symbolicVault.promotePendingSession(initId);
+      symbolicVault.loadFromSession(initId);
     }
   }
   const symbolicRewriter = (typeof SafeShareSymbolicRewriter !== "undefined" && symbolicVault) ? new SafeShareSymbolicRewriter(symbolicVault) : null;
@@ -63,7 +80,6 @@
   const idMap = { byValue: new Map(), byPlaceholder: new Map(), counters: {} };
   const extApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
   const idStore = extApi && extApi.storage && extApi.storage.session ? extApi.storage.session : null;
-  const chatIdOf = (url) => ((url || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/) || [])[1] || null;
   let idMapKey = `safeshare_idmap_${chatIdOf(typeof location !== "undefined" ? location.href : "") || "new"}`;
   function loadIdMap(chatId) {
     idMap.byValue.clear();
@@ -919,7 +935,7 @@
     );
 
     const isSymbolicMathContent = (str) =>
-      /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\b(?:VAL\d+|S\d+_[A-Za-z0-9_]+)\b|(?:\d+(?:\.\d+)?%?|[+\-*^×÷·(]|\\times|\\cdot|\\div|\b(?:Rp\.?|IDR|USD|EUR|GBP|\$)\s*`?|(?<!\/)\/(?!\/))\s*S\d+\b|\bS\d+\b\s*(?:[-+*^×÷·)]|\\times|\\cdot|\\div|(?<!\/)\/(?!\/))|<code>[^<]*\bS\d+\b[^<]*<\/code>/i.test(str);
+      /<S\d+>|\\langle\s*s?\d+\s*\\rangle|⟨\s*s?\d+\s*⟩|&lt;s?\d+&gt;|<s\d+>|\b(?:VAL\d+|S\d+_[A-Za-z0-9_]+)\b|\\(?:text|texttt|textsf|mathrm|mathit|mathsf|mathtt|operatorname|textnormal)\s*\{\s*S\d+\s*\}|(?:\d+(?:\.\d+)?%?|[+\-*^×÷·(]|\\times|\\cdot|\\div|\b(?:Rp\.?|IDR|USD|EUR|GBP|\$)\s*`?|(?<!\/)\/(?!\/))\s*S\d+\b|\bS\d+\b\s*(?:[-+*^×÷·)]|\\times|\\cdot|\\div|(?<!\/)\/(?!\/))|<code>[^<]*\bS\d+\b[^<]*<\/code>/i.test(str);
 
     // PASS 1: Hydrate KaTeX LaTeX equations in-place across ChatGPT, Claude, and DeepSeek
     const katexNodes = document.querySelectorAll("span.katex, div.katex-display, div[class*='math']");
@@ -958,6 +974,10 @@
       "[data-testid='assistant-message'] [data-cds='Prose'] p, [data-testid='assistant-message'] [data-cds='Prose'] li, [data-testid='assistant-message'] [data-cds='Prose'] td, [data-testid='assistant-message'] [data-cds='Prose'] th, " +
       "div.ds-markdown p, div.ds-markdown li, div.ds-markdown td, div.ds-markdown th, " +
       ".chat-message-assistant p, .chat-message-assistant li, .chat-message-assistant td, .chat-message-assistant th, " +
+      // ChatGPT's Oct 2026 layout: assistant answers live under .DilResponseRoot and no longer
+      // carry data-message-author-role or div.markdown, so tables and prose need these hooks.
+      ".DilResponseRoot p, .DilResponseRoot li, .DilResponseRoot td, .DilResponseRoot th, " +
+      ".DilResponseRoot div[data-d-component='text'], " +
       "div.markdown p, div.markdown li, div.markdown td, div.markdown th, div.markdown > div:not([class*='composer']), " +
       "[data-message-author-role='assistant'] h1, [data-message-author-role='assistant'] h2, [data-message-author-role='assistant'] h3, [data-message-author-role='assistant'] div.markdown:not(:has(p, li, table, div, h1, h2, h3, pre))"
     );
@@ -1435,21 +1455,28 @@
     const oldUrl = lastRecordedUrl;
     lastRecordedUrl = location.href;
 
-    const getChatId = (u) => {
-      const m = (u || "").match(/(?:\/c\/|\/chat\/|\/a\/chat\/s\/)([a-zA-Z0-9_-]+)/);
-      return m ? m[1] : null;
-    };
+    const getChatId = (u) => chatIdOf(u);
 
     const oldId = getChatId(oldUrl);
     const newId = getChatId(location.href);
 
     // If transitioning from root/new chat to the newly created session for the same prompt, KEEP VAULT!
     const isNewChatToSession = !oldId && !!newId;
+    // ChatGPT names a fresh chat "local-chatgpt:<id>" and swaps in the server id moments later.
+    // That is the same conversation: carry the mapping over instead of reading an empty one.
+    const isTemporaryToReal = !!oldId && !!newId && oldId !== newId && isTemporaryChatId(oldId);
     const isSameChat = oldId && newId && oldId === newId;
 
-    if (isNewChatToSession && newId) {
+    if ((isNewChatToSession || isTemporaryToReal) && newId) {
       // Migrate secrets from "new" session to the newly assigned conversation ID
-      if (symbolicVault) symbolicVault.saveToSession(newId);
+      if (symbolicVault) {
+        symbolicVault.saveToSession(newId);
+        symbolicVault.clearPending();
+        if (isTemporaryToReal) symbolicVault.dropSession(oldId);
+      }
+      if (isTemporaryToReal) {
+        try { if (idStore) Promise.resolve(idStore.remove(`safeshare_idmap_${oldId}`)).catch(() => {}); } catch (_) {}
+      }
       idMapKey = `safeshare_idmap_${newId}`;
       saveIdMap();
     } else if (!isSameChat) {

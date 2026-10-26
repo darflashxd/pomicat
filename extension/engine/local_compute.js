@@ -113,7 +113,7 @@ class SafeShareLocalCompute {
     s = s.replace(/⟨\s*s(\d+)\s*⟩/gi, "<S$1>");
     // 5. Strip LaTeX text wrappers: \text{<S1>}, \mathrm{<S1>}, \textbf{...}, \mathit{...}
     for (let pass = 0; pass < 2; pass++) {
-      s = s.replace(/\\(?:text|textbf|mathrm|mathit|mathsf|operatorname)\s*\{([^{}]*?(?:<\s*S\d+|\[?\s*S\d+|\bS\d+)[^{}]*?)\}/gi, "$1");
+      s = s.replace(/\\(?:text|texttt|textsf|mathrm|mathit|mathsf|mathtt|operatorname|textnormal)\s*\{([^{}]*?(?:<\s*S\d+|\[?\s*S\d+|\bS\d+)[^{}]*?)\}/gi, "$1");
     }
     // 6. Canonicalize Semantic-Role Symbols (VAL1_GAJI, S1_GAJI_POKOK, S1\_GAJI\_POKOK, <S1:GAJI>, [S1_GAJI]) to <S1>
     // Note: bare S1/s2 words without underscore or brackets are protected (e.g. "program S1", "favicon s2")
@@ -159,7 +159,7 @@ class SafeShareLocalCompute {
     s = s.replace(/\\%/g, "%");
     s = this.preNormalizeHtmlSymbols(s);
     // Strip LaTeX text formatting commands
-    s = s.replace(/\\(?:text|textbf|mathrm|mathit|mathsf|operatorname)\s*\{([^{}]+)\}/gi, "$1");
+    s = s.replace(/\\(?:text|texttt|textsf|mathrm|mathit|mathsf|mathtt|operatorname|textnormal)\s*\{([^{}]+)\}/gi, "$1");
     // Normalize LaTeX fractions \frac{a}{b} -> ((a) / (b)), handling nested fractions recursively
     let prevFrac = "";
     while (s !== prevFrac && /\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/i.test(s)) {

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.4.1 - 2026-10-26
+
+- Viewer: headings, lists, blockquotes, links and horizontal rules now render instead of showing
+  raw Markdown markers. Text is escaped before any tag is added, and only absolute http(s) links
+  become anchors.
+- Viewer: the dead-link message now says "Link Expired or Revoked" and names the three possible
+  causes (expired, revoked, or already opened once) instead of "Shredded".
+- Review: a percentage after a spending verb ("spend 15% on hobbies") is a ratio, not a short
+  expense amount, and stays visible; the short-expense detector no longer masks the number.
+- ChatGPT: the temporary `local-chatgpt:<uuid>` route is promoted to the server chat UUID, so the
+  vault mapping and the protected-value note survive the URL swap instead of reloading an empty
+  session.
+- ChatGPT hydration: `.DilResponseRoot` responses and `\text{S1}` / `\texttt{<S1>}` formula
+  variants are accepted before the review opens.
+
 ## Unreleased — experimental share review
 
 - Found on the live sites (18 Oct): clicking DeepSeek's send arrow sent messages **without

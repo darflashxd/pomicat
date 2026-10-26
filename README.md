@@ -15,6 +15,16 @@ information that entity-only redaction leaves behind.
 > Detection can miss sensitive information or flag harmless text. A successful attack check
 > means the supported attack found a clue; an empty result does not prove the chat is safe.
 
+## Status
+
+- **Current release:** `v2.4.1` (26 October 2026). The viewer now renders Markdown, revoked links
+  say so, and ChatGPT's renamed chat URLs keep their vault mapping across the swap.
+- **Tests:** `52/52` offline regression tests pass with `npm test`.
+- **Exercised interfaces:** ChatGPT, Claude, and DeepSeek with the unpacked Chromium extension.
+  Firefox packages build from the same source; the screenshot set is Chromium-only.
+- **Still open:** changed chat-site DOMs require re-verification, and detection remains
+  best-effort. The limitations below are part of the design, not footnotes.
+
 ![SafeShare review before sharing](docs/screenshots/01-review-overview.png)
 
 *Review before sharing. The original and protected turns stay side by side, and every detected
@@ -84,6 +94,12 @@ Original-value restoration depends on the browser session mappings remaining ava
 **Before-send protection is not a barrier against the chat site's JavaScript reading the composer
 while you type.** It changes what is submitted, not what the page could already observe.
 
+![The sent message keeps its mapping on screen](docs/screenshots/06-before-send-symbols.png)
+
+*The prompt was sent as `<S1>`. The note under the message keeps the mapping on this screen only,
+and the reply's formulas are computed locally against it. The chat site received `<S1>`, not
+`$4,800`. Captured from the v2.4.1 extension on Chrome 155 with a local relay.*
+
 ## Screenshots
 
 ### Hiding the original value is not enough
@@ -107,8 +123,9 @@ hidden salary. The three unmasked suggestions in these captures are date-like fa
 ![Recipient view of a shared conversation](docs/screenshots/04-recipient-view.png)
 
 *The recipient sees the reviewed conversation, not the owner's local restoration mapping. This
-capture uses the relay-served viewer without the extension, so no originals are available in the
-page.*
+capture uses the v2.4.1 relay-served viewer with the extension disabled, so no originals are
+available in the page. The conversation runs to its last line and the **Continue** bar stays
+visible.*
 
 ### Revocation
 
@@ -137,8 +154,10 @@ capture.*
 
 </details>
 
-All captures use the same fictional budgeting conversation, the v2.4.0 extension, Chrome 155, and
-a relay at `http://127.0.0.1:8787`. No mock UI or screenshot slideshow is used.
+All captures use the same fictional budgeting conversation, Chrome 155, and a relay at
+`http://127.0.0.1:8787`. The review, derived-amount, revocation, and platform captures were taken
+with v2.4.0; the before-send and recipient-view captures were retaken with v2.4.1. No mock UI or
+screenshot slideshow is used.
 
 ## Reproduce the attack
 

@@ -149,8 +149,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!res.ok) {
         if (res.status === 404 || res.status === 410) {
           lockScreen.style.display = "block";
-          lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Shredded";
-          lockScreen.querySelector("p").innerText = "This link has passed its expiration deadline or has been shredded after read (Burn-After-Reading).";
+          lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Revoked";
+          lockScreen.querySelector("p").innerText = "This link has expired, was revoked by the sender, or was already opened once.";
           return;
         }
         throw new Error(`Failed to load chat: ${res.statusText}`);
@@ -163,8 +163,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("[SafeShare Viewer] Relay decryption error:", err);
       lockScreen.style.display = "block";
       if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
-        lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Shredded";
-        lockScreen.querySelector("p").innerText = "This link has passed its expiration deadline or has been shredded after read (Burn-After-Reading).";
+        lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Revoked";
+        lockScreen.querySelector("p").innerText = "This link has expired, was revoked by the sender, or was already opened once.";
       } else {
         lockScreen.querySelector("h2").innerText = decryptStarted ? "Decryption Failed" : "Could Not Load Conversation";
         lockScreen.querySelector("p").innerText = decryptStarted
@@ -348,80 +348,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function formatChatContent(raw) {
     if (!raw) return "";
-
-    function escapeHtml(text) {
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    if (typeof SafeShareMarkdown !== "undefined" && SafeShareMarkdown &&
+        typeof SafeShareMarkdown.format === "function") {
+      return SafeShareMarkdown.format(raw);
     }
-
-    function formatInline(text) {
-      let s = escapeHtml(text);
-      s = s.replace(/`([^`\n]+)`/g, "<code>$1</code>");
-      s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-      s = s.replace(/\n/g, "<br>");
-      return s;
-    }
-
-    const blocks = [];
-    const parts = raw.split(/(```[a-zA-Z0-9_-]*[\s\S]*?```)/g);
-
-    for (const part of parts) {
-      if (part.startsWith("```") && part.endsWith("```")) {
-        const match = part.match(/^```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```$/);
-        if (match) {
-          const lang = match[1] || "text";
-          const code = match[2].trim();
-          blocks.push(`<pre><code class="language-${lang}">${escapeHtml(code)}</code></pre>`);
-        }
-      } else {
-        const sections = part.split(/\n\n+/);
-        for (const sec of sections) {
-          const trimmed = sec.trim();
-          if (!trimmed) continue;
-
-          const lines = trimmed.split("\n");
-          const isTable = lines.some(l => (l.trim().startsWith("|") && l.trim().endsWith("|")) || (l.includes("\t") && l.split("\t").length >= 2));
-
-          if (isTable) {
-            const rows = [];
-            for (const line of lines) {
-              const l = line.trim();
-              if (!l) continue;
-              if (l.startsWith("|") && l.endsWith("|")) {
-                if (/^\|[\s:-|-]+\|$/.test(l)) continue;
-                rows.push(l.split("|").slice(1, -1).map(c => c.trim()));
-              } else if (l.includes("\t")) {
-                rows.push(l.split("\t").map(c => c.trim()).filter(Boolean));
-              }
-            }
-
-            if (rows.length > 0) {
-              let tableHtml = `<div class="table-wrapper"><table>`;
-              const header = rows[0];
-              tableHtml += "<thead><tr>" + header.map(h => `<th>${formatInline(h)}</th>`).join("") + "</tr></thead>";
-              if (rows.length > 1) {
-                tableHtml += "<tbody>";
-                for (let r = 1; r < rows.length; r++) {
-                  tableHtml += "<tr>" + rows[r].map(c => `<td>${formatInline(c)}</td>`).join("") + "</tr>";
-                }
-                tableHtml += "</tbody>";
-              }
-              tableHtml += "</table></div>";
-              blocks.push(tableHtml);
-              continue;
-            }
-          }
-
-          blocks.push(`<p>${formatInline(trimmed)}</p>`);
-        }
-      }
-    }
-
-    return blocks.join("\n");
+    // Renderer missing (should not happen): show escaped plain text, never raw HTML.
+    const div = document.createElement("div");
+    div.textContent = String(raw);
+    return `<p>${div.innerHTML.replace(/\n/g, "<br>")}</p>`;
   }
 
   // 5. Zero-Clipboard Continuation Handlers
@@ -457,9 +391,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.innerText = str;
-    return div.innerHTML;
-  }
 });

@@ -39,6 +39,9 @@ class SafeShareSymbolicVault {
     this.activeChatId = null;
     this.store = vaultStore(() => {
       if (this.inMemoryVault.size === 0) this.loadFromSession(this.activeChatId);
+      // A new chat gets its /c/<id> URL only after the first send. If the site reloads the page
+      // there, the old content script is gone before it can move the "new chat" mapping.
+      if (this.inMemoryVault.size === 0 && this.activeChatId) this.promotePendingSession(this.activeChatId);
     });
     this.loadFromSession();
   }
@@ -82,6 +85,39 @@ class SafeShareSymbolicVault {
       const key = this.activeChatId ? `${this.storagePrefix}data_${this.activeChatId}` : `${this.storagePrefix}data_new`;
       this.store.setItem(key, serialized);
     } catch (_) {}
+  }
+
+  /**
+   * Moves a mapping saved for "a new chat" (no URL id yet) to the chat id the site just assigned.
+   * Handles the case where the site does a full page load between the send and the URL change.
+   */
+  promotePendingSession(chatId) {
+    if (!this.store || !chatId) return;
+    try {
+      const targetKey = `${this.storagePrefix}data_${chatId}`;
+      const pending = this.store.getItem(`${this.storagePrefix}data_new`);
+      if (!pending) return;
+      // A mapping this chat already has of its own always wins; the pending copy is stale here.
+      if (!this.store.getItem(targetKey)) this.store.setItem(targetKey, pending);
+      this.store.removeItem(`${this.storagePrefix}data_new`);
+      this.loadFromSession(chatId);
+    } catch (_) {}
+  }
+
+  /**
+   * Drops the mapping filed under "new" once it has been copied to a real chat id.
+   */
+  clearPending() {
+    if (!this.store) return;
+    try { this.store.removeItem(`${this.storagePrefix}data_new`); } catch (_) {}
+  }
+
+  /**
+   * Drops one chat's stored mapping without touching the values held in memory.
+   */
+  dropSession(chatId) {
+    if (!this.store || !chatId) return;
+    try { this.store.removeItem(`${this.storagePrefix}data_${chatId}`); } catch (_) {}
   }
 
   /**

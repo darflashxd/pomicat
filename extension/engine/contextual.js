@@ -288,6 +288,9 @@ class ContextualClassifier {
           if (!rawNum) continue;
           const matchIndex = sm.index + sm[0].lastIndexOf(rawNum);
 
+          // Percentages are ratios, not expense amounts: "spend 15% on hobbies" must not hide "15".
+          if (/^\s*%/.test(sent.substring(matchIndex + rawNum.length))) continue;
+
           if (phoneSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
           if (bankAccountSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
           if (addressSpans.some(([s, e]) => matchIndex >= s && (matchIndex + rawNum.length) <= e)) continue;
