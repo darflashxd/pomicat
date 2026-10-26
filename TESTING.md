@@ -1,5 +1,17 @@
 # Manual test checklist (Chrome)
 
+## v2.4.1 local check (2026-10-26)
+
+- Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,
+  chat-id, vault-promotion, and percentage-false-positive cases.
+- Live ChatGPT (Chromium 155, unpacked v2.4.1): a `\texttt{<S1>}` reply hydrated to
+  `$2,400 / $1,440 / $960 / $4,800`; the `🔒 1 value protected` note survived a reload; the
+  `local-chatgpt:<uuid>` → server-UUID route swap kept the same vault entry.
+- Hosted viewer (local relay, extension disabled): headings, table, lists, and the fixed
+  **Continue** bar rendered; `spend 15% on hobbies` stayed visible after the short-expense fix.
+- Not re-verified here: live Claude and DeepSeek after login, and Firefox runtime after the
+  2.4.1 package build. Treat those as open until run.
+
 ## GitHub readiness checks (2026-10-25)
 
 Local remediation on base `1af71c1`: the model-runtime review harness now checks
@@ -224,7 +236,7 @@ This list covers what needs a real browser and your logged-in chat accounts.
 
 After any code change: click the reload ↻ on the SafeShare card, then **close and reopen** the
 chat tabs (an old copy keeps running in a tab that was open during the reload). Check the page
-console (F12): it should say `[SafeShare-AI] Extension content script active (v2.4.0).` If you see
+console (F12): it should say `[SafeShare-AI] Extension content script active (v2.4.1).` If you see
 `[REDACTED_NIK]` instead of `[NIK_1]` in a sent message, the tab is still running old code.
 
 Quick check without ChatGPT: `python -m http.server 8790 --bind 127.0.0.1` in the repo, open
@@ -374,7 +386,9 @@ Repeat 1a and section 3. Firefox supports the local name model; real-extension r
 - Firefox viewer inspection used a temporary profile with `-remote-allow-system-access` and
   `extensions.webextensions.remote=false`. Privileged-script clicks are not evidence for the synthetic-click gate.
 - `[BLOCKED]` Firefox before-send On remains unverified because the harness could not locate its menu option.
-- ChatGPT first-message note disappearance remains open; its route migration already exists and needs fresh live reproduction.
+- `[FIXED 2.4.1]` ChatGPT first-message note disappearance: the temporary `local-chatgpt:<uuid>`
+  mapping is promoted to the server UUID (live-verified across a reload). Re-run after future DOM
+  changes.
 - Escape/Tab focus handling and revised decrypt errors still need dedicated browser verification.
 
 ## Report back
