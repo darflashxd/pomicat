@@ -98,7 +98,8 @@ while you type.** It changes what is submitted, not what the page could already 
 
 *The prompt was sent as `<S1>`. The note under the message keeps the mapping on this screen only,
 and the reply's formulas are computed locally against it. The chat site received `<S1>`, not
-`$4,800`. Captured from the v2.4.1 extension on Chrome 155 with a local relay.*
+`$4,800`. Captured from the v2.4.1 extension on Chrome 155, ChatGPT dark theme, with a local relay;
+the reply and its computed values are unedited.*
 
 ## Screenshots
 
@@ -127,6 +128,20 @@ capture uses the v2.4.1 relay-served viewer with the extension disabled, so no o
 available in the page. The conversation runs to its last line and the **Continue** bar stays
 visible.*
 
+### Where the key lives
+
+![The share key stays in the fragment and is absent from the request](docs/screenshots/07-fragment-boundary.png)
+
+*A share URL is `<relay>/v/<id>#<key>`. The part after `#` is the AES-256-GCM key, and the browser
+does not put it on the wire: the page's own request for the ciphertext is `/api/share/<id>`, with no
+fragment. The key is redacted in this capture; both URLs are the page's console output on v2.4.1
+against the local relay.*
+
+Search engines do not index or fetch anything behind `#`, and the relay also sends
+`X-Robots-Tag: noindex`. Both are defence in depth, not access control: a full link posted in
+public can still be copied, and anyone holding it can decrypt the share until it expires or is
+revoked.
+
 ### Revocation
 
 ![Revoked share link](docs/screenshots/05-revoked.png)
@@ -154,10 +169,10 @@ capture.*
 
 </details>
 
-All captures use the same fictional budgeting conversation, Chrome 155, and a relay at
+All captures use fictional conversations, Chrome 155, and a relay at
 `http://127.0.0.1:8787`. The review, derived-amount, revocation, and platform captures were taken
-with v2.4.0; the before-send and recipient-view captures were retaken with v2.4.1. No mock UI or
-screenshot slideshow is used.
+with v2.4.0; the before-send and recipient-view captures were retaken with v2.4.1, and the
+fragment-boundary capture was taken with v2.4.1. No mock UI or screenshot slideshow is used.
 
 ## Reproduce the attack
 

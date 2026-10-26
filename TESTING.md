@@ -9,6 +9,16 @@
   `local-chatgpt:<uuid>` → server-UUID route swap kept the same vault entry.
 - Hosted viewer (local relay, extension disabled): headings, table, lists, and the fixed
   **Continue** bar rendered; `spend 15% on hobbies` stayed visible after the short-expense fix.
+- README capture `06-before-send-symbols.png` re-shot on 2026-10-26 in ChatGPT dark theme
+  (Chromium 155, v2.4.1, local relay). The user bubble, which carries the injected
+  privacy-protocol suffix, was made transparent in-frame; the sent-note, reply table, computed
+  values, `Protecting amounts` chip, and composer are unedited. The free-tier ad slot and the
+  account avatar were hidden; no product UI was altered.
+- README capture `07-fragment-boundary.png` taken on 2026-10-26 with v2.4.1 against the local relay.
+  A fresh `--ttl 3600` share was opened through the viewer's click-to-open gate; the page then
+  requested `/api/share/<id>` with no fragment. The two commands and their output in the crop are
+  the page's own DevTools console, unedited except that the 43-character key is replaced by
+  `#<key>`. The share was revoked after the capture.
 - Not re-verified here: live Claude and DeepSeek after login, and Firefox runtime after the
   2.4.1 package build. Treat those as open until run.
 
