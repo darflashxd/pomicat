@@ -15,11 +15,15 @@ information that entity-only redaction leaves behind.
 > Detection can miss sensitive information or flag harmless text. A successful attack check
 > means the supported attack found a clue; an empty result does not prove the chat is safe.
 
-![SafeShare demonstration](docs/demo.gif)
+![SafeShare review before sharing](docs/screenshots/01-review-overview.png)
 
-[Quick start](#quick-start-share-privately) · [Reproduce the attack](#reproduce-the-attack) ·
-[Security model](#security-model) · [Evaluation](#evaluation-and-reproducibility) ·
-[Testing](TESTING.md) · [Deployment](DEPLOY.md)
+*Review before sharing. The original and protected turns stay side by side, and every detected
+item can be inspected or reversed before a link is created. Captured from the v2.4.0 extension on
+Chrome 155 with a local relay and fictional data.*
+
+[Quick start](#quick-start-share-privately) · [Screenshots](#screenshots) ·
+[Reproduce the attack](#reproduce-the-attack) · [Security model](#security-model) ·
+[Evaluation](#evaluation-and-reproducibility) · [Testing](TESTING.md) · [Deployment](DEPLOY.md)
 
 ## Quick start: Share Privately
 
@@ -79,6 +83,62 @@ Original-value restoration depends on the browser session mappings remaining ava
 
 **Before-send protection is not a barrier against the chat site's JavaScript reading the composer
 while you type.** It changes what is submitted, not what the page could already observe.
+
+## Screenshots
+
+### Hiding the original value is not enough
+
+The assistant still shows the numbers derived from the salary. Redacting `$4,800` does not hide
+`$1,200` at 25%, `$720` at 15%, `$2,880` at 60%, or the `$14,400` annual total.
+
+![Monthly allocations remain after the salary is redacted](docs/screenshots/02-derived-amounts.png)
+
+*The salary is masked, but the monthly allocations are also recoverable values. SafeShare reviews
+them together.*
+
+![Annual total reveals the hidden salary](docs/screenshots/02b-annual-derived.png)
+
+*`$14,400 ÷ 12 = $1,200` and `$1,200 ÷ 25% = $4,800`. The annual total is a second path to the
+hidden salary. The three unmasked suggestions in these captures are date-like false positives
+(`monthly`); the salary and its derived amounts are masked.*
+
+### The recipient view
+
+![Recipient view of a shared conversation](docs/screenshots/04-recipient-view.png)
+
+*The recipient sees the reviewed conversation, not the owner's local restoration mapping. This
+capture uses the relay-served viewer without the extension, so no originals are available in the
+page.*
+
+### Revocation
+
+![Revoked share link](docs/screenshots/05-revoked.png)
+
+*The owner can revoke a link after creating it. Revocation blocks subsequent retrieval; it cannot
+recall copies a recipient has already retained. This link points at the local relay used for the
+capture.*
+
+### Supported chat interfaces
+
+<details>
+<summary>ChatGPT, Claude, and DeepSeek</summary>
+
+**ChatGPT**
+
+![SafeShare on ChatGPT](docs/screenshots/platform-chatgpt.png)
+
+**Claude**
+
+![SafeShare on Claude](docs/screenshots/platform-claude.png)
+
+**DeepSeek**
+
+![SafeShare on DeepSeek](docs/screenshots/platform-deepseek.png)
+
+</details>
+
+All captures use the same fictional budgeting conversation, the v2.4.0 extension, Chrome 155, and
+a relay at `http://127.0.0.1:8787`. No mock UI or screenshot slideshow is used.
 
 ## Reproduce the attack
 
