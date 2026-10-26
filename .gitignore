@@ -4,6 +4,10 @@
 
 # 1. AI tooling: knowledge graphs (graphify) and Claude / agent config (never commit)
 node_modules/
+.env
+.env.*
+!.env.example
+!.env.sample
 graphify-out/
 **/graphify-out/
 .graphify*

@@ -111,7 +111,7 @@
     for (let i = 0; i < 100 && modal.publishing; i++) await new Promise(resolve => setTimeout(resolve, 20));
   } finally { console.error = logError; }
   assert(!modal.publishing && !document.getElementById("btn-encrypt-publish").disabled &&
-    !document.querySelector("#safeshare-maybe-items input").disabled, "failure unlocks real review controls");
+    !document.querySelector("#safeshare-maybe-items .btn-maybe-quick").disabled, "failure unlocks real review controls");
   modal.removeExisting();
   modal.open([{ role: "user", content: "The private figure is USD 8,765." }, { role: "assistant", content: "20% is USD 1,753; over twelve months USD 21,036." }]);
   modal.addCustomSelection("USD 8,765");

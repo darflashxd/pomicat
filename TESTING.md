@@ -1,5 +1,23 @@
 # Manual test checklist (Chrome)
 
+## GitHub readiness checks (2026-10-25)
+
+Local remediation on base `1af71c1`: the model-runtime review harness now checks
+the current preselected-suggestion policy and button `aria-pressed` state instead
+of the old unchecked-checkbox UI. The publication failure fixture also targets
+the current review button. Stale model results now display the text-changed warning.
+
+Windows local checks passed: Node 48/48 (after remediation), evaluator self-checks,
+Chromium and Firefox credential/lifecycle fixtures, both hosted local relay browser
+checks, and real Chromium extension ONNX inference plus share-dialog checks.
+These results do not establish Linux CI success, live vendor compatibility, or
+held-out detection accuracy. Verify the pushed commit in GitHub Actions separately.
+
+Release package check on 2026-10-26: extracted 2.4.0 Chrome and Firefox ZIPs passed
+actual ONNX inference and share-dialog checks (Chromium 149 and Firefox 158).
+Apache-2.0 section 4(d)'s omitted notice text was restored against the official
+license; the existing copyright is retained.
+
 ## Release regression additions (2026-10-21)
 
 `manual_redact.test.js` covers URI-password echoes, prose-punctuation echoes, embedded

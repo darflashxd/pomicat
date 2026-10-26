@@ -1122,7 +1122,7 @@ class SafeShareModal {
     const status = document.getElementById("safeshare-model-status");
     const missing = this.reviewBaseTurns?.some(t => !this.modelReview.has(t.content));
     if (status) status.textContent = /unavailable|skipped/i.test(this.modelState)
-      ? "Scan unavailable. Review manually." : !this.modelBusy && missing && /checked/i.test(this.modelState)
+      ? "Scan unavailable. Review manually." : !this.modelBusy && (/text changed/i.test(this.modelState) || missing && /checked/i.test(this.modelState))
         ? "Text changed. Re-scan to update suggestions." : "";
     list.innerHTML = "";
     if (!this.maybeCandidates.length) {

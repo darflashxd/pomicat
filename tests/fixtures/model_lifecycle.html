@@ -26,7 +26,7 @@ document.getElementById('chat').onload=async()=>{
   modal.setCandidateEnabled(amount,false);modal.rebuildViews();
   modal.addCustomSelection('Blue Harbor');
   pending[2]({success:true,spans:[]});await changedRun;
-  assert(d.getElementById('safeshare-model-status').textContent.includes('text changed'),'stale snapshot claimed current preview checked');
+   assert(/text changed/i.test(d.getElementById('safeshare-model-status').textContent),'stale snapshot claimed current preview checked');
   assert(!modal.sanitizedTurns[0].content.includes('Blue Harbor'),'late scan reversed manual choice');
   w.SafeShareNer={analyze:async()=>({success:false,error:'Expected offline failure'})};
   await modal.checkLocalModel();

@@ -33,9 +33,12 @@ async function checkBrowserReview() {
   assert(!modal.modelBusy && modal.modelState.includes("Local AI model checked"), modal.modelState);
   const modelCandidates = modal.maybeCandidates.filter(c => c.reason.startsWith("Local model:"));
   assert(modelCandidates.length > 0, "no model suggestions in actual share dialog");
-  assert(modelCandidates.every(c => !c.risky), "uncalibrated model candidates must not auto-hide");
+  for (const candidate of modelCandidates) {
+    assert(document.getElementById(candidate.id).getAttribute("aria-pressed") === String(Boolean(candidate.risky)), "model default differs from selection policy");
+  }
   const selected = modelCandidates[0];
-  document.getElementById(selected.id).click();
+  const checkbox = document.getElementById(selected.id);
+  if (checkbox.getAttribute("aria-pressed") !== "true") checkbox.click();
   assert(!modal.sanitizedTurns.some(t => t.content.includes(selected.raw)), "model suggestion choice not applied");
   // Inspector and suggestion checkbox must persist the same choice through a rebuild.
   const inspector = document.querySelector(`.cand-toggle-input[data-cand-id="${selected.id}"]`);
