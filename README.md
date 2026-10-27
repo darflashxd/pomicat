@@ -17,13 +17,15 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Current release:** `v2.4.1` (26 October 2026). The viewer now renders Markdown, revoked links
-  say so, and ChatGPT's renamed chat URLs keep their vault mapping across the swap.
-- **Tests:** `52/52` offline regression tests pass with `npm test`.
-- **Exercised interfaces:** ChatGPT, Claude, and DeepSeek with the unpacked Chromium extension.
-  Firefox packages build from the same source; the screenshot set is Chromium-only.
-- **Still open:** changed chat-site DOMs require re-verification, and detection remains
-  best-effort. The limitations below are part of the design, not footnotes.
+- **Current release:** `v2.5.0` (28 October 2026). Word Online documents can be reviewed, redacted,
+  and shared as encrypted document links. The public relay serves the v4 document viewer.
+- **Tests:** `54/54` offline regression tests pass with `npm test`.
+- **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
+  extension. A public-relay document link was opened in a clean browser context without the
+  extension. Firefox packages build from the same source; the screenshot set is Chromium-only.
+- **Still open:** changed chat-site DOMs require re-verification, SharePoint capture depends on the
+  tenant, and detection remains best-effort. Image text is marked by hand. The limitations below
+  are part of the design, not footnotes.
 
 ![SafeShare review before sharing](docs/screenshots/01-review-overview.png)
 
@@ -44,13 +46,18 @@ git clone https://github.com/darflashxd/safeshare.git
 cd safeshare
 ```
 
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Select **Load unpacked** and choose the repository's `extension/` folder.
-3. Open or refresh ChatGPT, Claude, or DeepSeek, then select **SafeShare**.
-4. Review the extracted user and assistant turns. Inspect redactions and **Maybe sensitive**
-   suggestions; add manual redactions for anything the detectors missed.
-5. Choose the reader profile, amount handling, expiry, and burn-after-read setting, then create
-   the link. Anyone receiving the **complete link, including its fragment**, can open it.
+1. Get the 2.5.0 Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
+   clone the repository and use the `extension/` folder while developing. Extract the ZIP.
+2. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the
+   extracted folder (or the repository's `extension/` folder).
+3. Open or refresh ChatGPT, Claude, DeepSeek, or a Word Online document. On Word, use the floating
+   **SafeShare** button at the bottom right.
+4. Review the extracted text or saved document copy. In Word, the **Maybe important** section shows
+   only model suggestions; automatic rule detections stay active and can be clicked in either
+   preview pane to redact or restore them.
+5. Choose the reader profile, amount handling, and expiry, then create the link or download the
+   DOCX. Anyone receiving the **complete link, including its fragment**, can open it; recipients do
+   not need the extension when the public relay serves the document viewer.
 
 The model, vocabulary, and ONNX WASM runtime are bundled in the repository. **Running the browser
 extension requires no Python, model download, or inference API key.** Creating and opening relay

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.5.0 - 2026-10-28
+
+- Word Online: a floating SafeShare button opens a separate saved copy of the document, so the
+  original is untouched. The review page reads the copy once, then offers Read again.
+- Word redaction edits the OOXML package in place. Tables, styles, headers, footers and equations
+  stay in place; tracked deletions, hidden text, comments, metadata and thumbnails are removed.
+- Detection uses the chat rules, money-column bases, the derived-amount solver and the local name
+  model. The Maybe important section lists only model candidates as Possible person or Possible
+  location with their score. Rule detections stay automatic and do not fill the list.
+- Any highlight can be clicked in Original or What others will see to redact or restore it. Selecting
+  other text adds a manual redaction. Scrolling one preview pane follows the other.
+- Images open in a full-size lightbox. Marked areas are written into the pixels, then checked before
+  export. Cropped areas that stay in the file are covered by Redact whole.
+- A reviewed copy can be downloaded as DOCX or shared as an encrypted link with 24h, 3d or 7d
+  expiry and revoke. The Cloudflare viewer now renders v4 document payloads and works without the
+  extension.
+- Limits: 512 KiB ciphertext cap, no burn-after-one-view for documents, image text needs manual
+  marking, and SharePoint download depends on the tenant.
+
 ## 2.4.1 - 2026-10-26
 
 - Viewer: headings, lists, blockquotes, links and horizontal rules now render instead of showing

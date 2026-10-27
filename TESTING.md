@@ -242,6 +242,18 @@ money stayed hidden; Hide all restored `24/24`. Applying produced
 Preview scroll sync maps the top block plus its fraction between panes; verified at scroll 400 and
 250 that both panes reported the same block and fraction. `node tests/run_all.js` passes 54/54.
 
+Public relay and release package (2026-10-28): deployed `safeshare-relay` with the current viewer
+assets (4 files changed). The public `/v/app.js` now contains the `kind === "document"` branch and
+the `Download sanitized DOCX` control. A synthetic v4 document payload, not a user file, was
+uploaded with a one-hour TTL and opened in a fresh browser context without the extension: the
+click gate, `SafeShare - Reviewed document`, the preview text and table, and the download button
+all rendered. Revoking the share and reloading showed `Link Expired or Revoked`.
+
+Extension packages were bumped to 2.5.0. Both ZIPs contain `word/`, `viewer/` and `models/`; SHA256
+checksums are written to `dist/SHA256SUMS`. The local `safeshare_relay` override was removed from
+the test profile, so it uses the public relay by default. This does not publish the extension in a
+store; GitHub release ZIPs still need to be installed manually or deployed by policy.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

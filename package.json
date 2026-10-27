@@ -1,6 +1,6 @@
 {
   "name": "safeshare-ai",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "Redacts sensitive data from AI chat transcripts, blocks algebraic recovery of redacted numbers, and shares the result as an end-to-end encrypted link.",
   "main": "bin/safeshare.js",
   "bin": {
