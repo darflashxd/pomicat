@@ -12,8 +12,12 @@ assert.throws(()=>downloadUrl(sample.replace("fictional.sharepoint.com","sharepo
 assert.throws(()=>downloadUrl(sample.replace("Example.docx","Example.xlsx")),/Unsupported/);
 for (const name of ["manifest.json", "manifest.firefox.json"]) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, name)));
-  assert.ok(manifest.optional_host_permissions.includes("https://*.sharepoint.com/*"));
-  assert.ok(!manifest.host_permissions.some(p => p.includes("sharepoint")), "Word site access must be opt-in");
+  assert.ok(manifest.host_permissions.includes("https://*.sharepoint.com/*"), "Word hosts must be static");
+  assert.ok(manifest.host_permissions.includes("https://word.cloud.microsoft/*"), "Word home must be static");
+  assert.ok(!manifest.optional_host_permissions, "no per-site prompt for Word");
+  const launcher = manifest.content_scripts.find(s => (s.js || []).includes("word/launcher.js"));
+  assert.ok(launcher, "launcher must be a static content script");
+  assert.ok(launcher.matches.includes("https://*.sharepoint.com/*"));
 }
 const html = fs.readFileSync(path.join(root, "word/index.html"), "utf8");
 assert.ok(!/type=["']file/.test(html));

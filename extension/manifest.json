@@ -17,9 +17,11 @@
     "https://chat.deepseek.com/*",
     "https://safeshare-relay.bleedguard.workers.dev/*",
     "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1/*",
+    "https://*.sharepoint.com/*",
+    "https://*.officeapps.live.com/*",
+    "https://word.cloud.microsoft/*"
   ],
-  "optional_host_permissions": ["https://*.sharepoint.com/*", "https://*.officeapps.live.com/*", "https://word.cloud.microsoft/*"],
   "background": {
     "service_worker": "background.js"
   },
@@ -65,6 +67,17 @@
         "engine/settings.js",
         "ui/modal.js",
         "content_script.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.sharepoint.com/*",
+        "https://*.officeapps.live.com/*",
+        "https://word.cloud.microsoft/*"
+      ],
+      "js": [
+        "word/launcher.js"
       ],
       "run_at": "document_idle"
     }

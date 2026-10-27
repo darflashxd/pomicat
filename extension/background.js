@@ -8,44 +8,19 @@ console.log("[SafeShare-AI] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
-async function restoreWordLaunchers() {
+// The Word launcher is declared statically in the manifest, so no runtime
+// permission request or dynamic registration is needed. Keep a single guarded
+// injection for tabs that loaded before the extension was reloaded.
+const WORD_ORIGIN = /^https:\/\/(?:[a-z0-9-]+\.)*(?:sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/i;
+async function injectWordLauncher(tabId, url) {
   try {
-    const { origins = [] } = await webExtApi.permissions.getAll();
-    const allowed = origins.filter(pattern => /^https:\/\/(?:\*\.)?(?:[a-z0-9-]+\.)*(?:sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)\/\*$/i.test(pattern));
-    const registered = await webExtApi.scripting.getRegisteredContentScripts();
-    const id = "safeshare-word-restored";
-    const old = registered.find(script => script.id === id);
-    if (!allowed.length) {
-      if (old) await webExtApi.scripting.unregisterContentScripts({ ids: [id] });
-      return;
-    }
-    const script = { id, matches: allowed, js: ["word/launcher.js"], runAt: "document_idle" };
-    if (old) await webExtApi.scripting.updateContentScripts([script]);
-    else await webExtApi.scripting.registerContentScripts([script]);
-    const tabs = await webExtApi.tabs.query({ url: allowed });
-    await Promise.allSettled(tabs.filter(tab => tab.id).map(tab =>
-      webExtApi.scripting.executeScript({ target: { tabId: tab.id }, files: ["word/launcher.js"] })));
-  } catch (_) {
-    console.warn("[SafeShare] Word launcher restoration unavailable; enable it from Word setup.");
-  }
-}
-// Run on worker load too: an unpacked-extension reload may retain site permission
-// while losing the dynamically registered script. No new permission is requested.
-restoreWordLaunchers();
-webExtApi.runtime.onStartup.addListener(restoreWordLaunchers);
-webExtApi.runtime.onInstalled.addListener(restoreWordLaunchers);
-webExtApi.permissions.onAdded.addListener(restoreWordLaunchers);
-// A page that finishes loading after the worker slept still needs the launcher.
-webExtApi.tabs.onUpdated.addListener(async (tabId, change, tab) => {
-  if (change.status !== "complete" || !tab?.url) return;
-  try {
-    const url = new URL(tab.url);
-    if (url.protocol !== "https:" || !/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) return;
-    if (!await webExtApi.permissions.contains({ origins: [url.origin + "/*"] })) return;
+    if (!url || !WORD_ORIGIN.test(new URL(url).origin)) return;
     await webExtApi.scripting.executeScript({ target: { tabId }, files: ["word/launcher.js"] });
   } catch (_) {}
+}
+webExtApi.tabs.onUpdated.addListener((tabId, change, tab) => {
+  if (change.status === "complete") injectWordLauncher(tabId, tab?.url);
 });
-webExtApi.permissions.onRemoved.addListener(restoreWordLaunchers);
 
 // Word setup runs in a trusted extension tab; provider access is opt-in.
 webExtApi.action.onClicked.addListener((tab) => {

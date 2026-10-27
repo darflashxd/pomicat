@@ -146,6 +146,14 @@ styles and images. Payload cap is the relay's 512 KiB ciphertext, so documents w
 must be downloaded instead. No burn-after-one-view. Recipient test used the same browser profile,
 so a clean no-extension context is still untested.
 
+Static launcher (2026-10-27): Word origins moved from `optional_host_permissions` to
+`host_permissions` and `word/launcher.js` became a declared content script, so the button appears
+on load without an Enable step. Removed the runtime permission request and dynamic registration;
+background only re-injects into tabs that finish loading. Verified in the extension build:
+button visible on the document route, hidden on the Word home route, and the setup page shows the
+connected state with no `#enable` control. Trade-off: Chrome now warns about SharePoint/Word
+access at install and the extension has DOM access to those origins, not only the open document.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

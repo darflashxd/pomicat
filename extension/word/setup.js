@@ -11,33 +11,19 @@ try {
   const parsed = new URL(query.get("origin"));
   if (parsed.protocol === "https:" && /(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(parsed.hostname)) origin = parsed.origin;
 } catch (_) {}
-if (origin) { $("source").textContent = `Allow the SafeShare button on ${new URL(origin).hostname}. This does not grant Microsoft file access.`; $("enable").disabled = false; }
-async function applyPermissionState() {
-  if (!origin || !/(^|\.)sharepoint\.com$/.test(new URL(origin).hostname)) return false;
-  if (!await api.permissions.contains({ origins: [origin + "/*"] })) return false;
-  $("enable-section").hidden = true;
-  $("capture-section").hidden = false;
-  $("capture-intro").textContent = `Connected to ${new URL(origin).hostname}. Reads the saved copy only; the original document is not changed.`;
-  return true;
-}
-applyPermissionState().catch(() => {});
-$("enable").addEventListener("click", async () => {
-  $("enable").disabled = true; $("error").hidden = true;
+// The launcher is declared statically, so this page only needs to know which
+// Word tab to read. No permission request happens here.
+const sharepointOrigin = (() => {
   try {
-    const pattern = origin + "/*";
-    if (!await api.permissions.request({origins:[pattern]})) throw new Error("Site access was not granted. You can try again.");
-    const id = "safeshare-word-" + new URL(origin).hostname.replace(/[^a-z0-9]/gi,"-");
-    if (!(await api.scripting.getRegisteredContentScripts({ids:[id]})).length) await api.scripting.registerContentScripts([{id,matches:[pattern],js:["word/launcher.js"],runAt:"document_idle"}]);
-    const tabId = Number(query.get("tab"));
-    if (Number.isInteger(tabId) && tabId > 0) {
-      const tab = await api.tabs.get(tabId);
-      if (new URL(tab.url).origin === origin) await api.scripting.executeScript({target:{tabId},files:["word/launcher.js"]});
-    }
-    $("status").textContent = "Launcher enabled. Return to Word to see SafeShare at the bottom right.";
-    $("enable").textContent = "Enabled on this site";
-    await applyPermissionState();
-  } catch (_) { $("error").textContent = "Could not enable the launcher. Reload the extension and try again; check site permissions."; $("error").hidden = false; $("enable").disabled = false; }
-});
+    const parsed = new URL(origin);
+    return /(^|\.)sharepoint\.com$/.test(parsed.hostname) ? parsed.origin : null;
+  } catch (_) { return null; }
+})();
+if (sharepointOrigin) {
+  $("capture-section").hidden = false;
+  $("capture-intro").textContent = `Connected to ${new URL(sharepointOrigin).hostname}. Reads the saved copy only; the original document is not changed.`;
+}
+
 $("capture").addEventListener("click",async()=>{
   $("capture").disabled=true;$("error").hidden=true;$("inspection").hidden=true;$("document-preview").replaceChildren();
   $("capture-status").textContent="Reading saved DOCX…";

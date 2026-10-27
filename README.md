@@ -103,7 +103,11 @@ the reply and its computed values are unedited.*
 
 ### Word Online integration ? preparation only
 
-Offline document import has been removed. The toolbar opens Word Online setup; you can opt in
+Offline document import has been removed. The Word button is declared as a normal content
+script, so it appears on Word documents without a per-site prompt; Chrome shows the access
+warning once at install. The extension therefore has DOM access to SharePoint/Word origins in
+general, and the launcher only reveals itself on Word editor routes. The toolbar opens Word Online
+setup; you can opt in
 on a supported SharePoint/Word origin and add a SafeShare launcher. This is **not yet document
 sharing**: an experimental **Read saved copy** action supports the observed SharePoint
 `Doc.aspx`/`doc2.aspx` session-download route after site permission. It accepts DOCX up to 5 MiB
