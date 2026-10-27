@@ -108,8 +108,9 @@ the toolbar opens Word Online setup. Opening it reads a **separate copy** of the
 through the current SharePoint session, leaving the original unchanged. The setup page is a
 document-first workspace: the preview spans the width at the top (original beside “what others
 will see”), followed by findings in a card grid, then images, then sharing. A sticky section nav
-jumps between the sections. Selecting text in either preview pane adds it as a manual finding.
-Opening setup from the launcher
+jumps between the sections. Findings show nine cards first with **Show more**; only model-derived
+rows carry a `Maybe important · 38%` note. Selecting text in either preview pane adds it as a
+manual finding, and scrolling one pane follows the other. Opening setup from the launcher
 reads the copy once automatically; the control then becomes **Read again**.
 
 Detection reuses the chat tiers plus money-column/currency bases and the derived-amount solver,

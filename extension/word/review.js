@@ -1,11 +1,12 @@
 let mediaCache = null;
 let imageState = [];
-let showAllFindings = false;
+let findingLimit = 9;
+let lastFindingsDoc = null;
 let wordPrefs = { reader: "public", numbers: "remove", categories: null };
 let attackLeaks = 0;
 let documentCurrency = null;
 let appliedSignature = null;
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 9;
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -221,6 +222,7 @@ function updateLowerLabel() {
 
 function renderFindings(doc) {
   const findings = findingRows(doc);
+  if (doc !== lastFindingsDoc) { findingLimit = PAGE_SIZE; lastFindingsDoc = doc; }
   const host = $("findings");
   host.replaceChildren();
   const chips = $("category-chips");
@@ -253,12 +255,14 @@ function renderFindings(doc) {
     text.className = "finding-text";
     const value = document.createElement("strong");
     value.textContent = finding.value;
-    const meta = document.createElement("small");
-    const score = Number.isFinite(finding.score)
-      ? `Model score ${Math.round(finding.score * 100)}%`
-      : (finding.source === "manual" ? "Added by you" : "Rule-based");
-    meta.textContent = `${finding.ruleName || finding.name || "Finding"} · ${score}`;
-    text.append(value, document.createElement("br"), meta);
+    text.append(value);
+    row.title = finding.ruleName || finding.name || "Finding";
+    if (Number.isFinite(finding.score)) {
+      const meta = document.createElement("small");
+      meta.className = "finding-score";
+      meta.textContent = `Maybe important · ${Math.round(finding.score * 100)}%`;
+      text.append(meta);
+    }
     const state = document.createElement("button");
     state.type = "button"; state.className = "finding-state";
     state.textContent = box.checked ? "Redacted" : "Visible";
@@ -274,16 +278,22 @@ function renderFindings(doc) {
     actions.className = "finding-actions";
     actions.append(state, locate);
     row.append(label, text, actions);
-    row.dataset.pageHidden = index >= PAGE_SIZE ? "1" : "0";
-    if (row.dataset.pageHidden === "1" && !showAllFindings) row.hidden = true;
+    row.dataset.pageHidden = index >= findingLimit ? "1" : "0";
+    if (row.dataset.pageHidden === "1") row.hidden = true;
     host.append(row);
   });
+  const shown = Math.min(findingLimit, findings.length);
   const more = $("show-more");
   if (findings.length > PAGE_SIZE) {
     more.hidden = false;
-    more.textContent = showAllFindings ? "Show fewer" : `Show ${findings.length - PAGE_SIZE} more`;
+    const remaining = Math.min(PAGE_SIZE, findings.length - shown);
+    more.textContent = shown >= findings.length
+      ? "Show fewer findings"
+      : `Show ${remaining} more finding${remaining === 1 ? "" : "s"}`;
   } else more.hidden = true;
-  $("findings-meta").textContent = findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "None";
+  $("findings-meta").textContent = !findings.length
+    ? "None"
+    : (shown < findings.length ? `${shown} of ${findings.length} shown` : `${findings.length} item${findings.length === 1 ? "" : "s"}`);
   const navCount = $("nav-findings");
   if (navCount) navCount.textContent = String(findings.length);
 
@@ -317,7 +327,7 @@ function rerenderKeepingChoices() {
     if (toggles.has(value)) box.checked = toggles.get(value);
     const chip = chips.get(row.dataset.category);
     row.dataset.categoryHidden = chip === false ? "1" : "0";
-    row.hidden = row.dataset.categoryHidden === "1" || (row.dataset.pageHidden === "1" && !showAllFindings);
+    row.hidden = row.dataset.categoryHidden === "1" || row.dataset.pageHidden === "1";
   }
   for (const box of document.querySelectorAll("#category-chips input")) {
     if (chips.has(box.dataset.category)) box.checked = chips.get(box.dataset.category);
@@ -368,7 +378,7 @@ function addManualCandidate(text) {
     $("apply-status").textContent = "That value is already in the list.";
     return false;
   }
-  providedFindings.push({
+  providedFindings.unshift({
     value, category: "CUSTOM", categoryLabel: "Added by you", ruleName: "Manual selection",
     reason: "selected in preview", replacement: $("placeholder-style").value, source: "manual", preChecked: true
   });
@@ -695,17 +705,46 @@ $("category-chips").addEventListener("change", () => {
   const allowed = new Set([...document.querySelectorAll("#category-chips input:checked")].map(box => box.dataset.category));
   for (const row of document.querySelectorAll(".finding")) {
     row.dataset.categoryHidden = allowed.has(row.dataset.category) ? "0" : "1";
-    row.hidden = row.dataset.categoryHidden === "1" || (row.dataset.pageHidden === "1" && !showAllFindings);
+    row.hidden = row.dataset.categoryHidden === "1" || row.dataset.pageHidden === "1";
   }
   updateCounts();
 });
 $("show-more").addEventListener("click", () => {
-  showAllFindings = !showAllFindings;
+  const total = document.querySelectorAll(".finding").length;
+  findingLimit = findingLimit >= total ? PAGE_SIZE : Math.min(total, findingLimit + PAGE_SIZE);
   rerenderKeepingChoices();
 });
 $("show-original").addEventListener("change", () => {
   document.body.classList.toggle("hide-original", !$("show-original").checked);
 });
+{
+  const original = $("document-preview"), sanitized = $("sanitized-preview");
+  let syncing = null;
+  const follow = event => {
+    const source = event.currentTarget;
+    if (syncing === source) return;
+    const target = source === original ? sanitized : original;
+    if (!target || target.clientHeight === 0) return;
+    syncing = target;
+    const sourceBlocks = [...source.children], targetBlocks = [...target.children];
+    if (sourceBlocks.length && sourceBlocks.length === targetBlocks.length) {
+      let index = sourceBlocks.findIndex(block => block.offsetTop + block.offsetHeight > source.scrollTop);
+      if (index < 0) index = sourceBlocks.length - 1;
+      const sourceBlock = sourceBlocks[index], targetBlock = targetBlocks[index];
+      const fraction = Math.min(1, Math.max(0,
+        (source.scrollTop - sourceBlock.offsetTop) / Math.max(1, sourceBlock.offsetHeight)));
+      target.scrollTop = targetBlock.offsetTop + fraction * targetBlock.offsetHeight;
+    } else {
+      const ratioY = source.scrollTop / Math.max(1, source.scrollHeight - source.clientHeight);
+      target.scrollTop = ratioY * Math.max(0, target.scrollHeight - target.clientHeight);
+    }
+    const ratioX = source.scrollLeft / Math.max(1, source.scrollWidth - source.clientWidth);
+    target.scrollLeft = ratioX * Math.max(0, target.scrollWidth - target.clientWidth);
+    requestAnimationFrame(() => { syncing = null; });
+  };
+  original.addEventListener("scroll", follow, { passive: true });
+  sanitized.addEventListener("scroll", follow, { passive: true });
+}
 let previewTimer = null;
 $("manual").addEventListener("input", () => {
   clearTimeout(previewTimer);

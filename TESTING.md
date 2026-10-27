@@ -221,6 +221,23 @@ in the sanitized pane raised it to 20; selecting `[REDACTED_FINANCIAL]` reported
 before adding visible text. At 788 CSS px the grid collapses to one column with no horizontal
 overflow. `node tests/run_all.js` passes 54/54.
 
+Finding labels, paging and synced scroll (2026-10-28): cards no longer print
+`Rule-based`. Rule and manual rows show only the value; model rows show
+`Maybe important · 40%` and keep the rule name in the tooltip. The first page is nine
+cards (3x3), with `Show 9 more findings` / `Show fewer findings` and a
+`9 of 18 shown` header; the section nav still reports the total. Manual selections
+are inserted first so they remain visible on the first page.
+
+The floating `Redact "…"` button had stretched to the viewport because an older
+sticky rule left `bottom: 0` while the new rule made it `position: fixed` with an
+inline `top`. The final rule sets `bottom: auto`, zero margin and `max-height: 44px`;
+measured height is 38px.
+
+Preview scroll sync is restored and maps the **top block plus its fraction** between
+the panes instead of raw pixels, so rows stay aligned when redacted placeholders wrap
+to a different height. If the block counts differ it falls back to a scroll ratio.
+Verified at scroll 400 and 250: both panes reported the same block index and fraction.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,
