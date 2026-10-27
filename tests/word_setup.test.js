@@ -21,7 +21,11 @@ for (const name of ["manifest.json", "manifest.firefox.json"]) {
 }
 const html = fs.readFileSync(path.join(root, "word/index.html"), "utf8");
 assert.ok(!/type=["']file/.test(html));
-assert.ok(html.includes("Not ready to share yet"));
+assert.ok(html.includes("Experimental integration"));
+assert.ok(html.includes('id="sanitized-preview"'), "review must show what the recipient will see");
+assert.ok(html.includes('id="show-original"'), "original pane must be collapsible");
+assert.ok(html.includes('id="share-panel"'), "share controls must be gated behind apply");
+assert.ok(html.includes('id="publish-hint"'), "disabled link control needs a reason");
 assert.ok(!fs.existsSync(path.join(root, "documents/index.html")));
 const viewer = fs.readFileSync(path.join(root,"viewer/app.js"),"utf8");
 assert.ok(/kind === "document"/.test(viewer));

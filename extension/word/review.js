@@ -4,7 +4,14 @@ let showAllFindings = false;
 let wordPrefs = { reader: "public", numbers: "remove", categories: null };
 let attackLeaks = 0;
 let documentCurrency = null;
+let appliedSignature = null;
 const PAGE_SIZE = 12;
+
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function categoriesOf(findings) {
+  return [...new Set(findings.map(f => f.category))].sort();
+}
 
 function collectFindings(doc) {
   const seen = new Map();
@@ -28,10 +35,6 @@ function collectFindings(doc) {
   return [...seen.values()];
 }
 
-function categoriesOf(findings) {
-  return [...new Set(findings.map(f => f.category))].sort();
-}
-
 function findingRows(doc) {
   if (providedFindings) {
     if (!mediaCache || mediaCache.doc !== doc) {
@@ -47,12 +50,137 @@ function findingRows(doc) {
   return mediaCache.findings;
 }
 
+function matchedFindings() {
+  return [...document.querySelectorAll(".finding")]
+    .filter(row => row.dataset.categoryHidden !== "1")
+    .map(row => ({
+      value: row.querySelector("strong").textContent,
+      replacement: row.dataset.replacement || "[REDACTED]",
+      checked: row.querySelector(".finding-toggle").checked,
+      category: row.dataset.category,
+      source: row.dataset.source
+    }));
+}
+
+function spanText(text, findings) {
+  const spans = [];
+  for (const finding of findings) {
+    const needle = finding.value;
+    if (!needle || needle.length < 2) continue;
+    const boundary = /^[\p{L}\p{N}_]/u.test(needle) ? "(?<![\\p{L}\\p{N}_])" : "";
+    const tail = /[\p{L}\p{N}_]$/u.test(needle) ? "(?![\\p{L}\\p{N}_])" : "";
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let pattern;
+    try { pattern = new RegExp(boundary + escaped + tail, "giu"); } catch (_) { continue; }
+    for (const match of text.matchAll(pattern)) {
+      spans.push({ start: match.index, end: match.index + match[0].length, finding });
+    }
+  }
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out = [];
+  for (const span of spans) {
+    const last = out[out.length - 1];
+    if (last && span.start < last.end) continue;
+    out.push(span);
+  }
+  return out;
+}
+
+function replacementFor(finding, value) {
+  let replacement = finding.replacement || "[REDACTED]";
+  if (wordPrefs.numbers === "range" && finding.source === "amount" && typeof SafeShareWordPolicy !== "undefined") {
+    replacement = SafeShareWordPolicy.rangeFor(value, documentCurrency) || replacement;
+  }
+  return replacement;
+}
+
+function manualFindings() {
+  const placeholder = $("placeholder-style").value || "[REDACTED]";
+  return $("manual").value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(value => ({
+    value, replacement: placeholder, checked: true, category: "CUSTOM", source: "manual"
+  }));
+}
+
+function renderTextHtml(text, findings, sanitized) {
+  const spans = spanText(text, findings);
+  let html = "", cursor = 0;
+  for (const span of spans) {
+    html += escapeHtml(text.slice(cursor, span.start));
+    const value = text.slice(span.start, span.end);
+    if (sanitized) {
+      html += span.finding.checked ? `<mark>${escapeHtml(replacementFor(span.finding, value))}</mark>` : escapeHtml(value);
+    } else {
+      html += `<mark class="${span.finding.checked ? "" : "keep"}">${escapeHtml(value)}</mark>`;
+    }
+    cursor = span.end;
+  }
+  html += escapeHtml(text.slice(cursor));
+  return html;
+}
+
+function renderPreview(doc) {
+  if (!doc) return;
+  const findings = matchedFindings().concat(manualFindings());
+  const source = $("document-preview"), sanitized = $("sanitized-preview");
+  const keepScroll = [source.scrollTop, sanitized.scrollTop];
+  source.replaceChildren();
+  sanitized.replaceChildren();
+  for (const block of doc.blocks) {
+    if (block.rows) {
+      for (const [label, target] of [["source", source], ["sanitized", sanitized]]) {
+        const table = document.createElement("table");
+        for (const row of block.rows) {
+          const tr = document.createElement("tr");
+          for (const cell of row) {
+            const td = document.createElement("td");
+            td.innerHTML = renderTextHtml(String(cell ?? ""), findings, label === "sanitized");
+            tr.append(td);
+          }
+          table.append(tr);
+        }
+        target.append(table);
+      }
+    } else if (block.text) {
+      for (const [label, target] of [["source", source], ["sanitized", sanitized]]) {
+        const p = document.createElement("p");
+        p.innerHTML = renderTextHtml(block.text, findings, label === "sanitized");
+        target.append(p);
+      }
+    }
+  }
+  for (const part of doc.supplementary || []) {
+    if (!part.text) continue;
+    for (const [target, isSanitized] of [[source, false], [sanitized, true]]) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = part.name;
+      const p = document.createElement("p");
+      p.innerHTML = renderTextHtml(part.text, findings, isSanitized);
+      details.append(summary, p);
+      target.append(details);
+    }
+  }
+  source.scrollTop = keepScroll[0];
+  sanitized.scrollTop = keepScroll[1];
+}
+
 function setHeader(title, subtitle) {
   $("review-title").textContent = title;
   $("review-subtitle").textContent = subtitle;
 }
 
 function updateCounts() {
+  if (sanitizedBytes && appliedSignature && currentSignature() !== appliedSignature) {
+    sanitizedBytes = null;
+    appliedSignature = null;
+    $("create-link").disabled = true;
+    $("download-sanitized").hidden = true;
+    $("verify").hidden = true;
+    $("share-panel").hidden = true;
+    $("apply").hidden = false;
+    $("apply-status").textContent = "Settings changed. Create the copy again to refresh the link.";
+    $("publish-hint").textContent = "Settings changed. Create the sanitized DOCX again to refresh the copy.";
+  }
   const rows = [...document.querySelectorAll(".finding")].filter(row => row.dataset.categoryHidden !== "1");
   const total = rows.length;
   const masked = rows.filter(row => row.querySelector(".finding-toggle").checked).length;
@@ -68,40 +196,12 @@ function updateCounts() {
   openChip.className = "count-chip open";
   openChip.textContent = `${total - masked} unmasked`;
   host.append(label, protectedChip, openChip);
-  setHeader(titleForState(masked, total), subtitleForState(masked, total));
-}
-
-function titleForState() {
-  return sanitizedBytes ? "Sanitized copy ready" : "Create sanitized copy";
-}
-
-function subtitleForState(masked, total) {
-  if (sanitizedBytes) return `Layout kept - ${masked} of ${total} items masked. Nothing is uploaded.`;
-  return "Reviewed locally. Nothing is uploaded until you create a link.";
-}
-
-function statusText(checked) {
-  return checked ? "Redacted" : "Visible";
-}
-
-function resetCompare() {
-  $("compare-toggle").checked = true;
-  $("compare").classList.remove("single");
-}
-
-function syncCompareScroll() {
-  const panes = [...document.querySelectorAll(".compare-pane")];
-  if (panes.length < 2) return;
-  let locked = false;
-  for (const pane of panes) {
-    pane.addEventListener("scroll", () => {
-      if (locked) return;
-      locked = true;
-      const ratio = pane.scrollTop / Math.max(1, pane.scrollHeight - pane.clientHeight);
-      for (const other of panes) if (other !== pane) other.scrollTop = ratio * Math.max(1, other.scrollHeight - other.clientHeight);
-      requestAnimationFrame(() => { locked = false; });
-    });
-  }
+  const title = sanitizedBytes ? "Sanitized copy ready" : "Create sanitized copy";
+  const subtitle = sanitizedBytes
+    ? `Layout kept - ${masked} of ${total} items masked. Nothing is uploaded.`
+    : "Reviewed locally. Nothing is uploaded until you create a link.";
+  setHeader(title, subtitle);
+  renderPreview(lastDoc);
 }
 
 function renderFindings(doc) {
@@ -124,35 +224,37 @@ function renderFindings(doc) {
     const row = document.createElement("div");
     row.className = "finding";
     row.dataset.category = finding.category;
-    const box = document.createElement("input");
+    row.dataset.replacement = finding.replacement || "[REDACTED]";
+    row.dataset.source = finding.source || "rule";
     const keepForReader = wordPrefs.reader === "trusted" && (finding.category === "PROFILE" || finding.category === "FINANCIAL");
+    const box = document.createElement("input");
     box.type = "checkbox"; box.checked = keepForReader ? false : finding.preChecked !== false;
     box.className = "finding-toggle";
     box.id = `finding-${index}`;
+    const label = document.createElement("label");
+    label.className = "finding-check";
+    label.append(box);
     const text = document.createElement("span");
     text.className = "finding-text";
     const value = document.createElement("strong");
     value.textContent = finding.value;
     const meta = document.createElement("small");
-    if (finding.aliasOf) finding.ruleName = `${finding.ruleName} (alias of ${finding.aliasOf})`;
-    meta.textContent = `${finding.ruleName || finding.name || "Finding"} - ${finding.replacement} - ${finding.source || "rule"}`;
-    row.dataset.replacement = finding.replacement || "[REDACTED]";
-    row.dataset.source = finding.source || "rule";
+    const score = Number.isFinite(finding.score)
+      ? `Model score ${Math.round(finding.score * 100)}%`
+      : (finding.source === "manual" ? "Added by you" : "Rule-based");
+    meta.textContent = `${finding.ruleName || finding.name || "Finding"} · ${score}`;
     text.append(value, document.createElement("br"), meta);
     const state = document.createElement("button");
     state.type = "button"; state.className = "finding-state";
-    state.textContent = statusText(box.checked);
+    state.textContent = box.checked ? "Redacted" : "Visible";
     state.addEventListener("click", () => {
       box.checked = !box.checked;
-      state.textContent = statusText(box.checked);
+      state.textContent = box.checked ? "Redacted" : "Visible";
       updateCounts();
     });
     const locate = document.createElement("button");
     locate.type = "button"; locate.className = "finding-locate"; locate.textContent = "Show in preview";
     locate.addEventListener("click", () => showInPreview(finding.value));
-    const label = document.createElement("label");
-    label.className = "finding-check";
-    label.append(box);
     row.append(label, text, state, locate);
     row.dataset.pageHidden = index >= PAGE_SIZE ? "1" : "0";
     if (row.dataset.pageHidden === "1" && !showAllFindings) row.hidden = true;
@@ -165,15 +267,44 @@ function renderFindings(doc) {
   } else more.hidden = true;
 
   renderImages(doc);
+  if (!sanitizedBytes) {
+    $("apply").hidden = false;
+    $("share-panel").hidden = true;
+    $("create-link").disabled = true;
+    $("download-sanitized").hidden = true;
+    $("verify").hidden = true;
+  }
   $("capture-section").hidden = true;
   $("read-again").hidden = false;
+  const firstRender = !document.body.classList.contains("reviewing");
   document.body.classList.add("reviewing");
+  if (firstRender) window.scrollTo(0, 0);
   documentCurrency = detectDocumentCurrency();
-  resetCompare();
   $("review-section").hidden = false;
   $("review-summary").textContent = findings.length ? "" : "Nothing detected automatically.";
-  updateCounts();
   $("apply-status").textContent = "";
+  updateCounts();
+}
+
+function rerenderKeepingChoices() {
+  const toggles = new Map([...document.querySelectorAll(".finding")].map(row => [row.querySelector("strong").textContent, row.querySelector(".finding-toggle").checked]));
+  const chips = new Map([...document.querySelectorAll("#category-chips input")].map(box => [box.dataset.category, box.checked]));
+  renderFindings(lastDoc);
+  for (const row of document.querySelectorAll(".finding")) {
+    const box = row.querySelector(".finding-toggle");
+    const value = row.querySelector("strong").textContent;
+    if (toggles.has(value)) box.checked = toggles.get(value);
+    const chip = chips.get(row.dataset.category);
+    row.dataset.categoryHidden = chip === false ? "1" : "0";
+    row.hidden = row.dataset.categoryHidden === "1" || (row.dataset.pageHidden === "1" && !showAllFindings);
+  }
+  for (const box of document.querySelectorAll("#category-chips input")) {
+    if (chips.has(box.dataset.category)) box.checked = chips.get(box.dataset.category);
+  }
+  for (const button of document.querySelectorAll(".finding-state")) {
+    button.textContent = button.closest(".finding").querySelector(".finding-toggle").checked ? "Redacted" : "Visible";
+  }
+  updateCounts();
 }
 
 function showInPreview(value) {
@@ -192,11 +323,20 @@ function showInPreview(value) {
     selection.addRange(range);
     const target = node.parentElement;
     target.scrollIntoView({ block: "center", behavior: "smooth" });
-    target.classList.add("preview-hit");
-    setTimeout(() => target.classList.remove("preview-hit"), 2200);
+    target.classList.add("hit");
+    setTimeout(() => target.classList.remove("hit"), 2200);
     return;
   }
   $("apply-status").textContent = "Not visible in the text preview (it may be inside an image).";
+}
+
+function detectDocumentCurrency() {
+  const text = (lastDoc?.blocks || []).map(block => block.rows ? block.rows.flat().join(" ") : block.text).join(" ");
+  if (/\bIDR\b|Rp\.?\s?\d/i.test(text)) return "IDR";
+  if (/\$|\bUSD\b/i.test(text)) return "USD";
+  if (/\u20AC|\bEUR\b/i.test(text)) return "EUR";
+  if (/\u00A3|\bGBP\b/i.test(text)) return "GBP";
+  return null;
 }
 
 function addManualCandidate(text) {
@@ -212,7 +352,7 @@ function addManualCandidate(text) {
     reason: "selected in preview", replacement: $("placeholder-style").value, source: "manual", preChecked: true
   });
   mediaCache = null;
-  renderFindings(lastDoc);
+  rerenderKeepingChoices();
   $("apply-status").textContent = `Added "${value}" to the redaction list.`;
 }
 
@@ -228,6 +368,7 @@ $("redact-selection").addEventListener("click", () => {
   $("redact-selection").hidden = true;
 });
 
+/* ---------- images ---------- */
 function renderImages(doc) {
   const host = $("image-list");
   host.replaceChildren();
@@ -238,107 +379,166 @@ function renderImages(doc) {
     const card = document.createElement("div");
     card.className = "image-card";
     const canvas = document.createElement("canvas");
-    canvas.width = 260; canvas.height = 150;
+    canvas.width = 480; canvas.height = 300;
     canvas.className = "image-canvas";
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", `Image ${index + 1} of the document`);
+    canvas.setAttribute("aria-label", `Image ${index + 1}`);
     const label = document.createElement("p");
     label.className = "image-status";
     const draw = () => {
       const context = canvas.getContext("2d");
       context.clearRect(0, 0, canvas.width, canvas.height);
-      const image = entry.bitmap;
-      if (!image) return;
-      const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
-      const width = image.width * scale, height = image.height * scale;
+      if (!entry.bitmap) return;
+      const scale = Math.min(canvas.width / entry.bitmap.width, canvas.height / entry.bitmap.height);
+      const width = entry.bitmap.width * scale, height = entry.bitmap.height * scale;
       const left = (canvas.width - width) / 2, top = (canvas.height - height) / 2;
-      context.drawImage(image, left, top, width, height);
+      context.drawImage(entry.bitmap, left, top, width, height);
       canvas.dataset.scale = String(scale);
       canvas.dataset.left = String(left);
       canvas.dataset.top = String(top);
-      context.strokeStyle = "#d7e6b4"; context.lineWidth = 2;
-      for (const [x, y, w, h] of state.rects) context.strokeRect(left + x * scale, top + y * scale, w * scale, h * scale);
       if (state.mode === "whole") { context.fillStyle = "#000"; context.fillRect(left, top, width, height); }
+      else {
+        context.fillStyle = "#000";
+        for (const [x, y, w, h] of state.rects) {
+          context.fillRect(left + x * scale, top + y * scale, w * scale, h * scale);
+        }
+      }
       label.textContent = state.mode === "whole" ? "Whole image will be replaced with black."
-        : state.rects.length ? `${state.rects.length} area(s) will be blacked out on the full-resolution image.`
+        : state.rects.length ? `${state.rects.length} area(s) marked.`
           : "Not redacted. Text inside this image is still visible.";
     };
     draw();
     const actions = document.createElement("div");
     actions.className = "image-actions";
-    for (const [text, handler] of [
-      ["Redact whole", () => { state.mode = "whole"; state.rects = []; draw(); }],
-      ["Clear areas", () => { state.mode = null; state.rects = []; draw(); }],
-      ["Keep", () => { state.mode = null; state.rects = []; draw(); }]
-    ]) {
-      const button = document.createElement("button");
-      button.type = "button"; button.textContent = text;
-      button.addEventListener("click", handler);
-      actions.append(button);
-    }
+    const open = document.createElement("button");
+    open.type = "button"; open.textContent = "Open large";
+    open.addEventListener("click", () => openImageDialog(index));
+    const keep = document.createElement("button");
+    keep.type = "button"; keep.textContent = "Keep";
+    keep.addEventListener("click", () => { state.mode = null; state.rects = []; draw(); renderDialogState(); if (sanitizedBytes) updateCounts(); });
+    const whole = document.createElement("button");
+    whole.type = "button"; whole.textContent = "Redact whole";
+    whole.addEventListener("click", () => { state.mode = "whole"; state.rects = []; draw(); renderDialogState(); if (sanitizedBytes) updateCounts(); });
+    actions.append(open, whole, keep);
     card.append(canvas, label, actions);
     host.append(card);
-    bindDrag(canvas, state, draw);
   });
 }
 
-function bindDrag(canvas, state, draw) {
+let dialogIndex = -1;
+const dialog = () => $("image-dialog");
+const dialogCanvas = () => $("dialog-canvas");
+
+function renderDialogState() {
+  const state = imageState[dialogIndex];
+  const canvas = dialogCanvas();
+  const entry = (lastDoc?.media || [])[dialogIndex];
+  if (!state || !entry) return;
+  const context = canvas.getContext("2d");
+  const maxW = Math.min(1100, window.innerWidth * 0.86);
+  const maxH = window.innerHeight * 0.66;
+  const scale = Math.min(maxW / entry.bitmap.width, maxH / entry.bitmap.height, 2);
+  canvas.width = Math.round(entry.bitmap.width * scale);
+  canvas.height = Math.round(entry.bitmap.height * scale);
+  canvas.dataset.scale = String(scale);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(entry.bitmap, 0, 0, canvas.width, canvas.height);
+  if (state.mode === "whole") { context.fillStyle = "#000"; context.fillRect(0, 0, canvas.width, canvas.height); }
+  context.strokeStyle = "#cfe3a8"; context.lineWidth = 2;
+  for (const [x, y, w, h] of state.rects) context.strokeRect(x * scale, y * scale, w * scale, h * scale);
+  if (state.pending) {
+    const [x, y, w, h] = state.pending;
+    context.fillStyle = "#cfe3a833";
+    context.fillRect(x * scale, y * scale, w * scale, h * scale);
+    context.strokeStyle = "#ffd9d4";
+    context.strokeRect(x * scale, y * scale, w * scale, h * scale);
+  }
+  const count = $("dialog-count");
+  if (state.mode === "whole") count.textContent = "Whole image will be replaced.";
+  else if (state.pending) {
+    const [, , pendingW, pendingH] = state.pending;
+    count.textContent = `Area ${Math.round(pendingW)} x ${Math.round(pendingH)} px - release to keep it.`;
+  } else count.textContent = `${state.rects.length} area(s) marked on this image.`;
+}
+
+function openImageDialog(index) {
+  dialogIndex = index;
+  const state = imageState[index];
+  state.pending = null;
+  const entry = (lastDoc?.media || [])[index];
+  $("dialog-title").textContent = `Review image ${index + 1} (${entry?.bitmap ? entry.bitmap.width + "×" + entry.bitmap.height : "unknown"})`;
+  renderDialogState();
+  dialog().showModal();
+}
+
+(function bindDialog() {
+  const canvas = dialogCanvas();
   let start = null;
-  const toImage = event => {
+  const point = event => {
     const rect = canvas.getBoundingClientRect();
-    const scale = Number(canvas.dataset.scale), left = Number(canvas.dataset.left), top = Number(canvas.dataset.top);
-    return { x: (event.clientX - rect.left - left) / scale, y: (event.clientY - rect.top - top) / scale };
+    const scale = Number(canvas.dataset.scale) || 1;
+    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
   };
   canvas.addEventListener("pointerdown", event => {
-    if (state.mode === "whole") return;
-    start = toImage(event);
+    if (imageState[dialogIndex]?.mode === "whole") return;
+    start = point(event);
     canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", event => {
+    if (!start) return;
+    const current = point(event);
+    imageState[dialogIndex].pending = [
+      Math.max(0, Math.min(start.x, current.x)),
+      Math.max(0, Math.min(start.y, current.y)),
+      Math.abs(current.x - start.x),
+      Math.abs(current.y - start.y)
+    ];
+    renderDialogState();
   });
   canvas.addEventListener("pointerup", event => {
     if (!start) return;
-    const end = toImage(event);
-    const x = Math.max(0, Math.min(start.x, end.x)), y = Math.max(0, Math.min(start.y, end.y));
-    const w = Math.abs(end.x - start.x), h = Math.abs(end.y - start.y);
+    const origin = start;
     start = null;
-    if (w < 8 || h < 8) return;
+    const current = point(event);
+    const state = imageState[dialogIndex];
+    state.pending = null;
+    const x = Math.max(0, Math.min(origin.x, current.x));
+    const y = Math.max(0, Math.min(origin.y, current.y));
+    const entry = lastDoc?.media?.[dialogIndex];
+    const maxW = entry?.bitmap?.width || canvas.width;
+    const maxH = entry?.bitmap?.height || canvas.height;
+    const w = Math.min(Math.abs(current.x - origin.x), maxW - x);
+    const h = Math.min(Math.abs(current.y - origin.y), maxH - y);
+    if (w < 6 || h < 6) { renderDialogState(); return; }
     state.rects.push([x, y, w, h]);
     state.mode = "areas";
-    draw();
+    renderDialogState();
+    renderImages(lastDoc);
+    if (sanitizedBytes) updateCounts();
   });
-}
+  $("dialog-whole").addEventListener("click", () => {
+    const state = imageState[dialogIndex];
+    state.mode = "whole"; state.rects = [];
+    renderDialogState(); renderImages(lastDoc);
+    if (sanitizedBytes) updateCounts();
+  });
+  $("dialog-clear").addEventListener("click", () => {
+    const state = imageState[dialogIndex];
+    state.mode = null; state.rects = [];
+    renderDialogState(); renderImages(lastDoc);
+    if (sanitizedBytes) updateCounts();
+  });
+  $("dialog-done").addEventListener("click", () => dialog().close());
+  $("dialog-close").addEventListener("click", () => dialog().close());
+})();
 
-function categoryFilter() {
-  const allowed = new Set([...document.querySelectorAll("#category-chips input:checked")].map(box => box.dataset.category));
-  for (const row of document.querySelectorAll(".finding")) {
-    row.dataset.categoryHidden = allowed.has(row.dataset.category) ? "0" : "1";
-    const pageHidden = row.dataset.pageHidden === "1" && !showAllFindings;
-    row.hidden = row.dataset.categoryHidden === "1" || pageHidden;
-  }
-  updateCounts();
-}
-
-function applyPagination() {
-  for (const row of document.querySelectorAll(".finding")) {
-    const pageHidden = row.dataset.pageHidden === "1" && !showAllFindings;
-    row.hidden = row.dataset.categoryHidden === "1" || pageHidden;
-  }
-}
-
-function detectDocumentCurrency() {
-  const text = (lastDoc?.blocks || []).map(block => block.rows ? block.rows.flat().join(" ") : block.text).join(" ");
-  if (/\bIDR\b|Rp\.?\s?\d/i.test(text)) return "IDR";
-  if (/\$|\bUSD\b/i.test(text)) return "USD";
-  if (/\u20AC|\bEUR\b/i.test(text)) return "EUR";
-  if (/\u00A3|\bGBP\b/i.test(text)) return "GBP";
-  return null;
-}
-
+/* ---------- rules ---------- */
 function activeRules() {
   const rules = [];
-  for (const box of document.querySelectorAll(".finding-toggle")) {
-    if (!box.checked) continue;
-    const row = box.closest(".finding");
+  for (const row of document.querySelectorAll(".finding")) {
     if (row.dataset.categoryHidden === "1") continue;
+    const box = row.querySelector(".finding-toggle");
+    if (!box.checked) continue;
     const value = row.querySelector("strong").textContent;
     let replacement = row.dataset.replacement || "[REDACTED]";
     if (wordPrefs.numbers === "range" && row.dataset.source === "amount" && typeof SafeShareWordPolicy !== "undefined") {
@@ -359,9 +559,17 @@ function activeImages() {
     .filter(state => state.mode === "whole" || state.rects.length);
 }
 
+function currentSignature() {
+  return JSON.stringify({
+    rules: activeRules(), images: activeImages(),
+    revisions: $("keep-revisions").checked, metadata: $("keep-metadata").checked
+  });
+}
+
 $("rescan").addEventListener("click", async () => {
   if (!lastDoc || typeof SafeShareNer === "undefined") return;
-  $("apply-status").textContent = "Re-scanning names?";
+  $("apply-status").textContent = "Re-scanning names…";
+  if (!providedFindings) providedFindings = findingRows(lastDoc).slice();
   const map = SafeShareTextMap.flatten(lastDoc);
   const extra = await SafeShareWordDetect.nerCandidates(map, SafeShareNer);
   const known = new Set((providedFindings || []).map(item => item.value.toLowerCase()));
@@ -372,7 +580,7 @@ $("rescan").addEventListener("click", async () => {
     known.add(item.value.toLowerCase());
     added++;
   }
-  renderFindings(lastDoc);
+  rerenderKeepingChoices();
   $("apply-status").textContent = added ? `Model found ${added} more name(s).` : "Model found no additional names.";
 });
 
@@ -386,7 +594,28 @@ $("select-none").addEventListener("click", () => {
   for (const button of document.querySelectorAll(".finding-state")) button.textContent = "Visible";
   updateCounts();
 });
-$("category-chips").addEventListener("change", categoryFilter);
+$("category-chips").addEventListener("change", () => {
+  const allowed = new Set([...document.querySelectorAll("#category-chips input:checked")].map(box => box.dataset.category));
+  for (const row of document.querySelectorAll(".finding")) {
+    row.dataset.categoryHidden = allowed.has(row.dataset.category) ? "0" : "1";
+    row.hidden = row.dataset.categoryHidden === "1" || (row.dataset.pageHidden === "1" && !showAllFindings);
+  }
+  updateCounts();
+});
+$("show-more").addEventListener("click", () => {
+  showAllFindings = !showAllFindings;
+  rerenderKeepingChoices();
+});
+$("show-original").addEventListener("change", () => {
+  document.body.classList.toggle("hide-original", !$("show-original").checked);
+});
+let previewTimer = null;
+$("manual").addEventListener("input", () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => { if (lastDoc && !$("review-section").hidden) updateCounts(); }, 200);
+});
+$("placeholder-style").addEventListener("change", () => { if (lastDoc) updateCounts(); });
+for (const id of ["keep-revisions", "keep-metadata"]) $(id).addEventListener("change", updateCounts);
 $("reader").addEventListener("change", async () => {
   wordPrefs.reader = $("reader").value;
   await SafeShareWordSettings.save({ reader: wordPrefs.reader });
@@ -395,32 +624,57 @@ $("reader").addEventListener("change", async () => {
 $("numbers").addEventListener("change", async () => {
   wordPrefs.numbers = $("numbers").value;
   await SafeShareWordSettings.save({ numbers: wordPrefs.numbers });
-  $("apply-status").textContent = wordPrefs.numbers === "range"
-    ? "Amounts you stated become approximate ranges; derived figures stay removed."
-    : "";
+  updateCounts();
 });
 $("reset-defaults").addEventListener("click", async () => {
   await SafeShareWordSettings.reset();
   wordPrefs = { ...SafeShareWordSettings.DEFAULTS };
   $("reader").value = wordPrefs.reader;
   $("numbers").value = wordPrefs.numbers;
-  $("terms").value = "";
   $("manual").value = "";
   for (const box of document.querySelectorAll("#category-chips input")) box.checked = true;
   renderFindings(lastDoc);
-  $("apply-status").textContent = "Defaults restored: public reader, amounts removed, all categories.";
+  $("apply-status").textContent = "Defaults restored.";
 });
 $("cancel-review").addEventListener("click", async () => {
   const api = typeof browser !== "undefined" ? browser : chrome;
   try { const tab = await api.tabs.getCurrent(); if (tab && tab.id != null) await api.tabs.remove(tab.id); else window.close(); }
   catch (_) { window.close(); }
 });
-$("findings").addEventListener("change", updateCounts);
-$("show-more").addEventListener("click", () => { showAllFindings = !showAllFindings; applyPagination(); renderFindings(lastDoc); });
-$("compare-toggle").addEventListener("change", () => {
-  const compare = $("compare");
-  compare.classList.toggle("single", !$("compare-toggle").checked);
-});
+
+/* ---------- apply ---------- */
+async function runAttackCheck(rules) {
+  const box = $("attack");
+  box.hidden = false;
+  attackLeaks = 0;
+  const text = [...document.querySelectorAll("#sanitized-preview p, #sanitized-preview td")].map(node => node.textContent).join("\n");
+  const visibleNumbers = [...new Set((text.match(/\d[\d.,]*/g) || [])
+    .map(raw => SafeShareWordPolicy.valueOf(raw))
+    .filter(value => Number.isFinite(value) && value >= 10))];
+  const hiddenNumbers = rules
+    .map(rule => SafeShareWordPolicy.valueOf(rule.value))
+    .filter(value => Number.isFinite(value) && value >= 10);
+  const ratios = [0.2, 0.25, 0.3, 0.5, 1.2, 1.25, 1.5, 2, 3, 4, 12, 1 / 12, 52, 1 / 52];
+  const recoverable = new Set();
+  for (const hidden of hiddenNumbers) {
+    for (const visible of visibleNumbers) {
+      if (Math.abs(visible - hidden) / hidden <= 0.015) continue;
+      if (ratios.some(ratio => Math.abs(visible * ratio - hidden) / hidden <= 0.015)) recoverable.add(hidden);
+    }
+  }
+  attackLeaks = recoverable.size;
+  if (!attackLeaks) {
+    $("attack-text").textContent = "No hidden amount can be recovered from the remaining visible numbers.";
+    $("attack-confirm-wrap").hidden = true;
+    $("download-sanitized").disabled = false;
+    return;
+  }
+  $("verify-details").open = true;
+  $("attack-text").textContent = `${attackLeaks} hidden amount(s) can still be recomputed from the numbers left in this copy. Redact those numbers or accept the risk.`;
+  $("attack-confirm-wrap").hidden = false;
+  $("attack-confirm").checked = false;
+  $("download-sanitized").disabled = true;
+}
 
 $("apply").addEventListener("click", async () => {
   if (!sourceBytes) return;
@@ -443,80 +697,22 @@ $("apply").addEventListener("click", async () => {
       throw new Error("Verification failed; original text remains in: " + parts);
     }
     sanitizedBytes = result.bytes;
+    appliedSignature = currentSignature();
     $("verify").hidden = false;
-    $("verify").textContent = `Verified: ${result.replaced} text replacements across ${result.parts} parts, ${result.images} image(s) redacted, ${result.removed} revision/hidden elements removed. No selected value remains in any XML part.`;
-    const preview = await inspectWordFile(result.bytes);
-    const compare = $("compare");
-    compare.replaceChildren();
-    const before = document.createElement("div"), after = document.createElement("div");
-    before.className = after.className = "compare-pane";
-    before.innerHTML = "<h3>Original (sender only)</h3>";
-    after.innerHTML = "<h3>Sanitized</h3>";
-    const plain = block => block.rows ? block.rows.map(row => row.join(" | ")).join("\n") : block.text;
-    for (const block of preview.blocks) {
-      const p = document.createElement("p"); p.textContent = plain(block); after.append(p);
-    }
-    for (const block of lastDoc.blocks) {
-      const p = document.createElement("p"); p.textContent = plain(block); before.append(p);
-    }
-    compare.append(before, after);
-    syncCompareScroll();
-    compare.hidden = false;
-    compare.classList.toggle("single", !$("compare-toggle").checked);
-    await runAttackCheck(preview, rules);
+    $("verify").textContent = `Verified: ${result.replaced} text replacements across ${result.parts} parts, ${result.images} image(s) redacted, ${result.removed} revision/hidden elements removed.`;
+    await runAttackCheck(rules);
     $("download-sanitized").hidden = false;
     $("create-link").disabled = false;
-    $("apply-status").textContent = "Sanitized DOCX ready. Tables, styles and equations come from the original package.";
+    $("share-panel").hidden = false;
+    $("apply").hidden = true;
+    $("apply-status").textContent = "";
+    $("publish-hint").textContent = "Sanitized copy is current. The link is encrypted locally; the relay only receives ciphertext.";
     updateCounts();
   } catch (e) {
     $("apply-status").textContent = "Sanitization stopped. Nothing was downloaded.";
     $("error").textContent = e.message; $("error").hidden = false;
   } finally { $("apply").disabled = false; }
 });
-
-async function runAttackCheck(preview, rules) {
-  const box = $("attack");
-  box.hidden = false;
-  attackLeaks = 0;
-  try {
-    const text = preview.blocks.map(block => block.rows ? block.rows.map(r => r.join(" ")).join("\n") : block.text).join("\n");
-    const visibleNumbers = [...new Set((text.match(/\d[\d.,]*/g) || [])
-      .map(raw => SafeShareWordPolicy.valueOf(raw))
-      .filter(value => Number.isFinite(value) && value >= 10))];
-    const hiddenNumbers = rules
-      .map(rule => SafeShareWordPolicy.valueOf(rule.value))
-      .filter(value => Number.isFinite(value) && value >= 10);
-    const ratios = [0.2, 0.25, 0.3, 0.5, 1.2, 1.25, 1.5, 2, 3, 4, 12, 1 / 12, 52, 1 / 52];
-    const recoverable = new Set();
-    for (const hidden of hiddenNumbers) {
-      for (const visible of visibleNumbers) {
-        if (Math.abs(visible - hidden) / hidden <= 0.015) continue;
-        if (ratios.some(ratio => Math.abs(visible * ratio - hidden) / hidden <= 0.015)) recoverable.add(hidden);
-      }
-    }
-    let textBased = 0;
-    if (typeof SafeSharePolicy !== "undefined") {
-      try {
-        textBased = (SafeSharePolicy.invert(text) || [])
-          .filter(finding => hiddenNumbers.some(value => Math.abs(finding.value - value) / value <= 0.015))
-          .filter(finding => !visibleNumbers.some(value => Math.abs(value - finding.value) <= 1)).length;
-      } catch (_) {}
-    }
-    attackLeaks = Math.max(recoverable.size, textBased);
-    if (!attackLeaks) {
-      $("attack-text").textContent = "No hidden amount can be recovered from the remaining visible numbers.";
-      $("attack-confirm-wrap").hidden = true;
-      $("download-sanitized").disabled = false;
-      return;
-    }
-    $("attack-text").textContent = `${attackLeaks} hidden amount(s) can still be recomputed from the numbers left in this copy. Redact those numbers or accept the risk.`;
-    $("attack-confirm-wrap").hidden = false;
-    $("attack-confirm").checked = false;
-    $("download-sanitized").disabled = true;
-  } catch (_) {
-    $("attack-text").textContent = "Attack check could not run on this document.";
-  }
-}
 
 $("attack-confirm").addEventListener("change", () => {
   $("download-sanitized").disabled = attackLeaks > 0 && !$("attack-confirm").checked;
@@ -531,16 +727,10 @@ $("download-sanitized").addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 });
 
+$("read-again").addEventListener("click", () => { if (window.__ssReadAgain) window.__ssReadAgain(); });
 
 SafeShareWordSettings.load().then(prefs => {
   wordPrefs = prefs;
   $("reader").value = prefs.reader;
   $("numbers").value = prefs.numbers;
-  if (Array.isArray(prefs.categories)) {
-    for (const box of document.querySelectorAll("#category-chips input")) {
-      box.checked = prefs.categories.includes(box.dataset.category);
-    }
-  }
 }).catch(() => {});
-
-$("read-again").addEventListener("click", () => { if (window.__ssReadAgain) window.__ssReadAgain(); });

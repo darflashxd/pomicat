@@ -18,17 +18,28 @@ async function relayBaseUrl() {
   return "https://safeshare-relay.bleedguard.workers.dev";
 }
 
+function escapePreview(value) {
+  return String(value ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
 function sanitizedPreviewHtml() {
-  const host = document.getElementById("compare");
-  const sanitizedPane = host ? host.lastElementChild : null;
+  const host = document.getElementById("sanitized-preview");
   const parts = [];
-  if (sanitizedPane) {
-    for (const node of sanitizedPane.children) {
-      if (node.tagName === "H3") continue;
-      parts.push(`<p>${node.textContent.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))}</p>`);
+  for (const node of host ? host.children : []) {
+    if (node.tagName === "P") {
+      parts.push(`<p>${escapePreview(node.textContent)}</p>`);
+    } else if (node.tagName === "TABLE") {
+      const rows = [...node.rows].map(row =>
+        `<tr>${[...row.cells].map(cell => `<td>${escapePreview(cell.textContent)}</td>`).join("")}</tr>`);
+      parts.push(`<table>${rows.join("")}</table>`);
+    } else if (node.tagName === "DETAILS") {
+      const summary = node.querySelector("summary");
+      const body = node.querySelector("p");
+      parts.push(`<h4>${escapePreview(summary ? summary.textContent : "")}</h4><p>${escapePreview(body ? body.textContent : "")}</p>`);
     }
   }
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Reviewed document</title><style>body{font:16px/1.6 Georgia,serif;color:#1a1a1a;background:#fff;margin:0;padding:32px;max-width:820px}p{white-space:pre-wrap;margin:0 0 14px}</style></head><body>${parts.join("")}</body></html>`;
+  const body = parts.join("") || "<p>This document contains no text blocks to preview.</p>";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Reviewed document</title><style>body{font:16px/1.6 Georgia,serif;color:#1a1a1a;background:#fff;margin:0;padding:32px;max-width:820px}p{white-space:pre-wrap;margin:0 0 14px}h4{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#555;margin:18px 0 6px}table{border-collapse:collapse;width:100%;margin:0 0 16px;font-size:14px}td{border:1px solid #b9bec6;padding:8px;vertical-align:top}</style></head><body>${body}</body></html>`;
 }
 
 async function publishSanitized() {
@@ -71,8 +82,10 @@ async function publishSanitized() {
     document.getElementById("share-link").value = encrypted.fullShareUrl;
     document.getElementById("link-result").hidden = false;
     status.textContent = "Encrypted link ready. Anyone holding the full link can read it.";
+    document.getElementById("publish-hint").textContent = "Relay stored ciphertext only; the decryption key stays in the link fragment.";
   } catch (error) {
     status.textContent = "Link was not created.";
+    document.getElementById("publish-hint").textContent = "The sanitized copy is unchanged. Download it, or check the relay setting.";
     const box = document.getElementById("error");
     box.textContent = error.message;
     box.hidden = false;
@@ -103,9 +116,21 @@ document.getElementById("revoke-link").addEventListener("click", async () => {
     PublishState.last = null;
     document.getElementById("link-result").hidden = true;
     document.getElementById("publish-status").textContent = "Link revoked. Saved copies remain.";
+    document.getElementById("publish-hint").textContent = "The uploaded ciphertext was deleted. Your sanitized DOCX is unaffected.";
   } catch (error) {
     document.getElementById("publish-status").textContent = error.message;
   } finally {
     button.disabled = false;
   }
 });
+
+(async () => {
+  const hint = document.getElementById("publish-hint");
+  if (!hint) return;
+  try {
+    const url = await relayBaseUrl();
+    if (!sanitizedBytes) hint.textContent = `Create a sanitized copy first. It is encrypted locally and uploaded to ${url}.`;
+  } catch (_) {
+    if (!sanitizedBytes) hint.textContent = "Create a sanitized copy first.";
+  }
+})();

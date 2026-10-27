@@ -11,10 +11,12 @@
 <div class="review-grid">
   <div class="pane preview-pane">
     <div class="pane-head"><span>Document preview</span><span id="inventory" class="pane-meta"></span></div>
-    <div id="document-preview" class="preview-body" tabindex="0"></div>
+    <label class="check compare-toggle"><input id="show-original" type="checkbox" checked> Show original</label>
+    <div class="preview-split">
+      <div class="preview-col"><h3>Original (sender only)</h3><div id="document-preview" class="preview-body" tabindex="0"></div></div>
+      <div class="preview-col"><h3>What others will see</h3><div id="sanitized-preview" class="preview-body sanitized"></div></div>
+    </div>
     <button type="button" id="redact-selection" class="redact-selection" hidden>Redact selected text</button>
-    <label class="check compare-toggle"><input id="compare-toggle" type="checkbox" checked> Compare with original</label>
-    <div id="compare" class="compare" hidden></div>
   </div>
   <div class="pane review-pane">
     <div class="review-scroll">
@@ -31,23 +33,35 @@
     <p id="review-summary" class="subtitle"></p>
     <div id="findings"></div>
     <button type="button" id="show-more" class="show-more" hidden></button>
-    <div id="image-block" hidden><h3>Images</h3><p class="help">Drag on an image to mark an area, or replace the whole image. Pixels are overwritten, never covered by a shape.</p><div id="image-list"></div></div>
+    <div id="image-block" hidden><h3>Images</h3><p class="help">Open an image to mark areas at full size. Pixels are overwritten, never covered by a shape.</p><div id="image-list"></div></div>
     </div>
     <div class="review-actions">
-      <label for="manual">Add private text, one phrase per line</label><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea>
+      <details class="policy manual-panel"><summary>Add private text</summary><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea></details>
       <button id="apply">Create sanitized DOCX</button>
       <p id="apply-status" role="status" aria-live="polite"></p>
-      <p id="verify" hidden></p>
-      <div id="attack" class="attack" hidden><h3>Attack check</h3><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div>
-      <button id="download-sanitized" hidden>Download sanitized DOCX</button>
-      <div class="publish"><label for="ttl">Expires after</label><select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select><button type="button" id="create-link" disabled>Create private link</button><p id="publish-status" class="subtitle" role="status" aria-live="polite"></p><div id="link-result" hidden><label for="share-link">Private link - includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div></div>
+      <div id="share-panel" hidden>
+        <div class="share-row">
+          <button type="button" id="download-sanitized" hidden>Download DOCX</button>
+          <label for="ttl" class="inline-label">Expires</label>
+          <select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select>
+          <button type="button" id="create-link" disabled>Create link</button>
+        </div>
+        <p id="publish-hint" class="subtitle"></p>
+        <p id="publish-status" class="subtitle" role="status" aria-live="polite"></p>
+        <div id="link-result" hidden><label for="share-link">Private link - includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div>
+        <details id="verify-details" class="policy">
+          <summary>Verification and attack check</summary>
+          <p id="verify" hidden></p>
+          <div id="attack" class="attack" hidden><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div>
+        </details>
+      </div>
       <div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div>
     </div>
   </div>
 </div>
 </section>
 
-<aside><h2>Not ready to share yet</h2><p>Document inspection is experimental. Redaction, image review and private sharing are not connected yet.</p></aside>
+<aside><h2>Experimental integration</h2><p>Read the saved copy, review redactions, then share an encrypted link. Nothing is uploaded until you create a link.</p></aside>
 <details><summary>How private Word sharing will work</summary><ol><li>Connect Microsoft and capture the saved document.</li><li>Review redactions in a formatted preview.</li><li>Share an encrypted link to the reviewed copy.</li></ol><p>Recipients will read the copy, with optional DOCX export. Editing in Word will require a separate copy in their Microsoft account.</p></details>
-<details><summary>Manage earlier experimental links</summary><p>Only revocation controls are kept. Offline file import is no longer available.</p><div id="legacy"></div></details>
-</main><script src="source.js"></script><script src="../engine/crypto.js"></script><script src="../engine/heuristics.js"></script><script src="docx.js"></script><script src="../engine/pseudonymizer.js"></script><script src="../engine/policy.js"></script><script src="../engine/ner_client.js"></script><script src="policy.js"></script><script src="settings.js"></script><script src="textmap.js"></script><script src="detect.js"></script><script src="redact.js"></script><script src="setup.js"></script><script src="review.js"></script><script src="publish.js"></script></body></html>
+<details><summary>Manage earlier experimental links</summary><p>Only revocation controls are kept. Offline file import is no longer available.</p><p id="status" class="subtitle" role="status"></p><div id="legacy"></div></details>
+</main><dialog id="image-dialog" class="image-dialog"><div class="dialog-head"><span id="dialog-title">Review image</span><button type="button" id="dialog-close">Close</button></div><canvas id="dialog-canvas"></canvas><p id="dialog-hint" class="help">Drag on the image to mark an area. Areas are burned into the pixels, not covered.</p><div class="row"><button type="button" id="dialog-whole">Redact whole image</button><button type="button" id="dialog-clear">Clear areas</button><button type="button" id="dialog-done">Done</button></div><p id="dialog-count" class="subtitle"></p></dialog><script src="source.js"></script><script src="../engine/crypto.js"></script><script src="../engine/heuristics.js"></script><script src="docx.js"></script><script src="../engine/pseudonymizer.js"></script><script src="../engine/policy.js"></script><script src="../engine/ner_client.js"></script><script src="policy.js"></script><script src="settings.js"></script><script src="textmap.js"></script><script src="detect.js"></script><script src="redact.js"></script><script src="setup.js"></script><script src="review.js"></script><script src="publish.js"></script></body></html>

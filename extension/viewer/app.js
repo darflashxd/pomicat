@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     lockScreen.style.display = "none";
-    document.title = "SafeShare ? Reviewed document";
+    document.title = "SafeShare - Reviewed document";
     const brand = document.querySelector(".brand-sub");
     if (brand) brand.textContent = "Private document";
     const section = document.createElement("section");

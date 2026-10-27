@@ -31,11 +31,12 @@ External English holdout candidates (not downloaded or incorporated):
 
 ## Live testing gate
 
-Open an authored sample in Word Online using an authorized test account. Confirm final
-`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating SafeShare launcher, complete capture,
-review, local-relay encrypted share and a recipient browser without extension as each capability
-becomes implemented. Compare tables, equations and image placements; independently inspect all
-sanitized OOXML/media parts. Existing launcher is setup only, not this complete pipeline.
+Open an authored sample in Word Online using an authorized test account. Confirm the final
+`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating SafeShare launcher, the automatic
+first read, the two-pane review, apply, local-relay encrypted share and a recipient browser
+without the extension. Compare tables, equations and image placements; independently inspect all
+sanitized OOXML/media parts. A link is only a correct test if the recipient preview and the
+downloaded DOCX contain no selected original value.
 
 Do not upload real user documents, expose account/token/key information in captures, or claim
 that OCR confidence or successful rendering proves privacy. Public relay uploads are not needed.
@@ -54,4 +55,12 @@ colour on every text run in `document.xml` and `footer1.xml`.
 
 Verified in Word Online: upload succeeds through Playwright's file chooser, the editor shows the
 document in two pages, and the extension's **Read saved copy** action returned 2 tables, 1 image
-asset and the full text including the final sentinel. This confirms capture and inspection only.
+asset and the full text including the final sentinel.
+
+End-to-end review on 2026-10-28: opening setup from the launcher read the memo automatically and
+reported 16 of 18 items masked. Applying produced 20 text replacements across 2 parts; the
+sanitized DOCX was downloaded and linked through the local relay. The recipient preview rendered
+2 tables and `[REDACTED]` values and did not contain `4,800`; revoking the link produced
+"Link Expired or Revoked". The image lightbox recorded a 307x95 px area at bitmap coordinates and
+the thumbnail showed it burned black. This covers one authored fixture, not every tenant or
+document shape.

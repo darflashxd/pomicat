@@ -54,12 +54,6 @@ async function runCapture(){
     sanitizedBytes=null;
     $("download-sanitized").hidden=true;$("verify").hidden=true;
     const doc=await inspectWordFile(bytes);
-    const preview=$("document-preview");
-    for(const block of doc.blocks){
-      if(block.rows){const table=document.createElement("table");for(const row of block.rows){const tr=document.createElement("tr");for(const value of row){const td=document.createElement("td");td.textContent=value;tr.append(td);}table.append(tr);}preview.append(table);}
-      else if(block.text){const p=document.createElement("p");p.textContent=block.text;preview.append(p);}
-    }
-    for(const part of doc.supplementary){const details=document.createElement("details"),summary=document.createElement("summary"),p=document.createElement("p");summary.textContent=part.name;p.textContent=part.text;details.append(summary,p);preview.append(details);}
     $("inventory").textContent=`${doc.tables} tables - ${doc.images} images - ${doc.equations} equations`;
     $("capture-status").textContent="Saved copy read.";
     lastDoc = doc;

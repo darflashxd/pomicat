@@ -65,27 +65,32 @@ label.finding input{margin-top:4px;width:16px;height:16px;accent-color:#cfe3a8}
 .footer-actions .subtle{background:transparent;border:1px solid var(--line);color:var(--muted);font-size:13px;min-height:36px;padding:6px 12px}
 
 .review-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
-.review-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(380px,0.95fr);gap:20px;align-items:start}
+.review-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(400px,0.92fr);gap:20px;align-items:stretch;flex:1;min-height:0}
 .pane{background:var(--surface);border:1px solid var(--line);padding:16px;min-width:0}
-.preview-pane{position:sticky;top:16px;height:calc(100vh - 170px);min-height:420px;display:flex;flex-direction:column;gap:10px}
+.preview-pane{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:10px}
 .pane-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .pane-meta{text-transform:none;letter-spacing:0}
 .preview-body{overflow:auto;background:#fafafa;color:#20242a;padding:18px;border-radius:4px;flex:1;min-height:240px}
 .preview-body p{margin:10px 0;white-space:pre-wrap}
-.preview-body table{border-collapse:collapse;width:100%;margin:14px 0}
-.preview-body td{border:1px solid #89919b;padding:8px;vertical-align:top}
-.review-pane{display:flex;flex-direction:column;gap:12px}.review-scroll{display:flex;flex-direction:column;gap:12px}
+.preview-body table{border-collapse:collapse;width:100%;margin:14px 0;table-layout:fixed}
+.preview-body td{border:1px solid #89919b;padding:8px;vertical-align:top;overflow-wrap:anywhere}
+.review-pane{display:flex;flex-direction:column;gap:12px;height:100%;min-height:0}
+.review-scroll{display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1;min-height:0}
 .review-actions{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px;flex:none;background:var(--surface)}
 .compare-toggle{margin:0}
 .policy summary{cursor:pointer;font-size:13px;color:var(--muted);margin-bottom:8px}
 .policy[open]{display:grid;gap:8px}
-@media(max-width:980px){main{max-width:760px}.review-grid{grid-template-columns:1fr}.preview-pane{position:static;max-height:none}.preview-body{max-height:420px}.review-pane{max-height:none}}
+@media(max-width:980px){main{max-width:760px}body.reviewing{display:block;height:auto;overflow:auto}body.reviewing main{display:block;height:auto;margin-top:24px;padding-bottom:32px}body.reviewing #review-section:not([hidden]){display:block;margin:20px 0}body.reviewing .review-grid{grid-template-columns:1fr;height:auto;min-height:0}.preview-pane{height:auto;max-height:none;overflow:visible}.preview-body{max-height:420px}.review-pane{height:auto;max-height:none}.review-scroll{overflow:visible;min-height:0}}
 
 .intro{max-width:620px}
 .review-head .subtle{background:transparent;border:1px solid var(--line);color:var(--muted);font-size:13px;min-height:34px;padding:4px 10px}
 
 body.reviewing .intro,body.reviewing h1,body.reviewing .eyebrow{display:none}
-body.reviewing main{margin-top:28px}
+body.reviewing{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body.reviewing header{flex:none}
+body.reviewing main{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;margin:12px auto 0;padding-bottom:12px}
+body.reviewing #review-section:not([hidden]){display:flex;flex-direction:column;flex:1;min-height:0;margin:0}
+body.reviewing .review-head{flex:none;margin-bottom:12px}
 #review-summary:empty{display:none}
 .head-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
@@ -93,3 +98,54 @@ body.reviewing main{margin-top:28px}
 .review-scroll{padding-right:2px}
 .chip{padding:4px 8px;font-size:12px}
 .finding{padding:8px 10px}
+
+.preview-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+.preview-col{display:flex;flex-direction:column;min-width:0;min-height:0;gap:6px}
+.preview-col h3{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.preview-body mark{background:#3a2b2b;color:#ffd9d4;border-radius:2px;padding:0 2px}
+.preview-body mark.keep{background:transparent;color:inherit;outline:1px dashed #8a8f98;outline-offset:1px}
+.preview-body .hit{background:#3d4a2b;outline:2px solid #cfe3a8}
+.sanitized mark{background:#2c3a24;color:#d9f0c0}
+body.hide-original .preview-split{grid-template-columns:1fr}
+body.hide-original .preview-col:first-child{display:none}
+.image-dialog{border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:16px;max-width:94vw;max-height:92vh}
+.image-dialog::backdrop{background:#000a}
+.image-dialog canvas{max-width:90vw;max-height:70vh;background:#0d0f11;cursor:crosshair;display:block;margin:auto}
+.dialog-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;font-weight:600}
+.image-dialog .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.image-dialog button{background:#2b3138;color:var(--fg);border:1px solid var(--line)}
+
+#publish-hint{margin:0;font-size:12px}
+@media(max-width:1180px){.preview-split{grid-template-columns:1fr}.preview-body{max-height:360px}}
+
+#share-panel{display:grid;gap:10px}
+.manual-panel{border-top:0;padding:0;margin:0}
+.manual-panel summary{font-size:13px;color:var(--muted)}
+.manual-panel textarea{margin-top:8px}
+#apply-status:empty,#publish-status:empty{display:none}
+.review-actions #apply{width:100%}
+
+body.reviewing main>aside,body.reviewing main>details{display:none}
+
+.share-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.share-row button{flex:1;min-width:140px}
+.inline-label{font-size:13px;color:var(--muted)}
+#verify-details{border-top:1px solid var(--line);padding-top:10px;margin:0}
+#verify-details summary{font-size:13px;color:var(--muted)}
+
+.review-actions p{margin:0}
+.settings .policy{padding:0;border:0}
+.settings .policy summary{min-height:24px;font-size:13px}
+.settings{gap:8px;padding:10px 12px}
+.review-scroll{gap:10px}
+
+@media(max-width:980px){
+  body.reviewing{display:block;height:auto;overflow:auto}
+  body.reviewing main{display:block;height:auto;margin-top:24px;padding-bottom:32px}
+  body.reviewing #review-section:not([hidden]){display:block;margin:20px 0}
+  .review-grid{grid-template-columns:1fr;height:auto;min-height:0}
+  .preview-pane{height:auto;max-height:none;overflow:visible}
+  .preview-body{max-height:380px}
+  .review-pane{height:auto;max-height:none}
+  .review-scroll{overflow:visible;min-height:0}
+}

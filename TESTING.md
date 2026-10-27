@@ -167,6 +167,33 @@ Verified at 1500x1000: preview and findings render side by side, 12 finding rows
 and publish controls reachable, `Read again` present, and no page errors. At <=980px the grid
 collapses to one column with a capped preview height.
 
+Review workspace and share gate (2026-10-28): the preview is now a live before/after pair. The
+left pane keeps the original with checked findings marked solid and unchecked ones dashed; the
+right pane renders “what others will see” with replacement tags, manual phrases and range mode
+applied as you toggle. `Show original` collapses the left side. Model-sourced rows show their
+score (for example `Local model: PERSON - Model score 40%`); rule and money rows say
+`Rule-based`.
+
+Actions were compacted so findings keep most of the right pane. Applying now hides the apply
+button and reveals Download and Create link with the relay target in plain text. Changing a
+finding, category, amount mode, manual phrase or image after applying invalidates the copy,
+hides the share panel and asks for a new apply; this prevents linking a stale sanitized file.
+
+Images: thumbnails are 480x300 with an `Open large` lightbox (up to 90vw). Dragging draws the
+rectangle live and reports `Area W x H px`; marked areas are burned black in the thumbnail.
+Area coordinates stay in bitmap space so the same rectangle is burned on export.
+
+Verified at 1500x1000: model score badge present; removing the `profile` category reduced preview
+marks from 20 to 17; applying produced `20 text replacements across 2 parts` and revealed the
+share row; toggling a finding afterwards hid the share panel, restored the apply button, disabled
+link creation and showed the stale-copy message. Re-applying and creating a link produced a
+recipient preview with 2 tables and `[REDACTED]` values, without `4,800`; revoking made the link
+report "Link Expired or Revoked". At 900x1000 the page had no horizontal overflow and the review
+stacked into one column. `node tests/run_all.js` passed 54/54.
+
+Still open: image text needs manual marking (no OCR), charts/OLE are counted but not rewritten,
+and the recipient path was exercised in the same Playwright profile.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

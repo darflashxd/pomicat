@@ -15,6 +15,7 @@
     if (seen.has(key)) {
       const prior = seen.get(key);
       if (item.preChecked) prior.preChecked = true;
+      if (Number.isFinite(item.score) && !Number.isFinite(prior.score)) prior.score = item.score;
       if (item.reason && !prior.reason.includes(item.reason)) prior.reason += `; ${item.reason}`;
       return;
     }
@@ -120,7 +121,7 @@
           out.push({
             value, category: "PROFILE", ruleName: `Local model: ${span.label}`,
             reason: `model score ${span.score.toFixed(2)} (not a probability)`,
-            replacement: "[REDACTED_NAME]", source: "model",
+            replacement: "[REDACTED_NAME]", source: "model", score: span.score,
             preChecked: span.score >= 0.6 || (value.split(/\s+/).length > 1 && span.score >= 0.35)
           });
         }

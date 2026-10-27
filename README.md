@@ -101,20 +101,32 @@ and the reply's formulas are computed locally against it. The chat site received
 `$4,800`. Captured from the v2.4.1 extension on Chrome 155, ChatGPT dark theme, with a local relay;
 the reply and its computed values are unedited.*
 
-### Word Online integration ? preparation only
+### Word Online integration
 
-Offline document import has been removed. The Word button is declared as a normal content
-script, so it appears on Word documents without a per-site prompt; Chrome shows the access
-warning once at install. The extension therefore has DOM access to SharePoint/Word origins in
-general, and the launcher only reveals itself on Word editor routes. The toolbar opens Word Online
-setup; you can opt in
-on a supported SharePoint/Word origin and add a SafeShare launcher. This is **not yet document
-sharing**: an experimental **Read saved copy** action supports the observed SharePoint
-`Doc.aspx`/`doc2.aspx` session-download route after site permission. It accepts DOCX up to 5 MiB
-and inspects text/tables/header/footer locally; images/equations are counted, not rendered.
-This is source inspection, **not a sanitized or full-fidelity preview**. Redaction and recipient
-sharing remain unimplemented. Session-download compatibility is tenant-dependent and may change.
-Existing chat protection is unchanged.
+The launcher appears on Word editor routes (`Doc.aspx`/`doc2.aspx`) without a per-site prompt;
+the toolbar opens Word Online setup. Opening it reads a **separate copy** of the saved document
+through the current SharePoint session, leaving the original unchanged. The setup page is a
+two-pane review workspace: the document preview on the left (original highlights beside “what
+others will see”) and findings, settings and actions on the right. Opening setup from the launcher
+reads the copy once automatically; the control then becomes **Read again**.
+
+Detection reuses the chat tiers plus money-column/currency bases and the derived-amount solver,
+with local NER for names. Every finding can be toggled per item, filtered by category, or selected
+directly in the preview; model-sourced rows show their model score. Redaction is surgical OOXML
+editing — `w:t` runs are rewritten inside the original package, so tables, styles, headers,
+footers and equations survive.
+
+Images are reviewed at full size in a lightbox: drag to mark areas or replace the whole image.
+Pixels are overwritten and re-encoded, then verified before export. A crop can still contain the
+hidden area in the file, so **Redact whole** is the safe choice when unsure.
+
+After applying, the verified DOCX can be downloaded or shared as an encrypted link (24h/3d/7d,
+revocable). The key stays in the link fragment; the relay stores ciphertext only. The current relay
+limit is 512 KiB ciphertext, so image-heavy documents should be downloaded instead. When the
+attack check still recovers hidden amounts, creating a link requires an explicit confirmation.
+
+Limits: text inside images is not detected automatically (mark it yourself), charts and OLE objects
+are counted but not rewritten, and SharePoint session-download compatibility is tenant-dependent.
 
 ## Screenshots
 
