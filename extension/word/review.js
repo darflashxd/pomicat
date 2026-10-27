@@ -165,6 +165,9 @@ function renderFindings(doc) {
   } else more.hidden = true;
 
   renderImages(doc);
+  $("capture-section").hidden = true;
+  $("read-again").hidden = false;
+  document.body.classList.add("reviewing");
   documentCurrency = detectDocumentCurrency();
   resetCompare();
   $("review-section").hidden = false;
@@ -539,3 +542,5 @@ SafeShareWordSettings.load().then(prefs => {
     }
   }
 }).catch(() => {});
+
+$("read-again").addEventListener("click", () => { if (window.__ssReadAgain) window.__ssReadAgain(); });

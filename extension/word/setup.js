@@ -24,8 +24,9 @@ if (sharepointOrigin) {
   $("capture-intro").textContent = `Connected to ${new URL(sharepointOrigin).hostname}. Reads the saved copy only; the original document is not changed.`;
 }
 
-$("capture").addEventListener("click",async()=>{
-  $("capture").disabled=true;$("error").hidden=true;$("inspection").hidden=true;$("document-preview").replaceChildren();
+async function runCapture(){
+  if ($("capture").disabled) return;
+  $("capture").disabled=true;$("error").hidden=true;$("document-preview").replaceChildren();
   $("capture-status").textContent="Reading saved DOCX…";
   try {
     const tabId=Number(query.get("tab"));
@@ -59,8 +60,8 @@ $("capture").addEventListener("click",async()=>{
       else if(block.text){const p=document.createElement("p");p.textContent=block.text;preview.append(p);}
     }
     for(const part of doc.supplementary){const details=document.createElement("details"),summary=document.createElement("summary"),p=document.createElement("p");summary.textContent=part.name;p.textContent=part.text;details.append(summary,p);preview.append(details);}
-    $("inventory").textContent=`${doc.tables} tables · ${doc.images} image assets · ${doc.equations} equations. Images/equations are not shown in this inspection.`;
-    $("inspection").hidden=false;$("capture-status").textContent="Saved copy read. This is source content, not a sanitized preview.";
+    $("inventory").textContent=`${doc.tables} tables - ${doc.images} images - ${doc.equations} equations`;
+    $("capture-status").textContent="Saved copy read.";
     lastDoc = doc;
     providedFindings = null;
     const map = SafeShareTextMap.flatten(doc);
@@ -81,8 +82,17 @@ $("capture").addEventListener("click",async()=>{
       }).catch(() => { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally?", " Name model unavailable."); });
     }
   }catch(e){$("error").textContent=e.message;$("error").hidden=false;$("capture-status").textContent="Inspection stopped. Nothing was shared.";}
-  finally{$("capture").disabled=false;}
-});
+  finally{$("capture").disabled=false;$("capture").textContent="Read again";}
+}
+$("capture").addEventListener("click", runCapture);
+window.__ssReadAgain = runCapture;
+
+// The launcher already expressed intent: read once automatically for that tab.
+const autoTab = Number(query.get("tab"));
+if (sharepointOrigin && Number.isInteger(autoTab) && autoTab > 0) {
+  $("capture-status").textContent = "Reading saved copy?";
+  runCapture();
+}
 
 async function legacyLinks() {
   try {

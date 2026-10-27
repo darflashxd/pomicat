@@ -6,19 +6,47 @@
 <section id="capture-section" hidden><h2>Inspect the saved document</h2><p id="capture-intro">Read a local copy through your current SharePoint session. Save changes in Word first.</p><button id="capture">Read saved copy</button><p id="capture-status" role="status" aria-live="polite"></p><p id="error" role="alert" hidden></p><details><summary>Prototype limits</summary><p>No document is uploaded to SafeShare unless you create a link. Preview shows text and table contents, not original layout. Images and equations are counted, not rendered.</p></details></section>
 
 
-<section id="review-section" hidden><h2 id="review-title">Create sanitized copy</h2><p id="review-subtitle" class="subtitle">Reviewed locally. Nothing is uploaded until you create a link.</p><p id="review-summary" class="subtitle"></p><p id="review-counts" class="counts"></p><button type="button" id="redact-selection" class="redact-selection" hidden>Redact selected text</button>
-<div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
-<div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
-<label class="check"><input id="hide-amounts" type="checkbox"> Also redact currency amounts</label>
-<label class="check"><input id="keep-revisions" type="checkbox"> Keep tracked changes and comments</label>
-<label class="check"><input id="keep-metadata" type="checkbox"> Keep document metadata</label>
-<label for="reader">Reader</label><select id="reader"><option value="public">Anyone with the link</option><option value="trusted">Someone I trust</option></select>
-<label for="numbers">Amounts</label><select id="numbers"><option value="remove">Remove</option><option value="range">Approximate ranges</option></select>
-<label for="placeholder-style">Placeholder for manual text</label><select id="placeholder-style"><option value="[REDACTED]">[REDACTED]</option><option value="[REDACTED_PRIVATE]">[REDACTED_PRIVATE]</option></select></div>
-<div id="findings"></div><button type="button" id="show-more" class="show-more" hidden></button>
-<div id="image-block" hidden><h3>Images</h3><p class="help">Drag on an image to mark an area, or replace the whole image. Pixels are overwritten, never covered by a shape.</p><div id="image-list"></div></div><label for="manual">Add private text, one phrase per line</label><textarea id="manual" rows="3" maxlength="4000" placeholder="Names or terms the rules missed"></textarea><button id="apply">Create sanitized DOCX</button><p id="apply-status" role="status" aria-live="polite"></p><p id="verify" hidden></p><button id="download-sanitized" hidden>Download sanitized DOCX</button><div class="publish"><label for="ttl">Expires after</label><select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select><button type="button" id="create-link" disabled>Create private link</button><p id="publish-status" class="subtitle" role="status" aria-live="polite"></p><div id="link-result" hidden><label for="share-link">Private link ? includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div></div>
-<div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div><div id="attack" class="attack" hidden><h3>Attack check</h3><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div><label class="check"><input id="compare-toggle" type="checkbox" checked> Compare with original</label><div id="compare" class="compare" hidden></div></section>
-<section id="inspection" hidden><h2>Source inspection — not redacted</h2><p id="inventory"></p><div id="document-preview"></div></section>
+<section id="review-section" hidden>
+<div class="review-head"><div><h2 id="review-title">Create sanitized copy</h2><p id="review-subtitle" class="subtitle">Reviewed locally. Nothing is uploaded until you create a link.</p></div><div class="head-actions"><p id="review-counts" class="counts"></p><button type="button" id="read-again" class="subtle" hidden>Read again</button></div></div>
+<div class="review-grid">
+  <div class="pane preview-pane">
+    <div class="pane-head"><span>Document preview</span><span id="inventory" class="pane-meta"></span></div>
+    <div id="document-preview" class="preview-body" tabindex="0"></div>
+    <button type="button" id="redact-selection" class="redact-selection" hidden>Redact selected text</button>
+    <label class="check compare-toggle"><input id="compare-toggle" type="checkbox" checked> Compare with original</label>
+    <div id="compare" class="compare" hidden></div>
+  </div>
+  <div class="pane review-pane">
+    <div class="review-scroll">
+    <div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
+    <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
+    <details class="policy"><summary>Protection settings</summary>
+    <label class="check"><input id="hide-amounts" type="checkbox"> Also redact currency amounts</label>
+    <label class="check"><input id="keep-revisions" type="checkbox"> Keep tracked changes and comments</label>
+    <label class="check"><input id="keep-metadata" type="checkbox"> Keep document metadata</label>
+    <label for="reader">Reader</label><select id="reader"><option value="public">Anyone with the link</option><option value="trusted">Someone I trust</option></select>
+    <label for="numbers">Amounts</label><select id="numbers"><option value="remove">Remove</option><option value="range">Approximate ranges</option></select>
+    <label for="placeholder-style">Placeholder for manual text</label><select id="placeholder-style"><option value="[REDACTED]">[REDACTED]</option><option value="[REDACTED_PRIVATE]">[REDACTED_PRIVATE]</option></select>
+    </details></div>
+    <p id="review-summary" class="subtitle"></p>
+    <div id="findings"></div>
+    <button type="button" id="show-more" class="show-more" hidden></button>
+    <div id="image-block" hidden><h3>Images</h3><p class="help">Drag on an image to mark an area, or replace the whole image. Pixels are overwritten, never covered by a shape.</p><div id="image-list"></div></div>
+    </div>
+    <div class="review-actions">
+      <label for="manual">Add private text, one phrase per line</label><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea>
+      <button id="apply">Create sanitized DOCX</button>
+      <p id="apply-status" role="status" aria-live="polite"></p>
+      <p id="verify" hidden></p>
+      <div id="attack" class="attack" hidden><h3>Attack check</h3><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div>
+      <button id="download-sanitized" hidden>Download sanitized DOCX</button>
+      <div class="publish"><label for="ttl">Expires after</label><select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select><button type="button" id="create-link" disabled>Create private link</button><p id="publish-status" class="subtitle" role="status" aria-live="polite"></p><div id="link-result" hidden><label for="share-link">Private link - includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div></div>
+      <div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div>
+    </div>
+  </div>
+</div>
+</section>
+
 <aside><h2>Not ready to share yet</h2><p>Document inspection is experimental. Redaction, image review and private sharing are not connected yet.</p></aside>
 <details><summary>How private Word sharing will work</summary><ol><li>Connect Microsoft and capture the saved document.</li><li>Review redactions in a formatted preview.</li><li>Share an encrypted link to the reviewed copy.</li></ol><p>Recipients will read the copy, with optional DOCX export. Editing in Word will require a separate copy in their Microsoft account.</p></details>
 <details><summary>Manage earlier experimental links</summary><p>Only revocation controls are kept. Offline file import is no longer available.</p><div id="legacy"></div></details>

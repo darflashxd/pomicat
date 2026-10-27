@@ -154,6 +154,19 @@ button visible on the document route, hidden on the Word home route, and the set
 connected state with no `#enable` control. Trade-off: Chrome now warns about SharePoint/Word
 access at install and the extension has DOM access to those origins, not only the open document.
 
+Layout and auto-start (2026-10-27): the review is a two-pane workspace - document preview on
+the left (sticky, own scroll) and findings/settings/actions on the right - replacing the single
+760px column. The hero is hidden once a review starts, `Inventory` moved into the pane header, and
+the standalone inspection section was merged into the preview pane.
+
+Opening the setup page from the launcher with a Word tab reference now reads the saved copy
+automatically; the button becomes `Read again` and a compact `Read again` control sits in the
+review header. Opening the page manually still requires an explicit read.
+
+Verified at 1500x1000: preview and findings render side by side, 12 finding rows visible, apply
+and publish controls reachable, `Read again` present, and no page errors. At <=980px the grid
+collapses to one column with a capped preview height.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,
