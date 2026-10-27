@@ -207,6 +207,20 @@ its height. Verified at 1500x1000 and 1000x1000: no horizontal overflow, the ima
 without the lightbox, apply/link/revoke update the lower label, and `node tests/run_all.js` passes
 54/54.
 
+Findings below and select-to-redact (2026-10-28): the preview is now full width at the top,
+followed by findings in a card grid (three columns at desktop width; 18 cards at about 342px),
+then images, then sharing. A sticky section nav reports `Findings 18`, `Images 1 · 1 unmarked`
+and jumps between sections; `Show in preview` scrolls the page back to the preview and highlights
+the value.
+
+Selecting text in **Original** or **What others will see** shows a floating `Redact "…"` button
+next to the selection, with a permanent `Tip: Select text in either pane to redact it.` line.
+Verified: selecting `Northbridge Advisory` raised findings 18→19; selecting `People Operations`
+in the sanitized pane raised it to 20; selecting `[REDACTED_FINANCIAL]` reported
+`That part is already redacted.` and added nothing. The sanitized pane strips placeholder tokens
+before adding visible text. At 788 CSS px the grid collapses to one column with no horizontal
+overflow. `node tests/run_all.js` passes 54/54.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

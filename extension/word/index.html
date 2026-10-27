@@ -8,73 +8,79 @@
 
 <section id="review-section" hidden>
 <div class="review-head"><div><h2 id="review-title">Create sanitized copy</h2><p id="review-subtitle" class="subtitle">Reviewed locally. Nothing is uploaded until you create a link.</p></div><div class="head-actions"><p id="review-counts" class="counts"></p><button type="button" id="read-again" class="subtle" hidden>Read again</button></div></div>
-<div class="review-grid">
+<nav class="section-nav" aria-label="Review sections">
+  <button type="button" data-target="preview-block">Preview</button>
+  <button type="button" data-target="findings-block">Findings <span id="nav-findings">0</span></button>
+  <button type="button" data-target="images-block">Images <span id="nav-images">0</span></button>
+  <button type="button" data-target="share-block">Share &amp; export</button>
+</nav>
+
+<section id="preview-block" class="review-block preview-block">
   <div class="pane preview-pane">
     <div class="pane-head"><span>Document preview</span><span id="inventory" class="pane-meta"></span></div>
-    <label class="check compare-toggle"><input id="show-original" type="checkbox" checked> Show original</label>
+    <div class="preview-tools">
+      <label class="check compare-toggle"><input id="show-original" type="checkbox" checked> Show original</label>
+      <p class="select-hint">Select text in either pane to redact it. <span id="selection-status" class="selection-status" role="status" aria-live="polite"></span></p>
+    </div>
     <div class="preview-split">
-      <div class="preview-col"><h3>Original (sender only)</h3><div id="document-preview" class="preview-body" tabindex="0"></div></div>
-      <div class="preview-col"><h3>What others will see</h3><div id="sanitized-preview" class="preview-body sanitized"></div></div>
+      <div class="preview-col"><h3>Original (sender only)</h3><div id="document-preview" class="preview-body" tabindex="0" title="Select text to redact it"></div></div>
+      <div class="preview-col"><h3>What others will see</h3><div id="sanitized-preview" class="preview-body sanitized" title="Select visible text to redact it"></div></div>
     </div>
-    <button type="button" id="redact-selection" class="redact-selection" hidden>Redact selected text</button>
+    <button type="button" id="redact-selection" class="redact-selection" hidden>Redact selection</button>
   </div>
-  <div class="pane review-pane">
-    <div class="pane-head"><span>Findings</span><span id="findings-meta" class="pane-meta"></span></div>
-    <div class="review-scroll">
-    <div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
-    <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
-    <details class="policy"><summary>Protection settings</summary>
-    <label class="check"><input id="hide-amounts" type="checkbox"> Also redact currency amounts</label>
-    <label class="check"><input id="keep-revisions" type="checkbox"> Keep tracked changes and comments</label>
-    <label class="check"><input id="keep-metadata" type="checkbox"> Keep document metadata</label>
-    <label for="reader">Reader</label><select id="reader"><option value="public">Anyone with the link</option><option value="trusted">Someone I trust</option></select>
-    <label for="numbers">Amounts</label><select id="numbers"><option value="remove">Remove</option><option value="range">Approximate ranges</option></select>
-    <label for="placeholder-style">Placeholder for manual text</label><select id="placeholder-style"><option value="[REDACTED]">[REDACTED]</option><option value="[REDACTED_PRIVATE]">[REDACTED_PRIVATE]</option></select>
-    </details></div>
-    <p id="review-summary" class="subtitle"></p>
-    <div id="findings"></div>
-    <button type="button" id="show-more" class="show-more" hidden></button>
+</section>
+
+<section id="findings-block" class="review-block findings-block">
+  <div class="block-head"><h3>Findings</h3><span id="findings-meta" class="pane-meta"></span></div>
+  <div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
+  <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
+  <details class="policy"><summary>Protection settings</summary>
+  <label class="check"><input id="hide-amounts" type="checkbox"> Also redact currency amounts</label>
+  <label class="check"><input id="keep-revisions" type="checkbox"> Keep tracked changes and comments</label>
+  <label class="check"><input id="keep-metadata" type="checkbox"> Keep document metadata</label>
+  <label for="reader">Reader</label><select id="reader"><option value="public">Anyone with the link</option><option value="trusted">Someone I trust</option></select>
+  <label for="numbers">Amounts</label><select id="numbers"><option value="remove">Remove</option><option value="range">Approximate ranges</option></select>
+  <label for="placeholder-style">Placeholder for manual text</label><select id="placeholder-style"><option value="[REDACTED]">[REDACTED]</option><option value="[REDACTED_PRIVATE]">[REDACTED_PRIVATE]</option></select>
+  </details></div>
+  <p id="review-summary" class="subtitle"></p>
+  <div id="findings"></div>
+  <button type="button" id="show-more" class="show-more" hidden></button>
+</section>
+
+<section id="images-block" class="review-block images-block">
+  <div class="block-head"><h3>Images</h3><span id="images-meta" class="pane-meta"></span></div>
+  <p id="image-empty" class="help" hidden>This document has no embedded images.</p>
+  <div id="image-block" hidden>
+    <p class="help">Open an image to mark areas at full size. Pixels are overwritten, never covered by a shape.</p>
+    <div id="image-list"></div>
+  </div>
+</section>
+
+<section id="share-block" class="review-block share-block">
+  <div class="block-head"><h3>Share &amp; export</h3><span id="share-meta" class="pane-meta"></span></div>
+  <div class="review-actions">
+  <details class="policy manual-panel"><summary>Add private text</summary><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea></details>
+  <button id="apply">Create sanitized DOCX</button>
+  <p id="apply-status" role="status" aria-live="polite"></p>
+  <div id="share-panel" hidden>
+    <div class="share-row">
+      <button type="button" id="download-sanitized" hidden>Download DOCX</button>
+      <label for="ttl" class="inline-label">Expires</label>
+      <select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select>
+      <button type="button" id="create-link" disabled>Create link</button>
     </div>
+    <p id="publish-hint" class="subtitle"></p>
+    <p id="publish-status" class="subtitle" role="status" aria-live="polite"></p>
+    <div id="link-result" hidden><label for="share-link">Private link - includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div>
+    <details id="verify-details" class="policy">
+      <summary>Verification and attack check</summary>
+      <p id="verify" hidden></p>
+      <div id="attack" class="attack" hidden><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div>
+    </details>
   </div>
-</div>
-<details id="lower-panel" class="lower-panel" open>
-  <summary><span id="lower-label">Images &amp; share</span></summary>
-  <div class="lower-grid">
-    <section class="pane image-pane" aria-label="Images">
-      <div class="pane-head"><span>Images</span><span id="images-meta" class="pane-meta"></span></div>
-      <p id="image-empty" class="help" hidden>This document has no embedded images.</p>
-      <div id="image-block" hidden>
-        <p class="help">Open an image to mark areas at full size. Pixels are overwritten, never covered by a shape.</p>
-        <div id="image-list"></div>
-      </div>
-    </section>
-    <section class="pane share-pane" aria-label="Share and export">
-      <div class="pane-head"><span>Share &amp; export</span><span id="share-meta" class="pane-meta"></span></div>
-      <div class="review-actions">
-      <details class="policy manual-panel"><summary>Add private text</summary><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea></details>
-      <button id="apply">Create sanitized DOCX</button>
-      <p id="apply-status" role="status" aria-live="polite"></p>
-      <div id="share-panel" hidden>
-        <div class="share-row">
-          <button type="button" id="download-sanitized" hidden>Download DOCX</button>
-          <label for="ttl" class="inline-label">Expires</label>
-          <select id="ttl"><option value="86400">24 Hours</option><option value="259200">3 Days</option><option value="604800">7 Days</option></select>
-          <button type="button" id="create-link" disabled>Create link</button>
-        </div>
-        <p id="publish-hint" class="subtitle"></p>
-        <p id="publish-status" class="subtitle" role="status" aria-live="polite"></p>
-        <div id="link-result" hidden><label for="share-link">Private link - includes the decryption key</label><input id="share-link" readonly><div class="row"><button type="button" id="copy-link">Copy link</button><button type="button" id="revoke-link">Revoke</button></div></div>
-        <details id="verify-details" class="policy">
-          <summary>Verification and attack check</summary>
-          <p id="verify" hidden></p>
-          <div id="attack" class="attack" hidden><p id="attack-text"></p><label class="check" id="attack-confirm-wrap" hidden><input id="attack-confirm" type="checkbox"> I understand these values can still be recovered</label></div>
-        </details>
-      </div>
-      <div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div>
-      </div>
-    </section>
+  <div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div>
   </div>
-</details>
+</section>
 </section>
 
 <aside><h2>Experimental integration</h2><p>Read the saved copy, review redactions, then share an encrypted link. Nothing is uploaded until you create a link.</p></aside>

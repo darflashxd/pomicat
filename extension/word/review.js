@@ -5,7 +5,7 @@ let wordPrefs = { reader: "public", numbers: "remove", categories: null };
 let attackLeaks = 0;
 let documentCurrency = null;
 let appliedSignature = null;
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -206,17 +206,15 @@ function updateCounts() {
 }
 
 function updateLowerLabel() {
-  const label = $("lower-label");
-  if (!label) return;
   const media = lastDoc?.media || [];
   const unmarked = imageState.filter(state => !state.mode).length;
-  const parts = [];
-  if (media.length) parts.push(`Images: ${unmarked ? `${unmarked} not marked` : "all marked"}`);
-  else parts.push("Images: none");
+  const nav = $("nav-images");
+  if (nav) {
+    nav.textContent = media.length ? `${media.length}${unmarked ? ` · ${unmarked} unmarked` : ""}` : "0";
+    nav.classList.toggle("warn", unmarked > 0);
+    nav.title = media.length ? (unmarked ? `${unmarked} image(s) not marked` : "All images marked") : "No images";
+  }
   const linked = typeof PublishState !== "undefined" && PublishState.last;
-  parts.push(linked ? "Link live" : sanitizedBytes ? "Sanitized copy ready" : "Share & export");
-  label.textContent = parts.join(" · ");
-  label.classList.toggle("warn", unmarked > 0);
   const meta = $("share-meta");
   if (meta) meta.textContent = linked ? "Link live" : sanitizedBytes ? "Ready" : "Not created";
 }
@@ -272,7 +270,10 @@ function renderFindings(doc) {
     const locate = document.createElement("button");
     locate.type = "button"; locate.className = "finding-locate"; locate.textContent = "Show in preview";
     locate.addEventListener("click", () => showInPreview(finding.value));
-    row.append(label, text, state, locate);
+    const actions = document.createElement("div");
+    actions.className = "finding-actions";
+    actions.append(state, locate);
+    row.append(label, text, actions);
     row.dataset.pageHidden = index >= PAGE_SIZE ? "1" : "0";
     if (row.dataset.pageHidden === "1" && !showAllFindings) row.hidden = true;
     host.append(row);
@@ -283,6 +284,8 @@ function renderFindings(doc) {
     more.textContent = showAllFindings ? "Show fewer" : `Show ${findings.length - PAGE_SIZE} more`;
   } else more.hidden = true;
   $("findings-meta").textContent = findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "None";
+  const navCount = $("nav-findings");
+  if (navCount) navCount.textContent = String(findings.length);
 
   renderImages(doc);
   if (!sanitizedBytes) {
@@ -359,11 +362,11 @@ function detectDocumentCurrency() {
 
 function addManualCandidate(text) {
   const value = String(text).replace(/\s+/g, " ").trim();
-  if (value.length < 3) return;
+  if (value.length < 3) return false;
   if (!providedFindings) providedFindings = findingRows(lastDoc).slice();
   if (providedFindings.some(item => item.value.toLowerCase() === value.toLowerCase())) {
     $("apply-status").textContent = "That value is already in the list.";
-    return;
+    return false;
   }
   providedFindings.push({
     value, category: "CUSTOM", categoryLabel: "Added by you", ruleName: "Manual selection",
@@ -372,18 +375,91 @@ function addManualCandidate(text) {
   mediaCache = null;
   rerenderKeepingChoices();
   $("apply-status").textContent = `Added "${value}" to the redaction list.`;
+  return true;
 }
 
-$("document-preview").addEventListener("mouseup", () => {
+let selectionTimer = null;
+let selectionStatusTimer = null;
+
+function selectionContext() {
   const selection = window.getSelection();
-  const text = selection ? selection.toString() : "";
-  $("redact-selection").hidden = text.trim().length < 3;
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
+  const text = selection.toString().trim();
+  if (text.length < 3) return null;
+  const node = selection.anchorNode;
+  const element = node ? (node.nodeType === 3 ? node.parentElement : node) : null;
+  const pane = element && element.closest ? element.closest("#document-preview, #sanitized-preview") : null;
+  if (!pane) return null;
+  return { text, pane: pane.id, rect: selection.getRangeAt(0).getBoundingClientRect() };
+}
+
+function hideSelectionButton() {
+  const button = $("redact-selection");
+  if (button) button.hidden = true;
+}
+
+function setSelectionStatus(message, warn) {
+  const status = $("selection-status");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("warn", Boolean(warn));
+  clearTimeout(selectionStatusTimer);
+  if (message) selectionStatusTimer = setTimeout(() => { status.textContent = ""; status.classList.remove("warn"); }, 4500);
+}
+
+function updateSelectionButton() {
+  const info = selectionContext();
+  const button = $("redact-selection");
+  if (!info) { hideSelectionButton(); return; }
+  const short = info.text.replace(/\s+/g, " ");
+  button.textContent = `Redact "${short.length > 38 ? short.slice(0, 35) + "…" : short}"`;
+  button.dataset.selection = info.text;
+  button.dataset.pane = info.pane;
+  button.hidden = false;
+  const width = Math.min(340, window.innerWidth - 20);
+  const left = Math.max(10, Math.min(window.innerWidth - width - 10, info.rect.left));
+  const top = info.rect.bottom + 54 > window.innerHeight ? Math.max(10, info.rect.top - 50) : info.rect.bottom + 8;
+  button.style.left = `${left}px`;
+  button.style.top = `${top}px`;
+  button.style.maxWidth = `${width}px`;
+}
+
+for (const id of ["document-preview", "sanitized-preview"]) {
+  const pane = $(id);
+  pane.addEventListener("mouseup", () => setTimeout(updateSelectionButton, 0));
+  pane.addEventListener("keyup", () => setTimeout(updateSelectionButton, 0));
+}
+document.addEventListener("selectionchange", () => {
+  clearTimeout(selectionTimer);
+  selectionTimer = setTimeout(() => { if (selectionContext()) updateSelectionButton(); }, 180);
 });
+window.addEventListener("scroll", hideSelectionButton, true);
+$("redact-selection").addEventListener("pointerdown", event => event.preventDefault());
 $("redact-selection").addEventListener("click", () => {
-  const selection = window.getSelection();
-  const text = selection ? selection.toString() : "";
-  if (text.trim().length >= 3) addManualCandidate(text);
-  $("redact-selection").hidden = true;
+  const button = $("redact-selection");
+  const raw = button.dataset.selection || "";
+  const pane = button.dataset.pane || "";
+  let text = raw;
+  if (pane === "sanitized-preview") {
+    text = text.replace(/\[REDACTED_[A-Z0-9_]*\]|\[REDACTED\]/gi, "\n");
+    if (!text.replace(/\s+/g, "").length) {
+      setSelectionStatus("That part is already redacted.", true);
+      hideSelectionButton();
+      return;
+    }
+  }
+  const parts = text.split(/\r?\n+/).map(line => line.replace(/\s+/g, " ").trim()).filter(line => line.length >= 3);
+  let added = 0;
+  for (const part of parts) if (addManualCandidate(part)) added++;
+  hideSelectionButton();
+  if (added) {
+    setSelectionStatus(added === 1 ? `Added "${parts[0]}" to findings.` : `Added ${added} phrases to findings.`);
+    window.getSelection()?.removeAllRanges();
+  } else if (!parts.length) {
+    setSelectionStatus("Select at least three visible characters.", true);
+  } else {
+    setSelectionStatus("That text is already in the findings.", true);
+  }
 });
 
 /* ---------- images ---------- */
@@ -750,6 +826,12 @@ $("download-sanitized").addEventListener("click", () => {
 
 $("read-again").addEventListener("click", () => { if (window.__ssReadAgain) window.__ssReadAgain(); });
 window.__ssLowerLabel = updateLowerLabel;
+document.querySelector(".section-nav").addEventListener("click", event => {
+  const button = event.target.closest("button[data-target]");
+  if (!button) return;
+  const target = document.getElementById(button.dataset.target);
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 SafeShareWordSettings.load().then(prefs => {
   wordPrefs = prefs;

@@ -26,8 +26,10 @@ assert.ok(html.includes('id="sanitized-preview"'), "review must show what the re
 assert.ok(html.includes('id="show-original"'), "original pane must be collapsible");
 assert.ok(html.includes('id="share-panel"'), "share controls must be gated behind apply");
 assert.ok(html.includes('id="publish-hint"'), "disabled link control needs a reason");
-assert.ok(html.includes('id="lower-panel"'), "images and sharing live below the workspace");
-assert.ok(html.indexOf('id="lower-panel"') > html.indexOf('id="findings"'), "images must not sit inside the findings column");
+assert.ok(html.includes('class="section-nav"'), "review sections need a jump navigation");
+assert.ok(html.indexOf('id="findings-block"') > html.indexOf('id="preview-block"'), "findings belong below the preview");
+assert.ok(html.indexOf('id="images-block"') > html.indexOf('id="findings-block"'), "images belong below findings");
+assert.ok(html.includes('id="selection-status"'), "selection feedback must be visible near the preview");
 assert.ok(!fs.existsSync(path.join(root, "documents/index.html")));
 const viewer = fs.readFileSync(path.join(root,"viewer/app.js"),"utf8");
 assert.ok(/kind === "document"/.test(viewer));
