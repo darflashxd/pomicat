@@ -175,11 +175,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Retired experimental document payloads are not safe Word snapshots.
+  // Reviewed Word documents: v4 carries the sanitized DOCX plus a text preview.
   if (decryptedData?.kind === "document") {
-    lockScreen.style.display = "block";
-    lockScreen.querySelector("h2").textContent = "Experimental document link retired";
-    lockScreen.querySelector("p").textContent = "Ask the sender for a new reviewed copy. Chat links are unaffected.";
+    const doc = decryptedData;
+    const valid = doc.version === 4 && doc.format === "docx" &&
+      typeof doc.docx === "string" && doc.docx.length < 700000 &&
+      /^[A-Za-z0-9+/]*={0,2}$/.test(doc.docx) && doc.docx.length % 4 === 0 &&
+      typeof doc.preview === "string" && doc.preview.length < 200000;
+    if (!valid) {
+      lockScreen.style.display = "block";
+      lockScreen.querySelector("h2").textContent = "Unsupported document link";
+      lockScreen.querySelector("p").textContent = "Ask the sender to create a new link with the current SafeShare version.";
+      return;
+    }
+    lockScreen.style.display = "none";
+    document.title = "SafeShare ? Reviewed document";
+    const brand = document.querySelector(".brand-sub");
+    if (brand) brand.textContent = "Private document";
+    const section = document.createElement("section");
+    section.className = "document-view";
+    const note = document.createElement("p");
+    note.className = "document-note";
+    note.textContent = "Sanitized copy reviewed by the sender. Text preview is shown; download keeps tables, styles and images.";
+    const frame = document.createElement("iframe");
+    frame.title = "Reviewed document";
+    frame.setAttribute("sandbox", "");
+    frame.srcdoc = doc.preview;
+    frame.style.cssText = "width:100%;height:60vh;border:1px solid #444;background:#fff;border-radius:6px";
+    const download = document.createElement("button");
+    download.type = "button";
+    download.className = "btn-primary";
+    download.textContent = "Download sanitized DOCX";
+    download.addEventListener("click", () => {
+      const bytes = Uint8Array.from(atob(doc.docx), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = "reviewed-document.docx"; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+    section.append(note, frame, download);
+    lockScreen.parentElement.append(section);
     return;
   }
 

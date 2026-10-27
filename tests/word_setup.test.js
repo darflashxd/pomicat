@@ -20,7 +20,9 @@ assert.ok(!/type=["']file/.test(html));
 assert.ok(html.includes("Not ready to share yet"));
 assert.ok(!fs.existsSync(path.join(root, "documents/index.html")));
 const viewer = fs.readFileSync(path.join(root,"viewer/app.js"),"utf8");
-assert.ok(viewer.includes("Experimental document link retired"));
+assert.ok(/kind === "document"/.test(viewer));
+assert.ok(viewer.includes("doc.version === 4"), "viewer must validate v4 document payloads");
+assert.ok(viewer.includes("Download sanitized DOCX"), "viewer must expose the sanitized download");
 assert.ok(!viewer.includes("SafeShareDocuments"));
 function launch(url) {
   let host;

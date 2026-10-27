@@ -53,3 +53,13 @@ label.finding input{margin-top:4px;width:16px;height:16px;accent-color:#cfe3a8}
 .compare.single{grid-template-columns:1fr}
 .compare.single .compare-pane:first-child{display:none}
 @media(max-width:760px){.finding{grid-template-columns:24px 1fr;row-gap:6px}.finding-state,.finding-locate{grid-column:2}}
+
+.publish{border-top:1px solid var(--line);margin-top:20px;padding-top:16px;display:grid;gap:10px}
+.publish select{width:auto;max-width:220px}
+#create-link{background:var(--accent);color:#1e2614;border-color:var(--accent);width:100%}
+#link-result{display:grid;gap:8px}
+#share-link{font-size:12px}
+#link-result .row{display:flex;gap:8px}
+#link-result button{background:#2b3138;color:var(--fg);border:1px solid var(--line)}
+.footer-actions{display:flex;gap:10px;margin-top:16px}
+.footer-actions .subtle{background:transparent;border:1px solid var(--line);color:var(--muted);font-size:13px;min-height:36px;padding:6px 12px}

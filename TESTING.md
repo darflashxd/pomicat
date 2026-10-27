@@ -130,6 +130,22 @@ grammar rewrite); reader `trusted` widens what leaves the browser and needs an e
 the publish step; the model-driven name path is still unverified, so broad names rely on the narrow
 initials rule plus manual selection.
 
+Delivery P4 (2026-10-27): `word/publish.js` encrypts a v4 document payload (sanitized DOCX plus a
+text/table preview), rejects payloads that would exceed the relay limit, uploads through the
+existing background handler, and shows copy/revoke controls. `viewer/app.js` renders the v4
+preview in a sandboxed iframe with a download button.
+
+Live check on the local relay: created link `http://127.0.0.1:8787/v/<id>#<43-char key>`, opened it
+in a new tab, clicked through, and the recipient page decrypted and displayed the sanitized text
+with a DOCX download. The downloaded file had 2 tables, 20 `[REDACTED]` markers and no
+`Whitfield`/`4,800`/`11,520`. Revoking from the sender produced "Link revoked"; reloading the
+recipient link then showed "Link Expired or Revoked".
+
+Limits: the viewer shows a text/table preview, not Word layout; the DOCX download keeps tables,
+styles and images. Payload cap is the relay's 512 KiB ciphertext, so documents with large images
+must be downloaded instead. No burn-after-one-view. Recipient test used the same browser profile,
+so a clean no-extension context is still untested.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

@@ -462,6 +462,7 @@ $("apply").addEventListener("click", async () => {
     compare.classList.toggle("single", !$("compare-toggle").checked);
     await runAttackCheck(preview, rules);
     $("download-sanitized").hidden = false;
+    $("create-link").disabled = false;
     $("apply-status").textContent = "Sanitized DOCX ready. Tables, styles and equations come from the original package.";
     updateCounts();
   } catch (e) {
