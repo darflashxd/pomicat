@@ -66,14 +66,15 @@ async function runCapture(){
     });
     renderFindings(doc);
     if (typeof SafeShareNer !== "undefined") {
-      $("review-summary").textContent += " Checking names locally?";
+      $("review-summary").textContent += " Checking names locally...";
       SafeShareWordDetect.nerCandidates(map, SafeShareNer).then(extra => {
-        if (!extra.length) { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally?", " Local name model found nothing; add names manually if needed."); return; }
+        if (!extra.length) { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", " Local name model found nothing; add names manually if needed."); return; }
         const known = new Set(providedFindings.map(f => f.value.toLowerCase()));
-        for (const item of extra) if (!known.has(item.value.toLowerCase())) providedFindings.push({ ...item, categoryLabel: "Contact & profile" });
+        const covered = value => providedFindings.some(f => f.value.length > value.length && f.value.toLowerCase().includes(value.toLowerCase()));
+        for (const item of extra) if (!known.has(item.value.toLowerCase()) && !covered(item.value)) providedFindings.push({ ...item, categoryLabel: "Contact & profile" });
         renderFindings(lastDoc);
-        $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally?", "");
-      }).catch(() => { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally?", " Name model unavailable."); });
+        $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", "");
+      }).catch(() => { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", " Name model unavailable."); });
     }
   }catch(e){$("error").textContent=e.message;$("error").hidden=false;$("capture-status").textContent="Inspection stopped. Nothing was shared.";}
   finally{$("capture").disabled=false;$("capture").textContent="Read again";}
@@ -84,7 +85,7 @@ window.__ssReadAgain = runCapture;
 // The launcher already expressed intent: read once automatically for that tab.
 const autoTab = Number(query.get("tab"));
 if (sharepointOrigin && Number.isInteger(autoTab) && autoTab > 0) {
-  $("capture-status").textContent = "Reading saved copy?";
+  $("capture-status").textContent = "Reading saved copy...";
   runCapture();
 }
 

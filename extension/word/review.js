@@ -1,18 +1,15 @@
 let mediaCache = null;
 let imageState = [];
-let findingLimit = 9;
+let findingLimit = 6;
 let lastFindingsDoc = null;
+let findingState = new Map();
 let wordPrefs = { reader: "public", numbers: "remove", categories: null };
 let attackLeaks = 0;
 let documentCurrency = null;
 let appliedSignature = null;
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 6;
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-function categoriesOf(findings) {
-  return [...new Set(findings.map(f => f.category))].sort();
-}
 
 function collectFindings(doc) {
   const seen = new Map();
@@ -51,16 +48,48 @@ function findingRows(doc) {
   return mediaCache.findings;
 }
 
+function findingKey(finding) {
+  return `${finding.category || "GENERAL"}|${String(finding.value).toLowerCase()}`;
+}
+
+function isModelFinding(finding) {
+  return finding.source === "model" || Number.isFinite(finding.score);
+}
+
+function defaultFindingChecked(finding) {
+  const keepForReader = wordPrefs.reader === "trusted" && (finding.category === "PROFILE" || finding.category === "FINANCIAL");
+  return !keepForReader && finding.preChecked !== false;
+}
+
+function resetFindingState(findings) {
+  findingState = new Map(findings.map(finding => [findingKey(finding), defaultFindingChecked(finding)]));
+}
+
+function syncFindingState(findings) {
+  const keys = new Set(findings.map(findingKey));
+  for (const key of [...findingState.keys()]) if (!keys.has(key)) findingState.delete(key);
+  for (const finding of findings) {
+    const key = findingKey(finding);
+    if (!findingState.has(key)) findingState.set(key, defaultFindingChecked(finding));
+  }
+}
+
+function findingChecked(finding) {
+  return findingState.get(findingKey(finding)) !== false;
+}
+
+function friendlyModelLabel(finding) {
+  const label = finding.modelLabel || /Local model:\s*([A-Z_]+)/i.exec(finding.ruleName || "")?.[1];
+  return label ? `Possible ${String(label).toLowerCase().replace(/_/g, " ")}` : "Possibly sensitive";
+}
+
 function matchedFindings() {
-  return [...document.querySelectorAll(".finding")]
-    .filter(row => row.dataset.categoryHidden !== "1")
-    .map(row => ({
-      value: row.querySelector("strong").textContent,
-      replacement: row.dataset.replacement || "[REDACTED]",
-      checked: row.querySelector(".finding-toggle").checked,
-      category: row.dataset.category,
-      source: row.dataset.source
-    }));
+  if (!lastDoc) return [];
+  return findingRows(lastDoc).map(finding => ({
+    ...finding,
+    key: findingKey(finding),
+    checked: findingChecked(finding)
+  }));
 }
 
 function spanText(text, findings) {
@@ -98,7 +127,7 @@ function replacementFor(finding, value) {
 function manualFindings() {
   const placeholder = $("placeholder-style").value || "[REDACTED]";
   return $("manual").value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(value => ({
-    value, replacement: placeholder, checked: true, category: "CUSTOM", source: "manual"
+    value, replacement: placeholder, checked: true, category: "CUSTOM", source: "manual-input"
   }));
 }
 
@@ -108,10 +137,15 @@ function renderTextHtml(text, findings, sanitized) {
   for (const span of spans) {
     html += escapeHtml(text.slice(cursor, span.start));
     const value = text.slice(span.start, span.end);
+    const checked = span.finding.checked !== false;
+    const title = checked ? "Click to keep visible in the shared copy" : "Click to redact in the shared copy";
+    const attrs = span.finding.key
+      ? ` class="${checked ? "redacted" : "keep"}" data-finding-key="${escapeHtml(span.finding.key)}" role="button" tabindex="0" title="${title}"`
+      : ` class="${checked ? "redacted" : "keep"}" title="Added in the private text field"`;
     if (sanitized) {
-      html += span.finding.checked ? `<mark>${escapeHtml(replacementFor(span.finding, value))}</mark>` : escapeHtml(value);
+      html += `<mark${attrs}>${escapeHtml(checked ? replacementFor(span.finding, value) : value)}</mark>`;
     } else {
-      html += `<mark class="${span.finding.checked ? "" : "keep"}">${escapeHtml(value)}</mark>`;
+      html += `<mark${attrs}>${escapeHtml(value)}</mark>`;
     }
     cursor = span.end;
   }
@@ -182,9 +216,9 @@ function updateCounts() {
     $("apply-status").textContent = "Settings changed. Create the copy again to refresh the link.";
     $("publish-hint").textContent = "Settings changed. Create the sanitized DOCX again to refresh the copy.";
   }
-  const rows = [...document.querySelectorAll(".finding")].filter(row => row.dataset.categoryHidden !== "1");
-  const total = rows.length;
-  const masked = rows.filter(row => row.querySelector(".finding-toggle").checked).length;
+  const findings = lastDoc ? findingRows(lastDoc) : [];
+  const total = findings.length;
+  const masked = findings.filter(findingChecked).length;
   const host = $("review-counts");
   host.replaceChildren();
   const label = document.createElement("span");
@@ -197,6 +231,8 @@ function updateCounts() {
   openChip.className = "count-chip open";
   openChip.textContent = `${total - masked} unmasked`;
   host.append(label, protectedChip, openChip);
+  const navCount = $("nav-findings");
+  if (navCount) navCount.textContent = String(findings.filter(isModelFinding).length);
   const title = sanitizedBytes ? "Sanitized copy ready" : "Create sanitized copy";
   const subtitle = sanitizedBytes
     ? `Layout kept - ${masked} of ${total} items masked. Nothing is uploaded.`
@@ -222,32 +258,35 @@ function updateLowerLabel() {
 
 function renderFindings(doc) {
   const findings = findingRows(doc);
-  if (doc !== lastFindingsDoc) { findingLimit = PAGE_SIZE; lastFindingsDoc = doc; }
+  if (doc !== lastFindingsDoc) {
+    findingLimit = PAGE_SIZE;
+    lastFindingsDoc = doc;
+    resetFindingState(findings);
+  } else {
+    syncFindingState(findings);
+  }
+  const suggestions = findings.filter(isModelFinding);
   const host = $("findings");
   host.replaceChildren();
-  const chips = $("category-chips");
-  chips.replaceChildren();
-  for (const category of categoriesOf(findings)) {
-    const label = document.createElement("label");
-    label.className = "chip";
-    const box = document.createElement("input");
-    box.type = "checkbox"; box.checked = true; box.dataset.category = category;
-    const text = document.createElement("span");
-    text.textContent = `${category.toLowerCase()} (${findings.filter(f => f.category === category).length})`;
-    label.append(box, text);
-    chips.append(label);
-  }
-  findings.forEach((finding, index) => {
+  suggestions.forEach((finding, index) => {
+    const key = findingKey(finding);
     const row = document.createElement("div");
     row.className = "finding";
+    row.dataset.key = key;
     row.dataset.category = finding.category;
-    row.dataset.replacement = finding.replacement || "[REDACTED]";
-    row.dataset.source = finding.source || "rule";
-    const keepForReader = wordPrefs.reader === "trusted" && (finding.category === "PROFILE" || finding.category === "FINANCIAL");
+    row.dataset.source = finding.source || "model";
+    row.title = finding.ruleName || "Model suggestion";
     const box = document.createElement("input");
-    box.type = "checkbox"; box.checked = keepForReader ? false : finding.preChecked !== false;
+    box.type = "checkbox";
+    box.checked = findingChecked(finding);
     box.className = "finding-toggle";
     box.id = `finding-${index}`;
+    box.addEventListener("change", () => {
+      findingState.set(key, box.checked);
+      const stateButton = row.querySelector(".finding-state");
+      if (stateButton) stateButton.textContent = box.checked ? "Redacted" : "Visible";
+      updateCounts();
+    });
     const label = document.createElement("label");
     label.className = "finding-check";
     label.append(box);
@@ -255,24 +294,24 @@ function renderFindings(doc) {
     text.className = "finding-text";
     const value = document.createElement("strong");
     value.textContent = finding.value;
-    text.append(value);
-    row.title = finding.ruleName || finding.name || "Finding";
-    if (Number.isFinite(finding.score)) {
-      const meta = document.createElement("small");
-      meta.className = "finding-score";
-      meta.textContent = `Maybe important · ${Math.round(finding.score * 100)}%`;
-      text.append(meta);
-    }
+    const meta = document.createElement("small");
+    meta.className = "finding-score";
+    meta.textContent = `${friendlyModelLabel(finding)} \u00b7 Model score ${Math.round(finding.score * 100)}%`;
+    text.append(value, meta);
     const state = document.createElement("button");
-    state.type = "button"; state.className = "finding-state";
+    state.type = "button";
+    state.className = "finding-state";
     state.textContent = box.checked ? "Redacted" : "Visible";
     state.addEventListener("click", () => {
       box.checked = !box.checked;
+      findingState.set(key, box.checked);
       state.textContent = box.checked ? "Redacted" : "Visible";
       updateCounts();
     });
     const locate = document.createElement("button");
-    locate.type = "button"; locate.className = "finding-locate"; locate.textContent = "Show in preview";
+    locate.type = "button";
+    locate.className = "finding-locate";
+    locate.textContent = "Show in preview";
     locate.addEventListener("click", () => showInPreview(finding.value));
     const actions = document.createElement("div");
     actions.className = "finding-actions";
@@ -282,20 +321,20 @@ function renderFindings(doc) {
     if (row.dataset.pageHidden === "1") row.hidden = true;
     host.append(row);
   });
-  const shown = Math.min(findingLimit, findings.length);
+  const shown = Math.min(findingLimit, suggestions.length);
   const more = $("show-more");
-  if (findings.length > PAGE_SIZE) {
+  if (suggestions.length > PAGE_SIZE) {
     more.hidden = false;
-    const remaining = Math.min(PAGE_SIZE, findings.length - shown);
-    more.textContent = shown >= findings.length
-      ? "Show fewer findings"
-      : `Show ${remaining} more finding${remaining === 1 ? "" : "s"}`;
+    const remaining = Math.min(PAGE_SIZE, suggestions.length - shown);
+    more.textContent = shown >= suggestions.length
+      ? "Show fewer suggestions"
+      : `Show ${remaining} more suggestion${remaining === 1 ? "" : "s"}`;
   } else more.hidden = true;
-  $("findings-meta").textContent = !findings.length
-    ? "None"
-    : (shown < findings.length ? `${shown} of ${findings.length} shown` : `${findings.length} item${findings.length === 1 ? "" : "s"}`);
+  $("findings-meta").textContent = !suggestions.length
+    ? "No model suggestions"
+    : (shown < suggestions.length ? `${shown} of ${suggestions.length} shown` : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"}`);
   const navCount = $("nav-findings");
-  if (navCount) navCount.textContent = String(findings.length);
+  if (navCount) navCount.textContent = String(suggestions.length);
 
   renderImages(doc);
   if (!sanitizedBytes) {
@@ -312,30 +351,13 @@ function renderFindings(doc) {
   if (firstRender) window.scrollTo(0, 0);
   documentCurrency = detectDocumentCurrency();
   $("review-section").hidden = false;
-  $("review-summary").textContent = findings.length ? "" : "Nothing detected automatically.";
+  $("review-summary").textContent = suggestions.length ? "" : "No model suggestions. Automatic detections are still applied.";
   $("apply-status").textContent = "";
   updateCounts();
 }
 
 function rerenderKeepingChoices() {
-  const toggles = new Map([...document.querySelectorAll(".finding")].map(row => [row.querySelector("strong").textContent, row.querySelector(".finding-toggle").checked]));
-  const chips = new Map([...document.querySelectorAll("#category-chips input")].map(box => [box.dataset.category, box.checked]));
   renderFindings(lastDoc);
-  for (const row of document.querySelectorAll(".finding")) {
-    const box = row.querySelector(".finding-toggle");
-    const value = row.querySelector("strong").textContent;
-    if (toggles.has(value)) box.checked = toggles.get(value);
-    const chip = chips.get(row.dataset.category);
-    row.dataset.categoryHidden = chip === false ? "1" : "0";
-    row.hidden = row.dataset.categoryHidden === "1" || row.dataset.pageHidden === "1";
-  }
-  for (const box of document.querySelectorAll("#category-chips input")) {
-    if (chips.has(box.dataset.category)) box.checked = chips.get(box.dataset.category);
-  }
-  for (const button of document.querySelectorAll(".finding-state")) {
-    button.textContent = button.closest(".finding").querySelector(".finding-toggle").checked ? "Redacted" : "Visible";
-  }
-  updateCounts();
 }
 
 function showInPreview(value) {
@@ -378,12 +400,13 @@ function addManualCandidate(text) {
     $("apply-status").textContent = "That value is already in the list.";
     return false;
   }
-  providedFindings.unshift({
+  const finding = {
     value, category: "CUSTOM", categoryLabel: "Added by you", ruleName: "Manual selection",
     reason: "selected in preview", replacement: $("placeholder-style").value, source: "manual", preChecked: true
-  });
-  mediaCache = null;
-  rerenderKeepingChoices();
+  };
+  providedFindings.unshift(finding);
+  findingState.set(findingKey(finding), true);
+  renderFindings(lastDoc);
   $("apply-status").textContent = `Added "${value}" to the redaction list.`;
   return true;
 }
@@ -463,14 +486,48 @@ $("redact-selection").addEventListener("click", () => {
   for (const part of parts) if (addManualCandidate(part)) added++;
   hideSelectionButton();
   if (added) {
-    setSelectionStatus(added === 1 ? `Added "${parts[0]}" to findings.` : `Added ${added} phrases to findings.`);
+    setSelectionStatus(added === 1 ? `Added "${parts[0]}" to the redaction list.` : `Added ${added} phrases to the redaction list.`);
     window.getSelection()?.removeAllRanges();
   } else if (!parts.length) {
     setSelectionStatus("Select at least three visible characters.", true);
   } else {
-    setSelectionStatus("That text is already in the findings.", true);
+    setSelectionStatus("That text is already in the redaction list.", true);
   }
 });
+
+function toggleFindingByKey(key) {
+  const finding = (lastDoc ? findingRows(lastDoc) : []).find(item => findingKey(item) === key);
+  if (!finding) return;
+  const next = !findingChecked(finding);
+  findingState.set(key, next);
+  const row = [...document.querySelectorAll(".finding")].find(item => item.dataset.key === key);
+  if (row) {
+    const box = row.querySelector(".finding-toggle");
+    if (box) box.checked = next;
+    const button = row.querySelector(".finding-state");
+    if (button) button.textContent = next ? "Redacted" : "Visible";
+  }
+  updateCounts();
+  const label = finding.value.length > 38 ? `${finding.value.slice(0, 35)}...` : finding.value;
+  setSelectionStatus(`"${label}" is now ${next ? "redacted" : "visible"} in the shared copy.`, !next);
+}
+
+for (const pane of [$("document-preview"), $("sanitized-preview")]) {
+  pane.addEventListener("click", event => {
+    const mark = event.target.closest("mark[data-finding-key]");
+    if (!mark) return;
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim().length > 1) return;
+    toggleFindingByKey(mark.dataset.findingKey);
+  });
+  pane.addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const mark = event.target.closest("mark[data-finding-key]");
+    if (!mark) return;
+    event.preventDefault();
+    toggleFindingByKey(mark.dataset.findingKey);
+  });
+}
 
 /* ---------- images ---------- */
 function renderImages(doc) {
@@ -642,16 +699,10 @@ function openImageDialog(index) {
 /* ---------- rules ---------- */
 function activeRules() {
   const rules = [];
-  for (const row of document.querySelectorAll(".finding")) {
-    if (row.dataset.categoryHidden === "1") continue;
-    const box = row.querySelector(".finding-toggle");
-    if (!box.checked) continue;
-    const value = row.querySelector("strong").textContent;
-    let replacement = row.dataset.replacement || "[REDACTED]";
-    if (wordPrefs.numbers === "range" && row.dataset.source === "amount" && typeof SafeShareWordPolicy !== "undefined") {
-      replacement = SafeShareWordPolicy.rangeFor(value, documentCurrency) || replacement;
-    }
-    rules.push({ value, replacement });
+  const findings = lastDoc ? findingRows(lastDoc) : [];
+  for (const finding of findings) {
+    if (!findingChecked(finding)) continue;
+    rules.push({ value: finding.value, replacement: replacementFor(finding, finding.value) });
   }
   const placeholder = $("placeholder-style").value;
   for (const value of $("manual").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean)) {
@@ -692,25 +743,17 @@ $("rescan").addEventListener("click", async () => {
 });
 
 $("select-all").addEventListener("click", () => {
-  for (const box of document.querySelectorAll(".finding-toggle")) if (!box.closest(".finding").hidden) box.checked = true;
-  for (const button of document.querySelectorAll(".finding-state")) button.textContent = "Redacted";
-  updateCounts();
+  if (!lastDoc) return;
+  for (const finding of findingRows(lastDoc).filter(isModelFinding)) findingState.set(findingKey(finding), true);
+  renderFindings(lastDoc);
 });
 $("select-none").addEventListener("click", () => {
-  for (const box of document.querySelectorAll(".finding-toggle")) box.checked = false;
-  for (const button of document.querySelectorAll(".finding-state")) button.textContent = "Visible";
-  updateCounts();
-});
-$("category-chips").addEventListener("change", () => {
-  const allowed = new Set([...document.querySelectorAll("#category-chips input:checked")].map(box => box.dataset.category));
-  for (const row of document.querySelectorAll(".finding")) {
-    row.dataset.categoryHidden = allowed.has(row.dataset.category) ? "0" : "1";
-    row.hidden = row.dataset.categoryHidden === "1" || row.dataset.pageHidden === "1";
-  }
-  updateCounts();
+  if (!lastDoc) return;
+  for (const finding of findingRows(lastDoc).filter(isModelFinding)) findingState.set(findingKey(finding), false);
+  renderFindings(lastDoc);
 });
 $("show-more").addEventListener("click", () => {
-  const total = document.querySelectorAll(".finding").length;
+  const total = lastDoc ? findingRows(lastDoc).filter(isModelFinding).length : 0;
   findingLimit = findingLimit >= total ? PAGE_SIZE : Math.min(total, findingLimit + PAGE_SIZE);
   rerenderKeepingChoices();
 });
@@ -755,7 +798,10 @@ for (const id of ["keep-revisions", "keep-metadata"]) $(id).addEventListener("ch
 $("reader").addEventListener("change", async () => {
   wordPrefs.reader = $("reader").value;
   await SafeShareWordSettings.save({ reader: wordPrefs.reader });
-  renderFindings(lastDoc);
+  if (lastDoc) {
+    resetFindingState(findingRows(lastDoc));
+    renderFindings(lastDoc);
+  }
 });
 $("numbers").addEventListener("change", async () => {
   wordPrefs.numbers = $("numbers").value;
@@ -768,8 +814,10 @@ $("reset-defaults").addEventListener("click", async () => {
   $("reader").value = wordPrefs.reader;
   $("numbers").value = wordPrefs.numbers;
   $("manual").value = "";
-  for (const box of document.querySelectorAll("#category-chips input")) box.checked = true;
-  renderFindings(lastDoc);
+  if (lastDoc) {
+    resetFindingState(findingRows(lastDoc));
+    renderFindings(lastDoc);
+  }
   $("apply-status").textContent = "Defaults restored.";
 });
 $("cancel-review").addEventListener("click", async () => {

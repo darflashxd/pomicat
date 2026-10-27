@@ -10,7 +10,7 @@
 <div class="review-head"><div><h2 id="review-title">Create sanitized copy</h2><p id="review-subtitle" class="subtitle">Reviewed locally. Nothing is uploaded until you create a link.</p></div><div class="head-actions"><p id="review-counts" class="counts"></p><button type="button" id="read-again" class="subtle" hidden>Read again</button></div></div>
 <nav class="section-nav" aria-label="Review sections">
   <button type="button" data-target="preview-block">Preview</button>
-  <button type="button" data-target="findings-block">Findings <span id="nav-findings">0</span></button>
+  <button type="button" data-target="findings-block">Maybe important <span id="nav-findings">0</span></button>
   <button type="button" data-target="images-block">Images <span id="nav-images">0</span></button>
   <button type="button" data-target="share-block">Share &amp; export</button>
 </nav>
@@ -20,7 +20,7 @@
     <div class="pane-head"><span>Document preview</span><span id="inventory" class="pane-meta"></span></div>
     <div class="preview-tools">
       <label class="check compare-toggle"><input id="show-original" type="checkbox" checked> Show original</label>
-      <p class="select-hint">Select text in either pane to redact it. <span id="selection-status" class="selection-status" role="status" aria-live="polite"></span></p>
+      <p class="select-hint">Click a highlight to redact or restore it; select other text to add a redaction. <span id="selection-status" class="selection-status" role="status" aria-live="polite"></span></p>
     </div>
     <div class="preview-split">
       <div class="preview-col"><h3>Original (sender only)</h3><div id="document-preview" class="preview-body" tabindex="0" title="Select text to redact it"></div></div>
@@ -31,9 +31,9 @@
 </section>
 
 <section id="findings-block" class="review-block findings-block">
-  <div class="block-head"><h3>Findings</h3><span id="findings-meta" class="pane-meta"></span></div>
-  <div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
-  <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
+  <div class="block-head"><h3>Maybe important</h3><span id="findings-meta" class="pane-meta"></span></div>
+  <div class="settings">
+  <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all" title="Hide all model suggestions">Hide all</button><button type="button" id="select-none" title="Keep all model suggestions visible">Keep all</button></div>
   <details class="policy"><summary>Protection settings</summary>
   <label class="check"><input id="hide-amounts" type="checkbox"> Also redact currency amounts</label>
   <label class="check"><input id="keep-revisions" type="checkbox"> Keep tracked changes and comments</label>

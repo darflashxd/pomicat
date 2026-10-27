@@ -107,17 +107,17 @@ The launcher appears on Word editor routes (`Doc.aspx`/`doc2.aspx`) without a pe
 the toolbar opens Word Online setup. Opening it reads a **separate copy** of the saved document
 through the current SharePoint session, leaving the original unchanged. The setup page is a
 document-first workspace: the preview spans the width at the top (original beside “what others
-will see”), followed by findings in a card grid, then images, then sharing. A sticky section nav
-jumps between the sections. Findings show nine cards first with **Show more**; only model-derived
-rows carry a `Maybe important · 38%` note. Selecting text in either preview pane adds it as a
-manual finding, and scrolling one pane follows the other. Opening setup from the launcher
-reads the copy once automatically; the control then becomes **Read again**.
+will see”), followed by the Maybe important section, then images, then sharing. A sticky section nav
+jumps between the sections. Maybe important lists only model suggestions, labelled
+`Possible person - Model score 78%`, six at a time with **Show more**. Rule detections stay
+automatic and are not listed; click any highlight in either pane to redact or restore it.
+Selecting other text adds a manual redaction, and scrolling one pane follows the other. Opening
+setup from the launcher reads the copy once automatically; the control then becomes **Read again**.
 
 Detection reuses the chat tiers plus money-column/currency bases and the derived-amount solver,
-with local NER for names. Every finding can be toggled per item, filtered by category, or selected
-directly in the preview; model-sourced rows show their model score. Redaction is surgical OOXML
-editing — `w:t` runs are rewritten inside the original package, so tables, styles, headers,
-footers and equations survive.
+with local NER for names. Rule results are applied automatically; model suggestions show their NER
+label and score and can be toggled per item. Redaction is surgical OOXML editing — `w:t` runs are
+rewritten inside the original package, so tables, styles, headers, footers and equations survive.
 
 Images are reviewed at full size in a lightbox: drag to mark areas or replace the whole image.
 Pixels are overwritten and re-encoded, then verified before export. A crop can still contain the

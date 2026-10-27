@@ -221,22 +221,26 @@ in the sanitized pane raised it to 20; selecting `[REDACTED_FINANCIAL]` reported
 before adding visible text. At 788 CSS px the grid collapses to one column with no horizontal
 overflow. `node tests/run_all.js` passes 54/54.
 
-Finding labels, paging and synced scroll (2026-10-28): cards no longer print
-`Rule-based`. Rule and manual rows show only the value; model rows show
-`Maybe important · 40%` and keep the rule name in the tooltip. The first page is nine
-cards (3x3), with `Show 9 more findings` / `Show fewer findings` and a
-`9 of 18 shown` header; the section nav still reports the total. Manual selections
-are inserted first so they remain visible on the first page.
+Maybe important, preview toggles and synced scroll (2026-10-28): the section is now titled
+`Maybe important` and renders only model candidates. Cards read `Possible person - Model score 78%`
+from the NER label; rule and manual detections are not listed. Model suggestions fully covered by a
+longer finding (for example `Okafor` inside `M. Okafor`) are dropped so they cannot show a toggle
+that has no effect. The first page holds six suggestions with `Show 6 more suggestions` /
+`Show fewer suggestions`; the nav reports the model count. On the HR fixture this showed
+`Maybe important 7`, `6 of 7 shown`, and the seventh after Show more.
 
-The floating `Redact "…"` button had stretched to the viewport because an older
-sticky rule left `bottom: 0` while the new rule made it `position: fixed` with an
-inline `top`. The final rule sets `bottom: auto`, zero margin and `max-height: 44px`;
-measured height is 38px.
+Automatic detections remain active. Clicking a highlighted value in Original, or a redaction tag in
+What others will see, toggles it for the whole copy and the status line reports that it is now
+visible or redacted. Verified: unredacting `4,800` in Original changed `16/16` to `15/16`;
+clicking the token in the sanitized pane redacted it again; clicking the `960` token made `960`
+visible. `Keep all` / `Hide all` change only model suggestions, leaving automatic money redaction
+untouched. On the HR fixture, Keep all changed `24/24` to `17/24` (seven names visible) while
+money stayed hidden; Hide all restored `24/24`. Applying produced
+`18 text replacements across 2 parts` and a verified result. The floating button still measured
+38px high.
 
-Preview scroll sync is restored and maps the **top block plus its fraction** between
-the panes instead of raw pixels, so rows stay aligned when redacted placeholders wrap
-to a different height. If the block counts differ it falls back to a scroll ratio.
-Verified at scroll 400 and 250: both panes reported the same block index and fraction.
+Preview scroll sync maps the top block plus its fraction between panes; verified at scroll 400 and
+250 that both panes reported the same block and fraction. `node tests/run_all.js` passes 54/54.
 
 ## v2.4.1 local check (2026-10-26)
 

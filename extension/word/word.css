@@ -245,3 +245,7 @@ body.reviewing #review-section:not([hidden]){display:block;margin:12px 0}
 .finding-score{display:block;margin-top:4px;font-size:12px;font-weight:500;color:#e6d3a3}
 
 .preview-body{position:relative}
+
+.preview-body mark[data-finding-key]{cursor:pointer}
+.preview-body mark[data-finding-key]:hover{outline:2px solid var(--accent);outline-offset:1px}
+.preview-body mark[data-finding-key]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

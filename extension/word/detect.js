@@ -16,6 +16,7 @@
       const prior = seen.get(key);
       if (item.preChecked) prior.preChecked = true;
       if (Number.isFinite(item.score) && !Number.isFinite(prior.score)) prior.score = item.score;
+      if (item.modelLabel && !prior.modelLabel) prior.modelLabel = item.modelLabel;
       if (item.reason && !prior.reason.includes(item.reason)) prior.reason += `; ${item.reason}`;
       return;
     }
@@ -121,7 +122,7 @@
           out.push({
             value, category: "PROFILE", ruleName: `Local model: ${span.label}`,
             reason: `model score ${span.score.toFixed(2)} (not a probability)`,
-            replacement: "[REDACTED_NAME]", source: "model", score: span.score,
+            replacement: "[REDACTED_NAME]", source: "model", score: span.score, modelLabel: span.label,
             preChecked: span.score >= 0.6 || (value.split(/\s+/).length > 1 && span.score >= 0.35)
           });
         }
@@ -170,6 +171,15 @@
       if (item.category !== "PROFILE" || /\s/.test(item.value)) continue;
       const longer = people.find(person => new RegExp(`(^|\\s)${item.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "i").test(person.value));
       if (longer) item.aliasOf = longer.value;
+    }
+    // A model suggestion fully covered by a longer finding cannot change visibility on its own.
+    for (let index = candidates.length - 1; index >= 0; index--) {
+      const item = candidates[index];
+      if (item.source !== "model") continue;
+      const lower = String(item.value).toLowerCase();
+      if (candidates.some(other => other !== item && other.value.length > item.value.length && String(other.value).toLowerCase().includes(lower))) {
+        candidates.splice(index, 1);
+      }
     }
     return candidates.map(item => ({ ...item, categoryLabel: CATEGORY[item.category] || "Other" }));
   }

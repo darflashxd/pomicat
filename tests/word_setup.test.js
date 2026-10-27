@@ -27,6 +27,8 @@ assert.ok(html.includes('id="show-original"'), "original pane must be collapsibl
 assert.ok(html.includes('id="share-panel"'), "share controls must be gated behind apply");
 assert.ok(html.includes('id="publish-hint"'), "disabled link control needs a reason");
 assert.ok(html.includes('class="section-nav"'), "review sections need a jump navigation");
+assert.ok(html.includes("Maybe important"), "the model suggestion section has its own name");
+assert.ok(!html.includes('id="category-chips"'), "rule categories are not a suggestion filter");
 assert.ok(html.indexOf('id="findings-block"') > html.indexOf('id="preview-block"'), "findings belong below the preview");
 assert.ok(html.indexOf('id="images-block"') > html.indexOf('id="findings-block"'), "images belong below findings");
 assert.ok(html.includes('id="selection-status"'), "selection feedback must be visible near the preview");
