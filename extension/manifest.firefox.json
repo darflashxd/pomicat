@@ -5,7 +5,9 @@
   "description": "Redacts sensitive data from AI chats before sharing and creates end-to-end encrypted, expiring share links. Works on ChatGPT, Claude and DeepSeek.",
   "permissions": [
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -16,6 +18,7 @@
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
+  "optional_host_permissions": ["https://*.sharepoint.com/*", "https://*.officeapps.live.com/*", "https://word.cloud.microsoft/*"],
   "background": {
     "scripts": [
       "models/ort.min.js",

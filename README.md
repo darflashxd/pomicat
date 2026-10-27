@@ -101,6 +101,17 @@ and the reply's formulas are computed locally against it. The chat site received
 `$4,800`. Captured from the v2.4.1 extension on Chrome 155, ChatGPT dark theme, with a local relay;
 the reply and its computed values are unedited.*
 
+### Word Online integration ? preparation only
+
+Offline document import has been removed. The toolbar opens Word Online setup; you can opt in
+on a supported SharePoint/Word origin and add a SafeShare launcher. This is **not yet document
+sharing**: an experimental **Read saved copy** action supports the observed SharePoint
+`Doc.aspx`/`doc2.aspx` session-download route after site permission. It accepts DOCX up to 5 MiB
+and inspects text/tables/header/footer locally; images/equations are counted, not rendered.
+This is source inspection, **not a sanitized or full-fidelity preview**. Redaction and recipient
+sharing remain unimplemented. Session-download compatibility is tenant-dependent and may change.
+Existing chat protection is unchanged.
+
 ## Screenshots
 
 ### Hiding the original value is not enough

@@ -8,6 +8,60 @@ console.log("[SafeShare-AI] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
+async function restoreWordLaunchers() {
+  try {
+    const { origins = [] } = await webExtApi.permissions.getAll();
+    const allowed = origins.filter(pattern => /^https:\/\/(?:\*\.)?(?:[a-z0-9-]+\.)*(?:sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)\/\*$/i.test(pattern));
+    const registered = await webExtApi.scripting.getRegisteredContentScripts();
+    const id = "safeshare-word-restored";
+    const old = registered.find(script => script.id === id);
+    if (!allowed.length) {
+      if (old) await webExtApi.scripting.unregisterContentScripts({ ids: [id] });
+      return;
+    }
+    const script = { id, matches: allowed, js: ["word/launcher.js"], runAt: "document_idle" };
+    if (old) await webExtApi.scripting.updateContentScripts([script]);
+    else await webExtApi.scripting.registerContentScripts([script]);
+    const tabs = await webExtApi.tabs.query({ url: allowed });
+    await Promise.allSettled(tabs.filter(tab => tab.id).map(tab =>
+      webExtApi.scripting.executeScript({ target: { tabId: tab.id }, files: ["word/launcher.js"] })));
+  } catch (_) {
+    console.warn("[SafeShare] Word launcher restoration unavailable; enable it from Word setup.");
+  }
+}
+// Run on worker load too: an unpacked-extension reload may retain site permission
+// while losing the dynamically registered script. No new permission is requested.
+restoreWordLaunchers();
+webExtApi.runtime.onStartup.addListener(restoreWordLaunchers);
+webExtApi.runtime.onInstalled.addListener(restoreWordLaunchers);
+webExtApi.permissions.onAdded.addListener(restoreWordLaunchers);
+// A page that finishes loading after the worker slept still needs the launcher.
+webExtApi.tabs.onUpdated.addListener(async (tabId, change, tab) => {
+  if (change.status !== "complete" || !tab?.url) return;
+  try {
+    const url = new URL(tab.url);
+    if (url.protocol !== "https:" || !/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) return;
+    if (!await webExtApi.permissions.contains({ origins: [url.origin + "/*"] })) return;
+    await webExtApi.scripting.executeScript({ target: { tabId }, files: ["word/launcher.js"] });
+  } catch (_) {}
+});
+webExtApi.permissions.onRemoved.addListener(restoreWordLaunchers);
+
+// Word setup runs in a trusted extension tab; provider access is opt-in.
+webExtApi.action.onClicked.addListener((tab) => {
+  const query = new URLSearchParams();
+  if (tab?.id && tab?.url) {
+    try {
+      const url = new URL(tab.url);
+      if (url.protocol === "https:" && /(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) {
+        query.set("tab", String(tab.id));
+        query.set("origin", url.origin);
+      }
+    } catch (_) {}
+  }
+  webExtApi.tabs.create({ url: webExtApi.runtime.getURL("word/index.html") + "?" + query });
+});
+
 // Let the content script keep the shield's placeholder -> original map in session storage:
 // private to the extension (the chat site's own scripts can't read it), cleared on browser exit.
 try {
@@ -65,6 +119,16 @@ function fromOwnContentScript(sender) {
 }
 
 webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "OPEN_WORD_SETUP") {
+    if (!fromOwnContentScript(sender) || !sender.tab || !sender.url) return false;
+    try {
+      const url = new URL(sender.url);
+      if (url.protocol !== "https:" || !/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) return false;
+      const params = new URLSearchParams({tab:String(sender.tab.id),origin:url.origin});
+      webExtApi.tabs.create({url:webExtApi.runtime.getURL("word/index.html")+"?"+params});
+    } catch (_) {}
+    return false;
+  }
   if (request.action === "PING") {
     if (typeof sendResponse === "function") sendResponse({ status: "PONG" });
     return false;

@@ -175,6 +175,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Retired experimental document payloads are not safe Word snapshots.
+  if (decryptedData?.kind === "document") {
+    lockScreen.style.display = "block";
+    lockScreen.querySelector("h2").textContent = "Experimental document link retired";
+    lockScreen.querySelector("p").textContent = "Ask the sender for a new reviewed copy. Chat links are unaffected.";
+    return;
+  }
+
   // Render Decrypted Chat View
   if (!decryptedData || !decryptedData.turns) {
     lockScreen.style.display = "block";

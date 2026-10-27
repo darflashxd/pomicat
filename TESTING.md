@@ -1,5 +1,135 @@
 # Manual test checklist (Chrome)
 
+## Retired offline document prototype
+
+Launcher recovery check: reload unpacked extension with existing SharePoint permission and no
+registered scripts. Worker restored `safeshare-word-restored`, injected exactly one visible
+44px-high button into the open Word wrapper; a real Playwright mouse click opened setup with
+source tab reference. Repeating restoration kept exactly one launcher. Context invalidation
+is caught and displays refresh guidance rather than an uncaught runtime error.
+
+Session-capture prototype: download URL builder restricted to HTTPS SharePoint DOCX editor routes,
+with UUID source id and no forwarded editor query parameters. Browser parser test of downloaded
+fictional DOCX found one table, one image, two supplementary parts and final sentinel. Fixture
+injection used only the test harness, not a product file picker. Real extension fetch remains
+unverified: optional site permission prompt stayed unresolved (`granted: false`) in Playwright.
+Parser bounds actual inflated bytes; it is inspection-only, not an audited OOXML sanitization engine.
+
+English Word corpus preparation: `python tools/build_word_corpus.py --self-check` creates and
+verifies eight fictional DOCX fixtures in a temporary directory. Covers merged table, split runs,
+OMML fraction, authored screenshot/crop, tracked deletion, metadata and final-content sentinels.
+Generation/package structure checks passed; no live Word capture, OCR or sanitization is implied.
+See `docs/WORD_ONLINE_TESTING.md`. External dataset records are not incorporated.
+
+The experimental XLSX/CSV/local-file workspace was removed in favor of Word Online integration.
+Earlier document-link payloads are rejected explicitly; chat payloads retain their existing path.
+Word setup is a launcher/permission surface, not a verified capture/redaction integration.
+
+Live Word acquisition check (2026-10-27): uploaded the authored fictional `04-incident.docx`
+through Playwright's file chooser into the authorized Microsoft account. Word editor ran inside
+`word-edit.officeapps.live.com`; SharePoint wrapper used `Doc.aspx` (now recognized alongside
+`doc2.aspx`). File → Create a Copy → Download a copy required a second confirmation button.
+Downloaded DOCX (47,744 bytes) reopened as ZIP/XML: one table, one media image, header part and
+`END_OF_DOCUMENT_04_INCIDENT` present. This verifies manual browser-automated acquisition only,
+not extension acquisition, privacy redaction or source-byte equivalence. No tokens extracted,
+no public relay upload, and the uploaded test copy was not deleted.
+
+Chromium extension-origin Playwright: Word setup loaded at desktop and 390px widths; no root
+horizontal overflow measured and no file picker. Supported fictional SharePoint origin enables
+setup control; `sharepoint.com.attacker.invalid` stays disabled. Permission grant, launcher on a
+real tenant, Microsoft OAuth and document retrieval were not tested. Node word_setup.test.js
+covers Word vs XLSX routes, opt-in manifest permissions, and retired-document refusal.
+
+Priority Word document check (2026-10-27): `python tools/build_priority_docx.py --self-check`
+built and verified the fictional compensation memo (75 KB, 2 tables, 1 image, sentinel present,
+every visible run `w:color=000000`). Uploaded through Playwright to Word Online; editor rendered
+two pages with footer page fields intact. Triggering the floating SafeShare button opened setup
+directly in the enabled state (no repeated Enable step), and **Read saved copy** returned
+`2 tables - 1 image assets - 0 equations` plus the complete text ending in the sentinel.
+Redaction, image pixel redaction and recipient sharing remain unimplemented.
+
+OOXML redaction, P0 (2026-10-27): `extension/word/redact.js` rewrites `w:t` nodes inside the
+original package instead of rebuilding a document, so tables, styles, sections and equation markup
+survive. It removes `w:del`/`w:moveFrom`, unwraps `w:ins`/`w:moveTo`, drops hidden runs and comment
+anchors, and clears core/app metadata. Runs are mapped character-by-character, so a value split
+across bold/italic runs is still replaced.
+
+Live Chromium check on the priority memo: capture returned 2 tables and 1 image; six manual terms
+(names and amounts) produced `8 replacements across 2 parts` and a clean verification pass. The
+downloaded sanitized DOCX reopened in Word Online with the compensation table intact, names and
+amounts replaced by `[REDACTED]`, 307 words, 2 pages. Independent Python inspection of the package
+found no selected value in any XML/relations part, 2 tables and 1 media part preserved.
+`node tests/word_redact_zip.test.js` round-trips all 19 package parts byte-identically in Node.
+
+**Still unsafe to share:** the embedded screenshot is not yet redacted, so the image still contains
+the fictional credential. Image pixel redaction is P1. No encrypted link or recipient viewer exists
+for Word documents yet.
+
+Image redaction and review parity (2026-10-27): `redact.js` now overwrites pixels through
+`OffscreenCanvas` and re-encodes the media part, verifying the redacted rectangle is solid black
+before export. Review UI gained category chips, select all/clear, currency-amount option,
+placeholder choice, keep-revisions/metadata toggles, an image card with "Redact whole" and
+drag-to-mark areas, and an original-vs-sanitized comparison.
+
+Live check on the priority memo: text rules plus whole-image redaction produced
+`8 text replacements across 2 parts, 1 image redacted`; the downloaded package had a 100% black
+media image, no selected value in any XML part, and both tables intact. Uploading the result to
+Word Online rendered the table with `[REDACTED]` cells; 8 redaction markers, 307 words.
+Limitations: no OCR suggestions yet (image review is manual), no category auto-detection for
+bare table numbers, no encrypted link or recipient viewer for Word.
+
+Document detection parity (2026-10-27): chat parity required the Tier 3 arithmetic solver, not a
+money regex. Added `word/textmap.js` (paragraph/table flattening, money-column typing, currency
+lexer) and `word/detect.js` (Tier 1 heuristics, money bases, `AdversaryOracleSolver` derived values,
+NER hook, conservative "initial + surname" fallback).
+
+Live check on the priority memo: 18 findings (13 financial, 5 profile). Money cells `4,800`, `960`,
+`5,760`, `3,600`, `540`, `4,140`, `2,900`, `290`, `3,190`, `11,300`, `1,790`, `13,090` were
+pre-checked; `11,520` was recovered as a derived value. `14 March 2026`, `20%` and `DOC-CR-2026-0417`
+were correctly excluded after adding a bare-number guard and a two-numeric-cell rule for columns
+("Compensation Committee" is not a money header). Applying produced 20 replacements; verification
+was narrowed to text-bearing parts because `960` occurs inside theme colour values
+(`dir="5400000"`). Word Online reopened the result with 20 markers, 2 tables and 307 words.
+
+Known gaps: no Tier 2 public/private contextual suppression yet, so a published average could be
+flagged; the solver only inverts single-step relations; broad name detection still depends on the
+local model, and the initials rule is intentionally narrow.
+
+Review parity UI (2026-10-27): added state-driven header ("Create sanitized copy" -> "Sanitized
+copy ready"), counters (`17 of 19 items masked`, protected/unmasked chips), `Hide all`/`Keep all`,
+per-item `Redacted` toggle, `Show in preview` (selects the value in the text preview),
+`Show N more`, `Compare with original` toggle (single pane when off), and select-to-redact in the
+preview with a sticky action.
+
+Detection additions: public-figure context downgrades amounts to suggestions
+(`average salary ... 62,000` stays unchecked), connection strings become
+`[REDACTED_CONNECTION_STRING]`, and the tabs.onUpdated listener re-injects the launcher after an
+extension reload without a manual page refresh.
+
+Live check: capture produced 18 findings; counters reported 16 of 18 masked before manual
+selection, 0 of 18 after `Keep all`, 18 visible after `Show N more`. `Show in preview` selected
+`4,800` in the document text; selecting `Northbridge` added a manual finding (17 of 19). Applying
+produced a sanitized copy with the header switching to "Sanitized copy ready".
+
+Still missing for true chat parity: working broad name detection (local model path unverified in
+this profile), contextual suppression beyond the public-figure list, alias grouping
+(Melissa / Melissa Jane Foster), range mode, expiry and the encrypted link.
+
+Policy parity P2 (2026-10-27): added reader profile (Anyone with the link / Someone I trust),
+amounts mode (Remove / Approximate ranges), persisted preferences in `word_preferences`,
+`Reset to defaults`, `Cancel`, and an attack-check panel driven by `SafeSharePolicy.invert` +
+visible-number filtering. Preferences survive reload; changing reader re-derives the checked set.
+
+Live verification: reader `trusted` unchecked names/amounts (0 of 18 on a memo made only of names
+and amounts); `public` restored 16 of 18. Amounts mode `range` exported `?2k-5k`, `?500-1k`,
+`?5k-10k` (17 ranges), kept 3 derived markers removed, and `4,800` was absent. Attack check reported
+no recoverable amount because derived figures stayed hidden.
+
+Known limits: range mode leaves surrounding words like "dollars" in place (approximation, not a
+grammar rewrite); reader `trusted` widens what leaves the browser and needs an explicit warning in
+the publish step; the model-driven name path is still unverified, so broad names rely on the narrow
+initials rule plus manual selection.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,
