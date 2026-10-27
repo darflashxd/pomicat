@@ -107,7 +107,8 @@ The launcher appears on Word editor routes (`Doc.aspx`/`doc2.aspx`) without a pe
 the toolbar opens Word Online setup. Opening it reads a **separate copy** of the saved document
 through the current SharePoint session, leaving the original unchanged. The setup page is a
 two-pane review workspace: the document preview on the left (original highlights beside “what
-others will see”) and findings, settings and actions on the right. Opening setup from the launcher
+others will see”) and findings plus settings on the right. Images and the share controls sit in a
+full-width row below the workspace. Opening setup from the launcher
 reads the copy once automatically; the control then becomes **Read again**.
 
 Detection reuses the chat tiers plus money-column/currency bases and the derived-amount solver,

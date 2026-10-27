@@ -202,6 +202,23 @@ function updateCounts() {
     : "Reviewed locally. Nothing is uploaded until you create a link.";
   setHeader(title, subtitle);
   renderPreview(lastDoc);
+  updateLowerLabel();
+}
+
+function updateLowerLabel() {
+  const label = $("lower-label");
+  if (!label) return;
+  const media = lastDoc?.media || [];
+  const unmarked = imageState.filter(state => !state.mode).length;
+  const parts = [];
+  if (media.length) parts.push(`Images: ${unmarked ? `${unmarked} not marked` : "all marked"}`);
+  else parts.push("Images: none");
+  const linked = typeof PublishState !== "undefined" && PublishState.last;
+  parts.push(linked ? "Link live" : sanitizedBytes ? "Sanitized copy ready" : "Share & export");
+  label.textContent = parts.join(" · ");
+  label.classList.toggle("warn", unmarked > 0);
+  const meta = $("share-meta");
+  if (meta) meta.textContent = linked ? "Link live" : sanitizedBytes ? "Ready" : "Not created";
 }
 
 function renderFindings(doc) {
@@ -265,6 +282,7 @@ function renderFindings(doc) {
     more.hidden = false;
     more.textContent = showAllFindings ? "Show fewer" : `Show ${findings.length - PAGE_SIZE} more`;
   } else more.hidden = true;
+  $("findings-meta").textContent = findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "None";
 
   renderImages(doc);
   if (!sanitizedBytes) {
@@ -374,12 +392,15 @@ function renderImages(doc) {
   host.replaceChildren();
   const media = doc.media || [];
   $("image-block").hidden = media.length === 0;
+  $("image-empty").hidden = media.length > 0;
+  $("images-meta").textContent = media.length ? `${media.length} image${media.length === 1 ? "" : "s"}` : "None";
+  updateLowerLabel();
   media.forEach((entry, index) => {
     const state = imageState[index];
     const card = document.createElement("div");
     card.className = "image-card";
     const canvas = document.createElement("canvas");
-    canvas.width = 480; canvas.height = 300;
+    canvas.width = 640; canvas.height = 360;
     canvas.className = "image-canvas";
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", `Image ${index + 1}`);
@@ -728,6 +749,7 @@ $("download-sanitized").addEventListener("click", () => {
 });
 
 $("read-again").addEventListener("click", () => { if (window.__ssReadAgain) window.__ssReadAgain(); });
+window.__ssLowerLabel = updateLowerLabel;
 
 SafeShareWordSettings.load().then(prefs => {
   wordPrefs = prefs;

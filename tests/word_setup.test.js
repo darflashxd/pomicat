@@ -26,6 +26,8 @@ assert.ok(html.includes('id="sanitized-preview"'), "review must show what the re
 assert.ok(html.includes('id="show-original"'), "original pane must be collapsible");
 assert.ok(html.includes('id="share-panel"'), "share controls must be gated behind apply");
 assert.ok(html.includes('id="publish-hint"'), "disabled link control needs a reason");
+assert.ok(html.includes('id="lower-panel"'), "images and sharing live below the workspace");
+assert.ok(html.indexOf('id="lower-panel"') > html.indexOf('id="findings"'), "images must not sit inside the findings column");
 assert.ok(!fs.existsSync(path.join(root, "documents/index.html")));
 const viewer = fs.readFileSync(path.join(root,"viewer/app.js"),"utf8");
 assert.ok(/kind === "document"/.test(viewer));

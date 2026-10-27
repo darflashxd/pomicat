@@ -194,6 +194,19 @@ stacked into one column. `node tests/run_all.js` passed 54/54.
 Still open: image text needs manual marking (no OCR), charts/OLE are counted but not rewritten,
 and the recipient path was exercised in the same Playwright profile.
 
+Document-first layout (2026-10-28): the review now keeps the document large. The grid is 1.5:1,
+so at 1500x1000 the preview is 764x750 and findings are 509 wide with a 677px scroll area (about
+seven rows). Images and share controls moved out of the findings column into a full-width row below
+the workspace: an image card about 696px wide on the left and `Share & export` on the right. Its
+summary reports `Images: 1 not marked - Share & export`, then `all marked`, `Sanitized copy ready`
+or `Link live` as state changes.
+
+Before/after stacks vertically when the preview is narrow (<=1350px); below 1100px the whole review
+stacks with normal page scrolling. The lower row stays in document flow, and the review grid keeps
+its height. Verified at 1500x1000 and 1000x1000: no horizontal overflow, the image text is readable
+without the lightbox, apply/link/revoke update the lower label, and `node tests/run_all.js` passes
+54/54.
+
 ## v2.4.1 local check (2026-10-26)
 
 - Node: **52/52** regression tests passed locally (`npm test`), including new viewer-Markdown,

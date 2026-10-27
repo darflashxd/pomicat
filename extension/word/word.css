@@ -149,3 +149,53 @@ body.reviewing main>aside,body.reviewing main>details{display:none}
   .review-pane{height:auto;max-height:none}
   .review-scroll{overflow:visible;min-height:0}
 }
+
+/* v3: document-first workspace with a full-width images/share row */
+.review-grid{grid-template-columns:minmax(0,1.5fr) minmax(380px,1fr);gap:18px}
+.preview-body{max-height:none;font-size:14px;line-height:1.55}
+.preview-body table{font-size:13px}
+.preview-body td{padding:7px 8px}
+.review-pane>.pane-head,.lower-grid .pane-head{padding:0 0 8px;border-bottom:1px solid var(--line);flex:none}
+.lower-panel{flex:none;margin-top:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+.lower-panel>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:40px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.lower-panel>summary::-webkit-details-marker{display:none}
+.lower-panel>summary::after{content:"Show";font-weight:500;color:var(--muted)}
+.lower-panel[open]>summary::after{content:"Hide"}
+#lower-label.warn{color:#ffd9a8}
+.lower-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(380px,1fr);gap:16px;height:clamp(200px,26vh,280px);padding:0 14px 14px}
+.lower-panel:not([open]) .lower-grid{display:none}
+.lower-panel[open] .lower-grid{display:grid}
+.lower-grid .pane{height:100%;min-height:0;display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:12px}
+.image-pane #image-block{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+.image-pane .help{margin:0}
+#image-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;overflow:auto;align-content:start;flex:1;min-height:0}
+.image-card{padding:8px}
+.share-pane .review-actions{border-top:0;padding-top:0;overflow:auto;flex:1;min-height:0;align-content:start}
+@media(max-width:1350px){.preview-split{grid-template-columns:1fr;grid-template-rows:1fr 1fr}}
+@media(max-width:1100px){
+  body.reviewing{display:block;height:auto;overflow:auto}
+  body.reviewing main{display:block;height:auto;margin-top:20px;padding-bottom:28px}
+  body.reviewing #review-section:not([hidden]){display:block;margin:16px 0}
+  .review-grid{grid-template-columns:1fr;height:auto;min-height:0}
+  .preview-pane{height:auto;overflow:visible}
+  .preview-split{grid-template-columns:1fr;grid-template-rows:none}
+  .preview-body{max-height:380px}
+  #document-preview,#sanitized-preview{max-height:340px}
+  .review-pane{height:auto}
+  .review-scroll{overflow:visible;min-height:0}
+  .lower-grid{grid-template-columns:1fr;height:auto;padding:0 12px 12px}
+  .lower-grid .pane{height:auto;overflow:visible}
+  #image-list{overflow:visible}
+  .share-pane .review-actions{overflow:visible}
+}
+
+/* v3.1: keep the review tall; images and sharing continue below the fold */
+body.reviewing{display:block;height:auto;overflow:auto}
+body.reviewing main{display:block;height:auto;margin-top:16px;padding-bottom:28px}
+body.reviewing #review-section:not([hidden]){display:block;margin:12px 0}
+.review-grid{height:calc(100vh - 250px);min-height:480px;flex:none}
+.lower-grid{height:auto;align-items:start}
+.lower-grid .pane{height:auto;overflow:visible}
+#image-list{overflow:visible}
+.share-pane .review-actions{overflow:visible}
+@media(max-width:1100px){.review-grid{height:auto;min-height:0}}

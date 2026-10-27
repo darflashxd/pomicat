@@ -19,6 +19,7 @@
     <button type="button" id="redact-selection" class="redact-selection" hidden>Redact selected text</button>
   </div>
   <div class="pane review-pane">
+    <div class="pane-head"><span>Findings</span><span id="findings-meta" class="pane-meta"></span></div>
     <div class="review-scroll">
     <div class="settings"><div id="category-chips" class="chips" aria-label="Categories"></div>
     <div class="row"><button type="button" id="rescan">Re-scan names</button><button type="button" id="select-all">Hide all</button><button type="button" id="select-none">Keep all</button></div>
@@ -33,9 +34,23 @@
     <p id="review-summary" class="subtitle"></p>
     <div id="findings"></div>
     <button type="button" id="show-more" class="show-more" hidden></button>
-    <div id="image-block" hidden><h3>Images</h3><p class="help">Open an image to mark areas at full size. Pixels are overwritten, never covered by a shape.</p><div id="image-list"></div></div>
     </div>
-    <div class="review-actions">
+  </div>
+</div>
+<details id="lower-panel" class="lower-panel" open>
+  <summary><span id="lower-label">Images &amp; share</span></summary>
+  <div class="lower-grid">
+    <section class="pane image-pane" aria-label="Images">
+      <div class="pane-head"><span>Images</span><span id="images-meta" class="pane-meta"></span></div>
+      <p id="image-empty" class="help" hidden>This document has no embedded images.</p>
+      <div id="image-block" hidden>
+        <p class="help">Open an image to mark areas at full size. Pixels are overwritten, never covered by a shape.</p>
+        <div id="image-list"></div>
+      </div>
+    </section>
+    <section class="pane share-pane" aria-label="Share and export">
+      <div class="pane-head"><span>Share &amp; export</span><span id="share-meta" class="pane-meta"></span></div>
+      <div class="review-actions">
       <details class="policy manual-panel"><summary>Add private text</summary><textarea id="manual" rows="2" maxlength="4000" placeholder="Names or terms the rules missed"></textarea></details>
       <button id="apply">Create sanitized DOCX</button>
       <p id="apply-status" role="status" aria-live="polite"></p>
@@ -56,9 +71,10 @@
         </details>
       </div>
       <div class="footer-actions"><button type="button" id="reset-defaults" class="subtle">Reset to defaults</button><button type="button" id="cancel-review" class="subtle">Cancel</button></div>
-    </div>
+      </div>
+    </section>
   </div>
-</div>
+</details>
 </section>
 
 <aside><h2>Experimental integration</h2><p>Read the saved copy, review redactions, then share an encrypted link. Nothing is uploaded until you create a link.</p></aside>

@@ -83,6 +83,7 @@ async function publishSanitized() {
     document.getElementById("link-result").hidden = false;
     status.textContent = "Encrypted link ready. Anyone holding the full link can read it.";
     document.getElementById("publish-hint").textContent = "Relay stored ciphertext only; the decryption key stays in the link fragment.";
+    if (window.__ssLowerLabel) window.__ssLowerLabel();
   } catch (error) {
     status.textContent = "Link was not created.";
     document.getElementById("publish-hint").textContent = "The sanitized copy is unchanged. Download it, or check the relay setting.";
@@ -117,6 +118,7 @@ document.getElementById("revoke-link").addEventListener("click", async () => {
     document.getElementById("link-result").hidden = true;
     document.getElementById("publish-status").textContent = "Link revoked. Saved copies remain.";
     document.getElementById("publish-hint").textContent = "The uploaded ciphertext was deleted. Your sanitized DOCX is unaffected.";
+    if (window.__ssLowerLabel) window.__ssLowerLabel();
   } catch (error) {
     document.getElementById("publish-status").textContent = error.message;
   } finally {
