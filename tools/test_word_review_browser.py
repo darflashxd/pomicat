@@ -70,9 +70,33 @@ def run(browser_type):
     page.locator('#manual').fill('edit before debounce')
     page.evaluate('publishSanitized()')
     assert page.locator('#create-link').is_disabled()
+    page.evaluate('''() => {
+      lastDoc = {blocks:[{text:'Salary 4,800; total USD 4,800.'}], supplementary:[], media:[]};
+      providedFindings = [
+        {value:'4,800',category:'FINANCIAL',source:'amount',replacement:'[REDACTED_FINANCIAL]',preChecked:true,ruleName:'Money amount'},
+        {value:'USD 4,800',category:'FINANCIAL',source:'derived',replacement:'[REDACTED_FINANCIAL_1]',preChecked:true,ruleName:'Derived amount'}
+      ];
+      renderFindings(lastDoc);
+    }''')
+    page.evaluate("document.querySelector('#sanitized-preview mark[data-finding-key]').click()")
+    page.wait_for_timeout(300)
+    grouped = page.evaluate('''() => ({
+      values: findingRows(lastDoc).map(item => ({value:item.value, checked:findingState.get(findingKey(item))})),
+      text: document.getElementById('sanitized-preview').innerText
+    })''')
+    assert all(not item['checked'] for item in grouped['values']), grouped
+    assert '[REDACTED_FINANCIAL' not in grouped['text'], grouped
+    page.evaluate("document.querySelector('#sanitized-preview mark[data-finding-key]').click()")
+    page.wait_for_timeout(300)
+    regrouped = page.evaluate('''() => ({
+      values: findingRows(lastDoc).map(item => ({value:item.value, checked:findingState.get(findingKey(item))})),
+      text: document.getElementById('sanitized-preview').innerText
+    })''')
+    assert all(item['checked'] for item in regrouped['values']), regrouped
+    assert '[REDACTED_FINANCIAL' in regrouped['text'], regrouped
     assert not errors, errors
     browser.close()
-    return {'browser':browser_type.name,'inlineToggle':True,'applyRaceRejected':True,'debouncePublishRejected':True,'downloadHashMatches':True,'failureReasonVisible':True,'pageErrors':errors}
+    return {'browser':browser_type.name,'inlineToggle':True,'applyRaceRejected':True,'debouncePublishRejected':True,'downloadHashMatches':True,'failureReasonVisible':True,'groupedFinancialToggle':True,'pageErrors':errors}
 
 
 with sync_playwright() as p:

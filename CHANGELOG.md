@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.5.4 - 2026-10-28
+
+- One click now changes every finding that points to the same value. Before, a
+  salary written as `4,800` and `USD 4,800` produced two findings, so turning off
+  `[REDACTED_FINANCIAL_1]` only revealed `[REDACTED_FINANCIAL]`; a second click was
+  needed. Financial findings are grouped by parsed amount, and other findings by
+  exact text, the same way chat review works.
+- The finding checkbox and the Redacted/Visible button use the same grouped toggle
+  as clicks in both preview panes.
+- Live Word Online check: one click on `[REDACTED_FINANCIAL_1]` for `$7,850`
+  revealed `$7,850` in both panes and cleared `7,850` and `$7,850` together. A
+  second click restored both. Apply then produced 19 replacements and a
+  34,983-byte DOCX.
+
 ## 2.5.3 - 2026-10-28
 
 - Raise the Word capture limit to 10 MiB and distinguish oversize failures from

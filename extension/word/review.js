@@ -265,12 +265,7 @@ function renderFindings(doc) {
     box.checked = findingChecked(finding);
     box.className = "finding-toggle";
     box.id = `finding-${index}`;
-    box.addEventListener("change", () => {
-      findingState.set(key, box.checked);
-      const stateButton = row.querySelector(".finding-state");
-      if (stateButton) stateButton.textContent = box.checked ? "Redacted" : "Visible";
-      updateCounts();
-    });
+    box.addEventListener("change", () => setFindingGroupState(key, box.checked));
     const label = document.createElement("label");
     label.className = "finding-check";
     label.append(box);
@@ -286,12 +281,7 @@ function renderFindings(doc) {
     state.type = "button";
     state.className = "finding-state";
     state.textContent = box.checked ? "Redacted" : "Visible";
-    state.addEventListener("click", () => {
-      box.checked = !box.checked;
-      findingState.set(key, box.checked);
-      state.textContent = box.checked ? "Redacted" : "Visible";
-      updateCounts();
-    });
+    state.addEventListener("click", () => toggleFindingByKey(key));
     const locate = document.createElement("button");
     locate.type = "button";
     locate.className = "finding-locate";
@@ -479,21 +469,48 @@ $("redact-selection").addEventListener("click", () => {
   }
 });
 
-function toggleFindingByKey(key) {
-  const finding = (lastDoc ? findingRows(lastDoc) : []).find(item => findingKey(item) === key);
-  if (!finding) return;
-  const next = !findingChecked(finding);
-  findingState.set(key, next);
-  const row = [...document.querySelectorAll(".finding")].find(item => item.dataset.key === key);
-  if (row) {
+function financialValueOf(finding) {
+  if (finding.category !== "FINANCIAL" || typeof SafeShareWordPolicy === "undefined") return null;
+  const value = SafeShareWordPolicy.valueOf(finding.value);
+  return Number.isFinite(value) ? value : null;
+}
+
+function relatedFindings(target) {
+  const all = lastDoc ? findingRows(lastDoc) : [];
+  const raw = String(target.value).toLowerCase();
+  const financial = financialValueOf(target);
+  return all.filter(item =>
+    item.value.toLowerCase() === raw ||
+    (financial !== null && financialValueOf(item) === financial));
+}
+
+function setFindingGroupState(key, next) {
+  const target = (lastDoc ? findingRows(lastDoc) : []).find(item => findingKey(item) === key);
+  if (!target) return null;
+  const group = relatedFindings(target);
+  for (const item of group) findingState.set(findingKey(item), next);
+  const rows = new Map([...document.querySelectorAll(".finding")].map(row => [row.dataset.key, row]));
+  for (const item of group) {
+    const row = rows.get(findingKey(item));
+    if (!row) continue;
     const box = row.querySelector(".finding-toggle");
     if (box) box.checked = next;
     const button = row.querySelector(".finding-state");
     if (button) button.textContent = next ? "Redacted" : "Visible";
   }
   updateCounts();
-  const label = finding.value.length > 38 ? `${finding.value.slice(0, 35)}...` : finding.value;
-  setSelectionStatus(`"${label}" is now ${next ? "redacted" : "visible"} in the shared copy.`, !next);
+  return { target, group, next };
+}
+
+function toggleFindingByKey(key) {
+  const target = (lastDoc ? findingRows(lastDoc) : []).find(item => findingKey(item) === key);
+  if (!target) return;
+  const next = !findingChecked(target);
+  const result = setFindingGroupState(key, next);
+  if (!result) return;
+  const label = target.value.length > 38 ? `${target.value.slice(0, 35)}...` : target.value;
+  const suffix = result.group.length > 1 ? ` (${result.group.length} related values)` : "";
+  setSelectionStatus(`"${label}" is now ${next ? "redacted" : "visible"} in the shared copy${suffix}.`, !next);
 }
 
 for (const pane of [$("document-preview"), $("sanitized-preview")]) {

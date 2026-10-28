@@ -353,3 +353,18 @@ same phrase appeared in every model chunk. Candidate deduplication by normalized
 value now keeps one card across chunks. This is a large-file capability test, not
 a layout/page-count or memory benchmark. The limit is still 10 MiB capture and
 512 KiB link ciphertext; larger links require a different storage design.
+
+## Grouped redaction toggle (2026-10-28)
+
+Automatic amount and derived-amount findings can describe the same money value in
+different forms. `4,800` and `USD 4,800`, for example, were separate findings, and
+the preview marked the longer span. Clicking `[REDACTED_FINANCIAL_1]` turned off
+only the derived finding, leaving `[REDACTED_FINANCIAL]` in place, so a second
+click was needed.
+
+The preview click, finding checkbox, and Redacted/Visible button now share one
+toggle. It changes all findings with the same text and, for FINANCIAL findings,
+all findings with the same parsed amount. The rule is the same one chat review
+uses. A live Word Online run with the HR letter showed one click revealing
+`$7,850` in both panes and clearing `7,850` and `$7,850` together; Apply produced
+19 replacements and a 34,983-byte DOCX.
