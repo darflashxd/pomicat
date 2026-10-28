@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.2 - 2026-10-28
+
+- Word model candidates now strip role words (`doctor`, `manager`, `patient`) before
+  scoring, so names like `Rebecca Louise Turner` are treated as person suggestions
+  instead of low-confidence role phrases.
+- Live Word Online test with the extracted Chrome package: 27/30 candidates masked,
+  19 replacements, sender download 34,983 bytes. Local relay link opened without an
+  extension, preview contained redactions and no tested names, recipient DOCX SHA256
+  matched the sender file, and revocation worked.
+- Added the detailed DOCX structure, formula, race, and package browser reports.
+
 ## 2.5.1 - 2026-10-28
 
 - Security: DOCX custom properties and Company/Manager/HyperlinkBase metadata are

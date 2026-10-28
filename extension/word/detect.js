@@ -110,8 +110,14 @@
       if (!buffer.trim()) { buffer = ""; return; }
       const result = await ner.analyze(buffer, 30000, true);
       if (!result || !result.success || !Array.isArray(result.spans)) throw new Error("Local model unavailable; document scan is incomplete.");
+      const modelSpans = result.spans.map(span => {
+        if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end > buffer.length) return span;
+        const raw = buffer.slice(span.start, span.end);
+        const role = /^(?:the\s+)?(?:doctor|dr|mr|mrs|ms|miss|manager|therapist|patient|employee|professor|nurse|sister|brother|wife|husband)\s+/i.exec(raw);
+        return role ? { ...span, start: span.start + role[0].length } : span;
+      });
       const candidates = maybe.scan([{ role: "document", content: buffer }],
-        result.spans.map(span => ({ ...span, turnIndex: 0 })));
+        modelSpans.map(span => ({ ...span, turnIndex: 0 })));
       for (const candidate of candidates.filter(item => item.source === "model")) {
         const label = candidate.modelLabel || "PERSONAL_INFORMATION";
         const category = /^(BANK_ACCOUNT|IBAN_CODE|CREDIT_CARD|FINANCIAL)$/.test(label) ? "FINANCIAL"

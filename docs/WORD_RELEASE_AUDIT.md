@@ -310,3 +310,27 @@ large fixture 10 MiB with four placed images, 45 tables, independent selected
 canary absent, reopening succeeded. Word Online capture and a real Microsoft
 session were not tested because the available browser reached a Microsoft sign-in
 page and no credentials were available. The 5 MiB capture ceiling remains.
+
+## Live Word Online acceptance (2026-10-28)
+
+A headed Playwright Chromium was loaded with the extracted 2.5.1 Chrome package
+and a persistent profile. After Microsoft login, the saved HR severance letter
+opened in Word Online. The launcher was visible.
+
+A synthetic Playwright coordinate click on the closed shadow host did not open
+setup, but dispatching the same mouse press/release through CDP did. The button's
+click handler opened the setup page; this is recorded as an automation limitation,
+not as a proven manual-click failure.
+
+Capture returned 30 candidates (27 masked, 3 unmasked model suggestions; 13 model
+suggestions, six shown initially). Apply completed with 19 text replacements and
+no error. The downloaded DOCX was 34,983 bytes. The sanitized text did not contain
+the tested names, password, connection string, salary or derived amounts; three
+unchecked city suggestions remained visible by design.
+
+A local relay on port 8788 produced a 104-character link. Opened in a separate
+headless Chromium context with no extension, the viewer showed the click gate,
+the document preview with redaction markers, no tested name, and downloaded a DOCX
+whose SHA256 matched the sender file. Revoking the link made a reload show
+`Link Expired or Revoked`. This is a local relay test; public relay lifecycle was
+tested earlier with a synthetic payload, not this document.
