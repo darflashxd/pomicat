@@ -105,6 +105,7 @@
   async function nerCandidates(map, ner, chunkSize = 6000) {
     if (!ner || typeof ner.analyze !== "function") return [];
     const out = [];
+    const seenModel = new Map();
     let buffer = "", offset = 0;
     const flush = async () => {
       if (!buffer.trim()) { buffer = ""; return; }
@@ -123,10 +124,19 @@
         const category = /^(BANK_ACCOUNT|IBAN_CODE|CREDIT_CARD|FINANCIAL)$/.test(label) ? "FINANCIAL"
           : /^(GOVERNMENT_ID|PASSPORT|DRIVERS_LICENSE|TAX_ID|US_LICENSE_PLATE)$/.test(label) ? "GOV_ID"
           : /^(IP_ADDRESS|MAC_ADDRESS|IMEI)$/.test(label) ? "SYSTEM" : "PROFILE";
-        out.push({ value: candidate.raw, category, ruleName: `Local model: ${label}`,
+        const prior = seenModel.get(candidate.raw.toLowerCase());
+        if (prior) {
+          if (candidate.risky) prior.preChecked = true;
+          if (candidate.modelScore > prior.score) { prior.score = candidate.modelScore; prior.modelLabel = label; prior.ruleName = `Local model: ${label}`; }
+          prior.occurrences = (prior.occurrences || []).concat(candidate.occurrences || []);
+          continue;
+        }
+        const item = { value: candidate.raw, category, ruleName: `Local model: ${label}`,
           reason: candidate.reason, source: "model", score: candidate.modelScore, modelLabel: label,
           replacement: label === "PERSON" ? "[REDACTED_NAME]" : `[REDACTED_${label}]`,
-          preChecked: candidate.risky, occurrences: candidate.occurrences });
+          preChecked: candidate.risky, occurrences: candidate.occurrences };
+        seenModel.set(candidate.raw.toLowerCase(), item);
+        out.push(item);
       }
       buffer = "";
     };

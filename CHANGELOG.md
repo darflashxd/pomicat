@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.3 - 2026-10-28
+
+- Raise the Word capture limit to 10 MiB and distinguish oversize failures from
+  access/permission errors.
+- Deduplicate model candidates by normalized value across document chunks. A long
+  document previously repeated the same phrase as dozens of separate cards.
+- Live test: 8.94 MiB DOCX with four placed images captured in Word Online,
+  1,890 replacements, 9,374,102-byte output with four media files. The 512 KiB link
+  limit rejected the link with a clear download fallback.
+- Link cap remains 512 KiB; larger links need a different storage design.
+
 ## 2.5.2 - 2026-10-28
 
 - Word model candidates now strip role words (`doctor`, `manager`, `patient`) before

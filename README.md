@@ -17,7 +17,7 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Current release:** `v2.5.2` (28 October 2026). Word Online documents can be reviewed, redacted,
+- **Current release:** `v2.5.3` (28 October 2026). Word Online documents can be reviewed, redacted,
   and shared as encrypted document links. The public relay serves the v4 document viewer.
 - **Tests:** `59/59` offline regression tests pass with `npm test`; local browser structure tests also pass in Chromium and Firefox.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
@@ -46,7 +46,7 @@ git clone https://github.com/darflashxd/safeshare.git
 cd safeshare
 ```
 
-1. Get the 2.5.2 Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
+1. Get the 2.5.3 Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
    clone the repository and use the `extension/` folder while developing. Extract the ZIP.
 2. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the
    extracted folder (or the repository's `extension/` folder).

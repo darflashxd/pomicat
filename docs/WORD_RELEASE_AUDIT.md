@@ -334,3 +334,22 @@ the document preview with redaction markers, no tested name, and downloaded a DO
 whose SHA256 matched the sender file. Revoking the link made a reload show
 `Link Expired or Revoked`. This is a local relay test; public relay lifecycle was
 tested earlier with a synthetic payload, not this document.
+
+## Large Word capture test (2026-10-28)
+ 
+A fictional 8.94 MiB DOCX with four placed random PNG images was uploaded to Word
+Online and opened in the logged-in Playwright browser. Capture succeeded with a
+10 MiB fetch limit:
+ 
+- 32 findings after model deduplication, 27 of them model suggestions shown six at
+  a time; 5 automatic findings protected by default.
+- Apply completed with 1,890 replacements across three package parts.
+- The downloaded DOCX was 9,374,102 bytes with 19 ZIP parts and four media files.
+- Creating a link was rejected with `This copy is too large for the current relay
+  limit. Download the file instead.`; the download remained available.
+ 
+The earlier 8.15 MiB run without deduplication produced 243 model cards because the
+same phrase appeared in every model chunk. Candidate deduplication by normalized
+value now keeps one card across chunks. This is a large-file capability test, not
+a layout/page-count or memory benchmark. The limit is still 10 MiB capture and
+512 KiB link ciphertext; larger links require a different storage design.
