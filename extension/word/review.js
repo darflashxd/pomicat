@@ -57,7 +57,9 @@ function isModelFinding(finding) {
 }
 
 function defaultFindingChecked(finding) {
-  const keepForReader = wordPrefs.reader === "trusted" && (finding.category === "PROFILE" || finding.category === "FINANCIAL");
+  const keepForReader = wordPrefs.reader === "trusted" &&
+    (["amount", "derived"].includes(finding.source) ||
+      (finding.source === "model" && /^(?:PERSON|GIVEN_NAME|SURNAME|LOCATION|CITY|STATE|STREET_NAME|ORGANIZATION)$/.test(finding.modelLabel || "")));
   return !keepForReader && finding.preChecked !== false;
 }
 
@@ -88,7 +90,9 @@ function matchedFindings() {
   return findingRows(lastDoc).map(finding => ({
     ...finding,
     key: findingKey(finding),
-    checked: findingChecked(finding)
+    checked: findingChecked(finding),
+    excludeValues: findingRows(lastDoc).filter(other => !findingChecked(other) && financialValueOf(finding) !== null &&
+      financialValueOf(other) === financialValueOf(finding) && other.value.length > finding.value.length).map(other => other.value)
   }));
 }
 
@@ -482,8 +486,10 @@ function relatedFindings(target) {
   const currency = item => /\b(?:USD|EUR|GBP|JPY|INR|IDR|SGD|MYR)\b/i.exec(item.value)?.[0].toUpperCase() ||
     (/[$€£¥₹]|Rp\.?/i.test(item.value) ? SafeShareWordPolicy.currencyOf(item.value) : null);
   const currencies = new Set(all.filter(item => financial !== null && financialValueOf(item) === financial).map(currency).filter(Boolean));
+  const pipAlias = item => item.ruleName === "Contextual LEGAL_HR" && /^(?:performance improvement plan(?:\s+\(pip\))?|pip)$/i.test(item.value.trim());
   return all.filter(item =>
     item.value.toLowerCase() === raw ||
+    (pipAlias(target) && pipAlias(item)) ||
     (financial !== null && financialValueOf(item) === financial &&
       (currency(target) && currency(item) ? currency(target) === currency(item) : currencies.size <= 1)));
 }
@@ -707,7 +713,8 @@ function activeRules() {
   const findings = lastDoc ? findingRows(lastDoc) : [];
   for (const finding of findings) {
     if (!findingChecked(finding)) continue;
-    const rule = { value: finding.value, replacement: replacementFor(finding, finding.value) };
+    const rule = { value: finding.value, replacement: replacementFor(finding, finding.value),
+      excludeValues: matchedFindings().find(item => item.key === findingKey(finding))?.excludeValues || [] };
     rule.occurrences = (lastDoc.paragraphs || []).flatMap(paragraph =>
       SafeShareWordRedact.spansFor(paragraph.text, [rule]).map(span => ({
         paragraphId:paragraph.id, part:paragraph.part, paragraphIndex:paragraph.paragraphIndex,

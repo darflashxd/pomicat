@@ -31,6 +31,11 @@ jobs:
       - run: python tools/eval/credential_browser.py --browser firefox
       - run: python tools/eval/relay_browser.py
       - run: python tools/eval/relay_browser.py --browser firefox
+      - run: python tools/test_hr_toggle_browser.py
+      - run: python tools/test_word_review_browser.py
+      - run: python tools/test_docx_privacy_browser.py
+      - run: pip install python-docx pillow
+      - run: python tools/test_word_structures.py
   model-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 15

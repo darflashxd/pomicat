@@ -368,7 +368,7 @@ class ContextualClassifier {
 
         // HR action check
         const hrMatch = sent.match(/(?:Surat Peringatan (?:Pertama|Kedua|Ketiga|\d|\(SP-[1-3]\))|PHK sepihak|PIP \d+ hari|(?:\d+[- ]day\s+)?(?:Performance Improvement Plan(?:\s+\(PIP\))?|pip\b)|final written warning|written warning(?:\s+from\s+hr)?|disciplinary warning|formal\s+disciplinary\s+hearing|termination\s+notice|gross\s+misconduct|mutual\s+nda)/i);
-        if (hrMatch) {
+        if (hrMatch && !(/^pip$/i.test(hrMatch[0]) && (!/\b(?:hr|manager|performance|disciplin\w*|severance|employment|employer|placed|warning|fired|termination)\b/i.test(turnText) || /\bpip\s+install\b|picture[- ]in[- ]picture/i.test(sent)))) {
           detected.push({
             turnIndex,
             raw: hrMatch[0],

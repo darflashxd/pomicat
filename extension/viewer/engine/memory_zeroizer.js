@@ -2,7 +2,7 @@
  * SafeShare-AI — Client-Side RAM Memory Zeroizer & Ephemeral Session Lifecycle
  * 
  * Cryptographic Hygiene & RAM Sanitization:
- *   1. Zeroizes decrypted plaintext buffers in browser memory upon session closure or termination.
+ *   1. Clears registered references and DOM content on closure (best effort, not RAM erasure).
  *   2. Automatically shreds the URI fragment (#key) from the address bar to prevent key leakage in browser history.
  *   3. Enforces ephemeral session revocation flags in local/session storage.
  *   4. Free from client-side DevTools / F12 gimmicks — enforces actual cryptographic boundaries.
@@ -184,14 +184,14 @@
       lockEl.innerHTML = `
         <div style="font-size: 48px; margin-bottom: 16px;">🛡️</div>
         <h1 style="color: #f4f4f5; font-size: 20px; font-weight: 600; margin-bottom: 8px;">
-          Session Ended & Memory Zeroed
+          Session Ended
         </h1>
         <p style="color: #a1a1aa; font-size: 14px; max-width: 520px; line-height: 1.5; margin-bottom: 20px;">
-          Decrypted conversation buffers in client RAM have been securely zeroized and flushed.<br>
+          Decrypted content was removed from the view and application references were cleared where possible. Browser memory erasure is not guaranteed.<br>
           <span style="color: #71717a; font-size: 12px; margin-top: 4px; display: inline-block;">Reason: ${reason}</span>
         </p>
         <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px 18px; font-size: 12px; color: #10b981;">
-          ✓ Client RAM buffers flushed (0 plaintext remanence)
+          Application cleanup requested; copies may remain in browser memory.
         </div>
       `;
     }

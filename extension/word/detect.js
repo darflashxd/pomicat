@@ -1,10 +1,11 @@
 /* Document detection pipeline: heuristics (Tier 1), money bases (Tier 2 shape),
    derived-value solver (Tier 3) and local NER. Pure text in, candidates out. */
 (function (root, factory) {
-  const api = factory(typeof module === "object" && module.exports ? require("../engine/maybe.js") : root.SafeShareMaybe);
+  const api = factory(typeof module === "object" && module.exports ? require("../engine/maybe.js") : root.SafeShareMaybe,
+    typeof module === "object" && module.exports ? require("../engine/contextual.js") : ContextualClassifier);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SafeShareWordDetect = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function (maybe) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (maybe, Contextual) {
   const CATEGORY = {
     CREDENTIALS: "Credentials", FINANCIAL: "Financial", GOV_ID: "Government ID",
     PROFILE: "Contact & profile", HEALTH: "Health", SYSTEM: "System", CUSTOM: "Added by you"
@@ -168,6 +169,14 @@
     for (const item of tier1(map, heuristics)) push(candidates, seen, item);
     for (const item of initialsRule(map)) push(candidates, seen, item);
     for (const item of connectionStrings(map)) push(candidates, seen, item);
+    const contextual = new Contextual();
+    for (const part of map.parts) for (const hit of contextual.classifyTurn(part, 0)) {
+      if (!["SENSITIVE_HEALTH", "SENSITIVE_LEGAL_HR"].includes(hit.category)) continue;
+      push(candidates, seen, { value: hit.raw, category: hit.category === "SENSITIVE_HEALTH" ? "HEALTH" : "PROFILE",
+        ruleName: `Contextual ${hit.category.replace("SENSITIVE_", "")}`, reason: "Personal contextual information",
+        replacement: hit.category === "SENSITIVE_HEALTH" ? "[CONFIDENTIAL_HEALTH_RECORD]" : "[HR_DISCIPLINARY_RECORD]",
+        source: "contextual", preChecked: true });
+    }
 
     const numericBases = [...bases.map(base => ({ value: base.value }))];
     for (const item of candidates) {

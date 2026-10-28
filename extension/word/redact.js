@@ -141,6 +141,8 @@
       const tail = /[\p{L}\p{N}_]$/u.test(rule.value) ? "(?![\\p{L}\\p{N}_])" : "";
       const pattern = new RegExp(boundary + escapePattern(rule.value) + tail, "giu");
       for (const match of text.matchAll(pattern)) {
+        if ((rule.excludeValues || []).some(value => [...text.matchAll(new RegExp(escapePattern(value), "giu"))]
+          .some(outer => match.index >= outer.index && match.index + match[0].length <= outer.index + outer[0].length))) continue;
         spans.push({ start: match.index, end: match.index + match[0].length, replacement: rule.replacement || "[REDACTED]", finding: rule });
       }
     }
@@ -168,7 +170,7 @@
     let text = "";
     const map = [];
     nodes.forEach((node, index) => {
-      if (index && (isMath(nodes[index - 1]) || isMath(node))) text += "\u0000";
+      if (index && (isMath(nodes[index - 1]) || isMath(node))) { text += "\u0000"; map.push(null); }
       for (let i = 0; i < node.textContent.length; i++) {
         text += node.textContent[i];
         map.push({ index, offset: i });
@@ -375,14 +377,29 @@
       const removedParts = new Set([...parts.keys()].filter(name => name.startsWith("docProps/thumbnail") || name === "word/thumbnail.jpeg"));
       removePackageParts(parts, removedParts);
     }
+    for (const [name, data] of parts) {
+      if (!name.endsWith('.rels')) continue;
+      const xml = new DOMParser().parseFromString(decoder.decode(data), 'application/xml');
+      if (xml.querySelector('parsererror')) throw new Error('Malformed relationships: ' + name);
+      for (const node of [...xml.documentElement.children]) {
+        const target = node.getAttribute('Target') || '';
+        let decoded = target;
+        try { decoded = decodeURIComponent(target); } catch (_) {}
+        if (rules.some(rule => rule.value && [target, decoded].some(value => value.toLowerCase().includes(rule.value.toLowerCase())))) {
+          if (node.getAttribute('TargetMode') !== 'External') throw new Error('Selected private text remains in an internal relationship. Export stopped.');
+          node.setAttribute('Target', 'about:blank');
+          node.setAttribute('TargetMode', 'External');
+        }
+      }
+      parts.set(name, encoder.encode(new XMLSerializer().serializeToString(xml)));
+    }
     const output = await zip(parts);
     return { bytes: output, replaced, removed, images: burned, parts: touched.length };
   }
 
-  /* Independent check on the produced package: no selected value may survive in a
-     text-bearing part. Theme/drawing XML is excluded: identifiers such as "960" occur
-     inside colour values and are not document text. */
-  const VERIFY_PART = /^(?:word\/(?:document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml|docProps\/[^/]+\.xml|customXml\/.*\.xml)$/;
+  /* Check text and semantic attributes in XML/relationships. Namespace, color and
+     revision identifiers are not document content. Explicitly visible occurrences are excluded. */
+  const VERIFY_PART = /\.(?:xml|rels)$/i;
   async function verifyDocx(bytes, rules) {
     const parts = await unzip(bytes);
     const leftovers = [];
@@ -394,13 +411,13 @@
       if (typeof DOMParser !== "undefined") {
         const xml = new DOMParser().parseFromString(raw, "application/xml");
         if (xml.querySelector("parsererror")) throw new Error("Malformed XML during verification: " + name);
-        text += "\n" + xml.documentElement.textContent;
+        text = xml.documentElement.textContent + "\n" + [...xml.getElementsByTagNameNS('*', 't')].map(node => node.textContent).join('\n') + "\n" + [...xml.getElementsByTagName('*')]
+          .flatMap(node => [...node.attributes].filter(attr => !/xmlns|rsid|color|fill/i.test(attr.name)).map(attr => attr.value)).join("\n");
+        try { text += "\n" + decodeURIComponent(text); } catch (_) {}
       }
       for (const rule of rules) {
         if (!rule.value) continue;
-        const boundary = /^[\p{L}\p{N}_]/u.test(rule.value) ? "(?<![\\p{L}\\p{N}_])" : "";
-        const tail = /[\p{L}\p{N}_]$/u.test(rule.value) ? "(?![\\p{L}\\p{N}_])" : "";
-        if (new RegExp(boundary + escapePattern(rule.value) + tail, "iu").test(text)) {
+        if (spansFor(text, [rule]).length) {
           leftovers.push({ part: name, value: rule.value });
         }
       }

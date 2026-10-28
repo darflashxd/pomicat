@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Fix a DOCX math offset bug that left the first character behind. Verify XML
+  text and attributes across package parts, including relationship destinations;
+  selected external links are disabled and unsupported leftovers stop export.
+- Keep proxy requests on the configured upstream and refuse redirects. Bound
+  relay JSON streams before parsing, including revoke requests.
+- Clear old Word review state when reading again fails. Trusted mode keeps rule
+  identifiers protected. Word now runs the shared health/HR contextual checks.
+- Keep different-currency overlap decisions consistent in preview and export,
+  reject technical PIP false positives, and run Word/HR browser regressions in CI.
+- Replace guaranteed RAM-erasure wording with best-effort cleanup wording.
+
 - Fix HR badges that needed three clicks to reveal `performance improvement plan
   (PIP)`. Known contextual variants now toggle together in both directions.
 - Keep record IDs and different currencies out of Word amount groups. Invalid

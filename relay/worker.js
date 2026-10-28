@@ -25,6 +25,29 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // A shared chat is text: even long ones are well under this. Keeps the relay useless as file hosting.
 const MAX_CIPHERTEXT = 512 * 1024;
 
+async function boundedJson(request, maxBytes) {
+  if (Number(request.headers.get('Content-Length') || 0) > maxBytes) {
+    await request.body?.cancel();
+    throw Object.assign(new Error('Request body too large'), { status: 413 });
+  }
+  const reader = request.body?.getReader();
+  if (!reader) throw Object.assign(new Error('Missing JSON body'), { status: 400 });
+  const chunks = []; let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > maxBytes) throw Object.assign(new Error('Request body too large'), { status: 413 });
+      chunks.push(value);
+    }
+  } finally { await reader.cancel(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  catch (_) { throw Object.assign(new Error('Invalid JSON body'), { status: 400 }); }
+}
+
 /**
  * Per-IP limits using Cloudflare's rate-limiting bindings (see wrangler.toml).
  * Returns true if the request may proceed. Without the binding (local tests) everything passes.
@@ -85,7 +108,7 @@ export default {
         });
       }
       try {
-        const body = await request.json();
+        const body = await boundedJson(request, MAX_CIPHERTEXT + 4096);
         const { id, ciphertext, ttl, burn_on_read } = body;
 
         if (!id || !ciphertext) {
@@ -169,7 +192,7 @@ export default {
         );
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
+          status: err.status || 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
@@ -186,7 +209,7 @@ export default {
 
       const shareId = url.pathname.replace(/^\/api\/revoke\//, "").trim();
       try {
-        const { token } = await request.json().catch(() => ({}));
+        const { token } = await boundedJson(request, 4096);
         if (typeof token !== "string" || !token) return json({ error: "Missing revoke token" }, 401);
         const tokenHash = await sha256Hex(token);
 
@@ -198,7 +221,7 @@ export default {
         if (!deleted) return json({ error: "Not found or invalid token" }, 404);
         return json({ status: "revoked", id: shareId }, 200);
       } catch (err) {
-        return json({ error: err.message }, 500);
+        return json({ error: err.message }, err.status || 500);
       }
     }
 

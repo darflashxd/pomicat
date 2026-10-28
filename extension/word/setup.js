@@ -29,8 +29,15 @@ if (sharepointOrigin) {
 async function runCapture(){
   if ($("capture").disabled) return;
   const generation = ++reviewGeneration;
+  sourceBytes = null;
+  lastDoc = null;
+  providedFindings = null;
   sanitizedBytes = null;
   appliedSnapshot = null;
+  $("review-section").hidden = true;
+  $("download-sanitized").hidden = true;
+  $("verify").hidden = true;
+  $("sanitized-preview").replaceChildren();
   $("create-link").disabled = true;
   $("share-panel").hidden = true;
   $("capture").disabled=true;$("error").hidden=true;$("document-preview").replaceChildren();

@@ -218,6 +218,9 @@ function refuse(res, status, message) {
 function start({ port = 8788, upstream = "https://api.openai.com", policy = {} } = {}) {
   const server = http.createServer(async (req, res) => {
     try {
+      if (!req.url.startsWith("/") || req.url.startsWith("//") || req.url.includes("\\")) return refuse(res, 400, "only origin-relative request paths are allowed.");
+      const target = new URL(req.url, upstream);
+      if (target.origin !== new URL(upstream).origin) return refuse(res, 400, "request target must use the configured upstream.");
       const chunks = [];
       let size = 0;
       for await (const c of req.iterator({ destroyOnReturn: false })) {
@@ -257,9 +260,10 @@ function start({ port = 8788, upstream = "https://api.openai.com", policy = {} }
       delete headers.host;
       delete headers["content-length"];
       delete headers["transfer-encoding"]; // body is buffered; fetch sets new framing
-      const upstreamRes = await fetch(new URL(req.url, upstream), {
+      const upstreamRes = await fetch(target, {
         method: req.method,
         headers,
+        redirect: "error",
         body: body.length ? body : undefined
       });
 
