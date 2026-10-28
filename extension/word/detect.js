@@ -106,7 +106,7 @@
     if (!ner || typeof ner.analyze !== "function") return [];
     const out = [];
     const seenModel = new Map();
-    let buffer = "", offset = 0;
+    let buffer = "", offset = 0, cursor = 0;
     const flush = async () => {
       if (!buffer.trim()) { buffer = ""; return; }
       const result = await ner.analyze(buffer, 30000, true);
@@ -125,25 +125,28 @@
           : /^(GOVERNMENT_ID|PASSPORT|DRIVERS_LICENSE|TAX_ID|US_LICENSE_PLATE)$/.test(label) ? "GOV_ID"
           : /^(IP_ADDRESS|MAC_ADDRESS|IMEI)$/.test(label) ? "SYSTEM" : "PROFILE";
         const prior = seenModel.get(candidate.raw.toLowerCase());
-        if (prior) {
-          if (candidate.risky) prior.preChecked = true;
-          if (candidate.modelScore > prior.score) { prior.score = candidate.modelScore; prior.modelLabel = label; prior.ruleName = `Local model: ${label}`; }
-          prior.occurrences = (prior.occurrences || []).concat(candidate.occurrences || []);
-          continue;
-        }
         const item = { value: candidate.raw, category, ruleName: `Local model: ${label}`,
           reason: candidate.reason, source: "model", score: candidate.modelScore, modelLabel: label,
           replacement: label === "PERSON" ? "[REDACTED_NAME]" : `[REDACTED_${label}]`,
-          preChecked: candidate.risky, occurrences: candidate.occurrences };
+          preChecked: candidate.risky, occurrences: (candidate.occurrences || []).map(occurrence => ({ ...occurrence, start: occurrence.start + offset, end: occurrence.end + offset })) };
+        if (prior) {
+          const occurrences = prior.occurrences.concat(item.occurrences);
+          const preChecked = prior.preChecked || item.preChecked;
+          if (item.score > prior.score) Object.assign(prior, item);
+          prior.preChecked = preChecked;
+          prior.occurrences = occurrences;
+          continue;
+        }
         seenModel.set(candidate.raw.toLowerCase(), item);
         out.push(item);
       }
       buffer = "";
     };
     for (const part of map.parts) {
-      if (buffer.length + part.length > chunkSize) await flush();
+      if (buffer.length + 2 + part.length > chunkSize) await flush();
+      if (!buffer) offset = cursor;
       buffer += (buffer ? "\n\n" : "") + part;
-      offset += part.length;
+      cursor += part.length + 2;
     }
     await flush();
     return out;

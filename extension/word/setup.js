@@ -46,7 +46,7 @@ async function runCapture(){
       try{
         const response=await fetch(target,{credentials:"same-origin",redirect:"error",signal:AbortSignal.timeout(20000)});
         if(!response.ok || /text\/html/i.test(response.headers.get("content-type")||""))return {error:"access"};
-        if(Number(response.headers.get("content-length")||0)>maxBytes)return {error:"size"};
+        if(Number(response.headers.get("content-length")||0)>maxBytes){await response.body?.cancel();return {error:"size"};}
         const reader=response.body.getReader(),chunks=[];let size=0;
         try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>maxBytes)return {error:"size"};chunks.push(part.value);}}finally{await reader.cancel();}
         const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}

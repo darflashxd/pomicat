@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Fix HR badges that needed three clicks to reveal `performance improvement plan
+  (PIP)`. Known contextual variants now toggle together in both directions.
+- Keep record IDs and different currencies out of Word amount groups. Invalid
+  number parses no longer join unrelated findings.
+- Keep model labels, categories and replacements consistent across chunks, with
+  document-relative occurrence offsets. Cancel oversized capture responses.
+- Checked with 20 live MCP Playwright clicks, delayed model responses, and
+  Chromium/Firefox regressions. See `docs/TOGGLE_PATCH_AUDIT.md` for timings and
+  remaining capture limitations.
+
 ## 2.5.4 - 2026-10-28
 
 - One click now changes every finding that points to the same value. Before, a

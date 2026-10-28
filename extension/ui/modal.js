@@ -377,11 +377,16 @@ class SafeShareModal {
       this.maybeChoices.set(cand.raw, enabled);
     }
     const candVal = this.pseudonymizer.parseFinancialValue(cand.raw);
+    // ponytail: mixed technical PIP stays independent; occurrence-scoped aliases can refine this later.
+    const isPipAlias = item => item.ruleName === "Contextual LEGAL_HR" &&
+      !this.currentTurns.some(turn => /\bpip\s+install\b|\bpicture[- ]in[- ]picture\b/i.test(turn.content)) &&
+      /^(?:performance improvement plan(?:\s+\(pip\))?|pip)$/i.test(item.raw.trim());
+    const pipAlias = isPipAlias(cand);
     this.candidates.forEach(other => {
       const isSameRaw = other.raw.toLowerCase() === cand.raw.toLowerCase();
       const otherVal = this.pseudonymizer.parseFinancialValue(other.raw);
       const isSameFinVal = (cand.isAmount && other.isAmount && candVal > 0 && otherVal === candVal);
-      if (isSameRaw || isSameFinVal) {
+      if (isSameRaw || isSameFinVal || (pipAlias && isPipAlias(other))) {
         other.enabled = enabled;
         if (other.id.startsWith("maybe_") || this.maybeChoices.has(other.raw)) {
           this.maybeChoices.set(other.raw, enabled);

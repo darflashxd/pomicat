@@ -78,22 +78,37 @@ def run(browser_type):
       ];
       renderFindings(lastDoc);
     }''')
-    page.evaluate("document.querySelector('#sanitized-preview mark[data-finding-key]').click()")
-    page.wait_for_timeout(300)
+    page.locator('#sanitized-preview mark[data-finding-key="FINANCIAL|usd 4,800"]').click()
     grouped = page.evaluate('''() => ({
       values: findingRows(lastDoc).map(item => ({value:item.value, checked:findingState.get(findingKey(item))})),
       text: document.getElementById('sanitized-preview').innerText
     })''')
     assert all(not item['checked'] for item in grouped['values']), grouped
     assert '[REDACTED_FINANCIAL' not in grouped['text'], grouped
-    page.evaluate("document.querySelector('#sanitized-preview mark[data-finding-key]').click()")
-    page.wait_for_timeout(300)
+    page.locator('#document-preview mark[data-finding-key="FINANCIAL|usd 4,800"]').focus()
+    page.keyboard.press('Space')
     regrouped = page.evaluate('''() => ({
       values: findingRows(lastDoc).map(item => ({value:item.value, checked:findingState.get(findingKey(item))})),
       text: document.getElementById('sanitized-preview').innerText
     })''')
     assert all(item['checked'] for item in regrouped['values']), regrouped
     assert '[REDACTED_FINANCIAL' in regrouped['text'], regrouped
+    page.evaluate('''() => {
+      lastDoc = {blocks:[{text:'Salary USD 4,800; record 4800; unknown; pending; EUR 4,800.'}], supplementary:[], media:[]};
+      providedFindings = [
+        {value:'USD 4,800',category:'FINANCIAL',source:'amount',replacement:'[REDACTED_FINANCIAL]',preChecked:true},
+        {value:'4800',category:'FINANCIAL',source:'rule',replacement:'[REDACTED_RECORD_ID]',preChecked:true},
+        {value:'unknown',category:'FINANCIAL',source:'amount',replacement:'[REDACTED_FINANCIAL]',preChecked:true},
+        {value:'pending',category:'FINANCIAL',source:'derived',replacement:'[REDACTED_FINANCIAL]',preChecked:true},
+        {value:'EUR 4,800',category:'FINANCIAL',source:'amount',replacement:'[REDACTED_FINANCIAL]',preChecked:true}
+      ];
+      renderFindings(lastDoc);
+    }''')
+    page.locator('#sanitized-preview mark[data-finding-key="FINANCIAL|usd 4,800"]').click()
+    assert page.evaluate("findingRows(lastDoc).filter(f => f.value !== 'USD 4,800').every(findingChecked)")
+    page.locator('#sanitized-preview mark[data-finding-key="FINANCIAL|unknown"]').click()
+    assert page.evaluate("findingRows(lastDoc).filter(f => ['4800','pending','EUR 4,800'].includes(f.value)).every(findingChecked)")
+    assert '[REDACTED_RECORD_ID]' in page.locator('#sanitized-preview').inner_text()
     assert not errors, errors
     browser.close()
     return {'browser':browser_type.name,'inlineToggle':True,'applyRaceRejected':True,'debouncePublishRejected':True,'downloadHashMatches':True,'failureReasonVisible':True,'groupedFinancialToggle':True,'pageErrors':errors}

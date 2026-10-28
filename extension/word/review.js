@@ -470,18 +470,22 @@ $("redact-selection").addEventListener("click", () => {
 });
 
 function financialValueOf(finding) {
-  if (finding.category !== "FINANCIAL" || typeof SafeShareWordPolicy === "undefined") return null;
+  if (finding.category !== "FINANCIAL" || !["amount", "derived"].includes(finding.source) || typeof SafeShareWordPolicy === "undefined") return null;
   const value = SafeShareWordPolicy.valueOf(finding.value);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function relatedFindings(target) {
   const all = lastDoc ? findingRows(lastDoc) : [];
   const raw = String(target.value).toLowerCase();
   const financial = financialValueOf(target);
+  const currency = item => /\b(?:USD|EUR|GBP|JPY|INR|IDR|SGD|MYR)\b/i.exec(item.value)?.[0].toUpperCase() ||
+    (/[$€£¥₹]|Rp\.?/i.test(item.value) ? SafeShareWordPolicy.currencyOf(item.value) : null);
+  const currencies = new Set(all.filter(item => financial !== null && financialValueOf(item) === financial).map(currency).filter(Boolean));
   return all.filter(item =>
     item.value.toLowerCase() === raw ||
-    (financial !== null && financialValueOf(item) === financial));
+    (financial !== null && financialValueOf(item) === financial &&
+      (currency(target) && currency(item) ? currency(target) === currency(item) : currencies.size <= 1)));
 }
 
 function setFindingGroupState(key, next) {
