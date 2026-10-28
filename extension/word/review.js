@@ -93,27 +93,10 @@ function matchedFindings() {
 }
 
 function spanText(text, findings) {
-  const spans = [];
-  for (const finding of findings) {
-    const needle = finding.value;
-    if (!needle || needle.length < 2) continue;
-    const boundary = /^[\p{L}\p{N}_]/u.test(needle) ? "(?<![\\p{L}\\p{N}_])" : "";
-    const tail = /[\p{L}\p{N}_]$/u.test(needle) ? "(?![\\p{L}\\p{N}_])" : "";
-    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    let pattern;
-    try { pattern = new RegExp(boundary + escaped + tail, "giu"); } catch (_) { continue; }
-    for (const match of text.matchAll(pattern)) {
-      spans.push({ start: match.index, end: match.index + match[0].length, finding });
-    }
-  }
-  spans.sort((a, b) => a.start - b.start || b.end - a.end);
-  const out = [];
-  for (const span of spans) {
-    const last = out[out.length - 1];
-    if (last && span.start < last.end) continue;
-    out.push(span);
-  }
-  return out;
+  const protectedSpans = SafeShareWordRedact.spansFor(text, findings.filter(finding => finding.checked !== false));
+  const visibleSpans = SafeShareWordRedact.spansFor(text, findings.filter(finding => finding.checked === false))
+    .filter(span => !protectedSpans.some(other => span.start < other.end && other.start < span.end));
+  return protectedSpans.concat(visibleSpans).sort((a, b) => a.start - b.start);
 }
 
 function replacementFor(finding, value) {
@@ -137,13 +120,13 @@ function renderTextHtml(text, findings, sanitized) {
   for (const span of spans) {
     html += escapeHtml(text.slice(cursor, span.start));
     const value = text.slice(span.start, span.end);
-    const checked = span.finding.checked !== false;
+    const checked = !span.finding || span.finding.checked !== false;
     const title = checked ? "Click to keep visible in the shared copy" : "Click to redact in the shared copy";
-    const attrs = span.finding.key
+    const attrs = span.finding && span.finding.key
       ? ` class="${checked ? "redacted" : "keep"}" data-finding-key="${escapeHtml(span.finding.key)}" role="button" tabindex="0" title="${title}"`
       : ` class="${checked ? "redacted" : "keep"}" title="Added in the private text field"`;
     if (sanitized) {
-      html += `<mark${attrs}>${escapeHtml(checked ? replacementFor(span.finding, value) : value)}</mark>`;
+      html += `<mark${attrs}>${escapeHtml(checked ? (span.finding ? replacementFor(span.finding, value) : span.replacement) : value)}</mark>`;
     } else {
       html += `<mark${attrs}>${escapeHtml(value)}</mark>`;
     }
@@ -207,6 +190,7 @@ function setHeader(title, subtitle) {
 function updateCounts() {
   if (sanitizedBytes && appliedSignature && currentSignature() !== appliedSignature) {
     sanitizedBytes = null;
+    appliedSnapshot = null;
     appliedSignature = null;
     $("create-link").disabled = true;
     $("download-sanitized").hidden = true;
@@ -702,7 +686,14 @@ function activeRules() {
   const findings = lastDoc ? findingRows(lastDoc) : [];
   for (const finding of findings) {
     if (!findingChecked(finding)) continue;
-    rules.push({ value: finding.value, replacement: replacementFor(finding, finding.value) });
+    const rule = { value: finding.value, replacement: replacementFor(finding, finding.value) };
+    rule.occurrences = (lastDoc.paragraphs || []).flatMap(paragraph =>
+      SafeShareWordRedact.spansFor(paragraph.text, [rule]).map(span => ({
+        paragraphId:paragraph.id, part:paragraph.part, paragraphIndex:paragraph.paragraphIndex,
+        start:span.start, end:span.end,
+        runs:paragraph.runs.filter(run => run.start < span.end && span.start < run.end)
+      })));
+    rules.push(rule);
   }
   const placeholder = $("placeholder-style").value;
   for (const value of $("manual").value.split(/\r?\n/).map(s => s.trim()).filter(Boolean)) {
@@ -726,10 +717,15 @@ function currentSignature() {
 
 $("rescan").addEventListener("click", async () => {
   if (!lastDoc || typeof SafeShareNer === "undefined") return;
+  const generation = reviewGeneration;
+  const doc = lastDoc;
+  $("rescan").disabled = true;
+  try {
   $("apply-status").textContent = "Re-scanning names…";
   if (!providedFindings) providedFindings = findingRows(lastDoc).slice();
   const map = SafeShareTextMap.flatten(lastDoc);
   const extra = await SafeShareWordDetect.nerCandidates(map, SafeShareNer);
+  if (generation !== reviewGeneration || lastDoc !== doc) return;
   const known = new Set((providedFindings || []).map(item => item.value.toLowerCase()));
   let added = 0;
   for (const item of extra) {
@@ -739,7 +735,12 @@ $("rescan").addEventListener("click", async () => {
     added++;
   }
   rerenderKeepingChoices();
-  $("apply-status").textContent = added ? `Model found ${added} more name(s).` : "Model found no additional names.";
+  $("apply-status").textContent = added ? `Model found ${added} more suggestion(s).` : "Model found no additional suggestions.";
+  } catch (error) {
+    if (generation === reviewGeneration && lastDoc === doc) $("apply-status").textContent = error.message;
+  } finally {
+    $("rescan").disabled = false;
+  }
 });
 
 $("select-all").addEventListener("click", () => {
@@ -832,29 +833,16 @@ async function runAttackCheck(rules) {
   box.hidden = false;
   attackLeaks = 0;
   const text = [...document.querySelectorAll("#sanitized-preview p, #sanitized-preview td")].map(node => node.textContent).join("\n");
-  const visibleNumbers = [...new Set((text.match(/\d[\d.,]*/g) || [])
-    .map(raw => SafeShareWordPolicy.valueOf(raw))
-    .filter(value => Number.isFinite(value) && value >= 10))];
-  const hiddenNumbers = rules
-    .map(rule => SafeShareWordPolicy.valueOf(rule.value))
-    .filter(value => Number.isFinite(value) && value >= 10);
-  const ratios = [0.2, 0.25, 0.3, 0.5, 1.2, 1.25, 1.5, 2, 3, 4, 12, 1 / 12, 52, 1 / 52];
-  const recoverable = new Set();
-  for (const hidden of hiddenNumbers) {
-    for (const visible of visibleNumbers) {
-      if (Math.abs(visible - hidden) / hidden <= 0.015) continue;
-      if (ratios.some(ratio => Math.abs(visible * ratio - hidden) / hidden <= 0.015)) recoverable.add(hidden);
-    }
-  }
-  attackLeaks = recoverable.size;
+  const result = SafeSharePolicy.attackCheck([{ role: "document", content: text }], AdversaryOracleSolver);
+  attackLeaks = result.leaks;
   if (!attackLeaks) {
-    $("attack-text").textContent = "No hidden amount can be recovered from the remaining visible numbers.";
+    $("attack-text").textContent = "No reconstruction found by the supported checks. This is not a guarantee of privacy.";
     $("attack-confirm-wrap").hidden = true;
     $("download-sanitized").disabled = false;
     return;
   }
   $("verify-details").open = true;
-  $("attack-text").textContent = `${attackLeaks} hidden amount(s) can still be recomputed from the numbers left in this copy. Redact those numbers or accept the risk.`;
+  $("attack-text").textContent = `${attackLeaks} supported reconstruction finding(s) remain in this copy. Redact those numbers or accept the risk.`;
   $("attack-confirm-wrap").hidden = false;
   $("attack-confirm").checked = false;
   $("download-sanitized").disabled = true;
@@ -868,6 +856,9 @@ $("apply").addEventListener("click", async () => {
   try {
     const rules = activeRules();
     const images = activeImages();
+    const source = sourceBytes;
+    const generation = reviewGeneration;
+    const signature = currentSignature();
     if (!rules.length && !images.length) throw new Error("Select a finding, add private text, or redact an image.");
     const result = await SafeShareWordRedact.sanitizeDocx(sourceBytes.buffer.slice(0), {
       rules, images,
@@ -880,8 +871,13 @@ $("apply").addEventListener("click", async () => {
       const parts = [...new Set(check.leftovers.map(item => item.part))].join(", ");
       throw new Error("Verification failed; original text remains in: " + parts);
     }
+    if (generation !== reviewGeneration || sourceBytes !== source || currentSignature() !== signature) {
+      throw new Error("The document or redaction choices changed. Create the sanitized copy again.");
+    }
     sanitizedBytes = result.bytes;
-    appliedSignature = currentSignature();
+    appliedSignature = signature;
+    renderPreview(lastDoc);
+    appliedSnapshot = Object.freeze({ bytes: result.bytes, preview: sanitizedPreviewHtml(), signature, generation });
     $("verify").hidden = false;
     $("verify").textContent = `Verified: ${result.replaced} text replacements across ${result.parts} parts, ${result.images} image(s) redacted, ${result.removed} revision/hidden elements removed.`;
     await runAttackCheck(rules);
@@ -893,7 +889,12 @@ $("apply").addEventListener("click", async () => {
     $("publish-hint").textContent = "Sanitized copy is current. The link is encrypted locally; the relay only receives ciphertext.";
     updateCounts();
   } catch (e) {
-    $("apply-status").textContent = "Sanitization stopped. Nothing was downloaded.";
+    sanitizedBytes = null;
+    appliedSnapshot = null;
+    $("share-panel").hidden = true;
+    $("create-link").disabled = true;
+    $("download-sanitized").hidden = true;
+    $("apply-status").textContent = "Could not create the sanitized copy: " + e.message;
     $("error").textContent = e.message; $("error").hidden = false;
   } finally { $("apply").disabled = false; }
 });
@@ -904,6 +905,10 @@ $("attack-confirm").addEventListener("change", () => {
 
 $("download-sanitized").addEventListener("click", () => {
   if (!sanitizedBytes) return;
+  if (!appliedSnapshot || appliedSnapshot.bytes !== sanitizedBytes || appliedSnapshot.generation !== reviewGeneration || appliedSnapshot.signature !== currentSignature()) {
+    $("apply-status").textContent = "The review changed. Create the sanitized copy again before downloading.";
+    return;
+  }
   if (attackLeaks > 0 && !$("attack-confirm").checked) return;
   const url = URL.createObjectURL(new Blob([sanitizedBytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
   const a = document.createElement("a");

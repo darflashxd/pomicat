@@ -6,6 +6,8 @@ let sourceBytes = null;
 let lastDoc = null;
 let providedFindings = null;
 let sanitizedBytes = null;
+let reviewGeneration = 0;
+let appliedSnapshot = null;
 const scanner = new HeuristicsRedactor();
 try {
   const parsed = new URL(query.get("origin"));
@@ -26,6 +28,11 @@ if (sharepointOrigin) {
 
 async function runCapture(){
   if ($("capture").disabled) return;
+  const generation = ++reviewGeneration;
+  sanitizedBytes = null;
+  appliedSnapshot = null;
+  $("create-link").disabled = true;
+  $("share-panel").hidden = true;
   $("capture").disabled=true;$("error").hidden=true;$("document-preview").replaceChildren();
   $("capture-status").textContent="Reading saved DOCX…";
   try {
@@ -68,13 +75,13 @@ async function runCapture(){
     if (typeof SafeShareNer !== "undefined") {
       $("review-summary").textContent += " Checking names locally...";
       SafeShareWordDetect.nerCandidates(map, SafeShareNer).then(extra => {
+        if (generation !== reviewGeneration || lastDoc !== doc) return;
         if (!extra.length) { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", " Local name model found nothing; add names manually if needed."); return; }
         const known = new Set(providedFindings.map(f => f.value.toLowerCase()));
-        const covered = value => providedFindings.some(f => f.value.length > value.length && f.value.toLowerCase().includes(value.toLowerCase()));
-        for (const item of extra) if (!known.has(item.value.toLowerCase()) && !covered(item.value)) providedFindings.push({ ...item, categoryLabel: "Contact & profile" });
+        for (const item of extra) if (!known.has(item.value.toLowerCase())) providedFindings.push({ ...item, categoryLabel: "Contact & profile" });
         renderFindings(lastDoc);
         $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", "");
-      }).catch(() => { $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", " Name model unavailable."); });
+      }).catch(() => { if (generation === reviewGeneration && lastDoc === doc) $("review-summary").textContent = $("review-summary").textContent.replace(" Checking names locally...", " Name model unavailable."); });
     }
   }catch(e){$("error").textContent=e.message;$("error").hidden=false;$("capture-status").textContent="Inspection stopped. Nothing was shared.";}
   finally{$("capture").disabled=false;$("capture").textContent="Read again";}

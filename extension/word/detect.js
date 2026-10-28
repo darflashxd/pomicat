@@ -1,10 +1,10 @@
 /* Document detection pipeline: heuristics (Tier 1), money bases (Tier 2 shape),
    derived-value solver (Tier 3) and local NER. Pure text in, candidates out. */
 (function (root, factory) {
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports ? require("../engine/maybe.js") : root.SafeShareMaybe);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SafeShareWordDetect = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (maybe) {
   const CATEGORY = {
     CREDENTIALS: "Credentials", FINANCIAL: "Financial", GOV_ID: "Government ID",
     PROFILE: "Contact & profile", HEALTH: "Health", SYSTEM: "System", CUSTOM: "Added by you"
@@ -102,8 +102,6 @@
     return out;
   }
 
-  const NAME_LABEL = /^(?:PERSON|GIVEN_NAME|SURNAME|FIRST_NAME|LAST_NAME)$/;
-
   async function nerCandidates(map, ner, chunkSize = 6000) {
     if (!ner || typeof ner.analyze !== "function") return [];
     const out = [];
@@ -111,21 +109,18 @@
     const flush = async () => {
       if (!buffer.trim()) { buffer = ""; return; }
       const result = await ner.analyze(buffer, 30000, true);
-      if (result && result.success && Array.isArray(result.spans)) {
-        for (const span of result.spans) {
-          if (!NAME_LABEL.test(span.label)) continue;
-          if (!Number.isFinite(span.score) || span.score < 0.35) continue;
-          let value = buffer.slice(span.start, span.end).trim();
-          // The model often includes the role word ("doctor Rebecca...", "manager Thomas...").
-          value = value.replace(/^(?:the\s+)?(?:doctor|dr|mr|mrs|ms|miss|manager|therapist|patient|employee|professor|nurse|sister|brother|wife|husband)\s+/i, "").trim();
-          if (!/\p{L}{3}/u.test(value) || value.split(/\s+/).length > 4) continue;
-          out.push({
-            value, category: "PROFILE", ruleName: `Local model: ${span.label}`,
-            reason: `model score ${span.score.toFixed(2)} (not a probability)`,
-            replacement: "[REDACTED_NAME]", source: "model", score: span.score, modelLabel: span.label,
-            preChecked: span.score >= 0.6 || (value.split(/\s+/).length > 1 && span.score >= 0.35)
-          });
-        }
+      if (!result || !result.success || !Array.isArray(result.spans)) throw new Error("Local model unavailable; document scan is incomplete.");
+      const candidates = maybe.scan([{ role: "document", content: buffer }],
+        result.spans.map(span => ({ ...span, turnIndex: 0 })));
+      for (const candidate of candidates.filter(item => item.source === "model")) {
+        const label = candidate.modelLabel || "PERSONAL_INFORMATION";
+        const category = /^(BANK_ACCOUNT|IBAN_CODE|CREDIT_CARD|FINANCIAL)$/.test(label) ? "FINANCIAL"
+          : /^(GOVERNMENT_ID|PASSPORT|DRIVERS_LICENSE|TAX_ID|US_LICENSE_PLATE)$/.test(label) ? "GOV_ID"
+          : /^(IP_ADDRESS|MAC_ADDRESS|IMEI)$/.test(label) ? "SYSTEM" : "PROFILE";
+        out.push({ value: candidate.raw, category, ruleName: `Local model: ${label}`,
+          reason: candidate.reason, source: "model", score: candidate.modelScore, modelLabel: label,
+          replacement: label === "PERSON" ? "[REDACTED_NAME]" : `[REDACTED_${label}]`,
+          preChecked: candidate.risky, occurrences: candidate.occurrences });
       }
       buffer = "";
     };
@@ -171,15 +166,6 @@
       if (item.category !== "PROFILE" || /\s/.test(item.value)) continue;
       const longer = people.find(person => new RegExp(`(^|\\s)${item.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "i").test(person.value));
       if (longer) item.aliasOf = longer.value;
-    }
-    // A model suggestion fully covered by a longer finding cannot change visibility on its own.
-    for (let index = candidates.length - 1; index >= 0; index--) {
-      const item = candidates[index];
-      if (item.source !== "model") continue;
-      const lower = String(item.value).toLowerCase();
-      if (candidates.some(other => other !== item && other.value.length > item.value.length && String(other.value).toLowerCase().includes(lower))) {
-        candidates.splice(index, 1);
-      }
     }
     return candidates.map(item => ({ ...item, categoryLabel: CATEGORY[item.category] || "Other" }));
   }

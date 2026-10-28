@@ -1069,23 +1069,11 @@ class SafeShareModal {
    * "the day after the 14th" clues, and combinations of identifying details in one message.
    */
   attackCheck(turns) {
-    const P = typeof SafeSharePolicy !== "undefined" ? SafeSharePolicy : require("../engine/policy.js");
-    const text = turns.map(t => t.content).join("\n");
-    // Only hidden amounts can leak: count the amount placeholders, ignore values that are visible
-    // anyway (a trusted reader sees them), and report at most one finding per hidden amount
-    const hiddenAmounts = (text.match(/\[[^\]]*(?:FINANCIAL|AMOUNT|SALARY|MONEY|INCOME|DERIVED|BUDGET)[^\]]*\]|<S\d+>/gi) || []).length;
+    const policy = typeof SafeSharePolicy !== "undefined" ? SafeSharePolicy : require("../engine/policy.js");
     const Solver = (typeof ConsistentPseudonymizer !== "undefined" ? ConsistentPseudonymizer : require("../engine/pseudonymizer.js")).AdversaryOracleSolver;
-    const visible = new Solver().lexNumericSpans(text).map(t => t.val);
-    const amounts = hiddenAmounts ? P.invert(text)
-      .filter(f => !visible.some(v => Math.abs(v - f.value) <= Math.max(1, f.value * 0.005)))
-      .slice(0, hiddenAmounts) : [];
-    const hidesBirth = /\[[^\]]*(?:DOB|BIRTH)[^\]]*\]|<DATE_TIME>/i.test(text);
-    const births = hidesBirth ? P.inferBirthYears(text) : [];
-    const dates = P.inferDates(text).filter(d => d.candidates.length && d.candidates.length <= 14);
-    const combos = turns.map((t, i) => ({ turn: i + 1, role: t.role, ...P.quasiIdentifiers(t.content) }))
-      .filter(c => c.role === "user" && c.risky);
-    return { amounts, births, dates, combos, leaks: amounts.length + births.length + dates.length };
+    return policy.attackCheck(turns, Solver);
   }
+
 
   renderAttackCheck() {
     const box = typeof document !== "undefined" && document.getElementById("safeshare-attack-results");

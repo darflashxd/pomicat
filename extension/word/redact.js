@@ -33,28 +33,50 @@
   }
 
   async function unzip(buffer) {
-    const bytes = new Uint8Array(buffer), view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    let end = -1;
-    for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
-      if (view.getUint32(i, true) === 0x06054b50 && i + 22 + view.getUint16(i + 20, true) === bytes.length) { end = i; break; }
-    }
-    if (end < 0) throw new Error("Invalid DOCX archive.");
-    const count = view.getUint16(end + 10, true);
-    let offset = view.getUint32(end + 16, true);
-    if (offset + view.getUint32(end + 12, true) !== end) throw new Error("Unsupported DOCX directory.");
-    const parts = new Map();
-    for (let i = 0; i < count; i++) {
-      if (view.getUint32(offset, true) !== 0x02014b50) throw new Error("Invalid DOCX entry.");
-      const method = view.getUint16(offset + 10, true);
-      const packed = view.getUint32(offset + 20, true), size = view.getUint32(offset + 24, true);
-      const nameSize = view.getUint16(offset + 28, true), local = view.getUint32(offset + 42, true);
-      const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameSize));
-      const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
-      const raw = bytes.subarray(start, start + packed);
-      parts.set(name, method === 8 ? await inflate(raw) : raw.slice());
-      offset += 46 + nameSize + view.getUint16(offset + 30, true) + view.getUint16(offset + 32, true);
-    }
-    return parts;
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let end = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+    if (view.getUint32(i, true) === 0x06054b50 && i + 22 + view.getUint16(i + 20, true) === bytes.length) { end = i; break; }
+  }
+  if (end < 0 || view.getUint16(end + 4,true) || view.getUint16(end + 6,true)) throw new Error("Unsupported DOCX archive.");
+  const count = view.getUint16(end + 10,true);
+  let offset = view.getUint32(end + 16,true), total = 0;
+  if (count > 1000 || offset + view.getUint32(end + 12,true) !== end) throw new Error("DOCX archive limit exceeded.");
+  const parts = new Map();
+  for (let index = 0; index < count; index++) {
+    if (offset + 46 > end || view.getUint32(offset,true) !== 0x02014b50) throw new Error("Invalid DOCX directory.");
+    const flags = view.getUint16(offset + 8,true), method = view.getUint16(offset + 10,true);
+    const packed = view.getUint32(offset + 20,true), size = view.getUint32(offset + 24,true);
+    const nameSize = view.getUint16(offset + 28,true), local = view.getUint32(offset + 42,true);
+    const next = offset + 46 + nameSize + view.getUint16(offset+30,true) + view.getUint16(offset+32,true);
+    if (next > end) throw new Error("Invalid DOCX entry.");
+    const name = decoder.decode(bytes.subarray(offset+46,offset+46+nameSize));
+    if (parts.has(name) || /(^\/|\.\.|\\)/.test(name) || flags & 1 || ![0,8].includes(method) || size > 8*1024*1024 || total+size > 24*1024*1024) throw new Error("Unsupported or oversized DOCX part.");
+    if (local+30 > end || view.getUint32(local,true) !== 0x04034b50 || view.getUint16(local+8,true)!==method || view.getUint16(local+6,true)!==flags) throw new Error("Invalid DOCX local header.");
+    const start = local+30+view.getUint16(local+26,true)+view.getUint16(local+28,true);
+    if (start+packed > view.getUint32(end+16,true)) throw new Error("Invalid DOCX part bounds.");
+    const localName = decoder.decode(bytes.subarray(local+30,local+30+view.getUint16(local+26,true)));
+    if (localName!==name) throw new Error("Mismatched DOCX entry.");
+    const compressed = bytes.slice(start,start+packed);
+    const stream = method===8 ? new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw")) : new Blob([compressed]).stream();
+    const reader = stream.getReader(), chunks = []; let length=0;
+    try {
+      while (true) {
+        const chunk=await reader.read(); if(chunk.done)break;
+        length+=chunk.value.length;
+        if(length>size || length>8*1024*1024 || total+length>24*1024*1024)throw new Error("DOCX decompression limit exceeded.");
+        chunks.push(chunk.value);
+      }
+    } finally { await reader.cancel(); }
+    if(length!==size)throw new Error("DOCX part size mismatch.");
+    total+=length;
+    const data=new Uint8Array(length);let cursor=0;for(const chunk of chunks){data.set(chunk,cursor);cursor+=chunk.length;}
+    if (crc32(data) !== view.getUint32(offset + 16, true)) throw new Error("DOCX checksum mismatch.");
+    parts.set(name,data);offset=next;
+  }
+  if(offset!==end || !parts.has("word/document.xml"))throw new Error("Missing DOCX document.");
+  return parts;
   }
 
   function dosTime(date) {
@@ -119,29 +141,41 @@
       const tail = /[\p{L}\p{N}_]$/u.test(rule.value) ? "(?![\\p{L}\\p{N}_])" : "";
       const pattern = new RegExp(boundary + escapePattern(rule.value) + tail, "giu");
       for (const match of text.matchAll(pattern)) {
-        spans.push({ start: match.index, end: match.index + match[0].length, replacement: rule.replacement || "[REDACTED]" });
+        spans.push({ start: match.index, end: match.index + match[0].length, replacement: rule.replacement || "[REDACTED]", finding: rule });
       }
     }
     spans.sort((a, b) => a.start - b.start || b.end - a.end);
     const merged = [];
     for (const span of spans) {
       const last = merged[merged.length - 1];
-      if (last && span.start < last.end) { last.end = Math.max(last.end, span.end); continue; }
+      if (last && span.start < last.end) {
+        if (span.end > last.end) {
+          last.end = span.end;
+          last.replacement = "[REDACTED]";
+          last.finding = null;
+        }
+        continue;
+      }
       merged.push({ ...span });
     }
     return merged;
   }
 
   function replaceInParagraph(paragraph, rules) {
-    const nodes = [...paragraph.getElementsByTagNameNS(W, "t")];
+    const nodes = [...paragraph.getElementsByTagNameNS("*", "t")].filter(node => node.namespaceURI === W || node.namespaceURI === "http://schemas.openxmlformats.org/officeDocument/2006/math");
     if (!nodes.length) return 0;
-    const text = nodes.map(n => n.textContent).join("");
-    const spans = spansFor(text, rules);
-    if (!spans.length) return 0;
+    const isMath = node => node.namespaceURI === "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    let text = "";
     const map = [];
     nodes.forEach((node, index) => {
-      for (let i = 0; i < node.textContent.length; i++) map.push({ index, offset: i });
+      if (index && (isMath(nodes[index - 1]) || isMath(node))) text += "\u0000";
+      for (let i = 0; i < node.textContent.length; i++) {
+        text += node.textContent[i];
+        map.push({ index, offset: i });
+      }
     });
+    const spans = spansFor(text, rules);
+    if (!spans.length) return 0;
     for (let s = spans.length - 1; s >= 0; s--) {
       const { start, end, replacement } = spans[s];
       const first = map[start], last = map[end - 1];
@@ -220,7 +254,7 @@
   function cleanCore(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, "application/xml");
     if (doc.querySelector("parsererror")) return xmlText;
-    const cleared = ["title", "subject", "description", "keywords", "category", "contentStatus"];
+    const cleared = ["title", "subject", "description", "keywords", "category", "contentStatus", "Company", "Manager", "HyperlinkBase"];
     for (const local of cleared) {
       for (const node of [...doc.getElementsByTagNameNS("*", local)]) node.textContent = "";
     }
@@ -233,11 +267,84 @@
     return new XMLSerializer().serializeToString(doc);
   }
 
+  function removePackageParts(parts, removed) {
+    for (const name of removed) parts.delete(name);
+    for (const [name, data] of parts) {
+      if (!name.endsWith('.rels') && name !== '[Content_Types].xml') continue;
+      const xml = new DOMParser().parseFromString(decoder.decode(data), 'application/xml');
+      if (xml.querySelector('parsererror')) throw new Error('Malformed package relationships.');
+      const owner = name === '_rels/.rels' ? '' : name.replace(/_rels\/[^/]+\.rels$/, '');
+      for (const child of [...xml.documentElement.children]) {
+        if (child.getAttribute('TargetMode') === 'External') continue;
+        const target = child.getAttribute('Target');
+        const resolved = target ? new URL(target, 'https://package.invalid/' + owner).pathname.slice(1) : '';
+        if (removed.has(resolved) || removed.has((child.getAttribute('PartName') || '').replace(/^\//, ''))) child.remove();
+      }
+      parts.set(name, encoder.encode(new XMLSerializer().serializeToString(xml)));
+    }
+  }
+
+  function removeEmptyBibliography(parts) {
+    const names = [...parts.keys()].filter(name => /^customXml\//i.test(name));
+    if (!names.length) return;
+    const allowed = new Set();
+    for (const name of names.filter(name => /^customXml\/item\d+\.xml$/.test(name))) {
+      const xml = new DOMParser().parseFromString(decoder.decode(parts.get(name)), 'application/xml');
+      const root = xml.documentElement;
+      if (xml.querySelector('parsererror') || root.namespaceURI !== 'http://schemas.openxmlformats.org/officeDocument/2006/bibliography'
+        || root.localName !== 'Sources' || root.children.length || root.textContent.trim()
+        || [...root.attributes].some(attr => attr.namespaceURI !== 'http://www.w3.org/2000/xmlns/' && !['SelectedStyle', 'StyleName'].includes(attr.name))) continue;
+      allowed.add(name);
+      const number = /item(\d+)\.xml$/.exec(name)[1];
+      const props = `customXml/itemProps${number}.xml`;
+      const rels = `customXml/_rels/item${number}.xml.rels`;
+      if (parts.has(props)) {
+        const propXml = new DOMParser().parseFromString(decoder.decode(parts.get(props)), 'application/xml');
+        const propRoot = propXml.documentElement;
+        const ns = 'http://schemas.openxmlformats.org/officeDocument/2006/customXml';
+        if (propXml.querySelector('parsererror') || propRoot.namespaceURI !== ns || propRoot.localName !== 'datastoreItem'
+          || propRoot.textContent.trim()
+          || [...propRoot.attributes].some(attr => attr.namespaceURI !== 'http://www.w3.org/2000/xmlns/' && !(attr.namespaceURI === ns && attr.localName === 'itemID' && /^\{[0-9a-f-]{36}\}$/i.test(attr.value)))
+          || [...propRoot.getElementsByTagName('*')].some(node => node.namespaceURI !== ns || !['schemaRefs','schemaRef'].includes(node.localName)
+            || [...node.attributes].some(attr => attr.namespaceURI !== 'http://www.w3.org/2000/xmlns/' && !(node.localName === 'schemaRef' && attr.namespaceURI === ns && attr.localName === 'uri' && attr.value === 'http://schemas.openxmlformats.org/officeDocument/2006/bibliography')))) continue;
+        allowed.add(props);
+      }
+      if (parts.has(rels)) {
+        const relXml = new DOMParser().parseFromString(decoder.decode(parts.get(rels)), 'application/xml');
+        if (relXml.querySelector('parsererror') || [...relXml.documentElement.children].some(node => node.getAttribute('Target') !== `itemProps${number}.xml`
+          || node.getAttribute('TargetMode') === 'External' || !node.getAttribute('Type').endsWith('/customXmlProps'))) continue;
+        allowed.add(rels);
+      }
+    }
+    if (names.some(name => !allowed.has(name))) throw new Error('Custom XML contains data or unsupported bindings. Export stopped; the original document is unchanged.');
+    removePackageParts(parts, new Set(names));
+  }
+
   async function sanitizeDocx(buffer, options = {}) {
     const parts = await unzip(buffer);
+    removeEmptyBibliography(parts);
+    const unsupported = [...parts.keys()].find(name => /^word\/(?:embeddings|charts|activeX)\//i.test(name) || /^word\/.*(?:afchunk|vbaProject)/i.test(name)
+      || /^word\/media\//i.test(name) && !/\.(?:png|jpe?g|gif|bmp)$/i.test(name));
+    if (unsupported) throw new Error("Unsupported embedded content: " + unsupported + ". Export stopped.");
+    for (const [name, data] of parts) {
+      if (TEXT_PART.test(name) && /<(?:\w+:)?(?:altChunk|dataBinding)\b/.test(decoder.decode(data))) {
+        throw new Error("Unsupported linked or data-bound content in " + name + ". Export stopped.");
+      }
+    }
     const rules = (options.rules || []).filter(rule => rule && rule.value);
     const images = (options.images || []).filter(image => image && image.mode);
     if (!rules.length && !images.length) throw new Error("Select a finding, add private text, or redact an image.");
+    for (const [name, data] of parts) {
+      if (!TEXT_PART.test(name)) continue;
+      const xml = new DOMParser().parseFromString(decoder.decode(data), "application/xml");
+      const values = [
+        ...[...xml.getElementsByTagNameNS(W, "fldSimple")].map(field => field.getAttributeNS(W, "instr") || ""),
+        ...[...xml.getElementsByTagNameNS(W, "instrText")].map(node => node.textContent || "")
+      ];
+      if (values.some(value => rules.some(rule => value.includes(rule.value)))) {
+        throw new Error("Unsupported field instruction contains selected private text. Export stopped; the original document is unchanged.");
+      }
+    }
     let replaced = 0, removed = 0, burned = 0;
     const touched = [];
     for (const [name, data] of [...parts]) {
@@ -259,12 +366,14 @@
       burned++;
     }
     if (options.removeMetadata !== false) {
+      if (parts.has("docProps/custom.xml")) {
+        parts.set("docProps/custom.xml", encoder.encode('<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"/>'));
+      }
       for (const name of ["docProps/core.xml", "docProps/app.xml"]) {
         if (parts.has(name)) parts.set(name, encoder.encode(cleanCore(decoder.decode(parts.get(name)))));
       }
-      for (const name of [...parts.keys()]) {
-        if (name.startsWith("docProps/thumbnail") || name === "word/thumbnail.jpeg") parts.delete(name);
-      }
+      const removedParts = new Set([...parts.keys()].filter(name => name.startsWith("docProps/thumbnail") || name === "word/thumbnail.jpeg"));
+      removePackageParts(parts, removedParts);
     }
     const output = await zip(parts);
     return { bytes: output, replaced, removed, images: burned, parts: touched.length };
@@ -273,13 +382,20 @@
   /* Independent check on the produced package: no selected value may survive in a
      text-bearing part. Theme/drawing XML is excluded: identifiers such as "960" occur
      inside colour values and are not document text. */
-  const VERIFY_PART = /^(?:word\/(?:document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml|docProps\/(?:core|app)\.xml)$/;
+  const VERIFY_PART = /^(?:word\/(?:document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml|docProps\/[^/]+\.xml|customXml\/.*\.xml)$/;
   async function verifyDocx(bytes, rules) {
     const parts = await unzip(bytes);
     const leftovers = [];
     for (const [name, data] of parts) {
       if (!VERIFY_PART.test(name)) continue;
-      const text = decoder.decode(data);
+      const raw = decoder.decode(data);
+      let text = raw;
+      // Node's ZIP-only regression has no XML DOM; browser export always parses XML.
+      if (typeof DOMParser !== "undefined") {
+        const xml = new DOMParser().parseFromString(raw, "application/xml");
+        if (xml.querySelector("parsererror")) throw new Error("Malformed XML during verification: " + name);
+        text += "\n" + xml.documentElement.textContent;
+      }
       for (const rule of rules) {
         if (!rule.value) continue;
         const boundary = /^[\p{L}\p{N}_]/u.test(rule.value) ? "(?<![\\p{L}\\p{N}_])" : "";
@@ -292,7 +408,7 @@
     return { clean: leftovers.length === 0, leftovers, parts: parts.size };
   }
 
-  const api = { sanitizeDocx, verifyDocx, unzip, zip, burnImage };
+  const api = { sanitizeDocx, verifyDocx, unzip, zip, burnImage, spansFor, replaceInParagraph };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SafeShareWordRedact = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

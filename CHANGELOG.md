@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.5.1 - 2026-10-28
+
+- Security: DOCX custom properties and Company/Manager/HyperlinkBase metadata are
+  cleaned; empty bibliography custom XML is removed with package relationships;
+  nonempty custom XML, data bindings, embedded objects and unsupported media stop
+  export. Verification covers all docProps/custom XML and reopens cleanly.
+- Word: OMML equation text is detected and redacted without flattening equations;
+  field instructions containing selected text fail closed with an explicit message.
+- Review: Apply/link use a saved snapshot, stale generations are discarded, and
+  download/link are disabled when choices change. Error reasons are visible outside
+  the hidden capture section.
+- Tests: shared chat/Word attack policy, model candidates, bounded ZIP rejection,
+  formula ranges, publication races, DOCX structures, and real browser downloads.
+  Local Node suite 59/59. Word Online live capture remains environment-dependent.
+
 ## 2.5.0 - 2026-10-28
 
 - Word Online: a floating SafeShare button opens a separate saved copy of the document, so the

@@ -237,5 +237,19 @@
       .slice(0, limit);
   }
 
-  return { invert, inferBirthYears, inferDates, quasiIdentifiers, bucket, formatRange, currencyOf, generalizeNumbers };
+  function attackCheck(turns, Solver) {
+    const text = turns.map(turn => turn.content).join("\n");
+    const hiddenAmounts = (text.match(/\[[^\]]*(?:FINANCIAL|AMOUNT|SALARY|MONEY|INCOME|DERIVED|BUDGET)[^\]]*\]|<S\d+>/gi) || []).length;
+    const visible = new Solver().lexNumericSpans(text).map(token => token.val);
+    const amounts = hiddenAmounts ? invert(text)
+      .filter(finding => !visible.some(value => Math.abs(value - finding.value) <= Math.max(1, finding.value * 0.005)))
+      .slice(0, hiddenAmounts) : [];
+    const births = /\[[^\]]*(?:DOB|BIRTH)[^\]]*\]|<DATE_TIME>/i.test(text) ? inferBirthYears(text) : [];
+    const dates = inferDates(text).filter(finding => finding.candidates.length && finding.candidates.length <= 14);
+    const combos = turns.map((turn, index) => ({ turn: index + 1, role: turn.role, ...quasiIdentifiers(turn.content) }))
+      .filter(finding => finding.role === "user" && finding.risky);
+    return { amounts, births, dates, combos, leaks: amounts.length + births.length + dates.length };
+  }
+
+  return { attackCheck, invert, inferBirthYears, inferDates, quasiIdentifiers, bucket, formatRange, currencyOf, generalizeNumbers };
 });

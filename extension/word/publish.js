@@ -44,6 +44,13 @@ function sanitizedPreviewHtml() {
 
 async function publishSanitized() {
   if (PublishState.busy || !sanitizedBytes) return;
+  const snapshot = appliedSnapshot;
+  if (!snapshot || snapshot.bytes !== sanitizedBytes || snapshot.generation !== reviewGeneration || snapshot.signature !== currentSignature()) {
+    document.getElementById("apply-status").textContent = "The review changed. Create the sanitized copy again before sharing.";
+    document.getElementById("create-link").disabled = true;
+    return;
+  }
+  const { bytes, preview, signature } = snapshot;
   if (attackLeaks > 0 && !document.getElementById("attack-confirm").checked) {
     document.getElementById("apply-status").textContent = "Confirm the attack check warning before creating a link.";
     return;
@@ -60,15 +67,16 @@ async function publishSanitized() {
       version: 4,
       kind: "document",
       format: "docx",
-      docx: bytesToBase64(sanitizedBytes),
-      preview: sanitizedPreviewHtml(),
-      byteLength: sanitizedBytes.length,
+      docx: bytesToBase64(bytes),
+      preview,
+      byteLength: bytes.length,
       ttl,
       timestamp: new Date().toISOString()
     };
     const rough = JSON.stringify(payload).length;
     if (rough > 340000) throw new Error("This copy is too large for the current relay limit. Download the file instead.");
     const encrypted = await cryptoEngine.encrypt(payload);
+    if (appliedSnapshot !== snapshot || snapshot.generation !== reviewGeneration || sanitizedBytes !== bytes || currentSignature() !== signature) throw new Error("The review changed. Create a new sanitized copy before sharing.");
     if (encrypted.ciphertext.length > 512 * 1024) throw new Error("Encrypted copy exceeds the relay limit. Download the file instead.");
     const api = typeof browser !== "undefined" ? browser : chrome;
     const result = await api.runtime.sendMessage({
@@ -81,7 +89,9 @@ async function publishSanitized() {
     await api.storage.local.set({ ["document_share_revoke_" + encrypted.shareId]: PublishState.last });
     document.getElementById("share-link").value = encrypted.fullShareUrl;
     document.getElementById("link-result").hidden = false;
-    status.textContent = "Encrypted link ready. Anyone holding the full link can read it.";
+    status.textContent = snapshot.generation === reviewGeneration && signature === currentSignature()
+      ? "Encrypted link ready. Anyone holding the full link can read it."
+      : "Link created for the earlier reviewed copy. Revoke it here if no longer needed.";
     document.getElementById("publish-hint").textContent = "Relay stored ciphertext only; the decryption key stays in the link fragment.";
     if (window.__ssLowerLabel) window.__ssLowerLabel();
   } catch (error) {
@@ -92,7 +102,7 @@ async function publishSanitized() {
     box.hidden = false;
   } finally {
     PublishState.busy = false;
-    button.disabled = false;
+    button.disabled = !appliedSnapshot || appliedSnapshot.generation !== reviewGeneration || appliedSnapshot.signature !== currentSignature();
   }
 }
 
