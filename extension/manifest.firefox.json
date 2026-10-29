@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Blackline",
-  "version": "2.5.5",
+  "version": "2.5.6",
   "description": "Redacts sensitive data in AI chats and Word documents, then shares a sanitized copy as an encrypted link.",
   "permissions": [
     "storage",
@@ -27,6 +27,7 @@
       "models/ort.min.js",
       "engine/wordpiece.js",
       "offscreen.js",
+      "relay_hosts.js",
       "background.js"
     ]
   },
@@ -39,6 +40,8 @@
         "http://127.0.0.1/*"
       ],
       "js": [
+        "relay_hosts.js",
+        "viewer/redirect_logic.js",
         "viewer_redirect.js"
       ],
       "run_at": "document_start"

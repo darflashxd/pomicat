@@ -17,11 +17,11 @@ for (const path of ['extension/manifest.json', 'extension/manifest.firefox.json'
 }
 assert.equal(pkg.name, 'safeshare-ai');
 assert.equal(pkg.bin.blackline, pkg.bin.safeshare);
-// Normalized hashes from e6cf08b; no Git-history dependency in source archives or CI.
+// Normalized hashes; viewer_redirect.js changed in 2.5.6 for the web-viewer fallback.
 for (const [path, hash] of Object.entries({
   'extension/engine/settings.js': '57f3173e764083949621f8c1eff915c5c2d4ed6b9861b0907da8ae5a59cd8511',
   'extension/word/settings.js': '42dde966b726b26d73368781d8d9a8824d152aa8c34f2bbd2bb0a46caa16cce6',
-  'extension/viewer_redirect.js': '763eefd378277576faff719e51f812b2e2cd5d576ff2a9cd9d0385ef4f561da0',
+  'extension/viewer_redirect.js': 'bb17ccdc5d0e87de7eec59567cc58abfd71ce0764c802bc356ff8e41bc7c5199',
   'relay/wrangler.toml': 'd7c393dbfda07094b1e65be493dfbe2539d3fcf5dca421ab9a50b3ec378e3450'
 })) {
   assert.equal(createHash('sha256').update(read(path).replace(/\r\n/g, '\n')).digest('hex'), hash, path + ' compatibility');

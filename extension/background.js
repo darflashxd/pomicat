@@ -8,6 +8,14 @@ console.log("[Blackline] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
+// One relay allowlist for every context. Chrome MV3 loads this with importScripts;
+// Firefox background pages load it from manifest.background.scripts before this file.
+if (typeof importScripts === "function") {
+  try { importScripts("relay_hosts.js"); } catch (_) {}
+}
+const RelayHosts = (typeof globalThis !== "undefined" && globalThis.BlacklineRelayHosts) ||
+  (typeof self !== "undefined" ? self.BlacklineRelayHosts : null);
+
 // The Word launcher is declared statically in the manifest, so no runtime
 // permission request or dynamic registration is needed. Keep a single guarded
 // injection for tabs that loaded before the extension was reloaded.
@@ -74,21 +82,51 @@ async function getOrCreateOffscreenDocument() {
   return true;
 }
 
-// Relays the background worker will talk to: the official one, a local one, or the one set
-// with chrome.storage.local.set({ safeshare_relay }) (see DEPLOY.md). Anything else is refused,
-// so a bug elsewhere can't turn upload/revoke into requests to arbitrary sites.
-const OFFICIAL_RELAY = /^(?:https:\/\/(?:safeshare|blackline)-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/;
+// Relays the background worker will talk to: the official ones (relay_hosts.js), a local one,
+// or the one set with chrome.storage.local.set({ safeshare_relay }) (see DEPLOY.md). Anything
+// else is refused, so a bug elsewhere can't turn upload/revoke into requests to arbitrary sites.
+function relayOrigin(relayUrl) {
+  if (RelayHosts) return RelayHosts.originOf(relayUrl);
+  try { return new URL(String(relayUrl)).origin; } catch (_) { return ""; }
+}
+
+function isKnownRelay(origin) {
+  if (!origin) return false;
+  if (RelayHosts) return RelayHosts.isRelayOrigin(origin);
+  return /^(?:https:\/\/(?:safeshare|blackline)-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/.test(origin);
+}
+
 async function relayAllowed(relayUrl) {
-  let origin;
-  try { origin = new URL(relayUrl).origin; } catch (_) { return false; }
-  if (OFFICIAL_RELAY.test(origin)) return true;
+  const origin = relayOrigin(relayUrl);
+  if (!origin) return false;
+  if (isKnownRelay(origin)) return true;
   try {
     const { safeshare_relay } = await webExtApi.storage.local.get("safeshare_relay");
-    return Boolean(safeshare_relay) && new URL(safeshare_relay).origin === origin;
+    return Boolean(safeshare_relay) && relayOrigin(safeshare_relay) === origin;
   } catch (_) {
     return false;
   }
 }
+
+// Host access is separate from the allowlist: an unpacked extension keeps the old grant until
+// it is reloaded. Failing here with RELOAD_REQUIRED turns a silent skew into a clear message.
+async function relayHostGranted(origin) {
+  if (!webExtApi.permissions || typeof webExtApi.permissions.contains !== "function") return true;
+  const pattern = RelayHosts ? RelayHosts.permissionPattern(origin) : "";
+  if (!pattern) return false;
+  try {
+    return await webExtApi.permissions.contains({ origins: [pattern] });
+  } catch (_) {
+    return false;
+  }
+}
+
+function relayError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function fromOwnContentScript(sender) {
   return sender && sender.id === webExtApi.runtime.id;
 }
@@ -148,23 +186,28 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "UPLOAD_TO_RELAY") {
     const { relayUrl, payload } = request;
     if (!fromOwnContentScript(sender)) return false;
+    const origin = relayOrigin(relayUrl);
 
-    relayAllowed(relayUrl).then((ok) => {
-      if (!ok) throw new Error("Relay not allowed: " + relayUrl);
-       return fetch(`${relayUrl}/api/share`, {
-       method: "POST",
-       signal: AbortSignal.timeout(20000),
-       redirect: "error",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+    relayAllowed(relayUrl).then(async (ok) => {
+      if (!ok) throw relayError("RELAY_NOT_ALLOWED", "Relay not allowed: " + relayUrl);
+      if (!(await relayHostGranted(origin))) {
+        throw relayError("RELOAD_REQUIRED",
+          `Extension reload required to grant access to ${origin}. Reload Blackline in chrome://extensions and approve the relay host.`);
+      }
+      return fetch(`${origin}/api/share`, {
+        method: "POST",
+        signal: AbortSignal.timeout(20000),
+        redirect: "error",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
     })
       .then(async (response) => {
         if (!response.ok) {
           const errText = await response.text();
-          throw new Error(`Relay returned status ${response.status}: ${errText}`);
+          throw relayError(`HTTP_${response.status}`, `Relay returned status ${response.status}: ${errText}`);
         }
         return response.json();
       })
@@ -174,7 +217,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })
       .catch((err) => {
         console.error("[Blackline Background] Upload failed:", err);
-        if (typeof sendResponse === "function") sendResponse({ success: false, error: err.message });
+        if (typeof sendResponse === "function") sendResponse({ success: false, error: err.message, code: err.code || null });
       });
 
     return true; // Required by Chrome MV3 to keep message channel open asynchronously
@@ -185,18 +228,37 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // A share link was opened on the relay: show it in the extension's own copy of the viewer
   // (see viewer_redirect.js), so the relay's page never runs with the key.
   if (request.action === "OPEN_SHARE_IN_EXTENSION") {
-    const relay = sender.url ? new URL(sender.url).origin : "";
-    const relayOk = OFFICIAL_RELAY.test(relay);
+    const relay = sender.url ? relayOrigin(sender.url) : "";
+    if (!sender.tab) {
+      sendResponse({ success: false, reason: "no_tab" });
+      return false;
+    }
+    if (!isKnownRelay(relay)) {
+      sendResponse({ success: false, reason: "relay_not_allowed" });
+      return false;
+    }
+    if (typeof request.hash !== "string" || !request.hash.startsWith("#") || request.hash.length < 2) {
+      sendResponse({ success: false, reason: "bad_hash" });
+      return false;
+    }
     const id = typeof request.id === "string" && /^[0-9a-f-]{36}$/i.test(request.id) ? request.id : "";
-    if (!sender.tab || !relayOk || typeof request.hash !== "string" || !request.hash.startsWith("#")) {
-      sendResponse({ success: false });
+    if (request.id && !id) {
+      sendResponse({ success: false, reason: "bad_id" });
       return false;
     }
     const url = webExtApi.runtime.getURL("viewer/index.html") +
       `?relay=${encodeURIComponent(relay)}${id ? `&id=${id}` : ""}${request.hash}`;
-    Promise.resolve(webExtApi.tabs.update(sender.tab.id, { url }))
-      .then(() => sendResponse({ success: true }))
-      .catch((err) => sendResponse({ success: false, error: err.message }));
+    // Without host access the extension viewer could not fetch the ciphertext. Tell the
+    // content script to fall back to the relay's own viewer instead of opening a dead tab.
+    relayHostGranted(relay).then((granted) => {
+      if (!granted) {
+        sendResponse({ success: false, reason: "reload_required" });
+        return;
+      }
+      Promise.resolve(webExtApi.tabs.update(sender.tab.id, { url }))
+        .then(() => sendResponse({ success: true }))
+        .catch((err) => sendResponse({ success: false, reason: "update_failed", error: err.message }));
+    });
     return true;
   }
 
@@ -218,9 +280,14 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "REVOKE_SHARE") {
     const { relayUrl, shareId, token } = request;
     if (!fromOwnContentScript(sender)) return false;
-    relayAllowed(relayUrl).then((ok) => {
-      if (!ok) throw new Error("Relay not allowed: " + relayUrl);
-      return fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {
+    const origin = relayOrigin(relayUrl);
+    relayAllowed(relayUrl).then(async (ok) => {
+      if (!ok) throw relayError("RELAY_NOT_ALLOWED", "Relay not allowed: " + relayUrl);
+      if (!(await relayHostGranted(origin))) {
+        throw relayError("RELOAD_REQUIRED",
+          `Extension reload required to grant access to ${origin}. Reload Blackline in chrome://extensions and approve the relay host.`);
+      }
+      return fetch(`${origin}/api/revoke/${encodeURIComponent(shareId)}`, {
         method: "POST",
         signal: AbortSignal.timeout(20000),
         redirect: "error",
@@ -228,8 +295,14 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
         body: JSON.stringify({ token })
       });
     })
-      .then((response) => sendResponse({ success: response.ok }))
-      .catch((err) => sendResponse({ success: false, error: err.message }));
+      .then(async (response) => {
+        if (!response.ok) {
+          const errText = await response.text();
+          throw relayError(`HTTP_${response.status}`, `Relay returned status ${response.status}: ${errText}`);
+        }
+        sendResponse({ success: true });
+      })
+      .catch((err) => sendResponse({ success: false, error: err.message, code: err.code || null }));
     return true;
   }
 });

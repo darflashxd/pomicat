@@ -15,7 +15,23 @@ async function relayBaseUrl() {
     const { safeshare_relay } = await api.storage.local.get("safeshare_relay");
     if (safeshare_relay) return String(safeshare_relay).replace(/\/$/, "");
   } catch (_) {}
-  return "https://blackline-relay.bleedguard.workers.dev";
+  return (typeof BlacklineRelayHosts !== "undefined" && BlacklineRelayHosts.DEFAULT_RELAY) ||
+    "https://blackline-relay.bleedguard.workers.dev";
+}
+
+// MV3 service workers can be asleep on the first message; retry once before giving up.
+async function sendRelayMessage(message) {
+  const api = typeof browser !== "undefined" ? browser : chrome;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await api.runtime.sendMessage(message);
+      if (result !== undefined) return result;
+    } catch (error) {
+      if (attempt === 1) throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+  return undefined;
 }
 
 function escapePreview(value) {
@@ -60,8 +76,10 @@ async function publishSanitized() {
   button.disabled = true;
   const status = document.getElementById("publish-status");
   status.textContent = "Encrypting and uploading…";
+  let relayUrl = "";
   try {
-    const cryptoEngine = new SafeShareCrypto(await relayBaseUrl(), await relayBaseUrl());
+    relayUrl = await relayBaseUrl();
+    const cryptoEngine = new SafeShareCrypto(relayUrl, relayUrl);
     const ttl = Number(document.getElementById("ttl").value) || 86400;
     const payload = {
       version: 4,
@@ -74,17 +92,22 @@ async function publishSanitized() {
       timestamp: new Date().toISOString()
     };
     const rough = JSON.stringify(payload).length;
-    if (rough > 340000) throw new Error("This copy is too large for the current relay limit. Download the file instead.");
+    if (rough > 340000) throw new Error("This copy is too large for the current relay limit (512 KB ciphertext). Download the file instead.");
     const encrypted = await cryptoEngine.encrypt(payload);
     if (appliedSnapshot !== snapshot || snapshot.generation !== reviewGeneration || sanitizedBytes !== bytes || currentSignature() !== signature) throw new Error("The review changed. Create a new sanitized copy before sharing.");
-    if (encrypted.ciphertext.length > 512 * 1024) throw new Error("Encrypted copy exceeds the relay limit. Download the file instead.");
+    if (encrypted.ciphertext.length > 512 * 1024) throw new Error("Encrypted copy exceeds the relay limit (512 KB). Download the file instead.");
     const api = typeof browser !== "undefined" ? browser : chrome;
-    const result = await api.runtime.sendMessage({
+    const result = await sendRelayMessage({
       action: "UPLOAD_TO_RELAY",
       relayUrl: cryptoEngine.relayBaseUrl,
       payload: { id: encrypted.shareId, ciphertext: encrypted.ciphertext, ttl }
     });
-    if (!result || !result.success || !result.data || !result.data.revoke_token) throw new Error("Relay upload failed. The sanitized file can still be downloaded.");
+    if (!result || !result.success || !result.data || !result.data.revoke_token) {
+      const uploadError = new Error((result && result.error) ||
+        "Relay upload failed (no revoke token). The sanitized file can still be downloaded.");
+      uploadError.code = (result && result.code) || "UPLOAD_FAILED";
+      throw uploadError;
+    }
     PublishState.last = { relayUrl: cryptoEngine.relayBaseUrl, shareId: encrypted.shareId, token: result.data.revoke_token };
     await api.storage.local.set({ ["document_share_revoke_" + encrypted.shareId]: PublishState.last });
     document.getElementById("share-link").value = encrypted.fullShareUrl;
@@ -95,10 +118,16 @@ async function publishSanitized() {
     document.getElementById("publish-hint").textContent = "Relay stored ciphertext only; the decryption key stays in the link fragment.";
     if (window.__ssLowerLabel) window.__ssLowerLabel();
   } catch (error) {
+    const described = typeof BlacklinePublishErrors !== "undefined"
+      ? BlacklinePublishErrors.describePublishError(error, relayUrl)
+      : {
+          message: error.message || String(error),
+          hint: "The sanitized copy is unchanged. Download it, or check the relay setting."
+        };
     status.textContent = "Link was not created.";
-    document.getElementById("publish-hint").textContent = "The sanitized copy is unchanged. Download it, or check the relay setting.";
+    document.getElementById("publish-hint").textContent = described.hint;
     const box = document.getElementById("error");
-    box.textContent = error.message;
+    box.textContent = described.message;
     box.hidden = false;
   } finally {
     PublishState.busy = false;
