@@ -40,6 +40,18 @@ class HeuristicsRedactor {
         replacement: "$1[REDACTED_ADDRESS]"
       },
       {
+        id: "ADDRESS_LABELLED", name: "Labelled address field", category: "PROFILE", valueGroup: 2,
+        // Table cells flatten to "Label | value"; prose uses "Address:"/"Alamat:". Accept both.
+        regex: /\b((?:home|mailing|residential|permanent|current|office|shipping)\s+address|address|alamat)(?:\s*\([^)\r\n]{0,40}\))?\s*[:：=\-–—|]*\s*((?:(?:jl\.?|jalan|gg\.?|gang|kp\.?|kampung|blok|rt|rw|dusun|desa|kel\.?|kec\.?)\s+|\d{1,6}\s+\p{L})[^\r\n|]{4,120}?)(?=\s*(?:\r?\n|\||\b(?:before|after|please)\b|[.;](?:\s|$)|$))/giu,
+        replacement: "$1[REDACTED_ADDRESS]"
+      },
+      {
+        id: "ADDRESS_STREET_ID", name: "Indonesian street address", category: "PROFILE", valueGroup: 1,
+        // Unlabelled "Jl. ... 10510" cells still carry a home address; postal code bounds the match.
+        regex: /\b((?:jl\.?|jalan)\s+[^\r\n|]{3,110}?\b\d{5})(?![ \t]?\d)/giu,
+        replacement: "[REDACTED_ADDRESS]"
+      },
+      {
         id: "COORDINATE_PAIR", name: "Personal coordinates", category: "PROFILE", valueGroup: 2,
         regex: /((?:\b(?:coordinates|koordinat)(?:\s+(?:rumah|saya|are|is)){0,3}\s*[:=]?\s*|google\.com\/maps\/@))(-?\d{1,2}\.\d+\s*,\s*-?\d{1,3}\.\d+)(?!\d)/gi,
         validator: (raw) => {
@@ -74,6 +86,17 @@ class HeuristicsRedactor {
       {
         id: "GROUPED_ACCOUNT", name: "Grouped bank account", category: "FINANCIAL", valueGroup: 2,
         regex: /\b((?:rekening|account)(?:\s+(?:Mandiri|BCA|saya|aku|number|is)){0,3}\s*[:=]?\s*)(\d{3}-\d{2}-\d{7}-\d)(?!\d)/gi,
+        replacement: "$1[REDACTED_ACCOUNT]"
+      },
+      {
+        id: "BANK_NAMED_ACCOUNT", name: "Named bank account", category: "FINANCIAL", valueGroup: 2,
+        // "BCA 5271 8890 1234" in a table cell has no "rekening/account" keyword; the bank name
+        // plus 10-18 grouped digits is specific enough to stay high precision.
+        regex: /\b((?:bank\s+)?(?:bca|mandiri|bni|bri|cimb(?:\s+niaga)?|permata|bsi|bank\s+syariah\s+indonesia|jago|jenius|danamon|btn|ocbc(?:\s+nisp)?|uob|maybank)\b[\s:.\-–—]*(?:(?:a\/n|atas\s+nama)\s+)?)((?:\d{2,4}[ \t-]){2,4}\d{2,4})(?![ \t-]?\d)/giu,
+        validator: (raw) => {
+          const digits = (raw.match(/\d/g) || []).length;
+          return digits >= 10 && digits <= 18;
+        },
         replacement: "$1[REDACTED_ACCOUNT]"
       },
       {
