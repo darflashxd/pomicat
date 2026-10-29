@@ -1,5 +1,9 @@
 # Blackline
 
+[![Tests](https://github.com/darflashxd/safeshare/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/darflashxd/safeshare/actions/workflows/test.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/darflashxd/safeshare?label=release)](https://github.com/darflashxd/safeshare/releases)
+
 Previously SafeShare. The extension keeps its existing ID, settings and relay so
 updating does not reset your installation or break earlier links. New links use
 `https://blackline-relay.bleedguard.workers.dev`; the old relay remains supported.
@@ -24,9 +28,10 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Source version:** `2.5.5` (Blackline rebrand). Published release ZIPs remain `v2.5.4`
-  under the SafeShare name until a new release is published. Word Online documents can be reviewed, redacted,
-  and shared as encrypted document links. The public relay serves the v4 document viewer.
+- **Source version:** `2.5.5` (Blackline rebrand). Release `v2.5.5` ships Blackline-named
+  Chrome and Firefox ZIPs; `v2.5.4` and earlier keep the SafeShare name. Word Online documents
+  can be reviewed, redacted, and shared as encrypted document links. The public relay serves
+  the v4 document viewer.
 - **Tests:** run `npm test` for the current offline regression suite; local browser structure checks cover Chromium and Firefox.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
   extension. A public-relay document link was opened in a clean browser context without the
@@ -288,6 +293,11 @@ Rules recognize supported credential, contact, banking, government-ID, location,
 personal-data patterns. Checksums and context help distinguish values, but coverage is not universal.
 The inversion defense additionally targets supported ratios, per-period amounts, projections,
 sums, and differences across turns. It does not model every possible inference.
+
+The rules and regression fixtures deliberately include Indonesian patterns and text alongside
+English ones. Indonesian amounts (`Rp`, `juta`, `jt`), addresses, bank accounts, role words and
+contextual phrases are part of the detection corpus, not leftover translations; the bilingual
+fixtures under `tests/` exist for that coverage.
 
 Review suggestions are **unverified candidates**, not confirmation that a credential works.
 Some start selected through explicit credential context or the review's hand-set scoring policy.

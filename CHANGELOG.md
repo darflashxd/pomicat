@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — audit hardening
+## 2.5.5 - 2026-10-29
 
 - Keep CLI leak exit status consistent in text/JSON output; add bounded explicit ratio recovery.
 - Public-looking labels no longer exempt direct percentage relations to known private amounts.
@@ -10,9 +10,6 @@
 - Run the Word attack check on the exported package (body, headers, footers, notes), not only preview text.
 - Save chat revocation controls across page closure; validate viewer chat schema and share ID.
 - Bound relay/viewer/proxy network waits; clarify expiry, size padding and watermark limits.
-
-
-## 2.5.5 - Unreleased
 
 - New links default to `blackline-relay.bleedguard.workers.dev`. The old relay
   remains supported; both Workers share D1. No schema or storage migration.
