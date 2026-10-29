@@ -34,6 +34,14 @@ async function main() {
 
   const verifier = await api.verifyDocx(rebuilt, [{ value: "A. Whitfield" }]);
   assert.equal(verifier.clean, false, "verifier must find a value that is still present");
+  const text = await api.documentText(rebuilt);
+  assert.match(text, /Whitfield/, "attack-check text must include body content");
+  const header = [...parts.keys()].find(name => /^word\/header\d*\.xml$/.test(name));
+  if (header) {
+    const bodyOnly = new TextEncoder().encode('<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Body</w:t></w:r></w:p></w:body></w:document>');
+    const withHeader = await api.documentText(await api.zip(new Map([["word/document.xml", bodyOnly], [header, parts.get(header)]])));
+    assert.ok(withHeader.split("\n").filter(Boolean).length > 1, "header/footer text must be scanned too");
+  }
   console.log(`word_redact_zip: ${parts.size} parts round-tripped byte-identically`);
 }
 

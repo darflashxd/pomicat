@@ -7,6 +7,7 @@
 - Isolate new draft mappings by origin and page identity; retain identified legacy chat reads.
 - Persist local burn before delivering ciphertext; refuse corrupt storage and bound revoke bodies.
 - Use the shared nominal parser for Word decimal/grouping formats.
+- Run the Word attack check on the exported package (body, headers, footers, notes), not only preview text.
 - Save chat revocation controls across page closure; validate viewer chat schema and share ID.
 - Bound relay/viewer/proxy network waits; clarify expiry, size padding and watermark limits.
 

@@ -54,6 +54,20 @@ def run(browser_type):
     download = download_event.value
     actual = Path(download.path()).read_bytes()
     assert hashlib.sha256(actual).digest() == hashlib.sha256(bytes([1,2,3])).digest()
+    # The attack check reads the exported package, so a header figure the preview never shows is caught.
+    page.evaluate('''() => {
+      const E = new TextEncoder();
+      const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+      const doc = '<w:document xmlns:w="'+W+'"><w:body><w:p><w:r><w:t>Salary [REDACTED_FINANCIAL]</w:t></w:r></w:p></w:body></w:document>';
+      const header = '<w:hdr xmlns:w="'+W+'"><w:p><w:r><w:t>20% of your monthly salary is 1,000.</w:t></w:r></w:p></w:hdr>';
+      SafeShareWordRedact.sanitizeDocx = async () => ({bytes: await SafeShareWordRedact.zip(new Map([
+        ['word/document.xml', E.encode(doc)], ['word/header1.xml', E.encode(header)]])), replaced: 1, parts: 2, images: 0, removed: 0});
+      appliedSnapshot = null; sanitizedBytes = null; document.getElementById('apply').hidden = false;
+    }''')
+    page.locator('#apply').click()
+    page.wait_for_function('!!appliedSnapshot')
+    assert 'reconstruction finding' in page.locator('#attack-text').inner_text()
+    assert page.locator('#download-sanitized').is_disabled()
     page.evaluate('''() => {
       appliedSnapshot = null; sanitizedBytes = null;
       document.getElementById('apply').hidden = false;

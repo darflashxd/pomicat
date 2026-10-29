@@ -425,7 +425,29 @@
     return { clean: leftovers.length === 0, leftovers, parts: parts.size };
   }
 
-  const api = { sanitizeDocx, verifyDocx, unzip, zip, burnImage, spansFor, replaceInParagraph };
+  /* Visible text of every text-bearing part, for the attack check. Headers, footers and notes are
+     included: they are shared content even when the preview shows only the document body. */
+  async function documentText(bytes) {
+    const parts = await unzip(bytes);
+    const out = [];
+    for (const [name, data] of parts) {
+      if (!TEXT_PART.test(name)) continue;
+      const raw = decoder.decode(data);
+      if (typeof DOMParser !== "undefined") {
+        const xml = new DOMParser().parseFromString(raw, "application/xml");
+        if (xml.querySelector("parsererror")) throw new Error("Malformed XML during attack check: " + name);
+        out.push([...xml.getElementsByTagNameNS("*", "t")].map(node => node.textContent || "").join("\n"));
+      } else {
+        // Node has no XML DOM; the archive regression only needs the text nodes.
+        out.push([...raw.matchAll(/<(?:w|m):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|m):t>/g)]
+          .map(match => match[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"))
+          .join("\n"));
+      }
+    }
+    return out.join("\n");
+  }
+
+  const api = { sanitizeDocx, verifyDocx, documentText, unzip, zip, burnImage, spansFor, replaceInParagraph };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SafeShareWordRedact = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

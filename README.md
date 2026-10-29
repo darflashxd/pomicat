@@ -152,7 +152,10 @@ attack check still recovers hidden amounts, creating a link requires an explicit
 Limits: text inside images is not detected automatically (mark it yourself). Unsupported embedded
 charts, OLE and other rejected package parts stop export. SharePoint session-download compatibility
 is tenant-dependent. Verification checks selected values in supported XML/relationship content and
-selected image rectangles; it does not certify that every sensitive item was discovered.
+selected image rectangles; it does not certify that every sensitive item was discovered. The attack
+check reads text from the exported package, including headers, footers and notes, not only the
+preview pane. If the package cannot be read for that check, the UI says the preview was checked
+instead; export permission still depends on the selected-value verification.
 
 ## Screenshots
 
