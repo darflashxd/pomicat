@@ -11,12 +11,12 @@
   const style = document.createElement("style");
   style.textContent = ':host{position:fixed;right:24px;bottom:24px;z-index:2147483646}button{display:flex;align-items:center;gap:8px;background:#20242a;color:#f0f2f5;border:1px solid #737d8a;border-radius:24px;padding:12px 18px;font:600 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 14px #0004;min-height:44px}button:focus-visible{outline:3px solid #dcebc1;outline-offset:3px}svg{width:18px;height:18px}';
   const button = document.createElement("button");
-  button.type = "button"; button.textContent = "SafeShare";
-  button.setAttribute("aria-label", "Open SafeShare Word integration setup");
-  button.title = "Inspect a saved Word copy — redaction and sharing are not connected yet";
+  button.type = "button"; button.textContent = "Blackline";
+  button.setAttribute("aria-label", "Open Blackline Word review");
+  button.title = "Review and redact a saved Word copy before sharing";
   const unavailable = () => {
     button.textContent = "Refresh Word to reconnect";
-    button.title = "Save your document, then refresh this Word tab to reconnect SafeShare.";
+    button.title = "Save your document, then refresh this Word tab to reconnect Blackline.";
     button.setAttribute("aria-label", button.title);
     button.disabled = true;
   };

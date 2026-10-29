@@ -103,7 +103,7 @@
         try {
           zeroizer();
         } catch (err) {
-          console.error("[SafeShare] Zeroizer callback error:", err);
+          console.error("[Blackline] Cleanup callback error:", err);
         }
       }
     }
@@ -120,7 +120,7 @@
       this.isTriggered = true;
       this.terminationReason = reason;
 
-      console.warn(`[SafeShare MemoryZeroizer] Session terminated: ${reason}. Zeroing RAM buffers.`);
+      console.warn(`[Blackline Cleanup] Session terminated: ${reason}. Clearing registered references.`);
 
       // 1. Instant URL Hash Shredding (Remove #key immediately from browser address bar)
       try {

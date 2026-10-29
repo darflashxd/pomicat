@@ -4,7 +4,7 @@
  * completely bypassing webpage CSP (Content Security Policy) and Mixed Content blocks.
  */
 
-console.log("[SafeShare-AI] Background script initialized.");
+console.log("[Blackline] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
@@ -77,7 +77,7 @@ async function getOrCreateOffscreenDocument() {
 // Relays the background worker will talk to: the official one, a local one, or the one set
 // with chrome.storage.local.set({ safeshare_relay }) (see DEPLOY.md). Anything else is refused,
 // so a bug elsewhere can't turn upload/revoke into requests to arbitrary sites.
-const OFFICIAL_RELAY = /^(?:https:\/\/safeshare-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/;
+const OFFICIAL_RELAY = /^(?:https:\/\/(?:safeshare|blackline)-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/;
 async function relayAllowed(relayUrl) {
   let origin;
   try { origin = new URL(relayUrl).origin; } catch (_) { return false; }
@@ -94,6 +94,11 @@ function fromOwnContentScript(sender) {
 }
 
 webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "GET_MAPPING_CONTEXT") {
+    if (!fromOwnContentScript(sender) || !Number.isInteger(sender.tab?.id)) return false;
+    sendResponse({ tabId: sender.tab.id });
+    return false;
+  }
   if (request.action === "OPEN_WORD_SETUP") {
     if (!fromOwnContentScript(sender) || !sender.tab || !sender.url) return false;
     try {
@@ -146,8 +151,10 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     relayAllowed(relayUrl).then((ok) => {
       if (!ok) throw new Error("Relay not allowed: " + relayUrl);
-      return fetch(`${relayUrl}/api/share`, {
-      method: "POST",
+       return fetch(`${relayUrl}/api/share`, {
+       method: "POST",
+       signal: AbortSignal.timeout(20000),
+       redirect: "error",
       headers: {
         "Content-Type": "application/json"
       },
@@ -162,11 +169,11 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return response.json();
       })
       .then((data) => {
-        console.log("[SafeShare-AI Background] Upload success");
+        console.log("[Blackline Background] Upload success");
         if (typeof sendResponse === "function") sendResponse({ success: true, data });
       })
       .catch((err) => {
-        console.error("[SafeShare-AI Background] Upload failed:", err);
+        console.error("[Blackline Background] Upload failed:", err);
         if (typeof sendResponse === "function") sendResponse({ success: false, error: err.message });
       });
 
@@ -179,7 +186,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // (see viewer_redirect.js), so the relay's page never runs with the key.
   if (request.action === "OPEN_SHARE_IN_EXTENSION") {
     const relay = sender.url ? new URL(sender.url).origin : "";
-    const relayOk = /^(?:https:\/\/safeshare-relay\.bleedguard\.workers\.dev|http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?)$/.test(relay);
+    const relayOk = OFFICIAL_RELAY.test(relay);
     const id = typeof request.id === "string" && /^[0-9a-f-]{36}$/i.test(request.id) ? request.id : "";
     if (!sender.tab || !relayOk || typeof request.hash !== "string" || !request.hash.startsWith("#")) {
       sendResponse({ success: false });
@@ -215,6 +222,8 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (!ok) throw new Error("Relay not allowed: " + relayUrl);
       return fetch(`${relayUrl}/api/revoke/${encodeURIComponent(shareId)}`, {
         method: "POST",
+        signal: AbortSignal.timeout(20000),
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token })
       });

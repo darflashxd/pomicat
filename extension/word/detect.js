@@ -181,7 +181,7 @@
     const numericBases = [...bases.map(base => ({ value: base.value }))];
     for (const item of candidates) {
       if (item.category !== "FINANCIAL") continue;
-      const value = Number(String(item.value).replace(/[^\d.]/g, ""));
+      const value = TextMap ? TextMap.numericValue(item.value) : null;
       if (Number.isFinite(value) && value > 0) numericBases.push({ value });
     }
     for (const item of solverLeaks(map, numericBases, Solver)) push(candidates, seen, item);

@@ -1,5 +1,16 @@
 # SafeShare roadmap
 
+## Current hardening status — 2026-10-29
+
+The older checklists below are historical. Current work adds explicit percentage-relation checks,
+public-keyword bypass regressions, scoped draft storage, persistent local burn handling, Word
+nominal parsing, saved chat revoke controls, viewer schema/ID checks and network timeouts.
+See TESTING.md for runnable checks and CHANGELOG.md for the unreleased changes.
+
+Still separate work: idempotent upload protocol, independent held-out data collection and annotation,
+ablation/utility studies, source-complete related-work citations, live-provider lifecycle checks,
+and release/deployment. No held-out score or production deployment is implied by regression tests.
+
 Updated 2026-10-16 after reviewing the 2.3.1 commits (MiniLM model, Tier-0 veto) and an
 independent read-only audit. Black Hat Asia 2027 Arsenal call for tools reportedly closes
 **2 Nov 2026** (confirm on blackhat.com). Reviewers judge the submission, so items marked

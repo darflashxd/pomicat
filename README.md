@@ -1,8 +1,15 @@
-# safeshare
+# Blackline
+
+Previously SafeShare. The extension keeps its existing ID, settings and relay so
+updating does not reset your installation or break earlier links. New links use
+`https://blackline-relay.bleedguard.workers.dev`; the old relay remains supported.
+The repository,
+npm package `safeshare-ai`, and `safeshare` command retain their existing names;
+`blackline` is also available as a CLI command.
 
 **Review and privately share AI conversations, with checks for sensitive data and arithmetic recovery of redacted values.**
 
-SafeShare's main workflow is **Share Privately**: review a conversation, redact sensitive spans
+Blackline's main workflow is **Share Privately**: review a conversation, redact sensitive spans
 and supported numerical clues, then publish an encrypted link with expiry, optional burn-after-read,
 and revocation. The browser extension integrates with ChatGPT, Claude, and DeepSeek. A CLI and
 text-redacting API proxy are also included.
@@ -17,9 +24,10 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Current release:** `v2.5.4` (28 October 2026). Word Online documents can be reviewed, redacted,
+- **Source version:** `2.5.5` (Blackline rebrand). Published release ZIPs remain `v2.5.4`
+  under the SafeShare name until a new release is published. Word Online documents can be reviewed, redacted,
   and shared as encrypted document links. The public relay serves the v4 document viewer.
-- **Tests:** `59/59` offline regression tests pass with `npm test`; local browser structure tests also pass in Chromium and Firefox.
+- **Tests:** run `npm test` for the current offline regression suite; local browser structure checks cover Chromium and Firefox.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
   extension. A public-relay document link was opened in a clean browser context without the
   extension. Firefox packages build from the same source; the screenshot set is Chromium-only.
@@ -46,12 +54,12 @@ git clone https://github.com/darflashxd/safeshare.git
 cd safeshare
 ```
 
-1. Get the 2.5.4 Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
+1. Use the latest published Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
    clone the repository and use the `extension/` folder while developing. Extract the ZIP.
 2. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the
    extracted folder (or the repository's `extension/` folder).
 3. Open or refresh ChatGPT, Claude, DeepSeek, or a Word Online document. On Word, use the floating
-   **SafeShare** button at the bottom right.
+   **Blackline** button at the bottom right (SafeShare in older release ZIPs).
 4. Review the extracted text or saved document copy. In Word, the **Maybe important** section shows
    only model suggestions; automatic rule detections stay active and can be clicked in either
    preview pane to redact or restore them.
@@ -63,7 +71,7 @@ The model, vocabulary, and ONNX WASM runtime are bundled in the repository. **Ru
 extension requires no Python, model download, or inference API key.** Creating and opening relay
 shares requires a reachable relay; local detection and model inference run on your device.
 
-Existing unpacked installations: run `git pull origin main`, reload SafeShare in the extensions
+Existing unpacked installations: run `git pull origin main`, reload Blackline in the extensions
 page, and refresh your chat tabs. Pulling source does not reload code already running in a tab.
 
 ### Firefox
@@ -75,7 +83,7 @@ published, or build the packages locally with Python 3:
 python tools/build_extension.py
 ```
 
-Extract `dist/SafeShare-<version>-firefox.zip`. Open
+Extract `dist/Blackline-<version>-firefox.zip` (older releases use `SafeShare-`). Open
 `about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**, and choose the extracted
 `manifest.json`. Temporary add-ons must be reloaded after a browser restart. The repository's
 `extension/manifest.json` is for Chromium, not Firefox.
@@ -97,6 +105,12 @@ The chip above the composer controls a separate, opt-in feature. Its default is 
 Supported formulas in AI replies can be evaluated locally against the symbolic values. This is
 not a general computer algebra system, and arbitrary model-generated formulas may be unsupported.
 Original-value restoration depends on the browser session mappings remaining available.
+
+Draft mappings are isolated by provider origin and page instance. A same-page transition to a
+conversation ID preserves them; an unassigned draft that undergoes full navigation cannot be
+safely assigned to the new page, so its original-value restoration may be unavailable. Existing
+identified chat mappings remain readable. A restored chat keeps its mappings until explicit reset
+or browser session exit, not necessarily until tab closure.
 
 **Before-send protection is not a barrier against the chat site's JavaScript reading the composer
 while you type.** It changes what is submitted, not what the page could already observe.
@@ -135,10 +149,15 @@ revocable). The key stays in the link fragment; the relay stores ciphertext only
 limit is 512 KiB ciphertext, so image-heavy documents should be downloaded instead. When the
 attack check still recovers hidden amounts, creating a link requires an explicit confirmation.
 
-Limits: text inside images is not detected automatically (mark it yourself), charts and OLE objects
-are counted but not rewritten, and SharePoint session-download compatibility is tenant-dependent.
+Limits: text inside images is not detected automatically (mark it yourself). Unsupported embedded
+charts, OLE and other rejected package parts stop export. SharePoint session-download compatibility
+is tenant-dependent. Verification checks selected values in supported XML/relationship content and
+selected image rectangles; it does not certify that every sensitive item was discovered.
 
 ## Screenshots
+
+Screenshots in this section show earlier SafeShare builds. Blackline keeps the
+same workflows; these images are historical evidence, not new-brand captures.
 
 ### Hiding the original value is not enough
 
@@ -147,7 +166,7 @@ The assistant still shows the numbers derived from the salary. Redacting `$4,800
 
 ![Monthly allocations remain after the salary is redacted](docs/screenshots/02-derived-amounts.png)
 
-*The salary is masked, but the monthly allocations are also recoverable values. SafeShare reviews
+*The salary is masked, but the monthly allocations are also recoverable values. Blackline reviews
 them together.*
 
 ![Annual total reveals the hidden salary](docs/screenshots/02b-annual-derived.png)
@@ -237,7 +256,7 @@ Most likely hidden value: $5,000 (agreed by 3 visible numbers)
     $12,000 / 12 / 20%
 ```
 
-Redact the original conversation with SafeShare, then run the same attack:
+Redact the original conversation with Blackline, then run the same attack:
 
 ```bash
 node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
@@ -300,6 +319,12 @@ requests. The relay API receives ciphertext, not the reviewed plaintext or the f
 Expiry, burn-after-read, and revocation are enforced by the relay; they cannot recall a copy
 already retained by a recipient.
 
+Expiry metadata is authenticated by AES-GCM and checked by the supported viewer. It is not
+cryptographic self-destruction: a holder of ciphertext and key can decrypt outside that viewer.
+Padding rounds plaintext size into 256-byte buckets; approximate message size remains visible.
+For newly created chat links, revocation controls are saved on this device. Open the extension
+toolbar workspace and expand **Manage earlier chat and document links** after closing a chat tab.
+
 ## Security model
 
 | Actor or risk | Protection | Residual risk |
@@ -311,7 +336,7 @@ already retained by a recipient.
 | Chat provider | Optional rewrite at submission | Typed text is visible to the page before submission; the provider retains anything already received. |
 | Changed chat-site layout | Extraction health checks and review UI | Missing turns or submit-hook changes still require real-site testing. |
 
-With SafeShare installed on a supported relay origin, share links are routed to the extension's
+With Blackline installed on a supported relay origin, share links are routed to the extension's
 own viewer. Without it, recipients use the hosted viewer and must trust its operator. CSP is
 defense in depth, not protection against a host that controls both the page and its headers.
 
@@ -326,7 +351,7 @@ defense in depth, not protection against a host that controls both the page and 
 - Restored amounts are ordinary page text and may be read by site scripts. Closed-shadow rendering
   for some other restored values is not a security boundary against a compromised browser or
   another privileged extension. Session mappings can disappear after browser/extension lifecycle
-  changes; SafeShare cannot reconstruct originals that were not sent to the AI.
+ changes; Blackline cannot reconstruct originals that were not sent to the AI.
 - The optional sharer-originals feature stores a separate encrypted restoration copy on the
   creator's device; ordinary recipients do not receive that private mapping. See [the changelog](CHANGELOG.md).
 - Copy deterrence is not copy protection. Screenshots, photographs, or an authorized reader's own
@@ -394,6 +419,10 @@ upstream provider. Supported text request formats include OpenAI Chat Completion
 Responses, and Anthropic Messages. Unsupported body-bearing endpoints are refused; unsupported
 tool or multimodal structures can also be rejected instead of forwarded without protection.
 Responses are not restored. Use fictional requests when testing a live provider.
+
+Redaction covers supported JSON body fields. URL query parameters and request headers are
+forwarded without redaction; keep private text out of those fields. Provider authentication headers
+must reach the configured provider. Upstream requests have a two-minute limit, including streaming.
 
 ### Optional Presidio integration and policy
 
@@ -476,7 +505,7 @@ or private transcripts. Repository issues are not a confidential reporting chann
 
 ## License and attribution
 
-SafeShare source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
+Blackline source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
 published by [Gravitee](https://huggingface.co/gravitee-io/bert-small-pii-detection) under
 Apache-2.0 as declared upstream. Bundled runtimes and optional dependencies retain their own
 licenses; see [bundled attribution and license texts](extension/THIRD_PARTY_NOTICES.md).

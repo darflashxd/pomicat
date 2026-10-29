@@ -1,10 +1,11 @@
 {
   "name": "safeshare-ai",
-  "version": "2.5.4",
-  "description": "Redacts sensitive data from AI chat transcripts, blocks algebraic recovery of redacted numbers, and shares the result as an end-to-end encrypted link.",
+  "version": "2.5.5",
+  "description": "Blackline reviews and redacts AI chats and Word documents before encrypted sharing. Previously SafeShare.",
   "main": "bin/safeshare.js",
   "bin": {
-    "safeshare": "bin/safeshare.js"
+    "safeshare": "bin/safeshare.js",
+    "blackline": "bin/safeshare.js"
   },
   "files": [
     "bin/",

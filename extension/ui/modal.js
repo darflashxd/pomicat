@@ -141,7 +141,7 @@ class SafeShareModal {
             </div>
             <div>
               <div class="safeshare-title" id="safeshare-modal-title">Share Privately</div>
-              <div class="safeshare-version-tag">End-to-end encrypted</div>
+            <div class="safeshare-version-tag">Blackline · End-to-end encrypted</div>
             </div>
           </div>
           <button class="safeshare-close-btn" id="safeshare-close-btn" aria-label="Close modal">
@@ -1101,7 +1101,7 @@ class SafeShareModal {
     };
     const money = (f) => `${f.currency || ""} ${Math.round(f.value).toLocaleString("en-US")}`.trim();
     if (r.amounts.length) {
-      for (const f of r.amounts) row(false, `Hidden amount recoverable: ${money(f)} (agreed by ${f.support} visible numbers). Hide the amounts it is derived from, or use "Amounts: Remove".`);
+      for (const f of r.amounts) row(false, `Possible hidden amount: ${money(f)} (${f.evidence === "explicit-relation" ? "explicit percentage relation" : `agreed by ${f.support} visible numbers`}). Hide the amounts it is derived from, or use "Amounts: Remove".`);
     }
     if (r.births.length) row(false, `Hidden birth date, but the birth year is ${r.births[0].year} (from stated ages).`);
     if (r.dates.length) for (const d of r.dates) row(false, `Hidden date narrowed to ${d.candidates.length} possible day(s) by ${d.clues.join(", ")}.`);
@@ -1753,6 +1753,7 @@ class SafeShareModal {
             if (res && res.success) {
               this.lastShare = null;
               this.forgetOwnOriginals(shareId);
+              await api.storage.local.remove(`chat_share_revoke_${shareId}`);
             } else window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
           } catch (_) {
             window.alert("The earlier link could not be revoked. It may still be readable until it expires.");
@@ -1825,7 +1826,7 @@ class SafeShareModal {
               throw new Error((response && response.error) || "Relay upload returned unsuccessful");
             }
           } catch (err) {
-            console.warn(`[SafeShare] Upload attempt ${attempt + 1} via background worker failed:`, err);
+            console.warn(`[Blackline] Upload attempt ${attempt + 1} via background worker failed:`, err);
             if (attempt < 2) {
               await new Promise(r => setTimeout(r, 200));
             }
@@ -1838,6 +1839,8 @@ class SafeShareModal {
           try {
             const uploadRes = await fetch(`${relayUrl}/api/share`, {
               method: "POST",
+              signal: AbortSignal.timeout(20000),
+              redirect: "error",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(uploadPayload)
             });
@@ -1846,12 +1849,23 @@ class SafeShareModal {
               revokeToken = (await uploadRes.json()).revoke_token;
             }
           } catch (fetchErr) {
-            console.warn("[SafeShare] Direct edge fetch fallback failed:", fetchErr);
+            console.warn("[Blackline] Direct edge fetch fallback failed:", fetchErr);
           }
         }
 
         if (!uploaded) {
           throw new Error("Unable to upload encrypted payload to Cloudflare Edge. Please verify your connection.");
+        }
+        // Save revocation even if the user closed the dialog while the upload completed.
+        if (revokeToken) {
+          try {
+            const api = typeof browser !== "undefined" ? browser : chrome;
+            await api.storage.local.set({ [`chat_share_revoke_${encResult.shareId}`]: {
+              relayUrl, shareId: encResult.shareId, token: revokeToken, expiresAt: encResult.expMs
+            } });
+          } catch (_) {
+            if (stillOpen()) window.alert("Link created, but revocation could not be saved. Keep this dialog open to revoke it.");
+          }
         }
         if (!stillOpen()) return; // An in-flight upload may finish, but must never alter another modal.
 
@@ -1873,8 +1887,7 @@ class SafeShareModal {
           setTimeout(() => (copyBtn.innerText = "Copy Link"), 2500);
         };
 
-        // Revoke button. ponytail: the token only lives in this modal; persist it in
-        // extension storage if users need to revoke after closing the dialog.
+        // Earlier chat links can also be revoked from the extension toolbar workspace.
         const revokeBtn = document.getElementById("btn-revoke-url");
         if (revokeToken) {
           this.lastShare = { relayUrl, shareId: encResult.shareId, token: revokeToken };
@@ -1891,13 +1904,16 @@ class SafeShareModal {
               token: revokeToken
             });
             revokeBtn.innerText = res && res.success ? "Revoked ✓" : "Revoke failed";
-            if (res && res.success) { this.lastShare = null; this.forgetOwnOriginals(encResult.shareId); }
+            if (res && res.success) {
+              this.lastShare = null; this.forgetOwnOriginals(encResult.shareId);
+              await api.storage.local.remove(`chat_share_revoke_${encResult.shareId}`);
+            }
             revokeBtn.disabled = !!(res && res.success);
           };
         }
       } catch (err) {
         if (!stillOpen()) return;
-        console.error("[SafeShare] Encryption error:", err);
+        console.error("[Blackline] Encryption error:", err);
         btn.innerText = "Error Encrypting";
         btn.disabled = false;
       } finally {

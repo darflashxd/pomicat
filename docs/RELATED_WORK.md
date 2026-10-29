@@ -7,8 +7,9 @@ In 2025–2026, share links from ChatGPT (~4,500 chats indexed; feature removed
 resumes and health details; indexing blocked Jul 2026) all ended up in search
 engines. Vendors removed the "discoverable" options, but a share link remains a
 page serving full plaintext to anyone holding it, forwardable and archivable by
-third parties. SafeShare redacts before sharing, encrypts so the host can't read
-it, and lets links expire.
+third parties. Blackline redacts before sharing and uploads ciphertext. The extension viewer
+decrypts independently of the relay; the hosted fallback trusts the host's served code.
+Expiry blocks subsequent retrieval, not decryption of copies already retained with their key.
 
 ## Redaction is not enough (prior failures)
 

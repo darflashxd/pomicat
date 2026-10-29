@@ -5,7 +5,7 @@
  * 
  * Guarantees:
  * 1. Zero network exposure: Secrets never leave client device.
- * 2. Ephemeral lifecycle: Automatically purged on session reset or tab close.
+ * 2. Ephemeral lifecycle: cleared on explicit reset or browser session exit.
  * 3. Multi-turn consistency: Re-uses the same symbol ID for the same raw secret across turns.
  */
 
@@ -18,22 +18,24 @@
 function vaultStore(onReady) {
   const ext = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
   const area = ext && ext.storage && ext.storage.session;
-  if (!area) return typeof sessionStorage !== "undefined" ? sessionStorage : null;
+  if (!area) return !ext && typeof sessionStorage !== "undefined" ? sessionStorage : null;
   const cache = new Map();
+  const changed = new Set();
   Promise.resolve(area.get(null)).then((all) => {
-    for (const [k, v] of Object.entries(all || {})) if (typeof v === "string") cache.set(k, v);
+    for (const [k, v] of Object.entries(all || {})) if (typeof v === "string" && !changed.has(k)) cache.set(k, v);
     onReady();
   }).catch(() => {});
   return {
     getItem: (k) => (cache.has(k) ? cache.get(k) : null),
-    setItem: (k, v) => { cache.set(k, v); Promise.resolve(area.set({ [k]: v })).catch(() => {}); },
-    removeItem: (k) => { cache.delete(k); Promise.resolve(area.remove(k)).catch(() => {}); }
+    setItem: (k, v) => { changed.add(k); cache.set(k, v); Promise.resolve(area.set({ [k]: v })).catch(() => {}); },
+    removeItem: (k) => { changed.add(k); cache.delete(k); Promise.resolve(area.remove(k)).catch(() => {}); }
   };
 }
 
 class SafeShareSymbolicVault {
-  constructor(storagePrefix = "safeshare_vault_") {
+  constructor(storagePrefix = "safeshare_vault_", pendingId = "new") {
     this.storagePrefix = storagePrefix;
+    this.pendingKey = pendingId === "new" ? `${storagePrefix}data_new` : `${storagePrefix}pending_${pendingId}`;
     this.inMemoryVault = new Map();
     this.counter = 1;
     this.activeChatId = null;
@@ -41,7 +43,7 @@ class SafeShareSymbolicVault {
       if (this.inMemoryVault.size === 0) this.loadFromSession(this.activeChatId);
       // A new chat gets its /c/<id> URL only after the first send. If the site reloads the page
       // there, the old content script is gone before it can move the "new chat" mapping.
-      if (this.inMemoryVault.size === 0 && this.activeChatId) this.promotePendingSession(this.activeChatId);
+      if (pendingId === "new" && this.inMemoryVault.size === 0 && this.activeChatId) this.promotePendingSession(this.activeChatId);
     });
     this.loadFromSession();
   }
@@ -55,8 +57,10 @@ class SafeShareSymbolicVault {
     try {
       this.inMemoryVault.clear();
       this.counter = 1;
-      const key = chatId ? `${this.storagePrefix}data_${chatId}` : `${this.storagePrefix}data_new`;
-      const data = this.store.getItem(key);
+      const key = chatId ? `${this.storagePrefix}data_${chatId}` : this.pendingKey;
+      // Legacy real-chat IDs can be read; unscoped "new" has no provable owner.
+      const data = this.store.getItem(key) || (chatId && this.storagePrefix !== "safeshare_vault_"
+        ? this.store.getItem(`safeshare_vault_data_${chatId}`) : null);
       if (data) {
         const parsed = JSON.parse(data);
         for (const [k, v] of Object.entries(parsed)) {
@@ -82,7 +86,7 @@ class SafeShareSymbolicVault {
         obj[k] = v;
       }
       const serialized = JSON.stringify(obj);
-      const key = this.activeChatId ? `${this.storagePrefix}data_${this.activeChatId}` : `${this.storagePrefix}data_new`;
+      const key = this.activeChatId ? `${this.storagePrefix}data_${this.activeChatId}` : this.pendingKey;
       this.store.setItem(key, serialized);
     } catch (_) {}
   }
@@ -95,11 +99,11 @@ class SafeShareSymbolicVault {
     if (!this.store || !chatId) return;
     try {
       const targetKey = `${this.storagePrefix}data_${chatId}`;
-      const pending = this.store.getItem(`${this.storagePrefix}data_new`);
+      const pending = this.store.getItem(this.pendingKey);
       if (!pending) return;
       // A mapping this chat already has of its own always wins; the pending copy is stale here.
       if (!this.store.getItem(targetKey)) this.store.setItem(targetKey, pending);
-      this.store.removeItem(`${this.storagePrefix}data_new`);
+      this.store.removeItem(this.pendingKey);
       this.loadFromSession(chatId);
     } catch (_) {}
   }
@@ -109,7 +113,7 @@ class SafeShareSymbolicVault {
    */
   clearPending() {
     if (!this.store) return;
-    try { this.store.removeItem(`${this.storagePrefix}data_new`); } catch (_) {}
+    try { this.store.removeItem(this.pendingKey); } catch (_) {}
   }
 
   /**
@@ -117,7 +121,10 @@ class SafeShareSymbolicVault {
    */
   dropSession(chatId) {
     if (!this.store || !chatId) return;
-    try { this.store.removeItem(`${this.storagePrefix}data_${chatId}`); } catch (_) {}
+    try {
+      this.store.removeItem(`${this.storagePrefix}data_${chatId}`);
+      if (this.storagePrefix !== "safeshare_vault_") this.store.removeItem(`safeshare_vault_data_${chatId}`);
+    } catch (_) {}
   }
 
   /**
@@ -205,8 +212,9 @@ class SafeShareSymbolicVault {
     this.activeChatId = null;
     if (this.store) {
       try {
-        const key = targetId ? `${this.storagePrefix}data_${targetId}` : `${this.storagePrefix}data_new`;
+        const key = targetId ? `${this.storagePrefix}data_${targetId}` : this.pendingKey;
         this.store.removeItem(key);
+        if (targetId && this.storagePrefix !== "safeshare_vault_") this.store.removeItem(`safeshare_vault_data_${targetId}`);
         this.store.removeItem(`${this.storagePrefix}data`);
       } catch (_) {}
     }

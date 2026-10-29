@@ -122,6 +122,13 @@ const Modal = require("../extension/ui/modal.js");
   // End to end through the share path: a multi-turn salary chat, then the attack on what would be
   // shared. Derived amounts are spread over several turns (attack C); nothing may be recoverable.
   const salaryChat = new Modal();
+  const publicKeyword = new Modal();
+  publicKeyword.currentTurns = [
+    { role: 'user', content: 'My salary is $5,000 per month. How much can I save at 20%?' },
+    { role: 'assistant', content: 'Benchmark output: 20% = $1,000.' }
+  ];
+  publicKeyword.runPipeline(); publicKeyword.rebuildViews();
+  assert.ok(!publicKeyword.sanitizedTurns[1].content.includes('$1,000'), 'public label must not bypass modal redaction');
   salaryChat.currentTurns = [
     { role: "user", content: "Gaji saya Rp 15.000.000 per bulan. Bantu buat anggaran." },
     { role: "assistant", content: "Tabungan 20% = Rp 3.000.000 per bulan, atau Rp 36.000.000 setahun." },
@@ -199,9 +206,12 @@ const Modal = require("../extension/ui/modal.js");
     encrypted = await encrypt(payload);
     return encrypted;
   };
-  global.browser = { storage: { local: { get: async () => ({}) } }, runtime: { sendMessage: async () => ({ success: true, data: { revoke_token: "fake" } }) } };
+  const saved = {};
+  global.browser = { storage: { local: { get: async () => ({}), set: async values => Object.assign(saved, values) } }, runtime: { sendMessage: async () => ({ success: true, data: { revoke_token: "fake" } }) } };
   await get("btn-encrypt-publish").click();
   assert(encrypted, "publication encrypted the preview");
+  assert.equal(saved[`chat_share_revoke_${encrypted.shareId}`].token, 'fake');
+  assert.equal(Object.hasOwn(saved[`chat_share_revoke_${encrypted.shareId}`], 'key'), false);
   const decrypted = await modal.crypto.decrypt(encrypted.ciphertext, encrypted.key);
   assert.deepEqual(decrypted.turns, preview);
   assert(decrypted.turns.every(t => Object.keys(t).sort().join() === "content,role"));

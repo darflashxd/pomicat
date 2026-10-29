@@ -32,7 +32,7 @@ External English holdout candidates (not downloaded or incorporated):
 ## Live testing gate
 
 Open an authored sample in Word Online using an authorized test account. Confirm the final
-`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating SafeShare launcher, the automatic
+`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating Blackline launcher, the automatic
 first read, the two-pane review, apply, local-relay encrypted share and a recipient browser
 without the extension. Compare tables, equations and image placements; independently inspect all
 sanitized OOXML/media parts. A link is only a correct test if the recipient preview and the

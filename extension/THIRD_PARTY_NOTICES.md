@@ -1,6 +1,6 @@
 # Bundled components
 
-SafeShare project code is licensed under Apache-2.0; see the repository's root
+Blackline (formerly SafeShare) project code is licensed under Apache-2.0; see the repository's root
 `LICENSE` (also included as `LICENSE` in the extension ZIP). Copyright ownership
 and third-party licenses are not changed by bundling.
 
@@ -14,7 +14,7 @@ Distribution: https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.30.
 
 The bundled files are byte-identical to these npm distribution files:
 
-| SafeShare path | Upstream path |
+| Project path | Upstream path |
 |---|---|
 | `models/ort.min.js` | `dist/ort.wasm.min.js` (renamed only) |
 | `models/ort-wasm-simd-threaded.mjs` | `dist/ort-wasm-simd-threaded.mjs` |

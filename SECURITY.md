@@ -1,6 +1,6 @@
 # Security policy
 
-SafeShare is research software, not a guarantee of anonymity. Read the threat model and limitations in [README.md](README.md#security-model).
+Blackline (previously SafeShare) is research software, not a guarantee of anonymity. Read the threat model and limitations in [README.md](README.md#security-model).
 
 ## Reporting vulnerabilities
 

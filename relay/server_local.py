@@ -41,13 +41,16 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 def load_storage():
-    if os.path.exists(STORAGE_FILE):
-        try:
-            with open(STORAGE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+    try:
+        with open(STORAGE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or any(not isinstance(v, dict) or
+                not isinstance(v.get("ciphertext"), str) or
+                not isinstance(v.get("expires_at"), (int, float)) for v in data.values()):
+            raise ValueError("Invalid relay storage; restore a valid copy before starting")
+        return data
+    except FileNotFoundError:
+        return {}
 
 
 def save_storage(data):
@@ -55,6 +58,8 @@ def save_storage(data):
     tmp_file = STORAGE_FILE + ".tmp"
     with open(tmp_file, "w", encoding="utf-8") as f:
         json.dump(data, f)
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(tmp_file, STORAGE_FILE)
 
 
@@ -97,6 +102,26 @@ def allowed(kind, ip):
 
 
 class SafeShareHandler(BaseHTTPRequestHandler):
+    def read_json(self, max_bytes):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or self.headers.get("Transfer-Encoding"):
+                raise ValueError("Unsupported request framing")
+            if length > max_bytes:
+                self.close_connection = True
+                self._send_cors(413)
+                self.wfile.write(b'{"error":"Request body too large"}')
+                return None
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("Expected JSON object")
+            return data
+        except (ValueError, UnicodeError):
+            self.close_connection = True
+            self._send_cors(400)
+            self.wfile.write(b'{"error":"Invalid JSON request"}')
+            return None
+
     def _send_cors(self, status=200, content_type="application/json"):
         self.send_response(status)
         origin = self.headers.get("Origin")
@@ -142,24 +167,11 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self._send_cors(429)
                 self.wfile.write(json.dumps({"error": "Too many requests, try again in a minute"}).encode())
                 return
-            length = int(self.headers.get("Content-Length", 0))
-            if length > MAX_BODY:
-                # Discard the body (bounded) so the client gets a readable 413 instead of a reset
-                remaining = min(length, 8 * 1024 * 1024)
-                while remaining > 0:
-                    chunk = self.rfile.read(min(65536, remaining))
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
-                self.close_connection = True
-                self._send_cors(413)
-                self.wfile.write(json.dumps({"error": "Share too large (max 512 KB)"}).encode())
+            data = self.read_json(MAX_BODY)
+            if data is None:
                 return
-
-            raw_body = self.rfile.read(length).decode("utf-8")
             try:
-                data = json.loads(raw_body)
-                share_id = str(data.get("id", "")).strip()
+                share_id = data.get("id", "")
                 ciphertext = data.get("ciphertext")
                 ttl = data.get("ttl", 86400)
                 burn_on_read = data.get("burn_on_read", False)
@@ -169,9 +181,14 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "Missing id or ciphertext"}).encode())
                     return
 
-                if not UUID_RE.match(share_id):
+                if not isinstance(share_id, str) or not UUID_RE.fullmatch(share_id):
                     self._send_cors(400)
                     self.wfile.write(json.dumps({"error": "Invalid share ID format"}).encode())
+                    return
+
+                if not isinstance(ciphertext, str) or len(ciphertext) > 512 * 1024:
+                    self._send_cors(413)
+                    self.wfile.write(b'{"error":"Invalid or oversized ciphertext"}')
                     return
 
                 # Never overwrite an existing share, expired or not
@@ -182,8 +199,8 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                         self.wfile.write(json.dumps({"error": "Share ID already exists"}).encode())
                         return
 
-                    is_burn = bool(burn_on_read) or ttl == "burn"
-                    ttl_sec = 86400 if ttl == "burn" else int(ttl)
+                    is_burn = burn_on_read is True or burn_on_read == 1 or ttl == "burn"
+                    ttl_sec = 86400 if ttl == "burn" else min(max(int(ttl), 300), 604800)
                     revoke_token = secrets.token_hex(32)
 
                     STORAGE[share_id] = {
@@ -214,15 +231,14 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Invalid share request: expected JSON object and valid TTL"}).encode())
         elif self.path.startswith("/api/revoke/"):
             share_id = self.path.replace("/api/revoke/", "").strip()
-            length = int(self.headers.get("Content-Length", 0))
-            try:
-                token = json.loads(self.rfile.read(length) or b"{}").get("token", "")
-            except Exception:
-                token = ""
+            data = self.read_json(4096)
+            if data is None:
+                return
+            token = data.get("token", "")
             with STORAGE_LOCK:
                 item = STORAGE.get(share_id)
                 token_hash = hashlib.sha256(str(token).encode()).hexdigest()
-                if not token or not item or not secrets.compare_digest(item.get("revoke_hash", ""), token_hash):
+                if not isinstance(token, str) or not token or not item or not secrets.compare_digest(item.get("revoke_hash", ""), token_hash):
                     self._send_cors(404)
                     self.wfile.write(json.dumps({"error": "Not found or invalid token"}).encode())
                     return
@@ -230,9 +246,9 @@ class SafeShareHandler(BaseHTTPRequestHandler):
                 try:
                     save_storage(STORAGE)
                 except OSError as e:
-                    # Gone from memory, but still on disk: it would come back after a restart
+                    STORAGE[share_id] = item
                     self._send_cors(500)
-                    self.wfile.write(json.dumps({"error": f"Revoked until restart only; could not save: {e}"}).encode())
+                    self.wfile.write(b'{"error":"Could not persist revocation; retry"}')
                     return
             print(f"[!] REVOKE: Shredded payload for ID: {share_id}")
             self._send_cors(200)
@@ -275,7 +291,13 @@ class SafeShareHandler(BaseHTTPRequestHandler):
 
                 if item.get("is_burn", False):
                     del STORAGE[share_id]
-                    save_or_log(STORAGE)
+                    try:
+                        save_storage(STORAGE)
+                    except OSError:
+                        STORAGE[share_id] = item
+                        self._send_cors(500)
+                        self.wfile.write(b'{"error":"Could not consume share; retry"}')
+                        return
                     print(f"[-] Atomic Burn: Shredded single-read payload for ID: {share_id}")
                 else:
                     item["view_count"] = item.get("view_count", 0) + 1
@@ -338,7 +360,7 @@ def run():
     host = os.environ.get("SAFESHARE_HOST", "127.0.0.1")
     server = ThreadedHTTPServer((host, PORT), SafeShareHandler)
     print(f"================================================================")
-    print(f"[*] SafeShare-AI Integrated Server Active on {host}:{PORT}")
+    print(f"[*] Blackline relay active on {host}:{PORT}")
     print(f"[*] Web Viewer: http://{host}:{PORT}")
     print(f"[*] Relay API : http://{host}:{PORT}/api/share")
     print(f"================================================================")

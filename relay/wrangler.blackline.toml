@@ -1,0 +1,33 @@
+name = "blackline-relay"
+main = "worker.js"
+account_id = "69ee5bf1edad9f9717b3d4ec74ff72f1"
+compatibility_date = "2026-09-18"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "../extension/viewer"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "safeshare-db"
+database_id = "b16c35b1-8428-4ccd-b4bb-e4bdc4f51954"
+
+# Share approximate per-location counters with the legacy Worker.
+[[ratelimits]]
+name = "UPLOAD_LIMITER"
+namespace_id = "1001"
+[ratelimits.simple]
+limit = 10
+period = 60
+
+[[ratelimits]]
+name = "READ_LIMITER"
+namespace_id = "1002"
+[ratelimits.simple]
+limit = 60
+period = 60
+
+# Cleanup cron remains on safeshare-relay; uploads also purge expired shares.

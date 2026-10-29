@@ -1,10 +1,11 @@
 /* Flatten an inspected DOCX into searchable text plus a reversible map back to
    paragraph/table-cell positions. Pure functions: no DOM, so this is testable in Node. */
 (function (root, factory) {
-  const api = factory();
+  const Pseudonymizer = typeof module === "object" && module.exports ? require("../engine/pseudonymizer.js") : ConsistentPseudonymizer;
+  const api = factory(new Pseudonymizer());
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.SafeShareTextMap = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (pseudonymizer) {
   const MONEY_HEADER = /\b(?:salary|salaries|base|bonus|pay|payout|wage|wages|income|earnings?|compensation|allowance|amount|total|subtotal|cost|fee|fees|price|balance|savings?|budget|rent|mortgage|debt|loan|premium|deduction|net|gross|gaji|tunjangan|upah|penghasilan|pendapatan|tabungan|biaya|harga|jumlah|total)\b/i;
   const NON_MONEY_HEADER = /\b(?:year|date|period|month|quarter|age|count|quantity|qty|number|no|id|code|percent|percentage|rate|share|ratio|index)\b/i;
 
@@ -71,13 +72,8 @@
   }
 
   function numericValue(raw) {
-    const cleaned = String(raw).replace(/[^\d.,-]/g, "");
-    if (!cleaned) return null;
-    // 4,800 / 4.800 (thousands) vs 4.80 (decimal)
-    let normalised = cleaned;
-    if (/^\d{1,3}(?:[.,]\d{3})+$/.test(cleaned)) normalised = cleaned.replace(/[.,]/g, "");
-    else normalised = cleaned.replace(/,/g, "");
-    const value = Math.abs(Number.parseFloat(normalised));
+    if (!/\d/.test(String(raw))) return null;
+    const value = Math.abs(pseudonymizer.parseFinancialValue(String(raw)));
     return Number.isFinite(value) ? value : null;
   }
 
@@ -95,7 +91,7 @@
       raw = String(raw).replace(/\s*(?:USD|IDR|SGD|MYR|dollars?|ringgit|rupiah)$/i, "").trim();
       const value = numericValue(raw);
       if (value === null || isYearToken(raw, value)) return;
-      const key = String(value);
+      const key = String(raw).trim().toLowerCase();
       const prior = bases.get(key);
       if (prior && prior.preChecked && !preChecked) return;
       bases.set(key, { value, raw: String(raw).trim(), reason, preChecked });

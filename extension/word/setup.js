@@ -45,7 +45,7 @@ async function runCapture(){
   try {
     const tabId=Number(query.get("tab"));
     const tab=await api.tabs.get(tabId);
-    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen SafeShare from Word.");
+    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen Blackline from Word.");
     const url=SafeShareWordSource.downloadUrl(tab.url);
     // Execute in isolated content-script world: session cookies stay with the browser.
     const result=await api.scripting.executeScript({target:{tabId},func:async (target,maxBytes)=>{
@@ -108,9 +108,11 @@ if (sharepointOrigin && Number.isInteger(autoTab) && autoTab > 0) {
 async function legacyLinks() {
   try {
     const stored = await api.storage.local.get(null);
-    const shares = [...Object.entries(stored).filter(([k])=>k.startsWith("document_share_revoke_")).map(([,v])=>v),...(stored.document_share_revocations || [])];
+    const expired = Object.entries(stored).filter(([k,v]) => k.startsWith("chat_share_revoke_") && v?.expiresAt <= Date.now()).map(([k]) => k);
+    if (expired.length) await api.storage.local.remove(expired);
+    const shares = [...Object.entries(stored).filter(([k])=>(k.startsWith("document_share_revoke_") || k.startsWith("chat_share_revoke_")) && !expired.includes(k)).map(([,v])=>v),...(stored.document_share_revocations || [])];
     $("legacy").replaceChildren();
-    if (!shares.length) { $("legacy").textContent = "No earlier document links stored on this device."; return; }
+    if (!shares.length) { $("legacy").textContent = "No earlier chat or document links stored on this device."; return; }
     for (const share of shares) {
       const button = document.createElement("button");button.textContent = `Revoke ${share.shareId}`;
       button.addEventListener("click",async()=>{
@@ -119,6 +121,8 @@ async function legacyLinks() {
           const result = await api.runtime.sendMessage({action:"REVOKE_SHARE",...share});
           if (!result?.success) throw new Error();
           await api.storage.local.remove("document_share_revoke_"+share.shareId);
+          await api.storage.local.remove("chat_share_revoke_"+share.shareId);
+          await api.storage.local.remove("safeshare_own_"+share.shareId);
           const current = await api.storage.local.get("document_share_revocations");
           if(current.document_share_revocations)await api.storage.local.set({document_share_revocations:current.document_share_revocations.filter(s=>s.shareId!==share.shareId)});
           await legacyLinks();$("status").textContent = "Earlier link revoked. Saved copies cannot be recalled.";

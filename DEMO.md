@@ -23,7 +23,7 @@ server does not change the extension's default hosted destination.
 
 ## 1. Show the sharing workflow (45 seconds)
 
-Open SafeShare on a short English chat. Check both user and assistant turns were extracted.
+Open Blackline on a short English chat. Check both user and assistant turns were extracted.
 Show automatic redactions, optional model suggestions, and a manual redaction of an unknown
 format. Explain: "The preview is what the recipient will receive. The model is English-focused;
 an empty scan is not proof of safety."

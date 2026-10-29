@@ -11,3 +11,7 @@ assert.equal(word.rangeFor('4,800','USD'), '$2k-$5k');
 assert.equal(word.rangeFor('4800','IDR'), 'Rp 2-5 ribu');
 assert.equal(policy.attackCheck([{role:'document',content:'Public annual salary 57,600.'}], AdversaryOracleSolver).leaks, 0);
 console.log('Word formula reconstruction and range policy checks passed');
+const textMap = require('../extension/word/textmap');
+for (const [raw, value] of [['Rp 4.800,50',4800.5],['$4,800.50',4800.5],['4,80',4.8],['-4.800',4800]]) {
+  assert.equal(textMap.numericValue(raw), value, raw);
+}

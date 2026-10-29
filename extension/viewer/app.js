@@ -10,7 +10,16 @@
  * 6. Zero-Clipboard Continuation Bridge
  */
 
+function validChatPayload(payload) {
+  return payload && (payload.kind === undefined || payload.kind === 'chat') &&
+    (payload.version === undefined || [1, 2, 3].includes(payload.version)) &&
+    Array.isArray(payload.turns) && payload.turns.length <= 10000 && payload.turns.every(turn =>
+      turn && ['user', 'assistant', 'system', 'developer', 'tool', 'function'].includes(turn.role) &&
+      typeof turn.content === 'string' && turn.content.length <= 512 * 1024);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  let decryptedData = null;
   const cryptoEngine = new SafeShareCrypto();
   const steganography = typeof SafeShareSteganography !== "undefined" ? new SafeShareSteganography() : null;
   const extensionBridge = typeof SafeShareExtensionBridge !== "undefined" ? new SafeShareExtensionBridge() : null;
@@ -23,10 +32,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lockMeta = document.querySelector("#crawler-lock-screen .lock-meta");
   if (lockMeta) {
     lockMeta.innerText = inExtension
-      ? "Opened inside the SafeShare extension: decrypted by the extension's own copy of this page." +
-        (/^https:\/\/safeshare-relay\.bleedguard\.workers\.dev$/.test(window.SAFESHARE_RELAY_URL)
+      ? "Opened inside the Blackline extension: decrypted by the extension's own copy of this page." +
+      (/^https:\/\/(?:safeshare|blackline)-relay\.bleedguard\.workers\.dev$/.test(window.SAFESHARE_RELAY_URL)
           ? "" : ` Chat loaded from ${window.SAFESHARE_RELAY_URL}, not the official relay.`)
-      : "Decrypted by this page, served by the relay. With the SafeShare extension installed, links open inside the extension instead.";
+      : "Decrypted by this page, served by the relay. With the Blackline extension installed, links open inside the extension instead.";
   }
   let shareId = params.get("id");
   if (!shareId) {
@@ -48,7 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       lock.querySelector("h2").innerText = "⚠️ Session Revoked";
       lock.querySelector("p").innerText = "This conversation session has been permanently revoked and cleared from memory.";
     }
-    console.warn("[SafeShare] Access denied: Session has been revoked.");
+    console.warn("[Blackline] Access denied: Session has been revoked.");
     return;
   }
 
@@ -64,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (memoryZeroizer) {
     memoryZeroizer.registerZeroizer(() => {
-      console.warn("[SafeShare] Zeroing memory and DOM buffers.");
+      console.warn("[Blackline] Clearing application references and DOM content.");
       decryptedData = null;
       if (watermarkedTurns && Array.isArray(watermarkedTurns)) {
         watermarkedTurns.length = 0;
@@ -102,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       decryptedData = await cryptoEngine.decrypt(ciphertext, hashKey);
     } catch (err) {
-      console.error("[SafeShare Viewer] Standalone decryption error:", err);
+      console.error("[Blackline Viewer] Standalone decryption error:", err);
       lockScreen.style.display = "block";
       if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired";
@@ -144,7 +153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let decryptStarted = false;
     try {
       const relayHost = window.SAFESHARE_RELAY_URL || window.location.origin;
-      const res = await fetch(`${relayHost}/api/share/${shareId}`);
+      const res = await fetch(`${relayHost}/api/share/${encodeURIComponent(shareId)}`, { signal: AbortSignal.timeout(20000), redirect: 'error' });
       
       if (!res.ok) {
         if (res.status === 404 || res.status === 410) {
@@ -159,8 +168,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { ciphertext } = await res.json();
       decryptStarted = true;
       decryptedData = await cryptoEngine.decrypt(ciphertext, hashKey);
+      if (!decryptedData || decryptedData.shareId !== shareId) throw new Error('Share ID does not match encrypted payload');
     } catch (err) {
-      console.error("[SafeShare Viewer] Relay decryption error:", err);
+      console.error("[Blackline Viewer] Relay decryption error:", err);
       lockScreen.style.display = "block";
       if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Revoked";
@@ -185,11 +195,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!valid) {
       lockScreen.style.display = "block";
       lockScreen.querySelector("h2").textContent = "Unsupported document link";
-      lockScreen.querySelector("p").textContent = "Ask the sender to create a new link with the current SafeShare version.";
+      lockScreen.querySelector("p").textContent = "Ask the sender to create a new link with the current Blackline version.";
       return;
     }
     lockScreen.style.display = "none";
-    document.title = "SafeShare - Reviewed document";
+    document.title = "Blackline - Reviewed document";
     const brand = document.querySelector(".brand-sub");
     if (brand) brand.textContent = "Private document";
     const section = document.createElement("section");
@@ -219,8 +229,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Render Decrypted Chat View
-  if (!decryptedData || !decryptedData.turns) {
+  if (!validChatPayload(decryptedData)) {
     lockScreen.style.display = "block";
+    lockScreen.querySelector("h2").textContent = "Unsupported conversation link";
+    lockScreen.querySelector("p").textContent = "The encrypted payload has an unsupported structure.";
     return;
   }
 
@@ -411,9 +423,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const summarize = summarizeChk ? summarizeChk.checked : true;
         const result = await extensionBridge.forwardToAIPlatform(platformName, turns, { summarize });
         if (result.success) {
-          alert(`[SafeShare]\n✓ ${result.message}`);
+          alert(`[Blackline]\n✓ ${result.message}`);
         } else {
-          alert(`[SafeShare]\nContext forwarding is supported directly via the SafeShare Browser Extension.`);
+          alert(`[Blackline]\nContext forwarding is supported directly via the Blackline Browser Extension.`);
         }
       }
     };

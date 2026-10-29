@@ -7,7 +7,7 @@ with sync_playwright() as p:
     for engine in [p.chromium, p.firefox]:
         browser = engine.launch()
         page = browser.new_page()
-        for name in ['engine/heuristics.js', 'engine/contextual.js', 'engine/maybe.js', 'word/detect.js', 'word/textmap.js']:
+        for name in ['engine/heuristics.js', 'engine/contextual.js', 'engine/pseudonymizer.js', 'engine/maybe.js', 'word/detect.js', 'word/textmap.js']:
             page.add_script_tag(path=str(ROOT / 'extension' / name))
         contextual = page.evaluate('''async () => {
           const doc={blocks:[{text:'My doctor diagnosed me with diabetes. My manager put me on a performance improvement plan.'}],supplementary:[]};

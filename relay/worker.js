@@ -339,7 +339,7 @@ export default {
     }
 
     return new Response(
-      "SafeShare-AI Production Worker Active. Web Viewer not bound to static assets.",
+      "Blackline relay active. Web viewer assets are not configured.",
       {
         status: 200,
         headers: corsHeaders

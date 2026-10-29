@@ -122,7 +122,7 @@ class SafeShareCrypto {
 
   /**
    * Decrypts ciphertext using key provided from URI fragment #.
-   * Cryptographically enforces the expiration deadline embedded in the payload.
+   * Enforces authenticated expiry metadata in this viewer, not against a holder of the key.
    */
   async decrypt(ciphertextB64Url, keyB64Url) {
     const key = await this.importKeyFromBase64Url(keyB64Url);
@@ -150,7 +150,7 @@ class SafeShareCrypto {
     const decodedStr = new TextDecoder().decode(unpaddedBytes).replace(/\0+$/, "");
     const parsed = JSON.parse(decodedStr);
 
-    // Cryptographic expiration enforcement: cannot be bypassed by editing URL fragment
+    // Authenticated expiry cannot be edited without the key; holders can decrypt outside this viewer.
     if (parsed && typeof parsed.expMs === "number" && parsed.expMs > 0) {
       if (Date.now() > parsed.expMs) {
         const expErr = new Error("Link expired: the cryptographic expiration deadline has passed.");
@@ -165,7 +165,7 @@ class SafeShareCrypto {
   // --- Cryptographic Padding Utilities (Traffic Analysis Mitigation) ---
 
   /**
-   * Applies PKCS#7 block padding to eliminate ciphertext length leakage.
+   * Applies 256-byte bucket padding to reduce size precision; bucket size remains visible.
    */
   pad(data, blockSize = 256) {
     const padLen = blockSize - (data.length % blockSize);

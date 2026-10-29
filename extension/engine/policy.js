@@ -171,6 +171,27 @@
   // Occam weighting: monthly<->yearly (12) is the usual step, other periods are less likely.
   const periodCost = (c) => (c === 12 ? 1 : 2);
 
+  // ponytail: explicit same-line percentage equations only; add other relations with negative controls.
+  function explicitRelations(text) {
+    const hidden = /\[[^\]]*(?:FINANCIAL|AMOUNT|SALARY|MONEY|INCOME|DERIVED|BUDGET)[^\]]*\]|<S\d+>/i.test(text);
+    const out = [];
+    const solver = new AdversaryOracleSolver();
+    for (const line of text.split(/\n/)) {
+      const tokens = solver.lexNumericSpans(line);
+      const ratios = tokens.filter(t => t.isRatio && t.val > 0 && t.val < 1);
+      const amounts = tokens.filter(t => !t.isRatio && !t.isSmallInt);
+      if (ratios.length !== 1 || amounts.length !== 1) continue;
+      const [r] = ratios, [a] = amounts;
+      if (r.end > a.start) continue;
+      const between = line.slice(r.end, a.start).trim();
+      const personal = /^(?:of (?:your|my) (?:monthly )?(?:salary|income)|dari gaji (?:saya|kamu|anda))\s+(?:is|equals|adalah|sebesar)$/i.test(between);
+      if (!personal && !(hidden && /^(?:=|gives|means|adalah|sebesar)$/i.test(between))) continue;
+      out.push({ value: a.val / r.val, support: 1, cost: 1, derivations: [`${a.raw.trim()} / ${r.raw.trim()}`],
+        currency: currencyOf(a.raw), evidence: 'explicit-relation' });
+    }
+    return out;
+  }
+
   /**
    * Returns hidden-value candidates that at least `minSupport` distinct visible numbers agree
    * on. Consistent numbers also agree on every rescaled value (x2, /60, ...), so candidates are
@@ -221,7 +242,7 @@
 
     const currency = (amounts.find((a) => /Rp|IDR/i.test(a.raw)) && "IDR") ||
       (amounts.find((a) => /\$|USD/.test(a.raw)) && "USD") || null;
-    return clusters
+    const ranked = clusters
       .map((k) => {
         const ds = [...k.bySource.values()];
         return {
@@ -235,6 +256,10 @@
       .filter((k) => k.support >= minSupport)
       .sort((a, b) => b.support - a.support || a.cost - b.cost)
       .slice(0, limit);
+    for (const finding of explicitRelations(text).reverse()) {
+      if (!ranked.some(candidate => near(candidate.value, finding.value))) ranked.unshift(finding);
+    }
+    return ranked.slice(0, limit);
   }
 
   function attackCheck(turns, Solver) {

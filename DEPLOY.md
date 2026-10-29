@@ -1,4 +1,14 @@
-# Deploying the SafeShare relay to Cloudflare
+# Deploying the Blackline relay to Cloudflare
+
+Production Blackline config: `relay/wrangler.blackline.toml`. From `relay/`, use
+`npx wrangler@4 deploy --config wrangler.blackline.toml --name blackline-relay`.
+It shares the existing D1 and rate-limit namespaces, runs the Worker before
+static assets for security headers, and adds no cleanup cron. `wrangler.toml`
+still targets the legacy SafeShare Worker: do not use it for a Blackline deploy.
+
+Previously SafeShare. Existing Worker/D1 names, URLs and configuration keys below
+stay unchanged for compatibility. Rebranding the extension does not deploy this
+Worker or move existing shares. Do not recreate the database for the rename.
 
 The relay is a Cloudflare Worker. It stores encrypted shares in a D1 database and serves the page
 that opens share links. It only ever sees ciphertext: the decryption key is in the link's `#`

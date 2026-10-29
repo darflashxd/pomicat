@@ -354,7 +354,11 @@ class AdversaryOracleSolver {
       for (const token of tokens) {
         if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
-        if (this.isSafePublicSpan(text, token.start, token.end)) continue;
+        // A public-looking label cannot override a direct relation to a known secret.
+        const directRelation = secretValues.some(value => Math.abs(token.val - value) / value <= this.tolerance ||
+          ratios.filter(r => r > 0 && r < 1).some(r =>
+            [token.val / r, token.val / (1 - r)].some(v => Math.abs(v - value) / value <= this.tolerance)));
+        if (!directRelation && this.isSafePublicSpan(text, token.start, token.end)) continue;
         if (disabledLeaks.some(dl => String(dl).trim().toLowerCase() === token.raw.trim().toLowerCase() ||
           this.lexNumericSpans(String(dl)).some(t => !t.isRatio && Math.abs(token.val - t.val) <= 0.01))) continue;
 
@@ -1287,7 +1291,12 @@ class ConsistentPseudonymizer {
               return match;
             }
             if (solverHelper.isSafePublicSpan(turn.content, offset, offset + match.length)) {
-              return match; // Safe public benchmark line, preserve!
+              // Preserve unrelated public figures, but never an explicit ratio of a known secret.
+              const line = turn.content.slice(turn.content.lastIndexOf("\n", offset) + 1, turn.content.indexOf("\n", offset) < 0 ? undefined : turn.content.indexOf("\n", offset));
+              const value = Math.abs(parseFinancialAmount(match));
+              const ratios = solverHelper.lexNumericSpans(line).filter(t => t.isRatio && t.val > 0 && t.val < 1);
+              if (!financialNums.some(f => Math.abs(value - f.val) / f.val <= solverHelper.tolerance || ratios.some(r =>
+                [value / r.val, value / (1 - r.val)].some(v => Math.abs(v - f.val) / f.val <= solverHelper.tolerance)))) return match;
             }
             if (isEmbeddedFinancialSpan(turn.content, offset, offset + match.length)) return match;
             const cleanMatch = match.trim();

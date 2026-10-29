@@ -15,7 +15,7 @@ async function relayBaseUrl() {
     const { safeshare_relay } = await api.storage.local.get("safeshare_relay");
     if (safeshare_relay) return String(safeshare_relay).replace(/\/$/, "");
   } catch (_) {}
-  return "https://safeshare-relay.bleedguard.workers.dev";
+  return "https://blackline-relay.bleedguard.workers.dev";
 }
 
 function escapePreview(value) {

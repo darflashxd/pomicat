@@ -212,11 +212,14 @@ async function redactMessages(messages, policy) {
 
 function refuse(res, status, message) {
   res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: { type: "safeshare_proxy", message: `SafeShare proxy: ${message}` } }));
+  res.end(JSON.stringify({ error: { type: "safeshare_proxy", message: `Blackline proxy: ${message}` } }));
 }
 
 function start({ port = 8788, upstream = "https://api.openai.com", policy = {} } = {}) {
   const server = http.createServer(async (req, res) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    res.once('close', () => { clearTimeout(timeout); controller.abort(); });
     try {
       if (!req.url.startsWith("/") || req.url.startsWith("//") || req.url.includes("\\")) return refuse(res, 400, "only origin-relative request paths are allowed.");
       const target = new URL(req.url, upstream);
@@ -264,6 +267,7 @@ function start({ port = 8788, upstream = "https://api.openai.com", policy = {} }
         method: req.method,
         headers,
         redirect: "error",
+        signal: controller.signal,
         body: body.length ? body : undefined
       });
 
@@ -271,14 +275,15 @@ function start({ port = 8788, upstream = "https://api.openai.com", policy = {} }
       delete outHeaders["content-encoding"]; // fetch already decoded the body
       delete outHeaders["content-length"];
       res.writeHead(upstreamRes.status, outHeaders);
-      if (upstreamRes.body) Readable.fromWeb(upstreamRes.body).pipe(res);
+      if (upstreamRes.body) Readable.fromWeb(upstreamRes.body).on('error', error => res.destroy(error)).pipe(res);
       else res.end();
     } catch (err) {
-      refuse(res, err.status || 502, err.status ? err.message : "redaction or upstream request failed; not forwarded successfully.");
+      if (!res.destroyed && !res.headersSent) refuse(res, err.status || 502, err.status ? err.message : "redaction or upstream request failed; not forwarded successfully.");
+      else res.destroy();
     }
   });
   server.listen(port, "127.0.0.1", () => {
-    console.log(`SafeShare proxy on http://127.0.0.1:${server.address().port}/v1 -> ${upstream}`);
+    console.log(`Blackline proxy on http://127.0.0.1:${server.address().port}/v1 -> ${upstream}`);
   });
   return server;
 }

@@ -40,7 +40,7 @@ def main():
             else:
                 raise RuntimeError('Local relay did not start')
 
-            def make_share(burn):
+            def make_share(burn, mismatch=False):
                 script = """
                 const Crypto=require('./extension/engine/crypto');
                 const {redactTurns}=require('./bin/safeshare');
@@ -51,6 +51,10 @@ def main():
                 """
                 enc = json.loads(subprocess.run(['node', '-e', script, origin], cwd=ROOT,
                     capture_output=True, text=True, encoding='utf-8', check=True, timeout=30).stdout)
+                if mismatch:
+                    import uuid
+                    enc['shareId'] = str(uuid.uuid4())
+                    enc['fullShareUrl'] = origin + '/v/' + enc['shareId'] + '#' + enc['key']
                 body = json.dumps({'id': enc['shareId'], 'ciphertext': enc['ciphertext'],
                                    'ttl': 3600, 'burn_on_read': burn}).encode()
                 with urlopen(Request(origin+'/api/share', data=body, headers={'Content-Type':'application/json'}), timeout=5) as res:
@@ -58,7 +62,7 @@ def main():
                     enc['revoke_token'] = json.load(res)['revoke_token']
                 return enc
 
-            burn, normal = make_share(True), make_share(False)
+            burn, normal, mismatch = make_share(True), make_share(False), make_share(False, True)
             with sync_playwright() as p:
                 browser = getattr(p, args.browser).launch()
                 try:
@@ -107,6 +111,10 @@ def main():
                     page.reload()
                     page.get_by_role('button', name='Open conversation', exact=True).click()
                     page.get_by_role('heading', name='⏱️ Link Expired or Revoked').wait_for()
+                    page.goto(mismatch['fullShareUrl'])
+                    page.get_by_role('button', name='Open conversation', exact=True).click()
+                    page.get_by_role('heading', name='Decryption Failed').wait_for()
+                    assert page.locator('#messages-container .chat-bubble').count() == 0
                     assert not blocked, 'Unexpected external request blocked'
                     assert not errors, errors
                     print(f'PASS {args.browser}: hosted local viewer, no pre-click read, untrusted click ignored, decrypted redacted turns, burn, revoke. No public relay used.')

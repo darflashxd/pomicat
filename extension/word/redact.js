@@ -261,7 +261,7 @@
       for (const node of [...doc.getElementsByTagNameNS("*", local)]) node.textContent = "";
     }
     for (const local of ["creator", "lastModifiedBy"]) {
-      for (const node of [...doc.getElementsByTagNameNS("*", local)]) node.textContent = "SafeShare";
+      for (const node of [...doc.getElementsByTagNameNS("*", local)]) node.textContent = "Blackline";
     }
     for (const local of ["created", "modified", "lastPrinted"]) {
       for (const node of [...doc.getElementsByTagNameNS("*", local)]) node.textContent = "2026-01-01T00:00:00Z";

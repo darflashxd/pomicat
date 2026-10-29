@@ -5,11 +5,24 @@
  * and executes Local Compute Hydration in client RAM.
  */
 
-(function () {
+(async function () {
   // The version tells you whether the tab runs the extension you just reloaded
   const runtimeApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
+  // Only the background knows tab identity; a page-controlled URL is not a draft identity.
+  let draftId = crypto.randomUUID();
+  if (runtimeApi?.runtime?.id) {
+    try {
+      const context = await Promise.race([
+        runtimeApi.runtime.sendMessage({ action: "GET_MAPPING_CONTEXT" }),
+        new Promise(resolve => setTimeout(() => resolve(null), 1500))
+      ]);
+      if (Number.isInteger(context?.tabId)) draftId = `tab-${context.tabId}-${draftId}`;
+    } catch (_) {}
+  }
+  const mappingScope = encodeURIComponent(location.origin);
+  const pendingMappingId = `draft-${draftId}`;
   const loadedVersion = runtimeApi && runtimeApi.runtime && runtimeApi.runtime.getManifest ? runtimeApi.runtime.getManifest().version : "dev";
-  console.log(`[SafeShare-AI] Extension content script active (v${loadedVersion}).`);
+  console.log(`[Blackline] Extension content script active (v${loadedVersion}).`);
 
   // The chat id is the last path segment after the site's marker. ChatGPT (Oct 2026) can hand out
   // ids such as "local-chatgpt:<uuid>", so the whole segment is taken and decoded rather than
@@ -26,13 +39,12 @@
     : (id) => typeof id === "string" && /^local-/i.test(id);
 
   // Ephemeral engines initialized in content script context
-  const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault() : null;
+  const symbolicVault = typeof SafeShareSymbolicVault !== "undefined" ? new SafeShareSymbolicVault(`safeshare_vault_${mappingScope}_`, pendingMappingId) : null;
   if (symbolicVault && typeof location !== "undefined") {
     const initId = chatIdOf(location.href);
     if (initId) {
-      // A chat started on "/" gets its /c/<id> URL after the first send. If the site reloads the
-      // page there, the mapping may still be filed under "new": move it before reading this chat.
-      symbolicVault.promotePendingSession(initId);
+      // A fresh page cannot prove that an unassigned draft belongs to this conversation.
+      // Known same-document route transitions migrate explicitly below.
       symbolicVault.loadFromSession(initId);
     }
   }
@@ -76,22 +88,23 @@
    * (not the page's), which the chat site's scripts can't read, and cleared when the browser closes.
    */
   // One map per chat ([NAME_1] in chat A is not [NAME_1] in chat B), keyed by the chat's ID from
-  // the URL; a brand-new chat uses "new" until the site assigns its ID.
+  // the URL and origin; a new draft has a per-document nonce, never a shared "new" key.
   const idMap = { byValue: new Map(), byPlaceholder: new Map(), counters: {} };
   const extApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
   const idStore = extApi && extApi.storage && extApi.storage.session ? extApi.storage.session : null;
-  let idMapKey = `safeshare_idmap_${chatIdOf(typeof location !== "undefined" ? location.href : "") || "new"}`;
+  const idStorageKey = id => `safeshare_idmap_${mappingScope}_${id ? `chat_${encodeURIComponent(id)}` : pendingMappingId}`;
+  let idMapKey = idStorageKey(chatIdOf(typeof location !== "undefined" ? location.href : ""));
   function loadIdMap(chatId) {
     idMap.byValue.clear();
     idMap.byPlaceholder.clear();
     idMap.counters = {};
-    idMapKey = `safeshare_idmap_${chatId || "new"}`;
+    idMapKey = idStorageKey(chatId);
     for (const [ph, value] of idMapsSeen.get(idMapKey) || []) rememberId(ph, value);
     if (!idStore) return;
     const key = idMapKey;
-    Promise.resolve(idStore.get(key)).then((res) => {
+    Promise.resolve(idStore.get(chatId ? [key, `safeshare_idmap_${chatId}`] : key)).then((res) => {
       if (key !== idMapKey) return; // switched chats meanwhile
-      for (const [ph, value] of (res && res[key]) || []) rememberId(ph, value);
+      for (const [ph, value] of (res && (res[key] || (chatId && res[`safeshare_idmap_${chatId}`]))) || []) rememberId(ph, value);
     }).catch(() => {});
   }
   const idMapsSeen = new Map(); // this tab's maps per chat, so switching back is instant
@@ -253,7 +266,7 @@
         count: syncRes.count + addedCount
       };
     } catch (err) {
-      console.warn("[SafeShare-AI] Gate 2 NER pass fallback:", err);
+      console.warn("[Blackline] Gate 2 NER pass fallback:", err);
       return { ...syncRes, nerUnavailable: true };
     }
   }
@@ -267,7 +280,7 @@
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       </svg>
-      <span>SafeShare</span>
+      <span>Blackline</span>
     `;
     pill.style.cssText = `
       position: fixed;
@@ -312,23 +325,23 @@
       let prepared;
       try { prepared = await prepareConversation(); }
       catch (error) {
-        if (error.name !== "AbortError") alert("SafeShare: Could not prepare this conversation. Please try again.");
+        if (error.name !== "AbortError") alert("Blackline: Could not prepare this conversation. Please try again.");
         return;
       } finally {
         delete pill.dataset.preparing;
         pill.textContent = label;
       }
       const { turns, uncertain } = prepared;
-      if (uncertain && !window.confirm("SafeShare could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
+      if (uncertain && !window.confirm("Blackline could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
       if (turns.length === 0) {
-        alert("SafeShare: No active conversation found in the current chat window.");
+        alert("Blackline: No active conversation found in the current chat window.");
         return;
       }
       // Reading only one side means the site's layout changed: a share without your own messages
       // also stops the inversion defence from knowing which amounts were yours (see ROADMAP P0.1)
       const users = turns.filter(t => t.role === "user").length;
       const answers = turns.filter(t => t.role === "assistant").length;
-      if ((!users || !answers) && !window.confirm(`SafeShare found ${users} of your messages and ${answers} AI answers in this chat. ` +
+      if ((!users || !answers) && !window.confirm(`Blackline found ${users} of your messages and ${answers} AI answers in this chat. ` +
         "The site may have changed its layout, so the share could be incomplete and protection weaker. Open the share dialog anyway?")) return;
       const modal = new SafeShareModal();
       modal.open(turns);
@@ -463,7 +476,7 @@
       if (indicator) indicator.remove(); // Remove stale indicator
       indicator = document.createElement("div");
       indicator.id = "safeshare-shield-indicator";
-      indicator.title = "SafeShare: what to protect before sending (click to change)";
+      indicator.title = "Blackline: what to protect before sending (click to change)";
       indicator.addEventListener("click", (e) => {
         e.stopPropagation();
         if (extensionGone()) return; // "SafeShare was updated: refresh this tab"
@@ -485,8 +498,8 @@
     const topics = sensitiveTopics(getInputText(inputEl));
     const topicNote = topics.length ? ` · ⚠️ ${topics.join(", ")} sent as typed` : "";
     indicator.title = topics.length
-      ? `This message says something personal about your ${topics.join(" and ")}. SafeShare doesn't replace it (the AI needs it to help); remove it if you'd rather not send it.`
-      : "SafeShare: what to protect before sending (click to change)";
+      ? `This message says something personal about your ${topics.join(" and ")}. Blackline doesn't replace it (the AI needs it to help); remove it if you'd rather not send it.`
+      : "Blackline: what to protect before sending (click to change)";
 
     if (!isEnabled) {
       indicator.className = "shield-disabled";
@@ -673,7 +686,7 @@
       const holdOnError = (err) => {
         e.preventDefault();
         e.stopImmediatePropagation();
-        console.error("[SafeShare-AI] Protection failed; message held, not sent:", err);
+        console.error("[Blackline] Protection failed; message held, not sent:", err);
         const indicator = document.getElementById("safeshare-shield-indicator");
         if (indicator) {
           indicator.textContent = "🛡️ Protection error: message NOT sent. Retry, or switch protection off ▾";
@@ -705,7 +718,7 @@
       if (rewritten && rewritten.isTransformed) {
         try { setInputText(inputEl, rewritten.sanitizedPrompt); }
         catch (err) { isRewriting = false; return holdOnError(err); }
-        console.log("[SafeShare-AI] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
+        console.log("[Blackline] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
       }
       if (rewritten && rewritten.nerUnavailable) {
         const indicator = document.getElementById("safeshare-shield-indicator");
@@ -790,7 +803,7 @@
         ? "not in this tab's map (sent from another tab, before a reload, or in another chat)"
         : !roots.length ? "no assistant message found by MESSAGE_SELECTOR on this site"
           : "only in your own message (shown as sent, by design) or outside the answer";
-      console.info(`[SafeShare-AI] ${m[0]} left as is: ${why}. Map size ${idMap.byPlaceholder.size}, answer roots ${roots.length}.`);
+      console.info(`[Blackline] ${m[0]} left as is: ${why}. Map size ${idMap.byPlaceholder.size}, answer roots ${roots.length}.`);
     }
   }
 
@@ -1475,10 +1488,11 @@
         if (isTemporaryToReal) symbolicVault.dropSession(oldId);
       }
       if (isTemporaryToReal) {
-        try { if (idStore) Promise.resolve(idStore.remove(`safeshare_idmap_${oldId}`)).catch(() => {}); } catch (_) {}
+        try { if (idStore) Promise.resolve(idStore.remove(idStorageKey(oldId))).catch(() => {}); } catch (_) {}
       }
-      idMapKey = `safeshare_idmap_${newId}`;
+      idMapKey = idStorageKey(newId);
       saveIdMap();
+      try { if (idStore) Promise.resolve(idStore.remove(idStorageKey(null))).catch(() => {}); } catch (_) {}
     } else if (!isSameChat) {
       // Truly different chat session: close modal and load secrets for this session (or clear)
       const existing = document.getElementById("safeshare-modal-backdrop");
@@ -1516,7 +1530,7 @@
       // shown on screen and shares can't be made: say so instead of failing quietly
       const indicator = document.getElementById("safeshare-shield-indicator");
       if (indicator) {
-        indicator.textContent = "⚠️ SafeShare was updated: refresh this tab";
+        indicator.textContent = "⚠️ Blackline was updated: refresh this tab";
         indicator.className = "shield-disabled";
         indicator.dataset.errorUntil = String(Number.MAX_SAFE_INTEGER);
       }
@@ -1558,11 +1572,11 @@
     if (key !== lastHealthKey && extApi && extApi.storage && extApi.storage.local) {
       lastHealthKey = key;
       Promise.resolve(extApi.storage.local.set({ [`safeshare_health_${location.hostname}`]: status })).catch(() => {});
-      if (!ok) console.warn("[SafeShare-AI] Site health check failed:", problems.join(", "));
+      if (!ok) console.warn("[Blackline] Site health check failed:", problems.join(", "));
     }
     const indicator = document.getElementById("safeshare-shield-indicator");
     if (!ok && indicator) {
-      indicator.textContent = `⚠️ SafeShare can't fully read this page (${problems.join(", ")}). The site may have changed; shares may be incomplete ▾`;
+      indicator.textContent = `⚠️ Blackline can't fully read this page (${problems.join(", ")}). The site may have changed; shares may be incomplete ▾`;
       indicator.dataset.errorUntil = String(Date.now() + 11000);
     }
   }
@@ -1594,7 +1608,7 @@
       const inputEl = findPromptInputElement();
       if (inputEl) {
         setInputText(inputEl, promptText);
-        console.log("[SafeShare-AI] Injected continuation prompt directly into active session.");
+        console.log("[Blackline] Injected continuation prompt directly into active session.");
       } else {
         // On a share page there is no chat box: open the chat site and paste it there
         const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
@@ -1616,7 +1630,7 @@
 
       const applyPrompt = (inputEl) => {
         setInputText(inputEl, pending.prompt);
-        console.log("[SafeShare-AI] Pasted continuation prompt into the new chat.");
+        console.log("[Blackline] Pasted continuation prompt into the new chat.");
       };
 
       // Immediate check at t=0

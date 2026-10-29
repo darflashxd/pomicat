@@ -1,5 +1,37 @@
 # Manual test checklist (Chrome)
 
+## Current audit hardening checks (2026-10-29)
+
+Run `npm test` for CLI exit-status parity, keyword-context inference bypasses, explicit ratio
+relations, relay persistence fault injection, per-draft vault isolation, Word decimal parsing,
+viewer schemas and saved chat revocation controls. Package installation uses the selected npm CLI
+without a shell and removes the inherited npm 12 `allow-scripts` lifecycle setting.
+
+`python tools/test_mapping_browser.py` uses a real Chromium extension and local fictional pages:
+two simultaneous drafts, two origins, same chat ID across origins, SPA migration and reload.
+Full navigation of an unassigned draft deliberately does not adopt an unproven mapping.
+`python tools/eval/credential_browser.py --browser firefox` exercises review and send lifecycle;
+`python tools/eval/relay_browser.py` exercises the hosted local viewer, burn and revoke.
+`python tools/test_word_structures.py` checks DOCX structures in Chromium and Firefox.
+
+The dated entries below are historical evidence, not a consolidated current feature specification.
+
+Compatibility note: new drafts use per-document nonces. Full navigation before a chat receives its
+identity does not restore that draft automatically. Identified legacy mappings are read through the
+old chat-ID keys for compatibility; those old keys did not record provider provenance. Browser
+session exit clears both old and new session mappings.
+
+Execution evidence for this working-tree hardening pass: Node 24.18.0, `npm test` 68/68;
+credential fixtures Chromium/Firefox; hosted local relay Chromium/Firefox including mismatched
+encrypted share ID rejection; Word review/structures/privacy Chromium/Firefox; real Chromium
+extension draft isolation and persisted revoke metadata after browser restart. No production relay
+deployment or live-provider session was used. English development challenge rerun retained 0/100
+supported-family recovery and the known 20/20 Base64 limitation; this is not held-out accuracy.
+
+Current source uses Blackline. Dated SafeShare results below describe historical
+builds; internal identifiers and relay names remain unchanged for compatibility.
+Run `node tests/rebrand.test.js` for identity, storage and naming checks.
+
 ## Retired offline document prototype
 
 Launcher recovery check: reload unpacked extension with existing SharePoint permission and no

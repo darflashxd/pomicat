@@ -382,7 +382,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
   let md;
   if (isLlm) {
     const readable = [];
-    if (!aborted) {
+    if (!aborted && !totalInvalid) {
       const naive = llmRow("naive");
       const presLlm = llmRow("presidio");
       const safe = llmRow("safeshare");
@@ -402,9 +402,9 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
           "",
           "**What this means**",
           "",
-          "- **Naive redaction is broken.** Hiding only the salary leaves the derived figures visible (\"save 20% → $1,000/month\"), so the LLM works the salary back out every time.",
+           "- Entity-only masking can leave arithmetic clues. Recovery above is measured on this run's templated cases, not all conversations.",
           ...(presLlm ? ["- **Presidio does not cover amounts.** A widely-used PII tool leaves the salary fully visible because its default recognizers target names, emails, phones and cards — not financial figures."] : []),
-          "- **SafeShare held.** Hiding the amounts too left the LLM nothing to invert, so it recovered nothing.",
+          `- SafeShare: ${safe.recovered}/${safe.n} salaries recovered after masking; ${safe.exposed}/${safe.n} left directly visible.`,
           ""
         );
         const aNaive = arithRow("naive");
@@ -429,7 +429,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
       ...(USE_LLM ? [`- Attacker model: \`${modelLabel}\` via the provider API.`] : []),
       ...(!pres ? ["- Presidio was skipped (`.venv-eval` absent)."] : []),
       ...(aborted ? ["- **Status: BLOCKED — run incomplete; do not read as a clean result.**"] : []),
-      ...(totalLlm && totalInvalid / totalLlm > 0.2 && !aborted ? [`- **Partial result:** ${totalInvalid} of ${totalLlm} LLM calls were invalid.`] : []),
+      ...(totalInvalid && !aborted ? [`- **Incomplete evidence:** ${totalInvalid} of ${totalLlm} LLM calls were invalid. Leakage percentages are observed lower bounds, not defense success rates.`] : []),
       "",
       "### Limits",
       "- One attacker model only (the roadmap targets 2–3 models).",
@@ -442,9 +442,9 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
       ...(USE_LLM_CLI ? [`Raw transcript: \`${LLM_LOG}\` (local only).`] : []),
       "",
       "### Full results",
-      "| Redactor | Attacker | Salary left visible | Recovered from the rest | Total leaked |",
-      "|---|---|---|---|---|",
-      ...rows.map((r) => `| ${r.redactor} | ${r.attacker} | ${pct(r.exposed, r.n)} | ${pct(r.recovered, r.n)} | **${pct(r.leaked, r.n)}** |`),
+      "| Redactor | Attacker | Salary left visible | Recovered from the rest | Observed leaked | No-information answer | Refusal | Invalid |",
+      "|---|---|---|---|---|---|---|---|",
+      ...rows.map((r) => `| ${r.redactor} | ${r.attacker} | ${pct(r.exposed, r.n)} | ${pct(r.recovered, r.n)} | **${pct(r.leaked, r.n)}** | ${r.rs.zero} | ${r.rs.refusal} | ${r.rs.invalid} |`),
       ""
     ].join("\n");
   } else {
@@ -464,7 +464,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
   }
   fs.writeFileSync(OUT, md);
   console.log(md);
-  if (aborted) process.exitCode = 1;
+  if (aborted || totalInvalid) process.exitCode = 1;
 })().catch((err) => {
   console.error(err && err.stack ? err.stack : err);
   process.exit(1);

@@ -383,6 +383,7 @@ function main(argv) {
   const births = hidesBirthDate ? inferBirthYears(text) : [];
   // A date counts as recovered when the clues leave a handful of possibilities in two years
   const dates = inferDates(text).filter((d) => d.candidates.length && d.candidates.length <= 14);
+  if (found.length || births.length || dates.length) process.exitCode = 2;
   if (opts.json) return console.log(JSON.stringify({ amounts: found, birthYears: births, dates, combinations: quasi }, null, 2));
   if (!found.length && !births.length && !dates.length) return console.log("No hidden values recovered.");
   found.forEach((f, i) => {

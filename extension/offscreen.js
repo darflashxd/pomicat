@@ -6,7 +6,7 @@
  * Zero remote telemetry, zero network leakage.
  */
 
-console.log("[SafeShare-AI Offscreen] Isolated NER runtime initialized with connect-src 'self' (local assets only).");
+console.log("[Blackline Offscreen] Isolated NER runtime initialized with connect-src 'self' (local assets only).");
 
 const nerExtApi = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
 
@@ -146,10 +146,10 @@ async function loadModel() {
     session = await ort.InferenceSession.create(modelRes, {
       executionProviders: ["wasm"]
     });
-    console.log("[SafeShare-AI Offscreen] BERT-small INT8 session initialized (English-focused).");
+    console.log("[Blackline Offscreen] BERT-small INT8 session initialized (English-focused).");
     return session;
   } catch (err) {
-    console.error("[SafeShare-AI Offscreen] Failed to load ONNX model:", err);
+    console.error("[Blackline Offscreen] Failed to load ONNX model:", err);
     throw err;
   }
 }

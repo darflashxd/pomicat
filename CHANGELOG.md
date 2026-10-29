@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased
+## Unreleased — audit hardening
+
+- Keep CLI leak exit status consistent in text/JSON output; add bounded explicit ratio recovery.
+- Public-looking labels no longer exempt direct percentage relations to known private amounts.
+- Isolate new draft mappings by origin and page identity; retain identified legacy chat reads.
+- Persist local burn before delivering ciphertext; refuse corrupt storage and bound revoke bodies.
+- Use the shared nominal parser for Word decimal/grouping formats.
+- Save chat revocation controls across page closure; validate viewer chat schema and share ID.
+- Bound relay/viewer/proxy network waits; clarify expiry, size padding and watermark limits.
+
+
+## 2.5.5 - Unreleased
+
+- New links default to `blackline-relay.bleedguard.workers.dev`. The old relay
+  remains supported; both Workers share D1. No schema or storage migration.
+- Apply security headers to all routes on the new Worker with Worker-first
+  static asset routing; disable preview URLs and keep cleanup on the old Worker.
+
+- Rename the extension and active product UI to Blackline. Existing extension IDs,
+  storage keys, relay endpoints and older links stay unchanged.
+- Add the `blackline` CLI alias; keep `safeshare` and the `safeshare-ai` package.
+- Build Blackline-named Chrome/Firefox ZIPs. Earlier releases and audit evidence
+  keep their original names.
 
 - Fix a DOCX math offset bug that left the first character behind. Verify XML
   text and attributes across package parts, including relationship destinations;

@@ -76,3 +76,23 @@ assert.equal(vault.size(), 0);
 assert.equal(store.getItem("safeshare_vault_data_chat-1"), null);
 
 console.log("vault session: all assertions passed");
+
+// Extension storage is shared: isolate pending maps by tab and real chats by origin.
+const a = new SafeShareSymbolicVault('safeshare_vault_origin-a_', 'draft-tab-1');
+a.register('$5,000', 5000, 'FINANCIAL', { currency: 'USD' });
+const b = new SafeShareSymbolicVault('safeshare_vault_origin-a_', 'draft-tab-2');
+assert.equal(b.size(), 0);
+b.promotePendingSession('other-chat');
+assert.equal(b.size(), 0);
+const c = new SafeShareSymbolicVault('safeshare_vault_origin-b_', 'draft-tab-1');
+assert.equal(c.size(), 0);
+a.saveToSession('assigned-chat'); a.clearPending();
+const reload = new SafeShareSymbolicVault('safeshare_vault_origin-a_', 'draft-tab-1');
+reload.loadFromSession('assigned-chat');
+assert.equal(reload.get('<S1>').numericValue, 5000);
+console.log('vault session: tab drafts and provider origins isolated');
+store.setItem('safeshare_vault_data_legacy', JSON.stringify({'<S1>': {numericValue: 1200, raw:'$1,200'}}));
+reload.loadFromSession('legacy');
+assert.equal(reload.get('<S1>').numericValue, 1200);
+reload.clear('legacy'); reload.loadFromSession('legacy');
+assert.equal(reload.size(), 0, 'explicit clearing must not resurrect a legacy fallback');

@@ -10,16 +10,21 @@ const { execFileSync } = require("child_process");
 const root = path.join(__dirname, "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "safeshare-pkg-"));
-// npm is a .cmd script on Windows and needs a shell; node does not (and its path has spaces)
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", shell: cmd === npm && process.platform === "win32", ...opts });
+// Nested npm inherits lifecycle config; npm 12 rejects allow-scripts for a local install.
+const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'npm_config_allow_scripts'));
+const npmCli = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+const run = (cmd, args, opts = {}) => execFileSync(cmd === npm ? process.execPath : cmd,
+  cmd === npm ? [npmCli, ...args] : args, { encoding: "utf8", env, ...opts });
 
 try {
   const tgz = run(npm, ["pack", "--silent", "--pack-destination", tmp], { cwd: root }).trim().split("\n").pop();
   fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "pkg-test", version: "1.0.0", private: true }));
-  run(npm, ["install", "--silent", "--no-audit", "--no-fund", path.join(tmp, tgz)], { cwd: tmp });
+  run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", path.join(tmp, tgz)], { cwd: tmp });
 
   const installed = path.join(tmp, "node_modules", "safeshare-ai");
   const cli = path.join(installed, "bin", "safeshare.js");
+  const metadata = require(path.join(installed, 'package.json'));
+  assert.equal(metadata.bin.blackline, metadata.bin.safeshare, 'both commands must use the same implementation');
   const chat = path.join(tmp, "chat.txt");
   fs.writeFileSync(chat, "User: My salary is $5,000 a month and my NIK is 3201012304950001.\nAssistant: Saving 20% is $1,000 a month, $12,000 a year.\n");
 
