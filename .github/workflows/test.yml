@@ -27,6 +27,7 @@ jobs:
       - run: pip install playwright==1.56.0
       - run: python -m playwright install --with-deps chromium
       - run: python tools/eval/credential_browser.py
+      - run: python tools/test_relay_redirect_browser.py
       - run: python -m playwright install --with-deps firefox
       - run: python tools/eval/credential_browser.py --browser firefox
       - run: python tools/eval/relay_browser.py
