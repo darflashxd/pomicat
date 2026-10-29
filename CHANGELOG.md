@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.5.6 - 2026-10-29
+
+- Add `extension/relay_hosts.js` as the single relay allowlist for the background worker, the
+  viewer redirect script and Word publish. A Node test fails if a manifest relay host is missing.
+- `viewer_redirect.js` now waits for the extension handoff and falls back to the relay's web
+  viewer (`?web=1`) when it fails. A stale service worker can no longer leave a stopped, blank page.
+- Background uploads and revokes check host permission first and return `RELOAD_REQUIRED` with
+  the relay origin when an unpacked extension has not been reloaded.
+- Word publish shows the real failure reason (reload, size limit, 429, unreachable relay) and
+  retries the background message once after a service-worker cold start.
+- New tests: relay host list vs manifests, redirect fallback logic, publish error mapping, and a
+  Playwright relay redirect/upload test wired into CI.
+- README, DEPLOY and the relay migration note describe the reload requirement and troubleshooting.
+
 ## 2.5.5 - 2026-10-29
 
 - Keep CLI leak exit status consistent in text/JSON output; add bounded explicit ratio recovery.

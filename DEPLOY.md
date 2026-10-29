@@ -120,6 +120,11 @@ changes above), override it in the extension: on `chrome://extensions`, click
 `git pull`, then `npx wrangler@4 deploy` from `relay/`. Check the changelog for any database
 step (like the `ALTER TABLE` above) before deploying.
 
+If a release adds a relay host to `extension/manifest.json`, also reload the unpacked extension
+in `chrome://extensions` and approve the new host. Chrome withholds new host permissions from an
+already-loaded extension; until it is reloaded, uploads fail with `RELOAD_REQUIRED` and relay
+links fall back to the web viewer.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -128,4 +133,6 @@ step (like the `ALTER TABLE` above) before deploying.
 | `Authentication error` | `npx wrangler@4 login` again |
 | `429 Too many requests` | wait a minute; the limits are in `wrangler.toml` under `[[ratelimits]]` |
 | Link page loads but says not found | the share expired, was burned, or was revoked |
+| Link opens blank after an extension update | reload the unpacked extension and approve the relay host |
+| Word says `Reload required` | reload the extension; the new relay host was not granted yet |
 | See live errors | `npx wrangler@4 tail` while you reproduce the problem |

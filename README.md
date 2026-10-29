@@ -28,7 +28,7 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Source version:** `2.5.5` (Blackline rebrand). Release `v2.5.5` ships Blackline-named
+- **Source version:** `2.5.6`. Release `v2.5.6` ships Blackline-named
   Chrome and Firefox ZIPs; `v2.5.4` and earlier keep the SafeShare name. Word Online documents
   can be reviewed, redacted, and shared as encrypted document links. The public relay serves
   the v4 document viewer.
@@ -515,6 +515,25 @@ or private transcripts. Repository issues are not a confidential reporting chann
 | [DEMO.md](DEMO.md) | Demonstration walkthrough |
 | [CHANGELOG.md](CHANGELOG.md) | Changes and security corrections |
 | [ROADMAP.md](ROADMAP.md) | Open work and research questions |
+
+## Troubleshooting
+
+**A share link opens a blank page.** The installed unpacked extension is older than the page.
+Reload it in `chrome://extensions`, approve `blackline-relay.bleedguard.workers.dev` if Chrome
+asks, then reopen the link. Current builds fall back to the web viewer (`?web=1`) when the
+extension cannot take over, so a stale background worker no longer leaves a blank page.
+
+**Word reports "Link was not created".** The red box under the button names the cause:
+
+| Message | What to do |
+|---|---|
+| Reload the Blackline extension… | Reload it in `chrome://extensions` and approve the relay host |
+| … too large … 512 KB … | Use Download DOCX; the encrypted link cap is 512 KB |
+| Too many uploads … | Wait about a minute |
+| Relay … could not be reached | Check the relay URL in the Word panel or retry |
+
+**"Open conversation" appears before the chat.** Intentional: link scanners open links without
+a person, and burn-after-reading shares would be consumed. Clicking the button is the first read.
 
 ## License and attribution
 

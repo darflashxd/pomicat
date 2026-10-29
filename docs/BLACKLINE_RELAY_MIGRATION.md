@@ -54,3 +54,19 @@ GitHub repository was not renamed. No GitHub release is implied by deployment.
 The old host still serves the previous SafeShare branding/header behavior until
 a separate reviewed deployment. Live expiry waiting, signed Firefox installation,
 and recovery of every historical originals entry are not claimed by these checks.
+
+## Client reload after a host change
+
+Adding a relay host to a manifest does not grant it to an already-loaded unpacked extension.
+Chrome keeps the previous service worker and withholds the new host until the extension is
+reloaded and the permission is approved. Before 2.5.6 this produced two failures: a relay page
+stopped by `viewer_redirect.js` stayed blank, and Word uploads reported "Link was not created".
+
+2.5.6 and later:
+
+- `relay_hosts.js` is the single allowlist shared by the background, the redirect script and Word;
+- `viewer_redirect.js` falls back to the relay's web viewer (`?web=1`) when the handoff fails;
+- uploads fail with `RELOAD_REQUIRED` and an explicit instruction instead of a generic message.
+
+After editing host permissions: reload the extension, confirm the new host under
+`chrome://extensions` → Details, then retest one chat link and one Word link.
