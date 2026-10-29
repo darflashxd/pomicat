@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.5.7 - 2026-10-29
+
+- Detect table-labelled and unlabelled home addresses: English labels, `Alamat`, and `Jl./Jalan`
+  values with a five-digit postal code.
+- Detect bank accounts written as a bank name plus grouped digits (`BCA`, Mandiri, BNI, BRI,
+  CIMB Niaga, Permata, Jago, and others), requiring 10-18 digits to keep precision.
+- Add a four-page fictional confidential DOCX regression test covering detection, sanitization
+  across every XML part, page/table/image preservation, hidden text, and removal of customXml and
+  the document thumbnail. Wired into CI.
+- Add focused address/bank rule tests with precision guards for reference numbers, short digit
+  groups and phone numbers.
+
 ## 2.5.6 - 2026-10-29
 
 - Add `extension/relay_hosts.js` as the single relay allowlist for the background worker, the

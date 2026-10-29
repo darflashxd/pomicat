@@ -28,7 +28,7 @@ information that entity-only redaction leaves behind.
 
 ## Status
 
-- **Source version:** `2.5.6`. Release `v2.5.6` ships Blackline-named
+- **Source version:** `2.5.7`. Release `v2.5.7` ships Blackline-named
   Chrome and Firefox ZIPs; `v2.5.4` and earlier keep the SafeShare name. Word Online documents
   can be reviewed, redacted, and shared as encrypted document links. The public relay serves
   the v4 document viewer.

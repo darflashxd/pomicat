@@ -1,6 +1,6 @@
 {
   "name": "safeshare-ai",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Blackline reviews and redacts AI chats and Word documents before encrypted sharing. Previously SafeShare.",
   "main": "bin/safeshare.js",
   "bin": {
