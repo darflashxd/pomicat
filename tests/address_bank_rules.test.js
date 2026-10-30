@@ -47,3 +47,10 @@ assert.equal(found[0].secret, '+62 811-0000-0001');
 assert.deepEqual(hits('Address: none'), []);
 
 console.log('address and bank rules: ok');
+for (const text of ['Home address | Jl. Cempaka Putih Tengah No. 42, Jakarta Pusat',
+  'Address: 123 Main Street No. 42, Springfield']) {
+  const output = redactor.scan(text).sanitizedText;
+  assert.ok(!/42|Jakarta|Springfield/.test(output), output);
+}
+assert.ok(!redactor.scan('BCA 527188901234').sanitizedText.includes('527188901234'));
+assert.ok(!hits('BCA 5271889012345678901').some(hit => hit.type === 'BANK_NAMED_ACCOUNT'));

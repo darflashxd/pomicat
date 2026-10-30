@@ -40,5 +40,22 @@ const detect = require('../extension/word/detect.js');
     assert.deepEqual(merged[0].occurrences.map(item => item.start), [0, 15]);
   }
   await assert.rejects(detect.nerCandidates({ parts: [content] }, { analyze: async () => ({ success: false }) }), /incomplete/);
+  const assigned = await detect.nerCandidates({ parts: ['client_secret: OddSecret42'] }, { analyze: async () => ({success: true, spans: []}) });
+  assert.ok(assigned.some(item => item.value === 'OddSecret42' && item.category === 'CREDENTIALS' && item.preChecked));
+  const H = require('../extension/engine/heuristics');
+  const T = require('../extension/word/textmap');
+  const assignedDoc = {blocks: [{text: 'client_secret: OddSecret42'}], supplementary: []};
+  const rulesOnly = await detect.detect({doc: assignedDoc, map: T.flatten(assignedDoc), heuristics: new H(), TextMap: T});
+  assert.ok(rulesOnly.some(item => item.value === 'OddSecret42' && item.category === 'CREDENTIALS' && item.preChecked), 'assignment protection must survive model failure');
+  const {redactTurns} = require('../bin/safeshare');
+  for (const text of ['Home address | Jl. Cempaka Putih Tengah No. 42, Jakarta Pusat', 'BCA 527188901234']) {
+    const document = {blocks: [{text}], supplementary: []};
+    const findings = await detect.detect({doc: document, map: T.flatten(document), heuristics: new H(), TextMap: T});
+    const selected = findings.filter(f => f.preChecked).map(f => f.value);
+    const chat = redactTurns([{role: 'user', content: text}])[0].content;
+    const secret = text.startsWith('BCA') ? '527188901234' : 'Jl. Cempaka Putih Tengah No. 42, Jakarta Pusat';
+    assert.ok(!chat.includes(secret) && !chat.includes('Jakarta Pusat'), 'chat full-value coverage');
+    assert.ok(selected.includes(secret), 'Word must select the full original value');
+  }
   console.log('Word model candidates use shared suggestion policy');
 })().catch(error => { console.error(error); process.exitCode = 1; });

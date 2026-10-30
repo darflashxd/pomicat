@@ -436,7 +436,17 @@
       if (typeof DOMParser !== "undefined") {
         const xml = new DOMParser().parseFromString(raw, "application/xml");
         if (xml.querySelector("parsererror")) throw new Error("Malformed XML during attack check: " + name);
-        out.push([...xml.getElementsByTagNameNS("*", "t")].map(node => node.textContent || "").join("\n"));
+        // Runs are formatting boundaries, not sentence boundaries. Keep paragraph order and tabs.
+        const paragraphs = [...xml.getElementsByTagNameNS(W, "p")];
+        for (const paragraph of paragraphs) {
+          const collect = node => {
+            if (node.nodeType !== 1) return "";
+            if (node.localName === "t" && [W, "http://schemas.openxmlformats.org/officeDocument/2006/math"].includes(node.namespaceURI)) return node.textContent || "";
+            if (node.namespaceURI === W && ["tab", "br", "cr"].includes(node.localName)) return " ";
+            return [...node.children].map(collect).join("");
+          };
+          out.push(collect(paragraph));
+        }
       } else {
         // Node has no XML DOM; the archive regression only needs the text nodes.
         out.push([...raw.matchAll(/<(?:w|m):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|m):t>/g)]

@@ -42,7 +42,7 @@ class HeuristicsRedactor {
       {
         id: "ADDRESS_LABELLED", name: "Labelled address field", category: "PROFILE", valueGroup: 2,
         // Table cells flatten to "Label | value"; prose uses "Address:"/"Alamat:". Accept both.
-        regex: /\b((?:home|mailing|residential|permanent|current|office|shipping)\s+address|address|alamat)(?:\s*\([^)\r\n]{0,40}\))?\s*[:：=\-–—|]*\s*((?:(?:jl\.?|jalan|gg\.?|gang|kp\.?|kampung|blok|rt|rw|dusun|desa|kel\.?|kec\.?)\s+|\d{1,6}\s+\p{L})[^\r\n|]{4,120}?)(?=\s*(?:\r?\n|\||\b(?:before|after|please)\b|[.;](?:\s|$)|$))/giu,
+        regex: /\b((?:home|mailing|residential|permanent|current|office|shipping)\s+address|address|alamat)(?:\s*\([^)\r\n]{0,40}\))?\s*[:：=\-–—|]*\s*((?:(?:jl\.?|jalan|gg\.?|gang|kp\.?|kampung|blok|rt|rw|dusun|desa|kel\.?|kec\.?)\s+|\d{1,6}\s+\p{L})[^\r\n|]{4,120}?)(?=\s*(?:\r?\n|\||\b(?:before|after|please)\b|;|(?<!\b(?:No|Jl|Gg|Kp|Kel|Kec))\.(?:\s|$)|$))/giu,
         replacement: "$1[REDACTED_ADDRESS]"
       },
       {
@@ -92,7 +92,7 @@ class HeuristicsRedactor {
         id: "BANK_NAMED_ACCOUNT", name: "Named bank account", category: "FINANCIAL", valueGroup: 2,
         // "BCA 5271 8890 1234" in a table cell has no "rekening/account" keyword; the bank name
         // plus 10-18 grouped digits is specific enough to stay high precision.
-        regex: /\b((?:bank\s+)?(?:bca|mandiri|bni|bri|cimb(?:\s+niaga)?|permata|bsi|bank\s+syariah\s+indonesia|jago|jenius|danamon|btn|ocbc(?:\s+nisp)?|uob|maybank)\b[\s:.\-–—]*(?:(?:a\/n|atas\s+nama)\s+)?)((?:\d{2,4}[ \t-]){2,4}\d{2,4})(?![ \t-]?\d)/giu,
+        regex: /\b((?:bank\s+)?(?:bca|mandiri|bni|bri|cimb(?:\s+niaga)?|permata|bsi|bank\s+syariah\s+indonesia|jago|jenius|danamon|btn|ocbc(?:\s+nisp)?|uob|maybank)\b[\s:.\-–—]*(?:(?:a\/n|atas\s+nama)\s+)?)((?:\d{2,4}[ \t-]){2,4}\d{2,4}|\d{10,18})(?![ \t-]?\d|[\p{L}_])/giu,
         validator: (raw) => {
           const digits = (raw.match(/\d/g) || []).length;
           return digits >= 10 && digits <= 18;

@@ -60,6 +60,16 @@ async function checkBrowserReview() {
     {language:'EN',text:'Please suggest a stronger password without changing the application code.',entities:[]}
   ];
   const diagnostics = [];
+  // Real bundled model probes. Report raw spans and compare rule coverage; no perfect-score claim.
+  for (const text of ['Home address | Jl. Cempaka Putih Tengah No. 42, Jakarta Pusat',
+    'BCA 527188901234', 'Home address [REDACTED_ADDRESS]. 42, Jakarta Pusat']) {
+    const response = await SafeShareNer.analyze(text, 60000, true);
+    assert(response.success && response.state === 'checked', 'paired probe runtime unavailable');
+    const ruleOutput = new HeuristicsRedactor().scan(text).sanitizedText;
+    diagnostics.push({probe: text, modelSpans: response.spans, ruleOutput});
+    if (text.startsWith('BCA ')) assert(!ruleOutput.includes('527188901234'), 'bank protection must not depend on NER');
+    if (text.startsWith('Home address |')) assert(!/42|Jakarta/.test(ruleOutput), 'address must be masked completely');
+  }
   for (const sample of samples) {
     const response = await SafeShareNer.analyze(sample.text, 60000, true);
     assert(response.success && Array.isArray(response.spans), 'model diagnostic unavailable');

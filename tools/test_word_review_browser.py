@@ -36,6 +36,8 @@ def run(browser_type):
     page.evaluate('''() => {
       SafeShareWordRedact.sanitizeDocx = () => new Promise(resolve => window.finishApply = () => resolve({bytes:new Uint8Array([1,2,3]),replaced:3,parts:1,images:0,removed:0}));
       SafeShareWordRedact.verifyDocx = async () => ({clean:true});
+      window.realDocumentText = SafeShareWordRedact.documentText;
+      SafeShareWordRedact.documentText = async () => 'Reviewed fictional text';
     }''')
     page.locator('#apply').click()
     page.wait_for_function('!!window.finishApply')
@@ -59,7 +61,8 @@ def run(browser_type):
       const E = new TextEncoder();
       const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
       const doc = '<w:document xmlns:w="'+W+'"><w:body><w:p><w:r><w:t>Salary [REDACTED_FINANCIAL]</w:t></w:r></w:p></w:body></w:document>';
-      const header = '<w:hdr xmlns:w="'+W+'"><w:p><w:r><w:t>20% of your monthly salary is 1,000.</w:t></w:r></w:p></w:hdr>';
+      const header = '<w:hdr xmlns:w="'+W+'"><w:p><w:r><w:t>20%</w:t></w:r><w:r><w:t> of your monthly salary is </w:t></w:r><w:r><w:t>1,000.</w:t></w:r></w:p></w:hdr>';
+      SafeShareWordRedact.documentText = window.realDocumentText;
       SafeShareWordRedact.sanitizeDocx = async () => ({bytes: await SafeShareWordRedact.zip(new Map([
         ['word/document.xml', E.encode(doc)], ['word/header1.xml', E.encode(header)]])), replaced: 1, parts: 2, images: 0, removed: 0});
       appliedSnapshot = null; sanitizedBytes = null; document.getElementById('apply').hidden = false;
@@ -77,7 +80,14 @@ def run(browser_type):
     page.wait_for_function('!document.getElementById("apply").disabled')
     assert page.locator('#error').is_visible()
     assert 'Synthetic unsupported content' in page.locator('#apply-status').inner_text()
-    page.evaluate('''() => {SafeShareWordRedact.sanitizeDocx = async () => ({bytes:new Uint8Array([1,2,3]),replaced:3,parts:1,images:0,removed:0});}''')
+    page.evaluate('''() => {
+      SafeShareWordRedact.sanitizeDocx = async () => ({bytes:new Uint8Array([1,2,3]),replaced:3,parts:1,images:0,removed:0});
+    }''')
+    page.locator('#apply').click()
+    page.wait_for_function('!document.getElementById("apply").disabled')
+    assert page.evaluate('appliedSnapshot === null && sanitizedBytes === null'), 'unreadable output must not be shareable'
+    assert page.locator('#create-link').is_disabled()
+    page.evaluate("SafeShareWordRedact.documentText = async () => 'Reviewed fictional text'")
     page.locator('#manual').fill('')
     page.locator('#apply').click()
     page.wait_for_function('!!appliedSnapshot')

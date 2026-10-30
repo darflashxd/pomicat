@@ -856,29 +856,19 @@ $("cancel-review").addEventListener("click", async () => {
 });
 
 /* ---------- apply ---------- */
-async function runAttackCheck(rules, bytes) {
+async function runAttackCheck(bytes) {
+  const generation = reviewGeneration;
   const box = $("attack");
   box.hidden = false;
   attackLeaks = 0;
   // Check the exported package, not just the preview pane: headers, footers and notes are shared too.
-  const previewText = () => [...document.querySelectorAll("#sanitized-preview p, #sanitized-preview td")]
-    .map(node => node.textContent).join("\n");
-  let packageChecked = Boolean(bytes);
-  let text;
-  if (bytes) {
-    try { text = await SafeShareWordRedact.documentText(bytes); }
-    catch (_) {
-      // Export is still gated by verifyDocx; say that this check saw less than the whole package.
-      packageChecked = false;
-      text = previewText();
-    }
-  } else text = previewText();
+  // A failed package read is incomplete verification, never a clean preview-only fallback.
+  const text = await SafeShareWordRedact.documentText(bytes);
+  if (generation !== reviewGeneration || sanitizedBytes !== bytes) throw new Error('The review changed during the output check. Create the copy again.');
   const result = SafeSharePolicy.attackCheck([{ role: "document", content: text }], AdversaryOracleSolver);
   attackLeaks = result.leaks;
   if (!attackLeaks) {
-    $("attack-text").textContent = packageChecked
-      ? "No reconstruction found by the supported checks. This is not a guarantee of privacy."
-      : "The exported package could not be read for this check; only the preview was checked. Review the download yourself.";
+    $("attack-text").textContent = "No reconstruction found by the supported checks. This is not a guarantee of privacy.";
     $("attack-confirm-wrap").hidden = true;
     $("download-sanitized").disabled = false;
     return;
@@ -922,7 +912,10 @@ $("apply").addEventListener("click", async () => {
     appliedSnapshot = Object.freeze({ bytes: result.bytes, preview: sanitizedPreviewHtml(), signature, generation });
     $("verify").hidden = false;
     $("verify").textContent = `Verified: ${result.replaced} text replacements across ${result.parts} parts, ${result.images} image(s) redacted, ${result.removed} revision/hidden elements removed.`;
-    await runAttackCheck(rules, result.bytes);
+    await runAttackCheck(result.bytes);
+    if (generation !== reviewGeneration || sourceBytes !== source || currentSignature() !== signature) {
+      throw new Error('The review changed during the output check. Create the copy again.');
+    }
     $("download-sanitized").hidden = false;
     $("create-link").disabled = false;
     $("share-panel").hidden = false;

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — chat and Word detection consistency
+
+- Keep labelled addresses complete across `No.` abbreviations and recognize contiguous named-bank account digits.
+- Reuse credential-assignment suggestions in Word even when the local model is unavailable.
+- Rejoin formatting runs for the DOCX attack check; reject unreadable output instead of checking only its preview.
+- Guard changes made during the asynchronous output check and add split-run/header and paired chat/Word regressions.
+- Add actual bundled-model address/bank probes to the browser harness. No model replacement or broad accuracy claim.
+
 ## 2.5.7 - 2026-10-29
 
 - Detect table-labelled and unlabelled home addresses: English labels, `Alamat`, and `Jl./Jalan`

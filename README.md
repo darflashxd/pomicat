@@ -159,8 +159,8 @@ charts, OLE and other rejected package parts stop export. SharePoint session-dow
 is tenant-dependent. Verification checks selected values in supported XML/relationship content and
 selected image rectangles; it does not certify that every sensitive item was discovered. The attack
 check reads text from the exported package, including headers, footers and notes, not only the
-preview pane. If the package cannot be read for that check, the UI says the preview was checked
-instead; export permission still depends on the selected-value verification.
+preview pane. Formatting runs within a paragraph are rejoined for this check. If the package cannot
+be read, export and link creation stop; a preview-only check is not treated as successful verification.
 
 ## Screenshots
 

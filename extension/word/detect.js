@@ -120,15 +120,16 @@
       });
       const candidates = maybe.scan([{ role: "document", content: buffer }],
         modelSpans.map(span => ({ ...span, turnIndex: 0 })));
-      for (const candidate of candidates.filter(item => item.source === "model")) {
+      for (const candidate of candidates.filter(item => item.source === "model" || item.source === "assignment")) {
         const label = candidate.modelLabel || "PERSONAL_INFORMATION";
-        const category = /^(BANK_ACCOUNT|IBAN_CODE|CREDIT_CARD|FINANCIAL)$/.test(label) ? "FINANCIAL"
+        const category = candidate.source === "assignment" ? "CREDENTIALS"
+          : /^(BANK_ACCOUNT|IBAN_CODE|CREDIT_CARD|FINANCIAL)$/.test(label) ? "FINANCIAL"
           : /^(GOVERNMENT_ID|PASSPORT|DRIVERS_LICENSE|TAX_ID|US_LICENSE_PLATE)$/.test(label) ? "GOV_ID"
           : /^(IP_ADDRESS|MAC_ADDRESS|IMEI)$/.test(label) ? "SYSTEM" : "PROFILE";
         const prior = seenModel.get(candidate.raw.toLowerCase());
-        const item = { value: candidate.raw, category, ruleName: `Local model: ${label}`,
-          reason: candidate.reason, source: "model", score: candidate.modelScore, modelLabel: label,
-          replacement: label === "PERSON" ? "[REDACTED_NAME]" : `[REDACTED_${label}]`,
+        const item = { value: candidate.raw, category, ruleName: candidate.source === "assignment" ? "Credential assignment" : `Local model: ${label}`,
+          reason: candidate.reason, source: candidate.source, score: candidate.modelScore, modelLabel: candidate.modelLabel,
+          replacement: candidate.source === "assignment" ? "[REDACTED_POSSIBLE_SECRET]" : label === "PERSON" ? "[REDACTED_NAME]" : `[REDACTED_${label}]`,
           preChecked: candidate.risky, occurrences: (candidate.occurrences || []).map(occurrence => ({ ...occurrence, start: occurrence.start + offset, end: occurrence.end + offset })) };
         if (prior) {
           const occurrences = prior.occurrences.concat(item.occurrences);
@@ -169,6 +170,13 @@
     for (const item of tier1(map, heuristics)) push(candidates, seen, item);
     for (const item of initialsRule(map)) push(candidates, seen, item);
     for (const item of connectionStrings(map)) push(candidates, seen, item);
+    // Credential assignments do not depend on model availability or its NER label coverage.
+    for (const part of map.parts) for (const candidate of maybe.scan([{role: 'document', content: part}])) {
+      if (candidate.source !== 'assignment') continue;
+      push(candidates, seen, {value: candidate.raw, category: 'CREDENTIALS', source: 'assignment',
+        ruleName: 'Credential assignment', reason: candidate.reason,
+        replacement: '[REDACTED_POSSIBLE_SECRET]', preChecked: candidate.risky});
+    }
     const contextual = new Contextual();
     for (const part of map.parts) for (const hit of contextual.classifyTurn(part, 0)) {
       if (!["SENSITIVE_HEALTH", "SENSITIVE_LEGAL_HR"].includes(hit.category)) continue;
