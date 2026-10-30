@@ -4,90 +4,68 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/darflashxd/safeshare?label=release)](https://github.com/darflashxd/safeshare/releases)
 
-**Review, redact and privately share AI conversations and Word documents, including the numbers that give a hidden value away.**
+**Review before you share.**
 
-Blackline's main workflow is **Share Privately**: review a chat or a document, redact sensitive
-spans and the numerical clues around them, then publish an encrypted link with expiry, optional
-burn-after-read, and revocation. The browser extension works on ChatGPT, Claude, DeepSeek and
-Word Online. A CLI and a text-redacting API proxy are also included.
-
-Hiding the obvious secret is not enough. If a chat says "I earn [REDACTED]" and the assistant
-replies "saving 20% is $1,000 a month", anyone can work the salary back out. Blackline hides the
-derived figures too, and checks the result with the same attack before you share.
+Review and redact AI conversations and Word documents, then share an encrypted copy. Blackline
+also checks supported numerical clues that can reveal values you have hidden.
 
 [Download extension](https://github.com/darflashxd/safeshare/releases) ·
-[Install](#quick-start-share-privately) · [Try offline](#try-the-attack-offline) ·
-[Screenshots](#screenshots) · [Demo walkthrough](DEMO.md) · [Security model](#security-model)
+[Quick start](#quick-start-share-privately) · [Screenshots](#screenshots) · [Demo walkthrough](DEMO.md)
 
-## Try the attack offline
+![Word review with original and protected text side by side](docs/screenshots/word-review-current.png)
 
-Requires Node.js 18 or newer and Git. No account, API key, model download or relay is needed.
-These examples contain fictional data only.
+*Word review using production scripts and a fictional local fixture, captured 30 October 2026
+from source based on `635766f`, Chromium 149. Names were selected manually; this capture does not
+show model inference, a live Microsoft tenant or a relay upload. [Capture details](#word-review-and-recipient-copy).*
 
-```bash
-git clone https://github.com/darflashxd/safeshare.git
-cd safeshare
-node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
+Works with ChatGPT, Claude, DeepSeek and supported Word Online documents. Detection and model
+inference run locally; creating and opening encrypted shares requires a reachable relay.
+
+> Detection is best-effort. Review the protected copy before publishing.
+
+## What you can do
+
+- **Review chats and documents.** Compare the original with what others will receive.
+- **Redact sensitive information and numerical clues.** Inspect automatic detections, model
+  suggestions and manual selections before sharing.
+- **Share an encrypted copy.** Create an expiring, revocable link. Chat links also support
+  burn-after-read; document links include a sanitized DOCX download.
+
+## Review, redact, share
+
+1. **Review:** open Blackline in a supported chat or Word Online document. Check that the
+   extracted conversation or saved document copy contains the material you intend to share.
+2. **Redact:** inspect the highlights, restore information you want to keep, and select anything
+   the detectors missed. Word images need manual marking; text inside them is not detected automatically.
+3. **Share:** encrypt the reviewed copy and send its complete link. Recipients can open the
+   hosted viewer without installing the extension; that path trusts the viewer's hosting operator.
+
+The source chat or Word document is not rewritten by Share Privately. Optional before-send
+protection is a separate feature that changes what is submitted to the AI.
+
+## Two ways to use Blackline
+
+### Share a financial conversation
+
+Hiding the stated salary does not necessarily hide its value:
+
+```text
+Salary: [REDACTED]
+Assistant: Saving 20% gives $1,000 a month.
+
+$1,000 / 0.20 = $5,000
 ```
 
-The leading candidate is `$5,000`: the visible monthly saving divided by its percentage.
-Alternative candidates are printed too; these are hypotheses, not confirmed private values.
-The command exits with status `2` when it finds a reconstruction candidate. That is expected.
+Review the original amount and supported derived figures together, then run the reconstruction
+check on the protected text. This is a bounded check, not proof against every inference.
+[See the example](#hiding-the-original-value-is-not-enough) or [try the attack offline](#try-the-attack-offline).
 
-Redact the original example, then run the same attack:
+### Share a reviewed Word copy
 
-```bash
-node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
-```
-
-Expected: `No hidden values recovered.` and exit status `0`. This means the supported check found
-no candidate, not that every possible inference is prevented. `invert --json` uses the same exit
-status contract. For an encrypted sharing walkthrough, see [DEMO.md](DEMO.md).
-
-### Results at a glance
-
-| Check | Baseline observation | Blackline observation | Source |
-|---|---|---|---|
-| Historical LLM salary attack: 3 models, 4 runs of 40 templated chats, EN + ID | Naive masking: 100% recovered. Presidio: 100% directly visible or recovered, depending on language. | 0 recoveries in 160 run cases, with repeated scenarios across models; not 160 independent conversations | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
-| Historical rule-based arithmetic attacker, 40 templated chats | Naive: 53% recovered. Presidio: 100% directly visible in the English run. | 0% recovered in this experiment | [attack bench](tools/attack_bench/RESULTS.md) |
-| Hidden birth date narrowed to ≤ 4 days from weekday clues | 40 / 40 | 0 / 40 | [RESULTS.md §8](tools/eval/RESULTS.md) |
-| HTTP retrieval of a chat/document share without its fragment key | A plaintext sharing page would expose its contents; not a measurement of current provider pages | Viewer shell contains no shared plaintext; API returns ciphertext; responses request `noindex` | `tests/relay_lifecycle.test.js` |
-
-Attack data is fictional and templated; the limits and historical configurations are in the linked
-reports. These are not current end-to-end detection scores. Direct exposure and recovery after
-masking are different outcomes. An indexing directive is not access control; anyone holding the
-complete link can open it with a compatible viewer.
-
-> Not a guarantee of anonymity. Review the output before publishing.
-> Detection can miss sensitive information or flag harmless text. A successful attack check
-> means the supported attack found a clue; an empty result does not prove the chat is safe.
-
-## Status
-
-- **Source version:** `2.5.7`. Release `v2.5.7` ships Blackline-named
-  Chrome and Firefox ZIPs; `v2.5.4` and earlier keep the SafeShare name. Word Online documents
-  can be reviewed, redacted, and shared as encrypted document links. The public relay serves
-  the v4 document viewer.
-- **Source vs release:** changes under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) are newer than
-  the published ZIPs. Cite the Git commit when testing source; a matching version string alone
-  does not establish identical code. A source update does not redeploy the hosted relay/viewer.
-- **Tests:** run `npm test` for the current offline regression suite; local browser structure checks cover Chromium and Firefox.
-- **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
-  extension. A public-relay document link was opened in a clean browser context without the
-  extension. Firefox packages build from the same source; the screenshot set is Chromium-only.
-- **Still open:** changed chat-site DOMs require re-verification, SharePoint capture depends on the
-  tenant, and detection remains best-effort. Image text is marked by hand. The limitations below
-  are part of the design, not footnotes.
-
-![SafeShare review before sharing](docs/screenshots/01-review-overview.png)
-
-*Review before sharing. The original and protected turns stay side by side, and every detected
-item can be inspected or reversed before a link is created. Captured from the v2.4.0 extension on
-Chrome 155 with a local relay and fictional data.*
-
-[Quick start](#quick-start-share-privately) · [Screenshots](#screenshots) ·
-[Reproduce the attack](#reproduce-the-attack) · [Security model](#security-model) ·
-[Evaluation](#evaluation-and-reproducibility) · [Testing](TESTING.md) · [Deployment](DEPLOY.md)
+Read a separate copy of the saved document, inspect names, contact details, credentials and
+amounts, then download or share the sanitized DOCX. The review preserves supported document
+structures rather than rebuilding everything as plain text. Images need manual redaction and
+unsupported embedded content can stop export. [See the Word review](#word-review-and-recipient-copy).
 
 ## Quick start: Share Privately
 
@@ -400,6 +378,36 @@ Padding rounds plaintext size into 256-byte buckets; approximate message size re
 For newly created chat links, revocation controls are saved on this device. Open the extension
 toolbar workspace and expand **Manage earlier chat and document links** after closing a chat tab.
 
+## FAQ
+
+**Does the original change?** Share Privately reviews a copy; it does not edit the source chat or
+Word document. Optional before-send protection separately rewrites supported text before submission.
+
+**What leaves the device?** Built-in rules and bundled model inference run locally. Sharing uploads
+ciphertext to the relay. The optional CLI Presidio integration sends text to the analyzer you configure.
+
+**Does a recipient need the extension?** No. The hosted viewer can decrypt the complete link,
+but its serving operator must be trusted. The extension viewer uses its own bundled code.
+
+**Who can read a link?** Anyone holding the complete URL, including its fragment key. Expiry and
+revocation block later retrieval; they cannot recall copies already saved by a recipient.
+
+**Can it miss information?** Yes. Detection is best-effort, the model is English-focused, and
+image text requires manual marking. Review the protected copy; an empty attack check is not a safety certificate.
+
+**Why are the repo and commands still called SafeShare?** Existing package names and aliases are
+kept for compatibility. See [updating and name compatibility](#updating-and-name-compatibility).
+
+## Status
+
+- **Source version:** `2.5.7`; published Chrome/Firefox packages are available under `v2.5.7`.
+  Changes under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) are newer than those ZIPs. Record
+  the commit when testing source: matching version strings do not establish identical code.
+- **Exercised interfaces:** ChatGPT, Claude, DeepSeek and Word Online with unpacked Chromium;
+  local browser regressions also cover Firefox. See [TESTING.md](TESTING.md) for scope and commands.
+- **Still open:** provider layouts change, SharePoint capture is tenant-dependent, and detection
+  remains best-effort. Image text is reviewed manually. Source updates do not deploy the hosted viewer.
+
 ## Security model
 
 | Actor or risk | Protection | Residual risk |
@@ -438,6 +446,42 @@ If a live credential has already been sent to a service, rotate or revoke it. Re
 share does not remove it from the original service or from copies already made.
 
 ## Evaluation and reproducibility
+
+### Results at a glance
+
+| Check | Baseline observation | Blackline observation | Source |
+|---|---|---|---|
+| Historical LLM salary attack: 3 models, 4 runs of 40 templated chats, EN + ID | Naive masking: 100% recovered. Presidio: 100% directly visible or recovered, depending on language. | 0 recoveries in 160 run cases, with repeated scenarios across models; not 160 independent conversations | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
+| Historical rule-based arithmetic attacker, 40 templated chats | Naive: 53% recovered. Presidio: 100% directly visible in the English run. | 0% recovered in this experiment | [attack bench](tools/attack_bench/RESULTS.md) |
+| Hidden birth date narrowed to ≤ 4 days from weekday clues | 40 / 40 | 0 / 40 | [RESULTS.md §8](tools/eval/RESULTS.md) |
+| HTTP retrieval without a fragment key | A plaintext sharing page would expose its contents; not a measurement of current provider pages | Viewer shell has no shared plaintext; API returns ciphertext; responses request `noindex` | `tests/relay_lifecycle.test.js` |
+
+Attack data is fictional and templated; historical configurations and limits are in the reports.
+These are not current end-to-end detection scores. Direct exposure and recovery after masking
+are different outcomes. An indexing directive is not access control.
+
+### Try the attack offline
+
+Requires Node.js 18 or newer and Git. No account, API key, model download or relay is needed.
+These examples contain fictional data only.
+
+```bash
+git clone https://github.com/darflashxd/safeshare.git
+cd safeshare
+node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
+```
+
+The leading candidate is `$5,000`: the monthly saving divided by its percentage. Alternative
+candidates are hypotheses, not confirmed private values. Exit status `2` means a reconstruction
+candidate was found; it is expected here.
+
+```bash
+node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+```
+
+Expected: `No hidden values recovered.` and exit status `0`. This means the supported check found
+no candidate, not that every inference is prevented. `invert --json` uses the same exit status
+contract. See [DEMO.md](DEMO.md) for an encrypted sharing walkthrough.
 
 **Regression success is not a detection-accuracy measurement.** Model-only, pipeline, and attack
 results answer different questions and must not be combined into one security score.
