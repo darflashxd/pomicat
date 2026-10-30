@@ -11,18 +11,29 @@ The repository,
 npm package `safeshare-ai`, and `safeshare` command retain their existing names;
 `blackline` is also available as a CLI command.
 
-**Review and privately share AI conversations, with checks for sensitive data and arithmetic recovery of redacted values.**
+**Review, redact and privately share AI conversations and Word documents, including the numbers that give a hidden value away.**
 
-Blackline's main workflow is **Share Privately**: review a conversation, redact sensitive spans
-and supported numerical clues, then publish an encrypted link with expiry, optional burn-after-read,
-and revocation. The browser extension integrates with ChatGPT, Claude, and DeepSeek. A CLI and
-text-redacting API proxy are also included.
+Blackline's main workflow is **Share Privately**: review a chat or a document, redact sensitive
+spans and the numerical clues around them, then publish an encrypted link with expiry, optional
+burn-after-read, and revocation. The browser extension works on ChatGPT, Claude, DeepSeek and
+Word Online. A CLI and a text-redacting API proxy are also included.
 
-The research question is straightforward: **what can a reader recover after the obvious secret
-has been removed?** An assistant's savings calculation, annual total, or stated age can reveal
-information that entity-only redaction leaves behind.
+Hiding the obvious secret is not enough. If a chat says "I earn [REDACTED]" and the assistant
+replies "saving 20% is $1,000 a month", anyone can work the salary back out. Blackline hides the
+derived figures too, and checks the result with the same attack before you share.
 
-> Research software, not a guarantee of anonymity. Review the output before publishing.
+### Results at a glance
+
+| Check | Without Blackline | With Blackline | Source |
+|---|---|---|---|
+| An LLM recovers a hidden salary (3 models, 4 runs of 40 chats, EN + ID) | 100% (naive redaction and Presidio) | 0 of 160 | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
+| Rule-based arithmetic attacker, same 40 chats | 53% naive, 100% Presidio | 0% | [attack bench](tools/attack_bench/RESULTS.md) |
+| Hidden birth date narrowed to ≤ 4 days from weekday clues | 40 / 40 | 0 / 40 | [RESULTS.md §8](tools/eval/RESULTS.md) |
+| A search crawler opening a share link (chat or document) | full text on a public page | ciphertext only, `noindex`, no key | `tests/relay_lifecycle.test.js` |
+
+All data is fictional and templated; the limits of each check are in the linked files.
+
+> Not a guarantee of anonymity. Review the output before publishing.
 > Detection can miss sensitive information or flag harmless text. A successful attack check
 > means the supported attack found a clue; an empty result does not prove the chat is safe.
 
@@ -202,7 +213,9 @@ fragment. The key is redacted in this capture; both URLs are the page's console 
 against the local relay.*
 
 Search engines do not index or fetch anything behind `#`, and the relay also sends
-`X-Robots-Tag: noindex`. Both are defence in depth, not access control: a full link posted in
+`X-Robots-Tag: noindex`. `tests/relay_lifecycle.test.js` fetches chat and document links as
+Googlebot and checks that neither the page, the API nor the relay's storage holds plaintext or the
+key. Both are defence in depth, not access control: a full link posted in
 public can still be copied, and anyone holding it can decrypt the share until it expires or is
 revoked.
 
@@ -385,6 +398,7 @@ results answer different questions and must not be combined into one security sc
 | [Candidate model comparison](tools/eval/MODEL_COMPARISON.md) | MiniLM, BERT-small INT8, and GLiNER experiments; native/WASM measurements | Small development set plus external synthetic data; not a guaranteed unseen holdout. |
 | BERT external EN experiment | Exact-span F1 0.952 on 500 Gretel documents / 963 canonical name, location, email, and phone entities | Common-label model evaluation, not all PII or the production pipeline. Thirteen entities were only partially covered. Dataset overlap with training is unknown. |
 | [Earlier CLI/Presidio evaluation](tools/eval/RESULTS.md) | Historical detector utility and inference experiments | Different configurations and metrics; not the current browser model's score. |
+| [LLM attacker](tools/attack_bench/RESULTS_LLM.md) | Whether DeepSeek V4 Pro, Claude Sonnet 5.5 and Claude Haiku 5.5 recover a hidden salary from redacted chats | 40 templated fictional chats per run; English and Indonesian; replies are not real model output. |
 | [Attack benchmark](tools/attack_bench/RESULTS.md) | Arithmetic recovery from 40 fictional templated chats | Tests supported transformations, not arbitrary AI output or real-world prevalence. |
 | [Regression and browser checks](TESTING.md) | Known bugs, UI choices, runtime execution, preview/payload consistency | A model loading successfully does not establish held-out precision or recall. |
 
@@ -510,11 +524,11 @@ or private transcripts. Repository issues are not a confidential reporting chann
 | Resource | Contents |
 |---|---|
 | [TESTING.md](TESTING.md) | Regression commands, browser fixtures, limitations, installation checks |
-| [MODELS_SETUP.md](MODELS_SETUP.md) | Model provenance, runtime, and research-only models |
+| [MODELS_SETUP.md](MODELS_SETUP.md) | Model provenance, runtime, and models that are not shipped |
 | [DEPLOY.md](DEPLOY.md) | Local/Cloudflare relay setup and upgrades |
 | [DEMO.md](DEMO.md) | Demonstration walkthrough |
 | [CHANGELOG.md](CHANGELOG.md) | Changes and security corrections |
-| [ROADMAP.md](ROADMAP.md) | Open work and research questions |
+| [ROADMAP.md](ROADMAP.md) | Open work |
 
 ## Troubleshooting
 
@@ -542,5 +556,4 @@ published by [Gravitee](https://huggingface.co/gravitee-io/bert-small-pii-detect
 Apache-2.0 as declared upstream. Bundled runtimes and optional dependencies retain their own
 licenses; see [bundled attribution and license texts](extension/THIRD_PARTY_NOTICES.md).
 Chrome/Firefox ZIPs include the project license and bundled third-party notices.
-Cite the exact SafeShare
-commit, model revision, dataset, and evaluation configuration when reporting research results.
+When reporting results, include the commit, model revision, dataset and configuration.

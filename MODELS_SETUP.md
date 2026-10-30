@@ -40,7 +40,7 @@ The extension runs a local token-classification model via `offscreen.js`
   The new review floor, conservative span scores and before-send policy need independent accuracy
   and calibration evaluation. Runtime smoke proves execution, not general detection accuracy.
 
-## Research only: DistilBERT token classifier
+## Not shipped: DistilBERT token classifier
 
 English candidate experiment (2026-10-19): BERT-small INT8 and GLiNER PII Edge UINT8 were
 compared with historical MiniLM. BERT was subsequently promoted in commit `47ede77`. External

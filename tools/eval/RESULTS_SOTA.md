@@ -65,4 +65,4 @@ MiniLM 50 ms · electra 63 ms · mobilebert 166 ms · mMiniLMv2 181 ms · albert
 | Before sending | Extension in Chrome: rules + MiniLM, writer-tied names/places only | not measured yet (ROADMAP §3) |
 | Share path | Share dialog: rules + contextual names, no MiniLM | CLI numbers in `RESULTS.md` are the closest |
 
-Reproduce: `tools/sota/RUNLOG.md` and the scripts in `tools/sota/`.
+Reproduce with the scripts in `tools/sota/`.

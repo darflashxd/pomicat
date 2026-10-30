@@ -190,9 +190,7 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
 - [x] "0% false positives" applies to the tested CLI hard-negative set only, not all chats. · `me`
 - [x] WildChat showed no personal-finance inversion incident in the sample; keep saying so. · `me`
 - [x] Separate four numbers in docs: raw model, simulated hybrid, before-sending, share path. · `me`
-- [x] Tone down overclaiming wording: conference "standard" labels
-      (`span_arbiter.js`), "Weaponized Algebraic Side-Channel Attack"
-      and "Peer-Reviewed" (old benchmark scripts, since removed).
+- [x] Tone down overclaiming wording in `span_arbiter.js` and the old benchmark scripts (since removed).
       Translate `tools/eval/RESULTS_SOTA.md` to English. · `me`
 
 ---
@@ -280,7 +278,7 @@ Each needs an attack (in `invert`), a defence, tests and a benchmark row, like t
       offsets near a hidden date. · `me`
 - [ ] **B. Combinations of details** (prototype first): "only female cardiologist at a
       50-bed hospital in Blitar" → estimated number of matching people from BPS statistics; warn
-      below ~5 and offer one-click generalisation; cite k-anonymity / Sweeney. · `me`
+      below ~5 and offer one-click generalisation. · `me`
       Prototype done: `quasiIdentifiers()` warns in `invert`. Still to do: population estimate
       (needs BPS tables), warning in the share dialog, one-click generalisation.
 - [x] **C. Across turns**: hidden value recovered only from messages 2+5+7;

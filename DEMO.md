@@ -90,8 +90,8 @@ on a supported origin, decryption uses the extension viewer. The two trust paths
 ### What a search crawler sees (30 seconds)
 
 In 2025, shared ChatGPT conversations turned up in Google results: a ChatGPT share is a plain
-page. A SafeShare link keeps its key after the `#`, which browsers and crawlers never send to the
-server. Use a share **without** `--burn` (fetching the API reads the share once):
+page. A Blackline link, for a chat or a Word document, keeps its key after the `#`, which
+browsers and crawlers never send to the server. Use a share **without** `--burn` (fetching the API reads the share once):
 
 ```bash
 curl -s -A "Googlebot/2.1" "http://127.0.0.1:8787/s/<id>" | grep -o '<meta name="robots"[^>]*>'
@@ -99,8 +99,8 @@ curl -s -A "Googlebot/2.1" -D - "http://127.0.0.1:8787/api/share/<id>" | grep -i
 ```
 
 The page is an empty viewer marked `noindex`; the API returns only ciphertext, marked `noindex`.
-`npm test` checks the same thing (`tests/relay_lifecycle.test.js`): no plaintext or key in the
-page, the API or the relay's storage. Say "search engines can't read or index it", not "links are
+`npm test` checks the same thing for chat and document links (`tests/relay_lifecycle.test.js`):
+no plaintext or key in the page, the API or the relay's storage. Say "search engines can't read or index it", not "links are
 private": anyone holding the full link, `#` part included, can open it until it expires.
 
 ## 5. Show a limit, not a perfect score (40 seconds)
