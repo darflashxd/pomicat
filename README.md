@@ -12,11 +12,13 @@ also checks supported numerical clues that can reveal values you have hidden.
 [Download extension](https://github.com/darflashxd/safeshare/releases) ·
 [Quick start](#quick-start-share-privately) · [Screenshots](#screenshots) · [Demo walkthrough](DEMO.md)
 
-![Word review with original and protected text side by side](docs/screenshots/word-review-current.png)
+| AI conversations | Word documents |
+|---|---|
+| ![AI conversation review](docs/screenshots/01-review-overview.png) | ![Word agreement review](docs/screenshots/word-agreement-review.png) |
+| Inspect the chat before sharing. Historical SafeShare v2.4.0 capture, fictional data and local relay. | Review a separation agreement and its payment details. Live Word capture with the installed Blackline v2.5.7 extension; fictional data. |
 
-*Word review using production scripts and a fictional local fixture, captured 30 October 2026
-from source based on `635766f`, Chromium 149. Names were selected manually; this capture does not
-show model inference, a live Microsoft tenant or a relay upload. [Capture details](#word-review-and-recipient-copy).*
+*These are two separate product views, not a combined UI. [Chat capture details](#supported-chat-interfaces)
+and [Word capture details](#word-review-and-recipient-copy) include build and review limitations.*
 
 Works with ChatGPT, Claude, DeepSeek and supported Word Online documents. Detection and model
 inference run locally; creating and opening encrypted shares requires a reachable relay.
@@ -189,21 +191,32 @@ be read, export and link creation stop; a preview-only check is not treated as s
 
 ## Screenshots
 
-Screenshots in this section show earlier SafeShare builds. Blackline keeps the
-same workflows; these images are historical evidence, not new-brand captures.
+Chat screenshots show historical SafeShare builds; the Word agreement screenshots show the
+installed Blackline extension. Captions distinguish live captures from local fixtures.
 
 ### Word review and recipient copy
 
-![Word document review with original and redacted text](docs/screenshots/word-review-current.png)
+![Separation agreement reviewed in Blackline](docs/screenshots/word-agreement-review.png)
+
+![Settlement amounts before and after redaction](docs/screenshots/word-agreement-payments.png)
+
+*Captured through Word Online and the installed Blackline v2.5.7 extension, 31 October 2026.
+The fictional separation agreement includes employee details, a settlement table and payment
+instructions. Names were selected by the local model; the account number required manual
+redaction. Thirteen text replacements across three package parts passed selected-value verification;
+independent ZIP/XML inspection found none of the 12 checked private values. The supported attack
+check found no reconstruction. This is one reviewed example, not an automatic-detection score.
+The installed extension's exact source commit was not independently attested. Screenshots are
+workspace crops without account identity or link keys; no review UI was fabricated. Generate the
+source DOCX with `python tools/build_agreement_showcase.py <new-output.docx>`. The source document
+was uploaded to the signed-in Word account; no encrypted public share was created for this capture.*
 
 ![Recipient document viewer with sanitized download](docs/screenshots/word-viewer-current.png)
 
-*Captured 30 October 2026 from source based on commit `635766f`, Chromium 149. These are local
-fixtures using production review, sanitizer, encryption and viewer scripts, not a live Word tenant
-or a relay upload. All document details are fictional; names were selected manually, not inferred
-by the model in this capture. The unmarked image is not claimed as automatically redacted.
-Reproduce with `python tools/capture_word_screenshots.py`. These captures do not describe the
-older published v2.5.7 ZIP byte-for-byte.*
+*The recipient viewer image above remains a separate local fixture captured 30 October 2026 from
+source based on `635766f`, Chromium 149. It is not a recipient link for the agreement shown here.
+Names were selected manually in that fixture; no tenant login or relay upload was involved.
+Reproduce it with `python tools/capture_word_screenshots.py`.*
 
 ### Hiding the original value is not enough
 
