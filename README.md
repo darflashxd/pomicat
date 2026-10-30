@@ -4,52 +4,47 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/darflashxd/safeshare?label=release)](https://github.com/darflashxd/safeshare/releases)
 
-**Review before you share.**
+### Share the content. Not the secrets.
 
-Review and redact AI conversations and Word documents, then share an encrypted copy. Blackline
-also checks supported numerical clues that can reveal values you have hidden.
+A useful AI chat can also contain your salary, a client's name, or a password pasted by mistake.
+A Word document can carry the same details into someone else's hands.
+
+Blackline lets you review the copy, redact sensitive information, and share it through an encrypted
+link. It works with ChatGPT, Claude, DeepSeek, and supported Word Online documents.
 
 [Download extension](https://github.com/darflashxd/safeshare/releases) ·
-[Quick start](#quick-start-share-privately) · [Screenshots](#screenshots) · [Demo walkthrough](DEMO.md)
+[Get started](#quick-start-share-privately) · [Screenshots](#screenshots) · [Demo walkthrough](DEMO.md)
 
 | AI conversations | Word documents |
 |---|---|
 | ![AI conversation review](docs/screenshots/01-review-overview.png) | ![Word agreement review](docs/screenshots/word-agreement-review.png) |
-| Inspect the chat before sharing. Historical SafeShare v2.4.0 capture, fictional data and local relay. | Review a separation agreement and its payment details. Live Word capture with the installed Blackline v2.5.7 extension; fictional data. |
+| Check what the recipient will see. | Review employee details and settlement figures before sending the copy. |
 
-*These are two separate product views, not a combined UI. [Chat capture details](#supported-chat-interfaces)
-and [Word capture details](#word-review-and-recipient-copy) include build and review limitations.*
+*Fictional examples, shown in separate product views. The chat capture is from SafeShare v2.4.0;
+the Word capture uses Blackline v2.5.7, with the account number redacted manually.
+[Chat capture details](#supported-chat-interfaces) · [Word capture details](#word-review-and-recipient-copy).*
 
-Works with ChatGPT, Claude, DeepSeek and supported Word Online documents. Detection and model
-inference run locally; creating and opening encrypted shares requires a reachable relay.
+Detection runs on your device. Sharing uploads an encrypted copy to a relay.
 
-> Detection is best-effort. Review the protected copy before publishing.
+> Detection can miss things. Check the redacted copy before sharing.
 
-## What you can do
+## Choose what others see
 
-- **Review chats and documents.** Compare the original with what others will receive.
-- **Redact sensitive information and numerical clues.** Inspect automatic detections, model
-  suggestions and manual selections before sharing.
-- **Share an encrypted copy.** Create an expiring, revocable link. Chat links also support
-  burn-after-read; document links include a sanitized DOCX download.
+- **Check the copy side by side.** Inspect each highlight, restore a selection, or mark something
+  the detectors missed. You make the final call on what stays visible.
+- **Look beyond the original value.** A percentage, subtotal, or annual figure can reveal a number
+  you already hid. Blackline checks supported arithmetic relationships as well as direct identifiers.
+- **Send a copy, not the original.** Share a reviewed chat or sanitized DOCX through an encrypted
+  link. Set an expiry or revoke future access. Chat links also offer burn-after-read.
 
-## Review, redact, share
+Share Privately does not edit the source chat or Word document. Recipients do not need the
+extension, but the hosted viewer must be trusted with decryption. Anyone holding the complete
+link can read the copy and save it; expiry and revocation cannot recall saved copies.
 
-1. **Review:** open Blackline in a supported chat or Word Online document. Check that the
-   extracted conversation or saved document copy contains the material you intend to share.
-2. **Redact:** inspect the highlights, restore information you want to keep, and select anything
-   the detectors missed. Word images need manual marking; text inside them is not detected automatically.
-3. **Share:** encrypt the reviewed copy and send its complete link. Recipients can open the
-   hosted viewer without installing the extension; that path trusts the viewer's hosting operator.
+## Hiding a number isn't always enough
 
-The source chat or Word document is not rewritten by Share Privately. Optional before-send
-protection is a separate feature that changes what is submitted to the AI.
-
-## Two ways to use Blackline
-
-### Share a financial conversation
-
-Hiding the stated salary does not necessarily hide its value:
+Redact a salary, but leave the savings calculation, and the salary is still there for anyone
+willing to do the math:
 
 ```text
 Salary: [REDACTED]
@@ -58,16 +53,9 @@ Assistant: Saving 20% gives $1,000 a month.
 $1,000 / 0.20 = $5,000
 ```
 
-Review the original amount and supported derived figures together, then run the reconstruction
-check on the protected text. This is a bounded check, not proof against every inference.
-[See the example](#hiding-the-original-value-is-not-enough) or [try the attack offline](#try-the-attack-offline).
-
-### Share a reviewed Word copy
-
-Read a separate copy of the saved document, inspect names, contact details, credentials and
-amounts, then download or share the sanitized DOCX. The review preserves supported document
-structures rather than rebuilding everything as plain text. Images need manual redaction and
-unsupported embedded content can stop export. [See the Word review](#word-review-and-recipient-copy).
+Blackline checks for numerical clues like these, so you can review the calculations as well as
+the original amount. It covers specific arithmetic relationships, not every possible inference.
+[See the example](#hiding-the-original-value-is-not-enough) or [try it offline](#try-the-attack-offline).
 
 ## Quick start: Share Privately
 
@@ -82,14 +70,8 @@ cd safeshare
    clone the repository and use the `extension/` folder while developing. Extract the ZIP.
 2. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the
    extracted folder (or the repository's `extension/` folder).
-3. Open or refresh ChatGPT, Claude, DeepSeek, or a Word Online document. On Word, use the floating
-   **Blackline** button at the bottom right (SafeShare in older release ZIPs).
-4. Review the extracted text or saved document copy. In Word, the **Maybe important** section shows
-   only model suggestions; automatic rule detections stay active and can be clicked in either
-   preview pane to redact or restore them.
-5. Choose the reader profile, amount handling, and expiry, then create the link or download the
-   DOCX. Anyone receiving the **complete link, including its fragment**, can open it; recipients do
-   not need the extension when the public relay serves the document viewer.
+3. Refresh any chat or Word tabs that were already open, then follow
+   [Create your first private share](#create-your-first-private-share).
 
 The model, vocabulary, and ONNX WASM runtime are bundled in the repository. **Running the browser
 extension requires no Python, model download, or inference API key.** Creating and opening relay
@@ -172,21 +154,17 @@ the reply and its computed values are unedited.*
 
 ### Word Online integration
 
-The launcher appears on Word editor routes (`Doc.aspx`/`doc2.aspx`) without a per-site prompt;
-the toolbar opens Word Online setup. Opening it reads a **separate copy** of the saved document
-through the current SharePoint session, leaving the original unchanged. The setup page is a
-document-first workspace: the preview spans the width at the top (original beside “what others
-will see”), followed by the Maybe important section, then images, then sharing. A sticky section nav
-jumps between the sections. Maybe important lists only model suggestions, labelled
-`Possible person - Model score 78%`, six at a time with **Show more**. Rule detections stay
-automatic and are not listed; click any highlight in either pane to redact or restore it.
-Selecting other text adds a manual redaction, and scrolling one pane follows the other. Opening
-setup from the launcher reads the copy once automatically; the control then becomes **Read again**.
+Open a saved document and click the floating **Blackline** button. The extension reads a separate
+copy through your existing SharePoint session; it does not overwrite the original.
 
-Detection reuses the chat tiers plus money-column/currency bases and the derived-amount solver,
-with local NER for names. Rule results are applied automatically; model suggestions show their NER
-label and score and can be toggled per item. Redaction is surgical OOXML editing — `w:t` runs are
-rewritten inside the original package, so tables, styles, headers, footers and equations survive.
+Compare the two previews and click a highlight to redact or restore it. Select other text to add
+a manual redaction. **Maybe important** lists model suggestions; automatic rule detections stay
+in the previews. Model scores are not calibrated probabilities. Use **Read again** after saving
+changes in Word, then create a new sanitized copy before sharing.
+
+Word uses the shared rules, local model and numerical checks, with extra handling for currency
+and money columns. Redaction rewrites text within the original DOCX package rather than rebuilding
+it as plain text, preserving supported tables, styles, headers, footers and equations.
 
 Images are reviewed at full size in a lightbox: drag to mark areas or replace the whole image.
 Pixels are overwritten and re-encoded, then verified before export. A crop can still contain the
@@ -268,12 +246,11 @@ does not put it on the wire: the page's own request for the ciphertext is `/api/
 fragment. The key is redacted in this capture; both URLs are the page's console output on v2.4.1
 against the local relay.*
 
-Search engines do not index or fetch anything behind `#`, and the relay also sends
-`X-Robots-Tag: noindex`. `tests/relay_lifecycle.test.js` fetches chat and document links as
-Googlebot and checks that neither the page, the API nor the relay's storage holds plaintext or the
-key. Both are defence in depth, not access control: a full link posted in
-public can still be copied, and anyone holding it can decrypt the share until it expires or is
-revoked.
+Browsers do not include the `#fragment` in HTTP requests. The relay also sends
+`X-Robots-Tag: noindex`. `tests/relay_lifecycle.test.js` uses a Googlebot user agent to check that
+HTTP responses and relay storage contain neither shared plaintext nor its key. This does not
+prove a URL cannot be indexed or that a browser bot holding the full link cannot decrypt it.
+Anyone holding the complete link can retrieve the share while it remains available and retain a copy.
 
 ### Revocation
 
