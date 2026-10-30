@@ -192,7 +192,7 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
 - [x] Separate four numbers in docs: raw model, simulated hybrid, before-sending, share path. · `me`
 - [x] Tone down overclaiming wording: conference "standard" labels
       (`span_arbiter.js`), "Weaponized Algebraic Side-Channel Attack"
-      (`tools/poc_asca_inversion.py`), "Peer-Reviewed" (`tools/benchmark_distilbert_vs_minilm.py`).
+      and "Peer-Reviewed" (old benchmark scripts, since removed).
       Translate `tools/eval/RESULTS_SOTA.md` to English. · `me`
 
 ---

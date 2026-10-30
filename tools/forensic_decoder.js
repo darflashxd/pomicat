@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SafeShare-AI — Standalone Forensic Traitor-Tracing Decoder (Black Hat Arsenal CLI)
+ * SafeShare-AI — Standalone watermark decoder for leaked share text
  * 
  * Extracts and verifies imperceptible Zero-Width Unicode HMAC watermarks from leaked AI text.
  * Determines the exact recipient, session ID, and timestamp of the unauthorized leak.
@@ -39,8 +39,7 @@ function parseArgs() {
 
 function printHelp() {
   console.log(`
-SafeShare-AI Forensic Traitor-Tracing Decoder
-Black Hat Arsenal & AI Context Privacy Tool
+SafeShare-AI watermark decoder
 
 Options:
   --text, -t <string>    Input string suspected of containing leaked AI conversation
