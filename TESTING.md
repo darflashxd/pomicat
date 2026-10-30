@@ -1,5 +1,43 @@
 # Manual test checklist (Chrome)
 
+## Historical audit scope and current release checks
+
+Submission cleanup package check (30 October 2026, runtime source based on `635766f`): built local
+Chrome/Firefox ZIPs with `tools/build_extension.py`, checked every SHA256SUMS entry, both manifests,
+the bundled model hash and packaged extension files against source. The extracted Chrome package
+passed `test_rebrand_browser.py` (including actual extension storage restart) and
+`test_word_review_browser.py` (review UI in Chromium/Firefox). This does not establish signed
+Firefox installation, a newly published release, or live-provider compatibility of that ZIP.
+Local files keep the current 2.5.7 filename; they must not replace the published 2.5.7 assets.
+Offline README commands were checked: naive input exits 2 with a $5,000 leading candidate;
+protected input exits 0 with no candidate. Screenshot capture uses only local fictional input.
+
+Historical notes were consolidated into CHANGELOG.md. A repaired regression is evidence for its
+specific case, not a complete security audit. Use current commands rather than historical suite counts:
+
+```text
+npm test
+python tools/test_word_review_browser.py
+python tools/test_docx_privacy_browser.py
+python tools/test_word_structures.py
+python tools/test_word_confidential_docx.py
+python tools/test_hr_toggle_browser.py
+python tools/test_mapping_browser.py
+python tools/test_rebrand_browser.py
+```
+
+The Word checks cover selected-value removal, semantic XML/relationships, split runs, equations,
+merged/nested tables, content controls, hidden/revision text, field-instruction refusal, output
+hashes and asynchronous review races. Tests supplying manual rules do not measure automatic NER
+recall. Large-file handling does not establish a memory budget or real-tenant compatibility.
+
+For a release, build with `python tools/build_extension.py`, test extracted packages, verify
+SHA256SUMS and record the commit, browser, model hash and artifact names. Source version 2.5.7 may
+include unreleased fixes: test results from source do not automatically describe published v2.5.7 ZIPs.
+Recheck both old and new relay origins, revoke and concurrent burn using only fictional shares.
+Full-navigation restoration of unassigned drafts, changed provider DOMs, image text without OCR,
+and semantic re-identification remain limitations. Keep those visible in submission material.
+
 ## Current audit hardening checks (2026-10-29)
 
 Run `npm test` for CLI exit-status parity, keyword-context inference bypasses, explicit ratio

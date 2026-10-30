@@ -21,6 +21,23 @@ Keep **before-send protection Off**: Share Privately is the main feature. If usi
 relay, configure the extension's relay override as described in TESTING.md. Starting a local
 server does not change the extension's default hosted destination.
 
+## Short recording (2–3 minutes)
+
+Use one build and fictional data throughout. Record its commit and whether the recipient uses the
+extension viewer or the hosted viewer. Do not expose account names, tenant URLs, full links or tokens.
+
+| Time | Scene |
+|---|---|
+| 0:00–0:25 | Hide the stated salary; show that the derived figures remain. |
+| 0:25–0:45 | Run the arithmetic attack, or show a clearly labelled previous LLM run. |
+| 0:45–1:20 | Review the chat, hide supported clues and run the attack check again. |
+| 1:20–1:45 | Create a link and open it as a recipient. |
+| 1:45–2:15 | Review a fictional Word document and show its sanitized recipient copy. |
+| 2:15–2:35 | Show ciphertext/noindex evidence and state the limits. |
+
+The longer walkthrough below is for rehearsal. A recorded LLM response must not be presented as
+a live response. Keep a local relay fallback; do not rely on venue connectivity.
+
 ## 1. Show the sharing workflow (45 seconds)
 
 Open Blackline on a short English chat. Check both user and assistant turns were extracted.
@@ -100,8 +117,11 @@ curl -s -A "Googlebot/2.1" -D - "http://127.0.0.1:8787/api/share/<id>" | grep -i
 
 The page is an empty viewer marked `noindex`; the API returns only ciphertext, marked `noindex`.
 `npm test` checks the same thing for chat and document links (`tests/relay_lifecycle.test.js`):
-no plaintext or key in the page, the API or the relay's storage. Say "search engines can't read or index it", not "links are
-private": anyone holding the full link, `#` part included, can open it until it expires.
+no shared plaintext or fragment key in the page response, the API or the relay's storage. Say:
+"The HTTP request does not carry the fragment key. The page and API do not serve shared plaintext,
+and the responses ask crawlers not to index them." This does not prove that a URL cannot be indexed
+or that a browser bot holding the full link cannot decrypt it. Anyone holding the full link,
+`#` part included, can open it until retrieval expires or is revoked.
 
 ## 5. Show a limit, not a perfect score (40 seconds)
 

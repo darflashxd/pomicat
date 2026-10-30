@@ -11,8 +11,20 @@ stay unchanged for compatibility. Rebranding the extension does not deploy this
 Worker or move existing shares. Do not recreate the database for the rename.
 
 The relay is a Cloudflare Worker. It stores encrypted shares in a D1 database and serves the page
-that opens share links. It only ever sees ciphertext: the decryption key is in the link's `#`
-part, which browsers never send to the server.
+that opens share links. Its API receives ciphertext: the decryption key is in the link's `#`
+part, which browsers do not include in HTTP requests. Hosted decryption still trusts the host's
+served code; a modified hosted viewer could read that fragment and plaintext.
+
+## Existing relay compatibility and rollback
+
+The Blackline and legacy SafeShare Workers share the existing D1 database and rate-limiter
+namespaces. No data copy is needed. Limits are approximate per-location counters, not global quotas.
+Keep cleanup cron on the legacy Worker; the Blackline config deliberately adds no duplicate cron.
+
+Keep both hosts permitted while older links circulate. A rollback changes client defaults or
+deploys reviewed code; do not restore an old database snapshot, which could resurrect burned or
+revoked shares. Do not delete an endpoint that existing links still use. Updating Git does not
+deploy either Worker. Decryption inside the extension and hosted fallback have different trust models.
 
 Everything below fits in Cloudflare's free plan. It takes about 15 minutes the first time.
 
@@ -22,7 +34,8 @@ Everything below fits in Cloudflare's free plan. It takes about 15 minutes the f
 - Node.js 18 or newer (`node --version`)
 - This repository: `git clone https://github.com/darflashxd/safeshare && cd safeshare/relay`
 
-All commands below run inside the `relay/` folder.
+All commands below run inside the `relay/` folder. They target the Blackline config explicitly;
+use the legacy config only when deliberately updating the legacy Worker.
 
 ## 1. Log in
 
@@ -41,7 +54,7 @@ Skip this step if `safeshare-db` already exists in your account (it's listed by
 npx wrangler@4 d1 create safeshare-db
 ```
 
-It prints a `database_id`. Open `wrangler.toml` and replace the existing `database_id` under
+It prints a `database_id`. Open `wrangler.blackline.toml` and replace the existing `database_id` under
 `[[d1_databases]]` with yours. Then create the table:
 
 ```bash
@@ -62,7 +75,7 @@ If it says the column already exists, that's fine.
 ## 3. Deploy
 
 ```bash
-npx wrangler@4 deploy
+npx wrangler@4 deploy --config wrangler.blackline.toml
 ```
 
 The output ends with your URL, for example `https://safeshare-relay.<your-subdomain>.workers.dev`,
@@ -74,9 +87,9 @@ and lists these bindings:
 | `UPLOAD_LIMITER` | max 10 new shares per minute per IP address |
 | `READ_LIMITER` | max 60 link opens per minute per IP address |
 | `ASSETS` | the share-link page (`extension/viewer/`) |
-| cron `17 3 * * *` | deletes expired shares once a day |
+| legacy Worker cron `17 3 * * *` | deletes expired shares once a day; do not duplicate on the new Worker |
 
-Shares are limited to 512 KB, which is plenty for a chat but useless for hosting files.
+Shares are limited to 512 KiB ciphertext. Larger DOCX copies must be downloaded instead.
 
 ## 4. Check it works
 
@@ -92,7 +105,7 @@ node bin/safeshare.js share examples/chat_original.txt --burn --relay https://sa
 
 ## 5. Point the extension at your relay
 
-If your URL is different from `https://safeshare-relay.bleedguard.workers.dev`, change the one
+If your URL is different from the official relay hosts, change the
 default in `extension/engine/crypto.js`:
 
 ```js
@@ -104,9 +117,11 @@ The extension only runs on, and only talks to, the relay it knows (so no other `
 can talk to it). Replace `safeshare-relay.bleedguard.workers.dev` with your host in the same three
 places too:
 
-- `extension/manifest.json` and `extension/manifest.firefox.json`: `host_permissions` and
-  `content_scripts.matches`
+- `extension/relay_hosts.js`: default/allowed origins
+- `extension/manifest.json` and `extension/manifest.firefox.json`: `host_permissions`,
+  `content_scripts.matches` and extension-page CSP `connect-src`
 - `extension/content_script.js`: `VIEWER_ORIGINS`
+- `extension/word/publish.js`: fallback default if the shared host module is unavailable
 
 Then rebuild the extension zips with `python tools/build_extension.py`.
 
@@ -117,7 +132,7 @@ changes above), override it in the extension: on `chrome://extensions`, click
 
 ## Updating later
 
-`git pull`, then `npx wrangler@4 deploy` from `relay/`. Check the changelog for any database
+`git pull`, then `npx wrangler@4 deploy --config wrangler.blackline.toml` from `relay/`. Check the changelog for any database
 step (like the `ALTER TABLE` above) before deploying.
 
 If a release adds a relay host to `extension/manifest.json`, also reload the unpacked extension

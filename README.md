@@ -4,13 +4,6 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/darflashxd/safeshare?label=release)](https://github.com/darflashxd/safeshare/releases)
 
-Previously SafeShare. The extension keeps its existing ID, settings and relay so
-updating does not reset your installation or break earlier links. New links use
-`https://blackline-relay.bleedguard.workers.dev`; the old relay remains supported.
-The repository,
-npm package `safeshare-ai`, and `safeshare` command retain their existing names;
-`blackline` is also available as a CLI command.
-
 **Review, redact and privately share AI conversations and Word documents, including the numbers that give a hidden value away.**
 
 Blackline's main workflow is **Share Privately**: review a chat or a document, redact sensitive
@@ -22,16 +15,48 @@ Hiding the obvious secret is not enough. If a chat says "I earn [REDACTED]" and 
 replies "saving 20% is $1,000 a month", anyone can work the salary back out. Blackline hides the
 derived figures too, and checks the result with the same attack before you share.
 
+[Download extension](https://github.com/darflashxd/safeshare/releases) ·
+[Install](#quick-start-share-privately) · [Try offline](#try-the-attack-offline) ·
+[Screenshots](#screenshots) · [Demo walkthrough](DEMO.md) · [Security model](#security-model)
+
+## Try the attack offline
+
+Requires Node.js 18 or newer and Git. No account, API key, model download or relay is needed.
+These examples contain fictional data only.
+
+```bash
+git clone https://github.com/darflashxd/safeshare.git
+cd safeshare
+node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
+```
+
+The leading candidate is `$5,000`: the visible monthly saving divided by its percentage.
+Alternative candidates are printed too; these are hypotheses, not confirmed private values.
+The command exits with status `2` when it finds a reconstruction candidate. That is expected.
+
+Redact the original example, then run the same attack:
+
+```bash
+node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+```
+
+Expected: `No hidden values recovered.` and exit status `0`. This means the supported check found
+no candidate, not that every possible inference is prevented. `invert --json` uses the same exit
+status contract. For an encrypted sharing walkthrough, see [DEMO.md](DEMO.md).
+
 ### Results at a glance
 
-| Check | Without Blackline | With Blackline | Source |
+| Check | Baseline observation | Blackline observation | Source |
 |---|---|---|---|
-| An LLM recovers a hidden salary (3 models, 4 runs of 40 chats, EN + ID) | 100% (naive redaction and Presidio) | 0 of 160 | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
-| Rule-based arithmetic attacker, same 40 chats | 53% naive, 100% Presidio | 0% | [attack bench](tools/attack_bench/RESULTS.md) |
+| Historical LLM salary attack: 3 models, 4 runs of 40 templated chats, EN + ID | Naive masking: 100% recovered. Presidio: 100% directly visible or recovered, depending on language. | 0 recoveries in 160 run cases, with repeated scenarios across models; not 160 independent conversations | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
+| Historical rule-based arithmetic attacker, 40 templated chats | Naive: 53% recovered. Presidio: 100% directly visible in the English run. | 0% recovered in this experiment | [attack bench](tools/attack_bench/RESULTS.md) |
 | Hidden birth date narrowed to ≤ 4 days from weekday clues | 40 / 40 | 0 / 40 | [RESULTS.md §8](tools/eval/RESULTS.md) |
-| A search crawler opening a share link (chat or document) | full text on a public page | ciphertext only, `noindex`, no key | `tests/relay_lifecycle.test.js` |
+| HTTP retrieval of a chat/document share without its fragment key | A plaintext sharing page would expose its contents; not a measurement of current provider pages | Viewer shell contains no shared plaintext; API returns ciphertext; responses request `noindex` | `tests/relay_lifecycle.test.js` |
 
-All data is fictional and templated; the limits of each check are in the linked files.
+Attack data is fictional and templated; the limits and historical configurations are in the linked
+reports. These are not current end-to-end detection scores. Direct exposure and recovery after
+masking are different outcomes. An indexing directive is not access control; anyone holding the
+complete link can open it with a compatible viewer.
 
 > Not a guarantee of anonymity. Review the output before publishing.
 > Detection can miss sensitive information or flag harmless text. A successful attack check
@@ -43,6 +68,9 @@ All data is fictional and templated; the limits of each check are in the linked 
   Chrome and Firefox ZIPs; `v2.5.4` and earlier keep the SafeShare name. Word Online documents
   can be reviewed, redacted, and shared as encrypted document links. The public relay serves
   the v4 document viewer.
+- **Source vs release:** changes under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) are newer than
+  the published ZIPs. Cite the Git commit when testing source; a matching version string alone
+  does not establish identical code. A source update does not redeploy the hosted relay/viewer.
 - **Tests:** run `npm test` for the current offline regression suite; local browser structure checks cover Chromium and Firefox.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek, and Word Online with the unpacked Chromium
   extension. A public-relay document link was opened in a clean browser context without the
@@ -89,6 +117,14 @@ shares requires a reachable relay; local detection and model inference run on yo
 
 Existing unpacked installations: run `git pull origin main`, reload Blackline in the extensions
 page, and refresh your chat tabs. Pulling source does not reload code already running in a tab.
+
+### Updating and name compatibility
+
+Previously SafeShare. The extension retains its identity and legacy settings so an update does not
+reset the installation. New links use `https://blackline-relay.bleedguard.workers.dev`; the old relay
+remains supported. The GitHub repository, npm package `safeshare-ai`, and `safeshare` command retain
+their names for compatibility; `blackline` is also available as a CLI alias. No account or relay
+migration is required merely to use the current name.
 
 ### Firefox
 
@@ -177,6 +213,19 @@ be read, export and link creation stop; a preview-only check is not treated as s
 
 Screenshots in this section show earlier SafeShare builds. Blackline keeps the
 same workflows; these images are historical evidence, not new-brand captures.
+
+### Word review and recipient copy
+
+![Word document review with original and redacted text](docs/screenshots/word-review-current.png)
+
+![Recipient document viewer with sanitized download](docs/screenshots/word-viewer-current.png)
+
+*Captured 30 October 2026 from source based on commit `635766f`, Chromium 149. These are local
+fixtures using production review, sanitizer, encryption and viewer scripts, not a live Word tenant
+or a relay upload. All document details are fictional; names were selected manually, not inferred
+by the model in this capture. The unmarked image is not claimed as automatically redacted.
+Reproduce with `python tools/capture_word_screenshots.py`. These captures do not describe the
+older published v2.5.7 ZIP byte-for-byte.*
 
 ### Hiding the original value is not enough
 

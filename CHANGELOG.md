@@ -2,6 +2,9 @@
 
 ## Unreleased — chat and Word detection consistency
 
+- Consolidate historical audit notes here; current operational instructions remain in DEPLOY.md
+  and reproducible checks in TESTING.md. Clarify historical benchmark denominators and crawler limits.
+
 - Keep labelled addresses complete across `No.` abbreviations and recognize contiguous named-bank account digits.
 - Reuse credential-assignment suggestions in Word even when the local model is unavailable.
 - Rejoin formatting runs for the DOCX attack check; reject unreadable output instead of checking only its preview.
@@ -73,9 +76,14 @@
   number parses no longer join unrelated findings.
 - Keep model labels, categories and replacements consistent across chunks, with
   document-relative occurrence offsets. Cancel oversized capture responses.
-- Checked with 20 live MCP Playwright clicks, delayed model responses, and
-  Chromium/Firefox regressions. See `docs/TOGGLE_PATCH_AUDIT.md` for timings and
-  remaining capture limitations.
+- Checked with 20 live Playwright clicks and delayed-model Chromium/Firefox regressions on
+  28 October: click-to-checked-state medians 141/129 ms in two ten-click runs, not isolated CPU
+  benchmarks. Completeness warnings and source-DOM cleanup remained open.
+- Historical Word audit found retained custom properties/custom XML and incomplete metadata
+  cleanup; subsequent fixes expanded verification and reject unsupported parts. Structural tests
+  cover split runs, nested/merged tables, equations, revisions and hidden text. These are not NER scores.
+- Historical Word acceptance included an 8.94 MiB fictional capture and download; the link was
+  correctly rejected by the 512 KiB ciphertext cap. This does not establish a memory budget.
 
 ## 2.5.4 - 2026-10-28
 
