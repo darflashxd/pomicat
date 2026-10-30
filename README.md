@@ -98,6 +98,22 @@ shares requires a reachable relay; local detection and model inference run on yo
 Existing unpacked installations: run `git pull origin main`, reload Blackline in the extensions
 page, and refresh your chat tabs. Pulling source does not reload code already running in a tab.
 
+### Create your first private share
+
+1. Open a short fictional conversation in ChatGPT, Claude or DeepSeek, then click **Blackline**.
+   For Word, open a saved fictional DOCX and click the floating **Blackline** button.
+2. Check that the expected messages or document content were captured. Compare the original and
+   protected previews, inspect suggestions, and manually select anything the detectors missed.
+3. For Word, choose **Create sanitized DOCX** and wait for verification. Review images manually.
+   Choose an expiry and create the private link when the reviewed copy is ready.
+4. Open the complete link in a separate browser context, click the opening button and check the
+   recipient's copy. Without the extension, the hosted viewer requires trust in its operator.
+5. Revoke the test link and check that a fresh retrieval is refused. Revocation cannot recall
+   copies already saved by a recipient. Never publish full links or revoke tokens in bug reports.
+
+Use only fictional data for this first run. An empty attack check means the supported checks
+found no reconstruction; it does not certify the copy as anonymous.
+
 ### Updating and name compatibility
 
 Previously SafeShare. The extension retains its identity and legacy settings so an update does not
