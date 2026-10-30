@@ -18,7 +18,7 @@ const SafeShareSymbolicRewriter = require("../extension/engine/symbolic_rewriter
 
 function runSymbolicLocalComputeSuite() {
   console.log("================================================================================");
-  console.log("   SAFESHARE-AI: PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE AUDIT (BLACK HAT)");
+  console.log("   SAFESHARE-AI: PRE-INFERENCE SYMBOLIC & LOCAL_COMPUTE CHECKS");
   console.log("================================================================================");
 
   const localCompute = new SafeShareLocalCompute();

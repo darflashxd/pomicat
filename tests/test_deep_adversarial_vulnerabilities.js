@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Black Hat Deep Adversarial Vulnerabilities & International Hardening Suite
+ * SafeShare-AI — Deep adversarial vulnerabilities and international hardening suite
  *
  * Verifies the 6 newly hardened international vectors & deep defense capabilities:
  *   1. VEC-DEEP-01: Unicode Homoglyph & Confusable Evasion (Cyrillic lookalikes & fullwidth NFKC normalization)
@@ -19,7 +19,7 @@ const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_b
 
 async function runDeepHardeningSuite() {
   console.log("================================================================================");
-  console.log("  SAFESHARE-AI: BLACK HAT DEEP ADVERSARIAL VULNERABILITIES & HARDENING AUDIT");
+  console.log("  SAFESHARE-AI: DEEP ADVERSARIAL VULNERABILITIES & HARDENING CHECKS");
   console.log("================================================================================");
 
   const heuristics = new HeuristicsRedactor();
@@ -170,7 +170,7 @@ async function runDeepHardeningSuite() {
   );
 
   console.log("\n================================================================================");
-  console.log("       ALL 6 DEEP BLACK HAT ADVERSARIAL VECTORS PASSED 100%!");
+  console.log("       All 6 deep adversarial vectors passed.");
   console.log("================================================================================\n");
 }
 

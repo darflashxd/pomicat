@@ -13,7 +13,7 @@ const PrioritySpanArbiter = require("../extension/engine/span_arbiter.js");
 
 function testPrioritySpanArbiter() {
   console.log("================================================================================");
-  console.log("   SAFESHARE-AI: PRIORITY SPAN ARBITER AUDIT (BLACK HAT TIER-0 VETO)");
+  console.log("   SAFESHARE-AI: PRIORITY SPAN ARBITER (TIER-0 VETO)");
   console.log("================================================================================");
 
   const arbiter = new PrioritySpanArbiter();

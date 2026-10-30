@@ -19,7 +19,7 @@ const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
 
 function runComprehensiveBenchmarkSuite() {
   console.log("================================================================================");
-  console.log("  SAFESHARE-AI: COMPREHENSIVE MULTI-DOMAIN ADVERSARIAL BENCHMARK (BLACK HAT SOTA)");
+  console.log("  SAFESHARE-AI: COMPREHENSIVE MULTI-DOMAIN ADVERSARIAL BENCHMARK");
   console.log("================================================================================");
 
   const datasetPath = path.join(__dirname, "..", "data", "comprehensive_adversarial_dataset.json");

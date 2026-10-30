@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Black Hat Arsenal Worldwide PII & Adversarial Stress Suite
+ * SafeShare-AI — Worldwide PII and adversarial stress suite
  * 
  * Comprehensive Verification of 63 Attack Vectors & Global PII Standards:
  *   1. Payment Cards & CVV Immunity (10 Vectors: formatted, spaced, conversational, Amex 4-digit CID, echo sweeper)
@@ -62,9 +62,9 @@ function setupDOMMocks() {
   };
 }
 
-async function runBlackHatGlobalPIISuite() {
+async function runGlobalPIISuite() {
   console.log("================================================================================");
-  console.log("   SAFESHARE-AI: MASTER BLACK HAT GLOBAL PII ADVERSARIAL BENCHMARK (63 VECTORS)");
+  console.log("   SAFESHARE-AI: GLOBAL PII ADVERSARIAL CHECKS (63 VECTORS)");
   console.log("================================================================================");
 
   const heuristics = new HeuristicsRedactor();
@@ -676,22 +676,22 @@ async function runBlackHatGlobalPIISuite() {
   // SUMMARY METRICS
   // ---------------------------------------------------------------------------
   console.log("\n================================================================================");
-  console.log("             BLACK HAT GLOBAL PII AUDIT METRICS SUMMARY");
+  console.log("             GLOBAL PII CHECK SUMMARY");
   console.log("================================================================================");
   console.log(`[*] Total Vectors Evaluated      : 63`);
   console.log(`[*] Vectors 100% Passed          : ${totalPassed} / 63 (100.0%)`);
   console.log(`[*] CVV Leak Recurrence Rate     : 0.00% (Absolute Zero-Tolerance)`);
   console.log(`[*] Orphan Badge Rate (c_tag)    : 0.00% (Zero Ghost Badges)`);
   console.log(`[*] Global PII Country Coverage  : US, UK, CA, IN, SG, BR, ES, IT, FR, DE, ID, AU, SA`);
-  console.log(`[*] Security Verification Status : 100% PRODUCTION HARDENED (BLACK HAT ARSENAL SOTA)`);
+  console.log(`[*] Status : all listed vectors handled (regression check, not a security guarantee)`);
   console.log("================================================================================\n");
 }
 
 if (require.main === module) {
-  runBlackHatGlobalPIISuite().catch(err => {
-    console.error("[-] Black Hat PII Suite Failure:", err);
+  runGlobalPIISuite().catch(err => {
+    console.error("[-] Global PII suite failure:", err);
     process.exit(1);
   });
 }
 
-module.exports = runBlackHatGlobalPIISuite;
+module.exports = runGlobalPIISuite;

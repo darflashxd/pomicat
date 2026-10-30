@@ -263,7 +263,7 @@ async function runEdgeCaseAudit() {
   console.log("  [✓] Email Sentence Boundary & Double-Bracket Immunity verified!");
 
   // --- TEST 16: INTERNATIONAL MULTI-DOMAIN SCENARIOS (SINGAPORE, UK, AUSTRALIA) ---
-  console.log("\n[Audit 16] Testing International Multi-Domain Scenarios (Black Hat Asia Context)...");
+  console.log("\n[Audit 16] Testing International Multi-Domain Scenarios (Singapore, UK, Australia)...");
   const sgText = "I stay at 15 Marina Boulevard, Singapore 018940. Mobile +65 9123 4567, DBS account 123-45678-9, base SGD 14,500.";
   const sgScan = heuristics.scan(sgText);
   const sgDets = contextual.classifyTurn(sgScan.sanitizedText, 0);
@@ -295,7 +295,7 @@ async function runEdgeCaseAudit() {
   console.log("  [✓] International Multi-Domain Scenarios verified!");
 
   console.log("\n================================================================================");
-  console.log("  ALL AUDIT CHECKS PASSED: 100% PRODUCTION READY & SECURE");
+  console.log("  All edge-case checks passed.");
   console.log("================================================================================");
 }
 

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Black Hat Arsenal Uncopyable Enclave Audit
+ * SafeShare-AI — Post-decryption copy-protection checks
  * 
  * Verifies the 7 Pillars of Post-Decryption Exfiltration Defense:
  *   Audit 1: Dynamic Glyph Scrambler & Honeypot Trap
@@ -19,14 +19,14 @@ const SafeShareExtensionBridge = require("../extension/viewer/engine/extension_b
 
 async function runUncopyableEnclaveAudit() {
   console.log("================================================================================");
-  console.log("     SAFESHARE-AI: BLACK HAT ARSENAL POST-DECRYPTION ENCLAVE AUDIT");
+  console.log("     SAFESHARE-AI: POST-DECRYPTION COPY-PROTECTION CHECKS");
   console.log("================================================================================");
 
   // ---------------------------------------------------------------------------
   // AUDIT 1: Dynamic Glyph Scrambler & Honeypot Trap
   // ---------------------------------------------------------------------------
   console.log("\n[Audit 1] Testing Dynamic Glyph Scrambler & Honeypot Trap...");
-  const scrambler = new SafeShareFontScrambler("blackhat-demo-seed-2026");
+  const scrambler = new SafeShareFontScrambler("fictional-demo-seed-2026");
   const confidentialPrompt = "Review confidential Q4 financial projections and employee salaries.";
   
   const scrambled = scrambler.scramble(confidentialPrompt);
@@ -61,7 +61,7 @@ async function runUncopyableEnclaveAudit() {
   // AUDIT 3: Zero-Width Unicode HMAC Steganography (Traitor Tracing)
   // ---------------------------------------------------------------------------
   console.log("\n[Audit 3] Testing Zero-Width Unicode HMAC Steganography (Traitor Tracing)...");
-  const masterKey = "SafeShare-BlackHat-Key-0x99";
+  const masterKey = "SafeShare-Fictional-Key-0x99";
   const steg = new SafeShareSteganography(masterKey);
   const sensitiveReport = "Laporan audit internal divisi security operasional 2026.";
   const meta = {
@@ -176,7 +176,7 @@ async function runUncopyableEnclaveAudit() {
   console.log("  [✓] Audit 7 Passed: Atomic Burn-After-Reading single-use destruction verified!");
 
   console.log("\n================================================================================");
-  console.log("   ALL 7 BLACK HAT POST-DECRYPTION ENCLAVE AUDITS PASSED WITH ZERO FLAWS!");
+  console.log("   All 7 post-decryption copy-protection checks passed.");
   console.log("================================================================================");
 }
 

@@ -426,7 +426,7 @@ async function runAutonomousDeepAudit() {
   console.log("  PHASE 4: POST-DECRYPTION ENCLAVE & FORENSIC TRAITOR TRACING");
   console.log("--------------------------------------------------------------------------------");
 
-  const masterSecret = "BlackHat-MasterKey-2026-Enclave";
+  const masterSecret = "Fictional-MasterKey-2026-Enclave";
   const steg = new SafeShareSteganography(masterSecret);
   const plainDocument = "Catatan evaluasi kinerja rahasia kuartal 4 internal perbankan.";
   const metaTraitor = {

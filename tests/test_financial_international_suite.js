@@ -16,7 +16,7 @@ const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
 
 function runFinancialBenchmarkSuite() {
   console.log("================================================================================");
-  console.log("   SAFESHARE-AI: GLOBAL FINANCIAL ADVERSARIAL BENCHMARK AUDIT (BLACK HAT SOTA)");
+  console.log("   SAFESHARE-AI: GLOBAL FINANCIAL ADVERSARIAL BENCHMARK");
   console.log("================================================================================");
 
   const datasetPath = path.join(__dirname, "..", "data", "financial_benchmark_dataset.json");

@@ -17,7 +17,7 @@ const ConsistentPseudonymizer = require("../extension/engine/pseudonymizer.js");
 
 function runUniversalDomainInvarianceSuite() {
   console.log("================================================================================");
-  console.log("   SAFESHARE-AI: UNIVERSAL DOMAIN INVARIANCE BENCHMARK (BLACK HAT ARSENAL)");
+  console.log("   SAFESHARE-AI: UNIVERSAL DOMAIN INVARIANCE BENCHMARK");
   console.log("================================================================================");
 
   const heuristics = new HeuristicsRedactor();
