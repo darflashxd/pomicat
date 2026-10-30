@@ -94,5 +94,3 @@ tools/sota/results_raw/
 training/model_output/mminilmv2-sota/tokenizer.json
 training/model_output/mminilmv2-smoke/
 
-# Submission drafts (kept locally, not part of the product)
-docs/ARSENAL_ABSTRACT.md

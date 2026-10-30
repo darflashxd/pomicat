@@ -44,9 +44,9 @@
 - Server restart membatalkan deberta di 90% (step 3463). Checkpoint-2564 utuh (optimizer+scheduler+rng ada).
 - Tambah `--resume` ke finetune.py (terverifikasi compile + isi checkpoint lengkap). Resume 10% sisa jalan background.
 - mMiniLM CLI FP: **0.00%** (lolos <2%). Pola: fine-tune+hardneg → 0% FP tapi recall real lemah; MiniLM produksi → recall kuat tapi FP 38% (13% pasca-arbiter). Tradeoff inti untuk matriks.
-- DEBERTA CLI FP **0.00%**. Matriks final ditulis: `tools/eval/RESULTS_SOTA.md`. KEPUTUSAN: NO-GO ganti model — MiniLM produksi tetap juara (0.848); cerita BlackHat = MiniLM+arbiter+Tier-1+inversion defense.
+- DEBERTA CLI FP **0.00%**. Matriks final ditulis: `tools/eval/RESULTS_SOTA.md`. KEPUTUSAN: NO-GO ganti model — MiniLM produksi tetap juara (0.848); cerita utama = MiniLM+arbiter+Tier-1+inversion defense.
 - DEBERTA SELESAI (resume sukses): sintetik F1 **0.783** (terbaik fine-tune) → ai4privacy recall 0.366 / F1 **0.458** (terbaik fine-tune, masih << MiniLM 0.848). CLI FP menyusul (background).
-- P4 DOCS SELESAI: README/DEMO/MODELS_SETUP klaim MiniLM jujur, duplikat dihapus, 28/28 terverifikasi, RELATED_WORK.md baru + sitasi abstract.
+- P4 DOCS SELESAI: README/DEMO/MODELS_SETUP klaim MiniLM jujur, duplikat dihapus, 28/28 terverifikasi, RELATED_WORK.md baru + sitasi.
 - P1 SELESAI: Tier-0 +BARE_PORT/+SQL_NUMERIC/+PRIVATE_IP, Tier-1 kecualikan IP privat. Hybrid CLI FP 13.08%→**1.10%**→(fix lookbehind `--port`)→**0.00%**. GIT_HASH wajib huruf → hybrid ai4privacy 0.759/0.816→**0.797/0.834** (CARD 0→0.975, SSN 0.36→0.806); UNION Tier-1+Gate-2 **0.811**.
 - P2 SELESAI: ID_DOB_BARE kontekstual (MDY+DMY+ISO, validator marker ±60 char). 6/6 smoke OK. Regression ditambah ke cli.test.js.
 - P6 SELESAI: KV fallback dihapus (D1 wajib), /api/chat + gateway dihapus, --ttl divalidasi 300..604800. relay_worker.test lolos, 28/28 hijau.

@@ -2,8 +2,7 @@
   "metadata": {
     "version": "1.0.0",
     "name": "SafeShare-AI Global Financial Adversarial Benchmark",
-    "description": "50+ diverse, unconventional, and rigorous financial adversarial scenarios covering Silicon Valley tech compensation, direct banking IDs, corporate ledgers, mortgages, accounting parentheses, and macroeconomic controls.",
-    "benchmark_target": "Black Hat Asia 2027 Arsenal & USENIX PETS"
+    "description": "50+ diverse, unconventional, and rigorous financial adversarial scenarios covering Silicon Valley tech compensation, direct banking IDs, corporate ledgers, mortgages, accounting parentheses, and macroeconomic controls."
   },
   "scenarios": [
     {

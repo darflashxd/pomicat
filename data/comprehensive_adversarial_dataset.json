@@ -2,8 +2,7 @@
   "metadata": {
     "version": "1.0.0",
     "name": "SafeShare-AI Comprehensive Multi-Domain Adversarial Benchmark",
-    "description": "Exhaustive English test suite evaluating Cybersecurity/Cloud credentials, Healthcare/HIPAA disclosures, Workplace/HR actions, and Unexpected/Adversarial edge cases.",
-    "benchmark_target": "Black Hat Asia 2027 Arsenal & USENIX Security"
+    "description": "Exhaustive English test suite evaluating Cybersecurity/Cloud credentials, Healthcare/HIPAA disclosures, Workplace/HR actions, and Unexpected/Adversarial edge cases."
   },
   "scenarios": [
     {

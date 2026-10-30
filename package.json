@@ -20,7 +20,6 @@
   },
   "scripts": {
     "test": "node tests/run_all.js",
-    "benchmark": "node tools/benchmark_comparative.js",
     "relay:local": "python relay/server_local.py",
     "demo": "node bin/safeshare.js invert examples/chat_naive_redacted.txt"
   },
@@ -28,7 +27,6 @@
     "privacy",
     "aes-gcm",
     "llm-security",
-    "blackhat-arsenal",
     "contextual-integrity",
     "data-redaction",
     "algebraic-reconstruction",

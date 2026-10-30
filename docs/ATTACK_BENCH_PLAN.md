@@ -30,7 +30,7 @@ results: [`tools/attack_bench/RESULTS.md`](../tools/attack_bench/RESULTS.md).
 | 2.4 | Replace templated assistant replies with **real replies** from the same models (ask each model the user's question, keep its answer), then redact and attack those | 2.1, 2.2 | `me` |
 | 2.5 | Widen the cases: loans, rent splits, ages/birth years, travel dates, combinations of details (ROADMAP §3: ~300 prompts) | – | `me` |
 | 2.6 | Report per redactor × attacker × inference type, with how many chats and the exact model versions | 2.3–2.5 | `me` |
-| 2.7 | One headline number for the abstract ("an LLM recovers X% of hidden salaries from naive redaction, Y% from Presidio, Z% after SafeShare") | 2.6 | `me` + `you` |
+| 2.7 | One headline number for the README ("an LLM recovers X% of hidden salaries from naive redaction, Y% from Presidio, Z% after SafeShare") | 2.6 | `me` + `you` |
 
 **Progress 2026-10-24:** one model done via `--llm-cli` (no API key): DeepSeek V4 Pro
 (`9router/ds/deepseek-v4-pro`) across 40 English chats — naive 100% leaked, Presidio 100% left
@@ -52,13 +52,13 @@ publish the script and seed so anyone can rerun it; don't extrapolate to "all ch
 | 4.5 | Results table per tool; frame as "a limit of this class of tools", not a CVE | 4.2–4.4 | `me` |
 | 4.6 | Disclosure: I draft a short note per tool that leaks (what, how to reproduce with fictional data, suggested fix); **you send it**, I don't send messages for you. GitHub issue for open source, security contact for the rest | 4.5 | `me` drafts, `you` send |
 | 4.7 | Disclosure window: 90 days is standard; for a March 2027 talk send **by early December 2026**. Keep a log (date sent, reply) | 4.6 | `you` |
-| 4.8 | Decide whether the talk names the tools or anonymises them (depends on vendor replies) | 4.7 | `you` |
+| 4.8 | Decide whether the write-up names the tools or anonymises them (depends on vendor replies) | 4.7 | `you` |
 
 ## Timeline
 
 | By | What |
 |---|---|
 | this week | 2.1–2.3 (needs the key), 4.1 decided |
-| before 2 Nov (CFP) | 2.4, 2.7 headline number; 4.2 open-source tools in the table |
+| early Nov | 2.4, 2.7 headline number; 4.2 open-source tools in the table |
 | early Dec | 4.6–4.7 disclosures sent |
 | before March | 2.5–2.6 full report; 4.3–4.4 if accounts allow |

@@ -12,15 +12,13 @@ ablation/utility studies, source-complete related-work citations, live-provider 
 and release/deployment. No held-out score or production deployment is implied by regression tests.
 
 Updated 2026-10-16 after reviewing the 2.3.1 commits (MiniLM model, Tier-0 veto) and an
-independent read-only audit. Black Hat Asia 2027 Arsenal call for tools reportedly closes
-**2 Nov 2026** (confirm on blackhat.com). Reviewers judge the submission, so items marked
-**before 2 Nov** go in the abstract; the rest can land before the conference (March 2027).
+independent read-only audit.
 
 **Owners:** `me` = done in this repo · `you` = project owner · `friend` = co-developer /
 Cloudflare account owner · `friends` = testers / labellers
 **Status tags:** ✅ confirmed by reproducing it · 🔎 reported, still to verify
 
-Done work is tracked in [TODO.md](TODO.md); this file is what's next.
+Done items are ticked in place; open items are what's next.
 
 > **P0 fixes are in (2026-10-16, commits `f484f89`..`24cfe6b`).** Still open before calling the
 > extension production-ready: the browser checks on real ChatGPT / Claude pages (P0.1, P0.2) and
@@ -62,7 +60,7 @@ Done work is tracked in [TODO.md](TODO.md); this file is what's next.
 
 ---
 
-## P0 — leaks and breakage (fix before any demo, release or submission)
+## P0 — leaks and breakage (fix before any demo or release)
 
 ### P0.1 User messages are dropped when a chat is read for sharing ✅
 `extension/content_script.js:702`: the input/UI filter `isPromptInputOrUIElement()` now also
@@ -184,7 +182,7 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
 - [x] One test file fails: `test_symbolic_local_compute.js` (`CHF 120’000` vs `CHF 120'000`,
       locale formatting). · `me`
 
-## Claims to narrow (README, abstract, RESULTS_SOTA)
+## Claims to narrow (README, RESULTS_SOTA)
 
 - [x] "removes **every** visible number that can be derived" → "removes numbers derivable through
       the supported transformations (ratios, periods, projections, sums/differences)"
@@ -192,14 +190,14 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
 - [x] "0% false positives" applies to the tested CLI hard-negative set only, not all chats. · `me`
 - [x] WildChat showed no personal-finance inversion incident in the sample; keep saying so. · `me`
 - [x] Separate four numbers in docs: raw model, simulated hybrid, before-sending, share path. · `me`
-- [x] Tone down overclaiming wording: "Standard: Black Hat Asia 2027 & USENIX Security"
+- [x] Tone down overclaiming wording: conference "standard" labels
       (`span_arbiter.js`), "Weaponized Algebraic Side-Channel Attack"
       (`tools/poc_asca_inversion.py`), "Peer-Reviewed" (`tools/benchmark_distilbert_vs_minilm.py`).
       Translate `tools/eval/RESULTS_SOTA.md` to English. · `me`
 
 ---
 
-## 1. Security hardening (before the conference)
+## 1. Security hardening
 
 ### The host can read chats by changing the share page (most important)
 The relay serves the page that decrypts the chat (`viewer/`). Whoever controls it (us,
@@ -277,15 +275,15 @@ to an unlocked device.
 
 Each needs an attack (in `invert`), a defence, tests and a benchmark row, like the birth-year one.
 
-- [x] **A. Dates** (before 2 Nov; `inferDates`, `tests/inference.test.js`; benchmark: `tools/eval/RESULTS.md` §8, naive 40/40 narrowed, share dialog 0/40): "[REDACTED_DATE] is a Tuesday, the day after my birthday on the
+- [x] **A. Dates** (`inferDates`, `tests/inference.test.js`; benchmark: `tools/eval/RESULTS.md` §8, naive 40/40 narrowed, share dialog 0/40): "[REDACTED_DATE] is a Tuesday, the day after my birthday on the
       14th" → candidate dates in a ±12-month window; defence hides weekdays, day numbers and
       offsets near a hidden date. · `me`
-- [ ] **B. Combinations of details** (prototype before 2 Nov): "only female cardiologist at a
+- [ ] **B. Combinations of details** (prototype first): "only female cardiologist at a
       50-bed hospital in Blitar" → estimated number of matching people from BPS statistics; warn
       below ~5 and offer one-click generalisation; cite k-anonymity / Sweeney. · `me`
       Prototype done: `quasiIdentifiers()` warns in `invert`. Still to do: population estimate
       (needs BPS tables), warning in the share dialog, one-click generalisation.
-- [x] **C. Across turns** (before 2 Nov): hidden value recovered only from messages 2+5+7;
+- [x] **C. Across turns**: hidden value recovered only from messages 2+5+7;
       separate benchmark row. Depends on P0.1. · `me`
 - [x] **D. Locations** (later): hide landmark + distance phrases near a hidden address. · `me`
 
@@ -310,7 +308,7 @@ Detailed steps, owners and needs: [docs/ATTACK_BENCH_PLAN.md](docs/ATTACK_BENCH_
 - [ ] Real replies from 2–3 current models instead of templated ones. · `me` · **needs API keys**
 - [ ] Redact with every tool in §4 + Presidio + a regex baseline; report recovery per tool and
       per inference type, and what's left after SafeShare. · `me`
-- [ ] Publish dataset (fictional only) and scripts; update RESULTS.md and the abstract. · `me`
+- [ ] Publish dataset (fictional only) and scripts; update RESULTS.md. · `me`
 
 ## 4. Test real redaction tools, disclose responsibly
 
@@ -337,19 +335,16 @@ of tools*, not a vulnerability or CVE.
 - [ ] Evaluate vs rules on friends' labels, ai4privacy names, WildChat % touched. · `me`
 - [ ] Gate P0.5 (names before sending) and sharing with it; rules stay as fallback. · `me`
 
-## 6. Submission and booth
+## 6. Release and demo
 
-- [x] Reframe the abstract: "redaction is broken for AI chats", extension-first, with the LLM
-      attacker, arithmetic and dates results (local `docs/ARSENAL_ABSTRACT.md`, not in the repo; 24 Oct). · `me`
 - [x] Friend deploys the relay with [DEPLOY.md](DEPLOY.md) (incl. `ALTER TABLE`). · `friend`
       Live and serving CSP on share pages (checked 24 Oct), but the viewer is the ~20 Oct build:
       redeploy after the next push so the 21–24 Oct viewer changes go live.
 - [ ] Run [TESTING.md](TESTING.md) on ChatGPT, Claude and DeepSeek against the live relay. · `you`
 - [ ] 2–3 minute demo video. · `you`
-- [ ] Presenter names and bios in the abstract (local `docs/ARSENAL_ABSTRACT.md`); push; Release with checksums;
-      submit. · `you` · **by 2 Nov**
+- [ ] Release with checksums. · `you`
 - [x] Extension icon (16/48/128). · `me`
-- [ ] "Paste a redacted chat, we'll try to break it" booth page, fully in-browser. · `me` · March
+- [ ] "Paste a redacted chat, we'll try to break it" demo page, fully in-browser. · `me`
 
 ---
 
@@ -360,11 +355,10 @@ of tools*, not a vulnerability or CVE.
 | ~~Now – 20 Oct~~ | ~~**P0.1–P0.7** with regression tests~~ done 16 Oct |
 | ~~20 – 25 Oct~~ | ~~P1 + claim fixes · §2A dates · §2C across turns~~ done 16–18 Oct |
 | 18 – 25 Oct | #2 LLM attacker (needs key) · #4 open-source tools · friend: redeploy relay, model licence |
-| 25 Oct – 2 Nov | Live deploy · TESTING.md on 3 sites · video · bios · reframed abstract · **submit** |
+| 25 Oct – 2 Nov | Live deploy · TESTING.md on 3 sites · demo video |
 | November | §1 in-extension decryption, shadow DOM, vault move · §4 harness · §5 data + first model |
 | Early December | §4 disclosure emails sent |
-| Dec – Feb | §5 model in browser · store listings · booth page · rehearse DEMO.md |
-| March 2027 | Black Hat Asia, Singapore |
+| Dec – Feb | §5 model in browser · store listings · demo page · rehearse DEMO.md |
 
 ## Blocked on someone else
 
@@ -378,7 +372,7 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
    - [ ] the exact model link (`huggingface.co/<owner>/<model>`) and the licence on its page
    - [ ] what it was trained on (its model card says), and whether that includes ai4privacy:
          if yes, our 0.848 on ai4privacy is measured on data like its training data, and the
-         README/abstract must say so instead of "beats Presidio"
+         README must say so instead of "beats Presidio"
    - [ ] whether it was changed after download (vocabulary pruned to 19,730 tokens, 4-bit
          quantised): which script did it, so others can reproduce it
    - [ ] add all of this to `MODELS_SETUP.md` and credit the original authors
@@ -424,7 +418,6 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
 6. **Cloudflare:** deploy with DEPLOY.md (incl. `ALTER TABLE`); move the official relay to a
    project account with 2FA and both of you as members; optional domain.
 7. **Repo binaries:** Git LFS or release assets for the 28 MB model + WASM and tokenizer files.
-8. **Submission:** co-presenter or not, bio, availability both conference days.
 
 ### From you
 1. API key(s) (OpenAI, Anthropic or Gemini; one is enough to start) for InversionBench and the
@@ -432,7 +425,7 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
 2. **Decision:** OK to test third-party redaction tools with fictional data and report findings
    (§4)? Yes / no.
 3. Cloud accounts (Google / AWS / Azure free tiers) for §4; store developer accounts (§1).
-4. Presenter bios, demo video, submission.
+4. Demo video.
 
 ### From friends (testers / labellers)
 1. Label `tools/eval/data/label_sheet.csv` with `LABELLING.md` (2 people per sheet).

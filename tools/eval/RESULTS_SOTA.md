@@ -2,7 +2,7 @@
 
 Same gold data for every row: ai4privacy EN 2000 (`tools/eval/data/ai4privacy_en.jsonl`,
 seed 1337) and the CLI hard-negative set of 5000 (`data/cli_hardneg_gold.jsonl`). Scored with
-`tools/eval/score.py`. English first, since the Black Hat audience is international.
+`tools/eval/score.py`. English first, since most users and comparison tools are English.
 
 **What these numbers are not.** They measure each model on these two datasets. They are not the
 extension's behaviour in a chat: before sending, the extension keeps only names/places tied to the
@@ -52,7 +52,7 @@ MiniLM 50 ms · electra 63 ms · mobilebert 166 ms · mMiniLMv2 181 ms · albert
 2. Supported by these numbers: MiniLM F1 0.848; the arbiter cut CLI false positives from 38% to
    0% on the hard-negative set; Tier-1 rules cover cards/SSNs; the inversion defense leaves no
    salary recoverable (`RESULTS.md`). GLiNER is a strong zero-shot comparison (0.743).
-3. Follow-ups (not Arsenal blockers): DATE/TIME through a date recognizer; multilingual tests.
+3. Follow-ups (not blockers): DATE/TIME through a date recognizer; multilingual tests.
 4. Replace `extension/models/`? **No**: there is no better model. The 2.55 GB model zoo can be
    deleted except for reproducibility.
 

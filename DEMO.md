@@ -1,6 +1,6 @@
 # English demo: review, attack, defend, share
 
-About five minutes. Fictional data only. Keep an offline fallback; vendor sessions and conference
+About five minutes. Fictional data only. Keep an offline fallback; vendor sessions and venue
 Wi-Fi are not prerequisites for showing the arithmetic attack or local encrypted sharing.
 
 ## Preparation
