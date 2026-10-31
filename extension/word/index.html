@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PomiCat for Word Online</title><link rel="stylesheet" href="word.css"><script src="../engine/contextual.js"></script></head>
-<body><header><a href="index.html" class="brand"><img src="../icons/icon48.png" alt="">PomiCat</a><nav class="top-links" aria-label="Help"><span>Word Online</span><a href="https://darflashxd.github.io/pomicat/" target="_blank" rel="noopener">Docs</a><a href="https://github.com/darflashxd/pomicat" target="_blank" rel="noopener">GitHub</a></nav></header><main>
-<p class="eyebrow">Word Online · Experimental integration</p><h1>Private sharing.<br>From Word Online.</h1>
-<p class="intro">Review a separate copy before sharing. Your original Word document stays unchanged.</p>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PomiCat</title><link rel="stylesheet" href="word.css"><script src="../engine/contextual.js"></script></head>
+<body><header><a href="index.html" class="brand"><img src="../icons/icon48.png" alt="">PomiCat</a><nav class="top-links" aria-label="Help"><a href="https://darflashxd.github.io/pomicat/" target="_blank" rel="noopener">Docs</a><a href="https://github.com/darflashxd/pomicat" target="_blank" rel="noopener">GitHub</a></nav></header><main>
+<div class="word-hero"><p class="eyebrow">Word Online · Experimental integration</p><h1>Private sharing.<br>From Word Online.</h1>
+<p class="intro">Review a separate copy before sharing. Your original Word document stays unchanged.</p></div>
 <section id="capture-section" hidden><h2>Inspect the saved document</h2><p id="capture-intro">Read a local copy through your current SharePoint session. Save changes in Word first. DOCX up to 10 MiB.</p><button id="capture">Read saved copy</button><p id="capture-status" role="status" aria-live="polite"></p><details><summary>Prototype limits</summary><p>No document is uploaded to PomiCat unless you create a link. Preview shows text and table contents, not original layout. Images are reviewed separately; equations appear as text.</p></details></section>
 
 
@@ -85,25 +85,32 @@
 </section>
 
 <div class="welcome">
-<h2>How it works</h2>
-<ol class="steps">
-<li><strong>Open the document</strong>Open a saved .docx in Word Online, then click the PomiCat button in the bottom-right corner.</li>
-<li><strong>Review a copy</strong>PomiCat reads the saved copy on your computer and highlights what looks private. Click any highlight to hide or restore it.</li>
-<li><strong>Share or download</strong>Create an encrypted link that can expire or be revoked, or download the cleaned DOCX.</li>
-</ol>
+<p class="eyebrow">Private sharing for AI chats and documents</p>
+<h1>Stop crawlers from reading<br>your shared chats.</h1>
+<p class="intro">Shared AI chats have turned up in Google search. PomiCat hides what is private before you share, then sends an encrypted link whose key never reaches the server, so search engines and crawlers get nothing they can read.</p>
+<div class="paths">
+<section class="path"><h2>Share an AI chat</h2><p class="path-sites">ChatGPT · Claude · Gemini · DeepSeek</p>
+<ol><li>Open the conversation and click the PomiCat button in the bottom-right corner.</li>
+<li>Compare the original with what others will see. Click a highlight to hide or restore it, or select text to hide it yourself.</li>
+<li>Create a private link. Set an expiry, burn it after one read, or revoke it later.</li></ol></section>
+<section class="path"><h2>Share a Word document</h2><p class="path-sites">Word Online · Experimental integration</p>
+<ol><li>Open a saved .docx in Word Online and click the PomiCat button in the bottom-right corner.</li>
+<li>PomiCat reads a separate copy on your computer. Your original stays as it is.</li>
+<li>Download the cleaned DOCX or create an encrypted link that expires or can be revoked.</li></ol></section>
+</div>
 <h2>What gets checked</h2>
 <ul class="features">
 <li><strong>Names and places</strong>Found by a small model that runs in your browser.</li>
-<li><strong>IDs and account numbers</strong>National IDs, bank accounts, cards, phone numbers and similar formats.</li>
-<li><strong>Amounts</strong>Salaries and payments, plus the figures that would let someone work them back out.</li>
-<li><strong>Tracked changes and comments</strong>Removed by default, so old wording does not travel with the copy.</li>
-<li><strong>Document details</strong>Author, company and other hidden properties are cleared unless you keep them.</li>
-<li><strong>Images</strong>Mark areas by hand. The pixels are replaced, not covered with a shape.</li>
+<li><strong>IDs, accounts and credentials</strong>National IDs, bank accounts, cards, phone numbers, passwords and API keys.</li>
+<li><strong>Amounts and the maths behind them</strong>A salary, plus the "20% is $1,000" line that would let someone work it back out.</li>
+<li><strong>Tracked changes and comments</strong>Removed from Word copies by default, so old wording does not travel with them.</li>
+<li><strong>Document details</strong>Author, company and other hidden Word properties are cleared unless you keep them.</li>
+<li><strong>Images</strong>Mark areas by hand in Word copies. The pixels are replaced, not covered with a shape.</li>
 </ul>
-<div class="promise"><strong>Your original stays as it is.</strong>
-<ul><li>Nothing leaves your computer until you create a link.</li>
-<li>The key to open a link is the part after <code>#</code>, which browsers never send to a server.</li>
-<li>Detection can miss things. Read the preview before you share.</li></ul></div>
+<div class="promise"><strong>Why crawlers get nothing</strong>
+<ul><li>The key is the part of the link after <code>#</code>. Browsers and crawlers never send it to a server.</li>
+<li>The relay stores only ciphertext and tells search engines not to index it. Opening a link needs a click.</li>
+<li>Nothing leaves your computer until you create a link. Detection can miss things, so read the copy before you share.</li></ul></div>
 </div>
 <details><summary>What the recipient gets</summary><p>Recipients read the cleaned copy in their browser and can download it as DOCX. To edit it in Word, they save their own copy to their Microsoft account.</p></details>
 <details><summary>Manage earlier chat and document links</summary><p>Revocation controls are saved on this device. Revoking blocks future retrieval; saved copies remain.</p><p id="status" class="subtitle" role="status"></p><div id="legacy"></div></details>
