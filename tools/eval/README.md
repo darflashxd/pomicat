@@ -65,6 +65,5 @@ gitleaks only looks for secrets, so compare it on the credential labels only.
 - **Inversion in real chats**: `python tools/eval/wildchat_to_cache.py` (one WildChat shard,
   ~230 MB, kept local) then `node tools/eval/inversion_wild.js 20000`. Writes
   `data/inversion_wild_report.json`; see RESULTS.md section 6.
-- **Labelling** for the "is this about the writer?" question: see `LABELLING.md` in the repo root.
 
 Report every number, including the categories where SafeShare loses.

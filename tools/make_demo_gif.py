@@ -1,6 +1,6 @@
 """Usage: python tools/make_demo_gif.py [--relay http://127.0.0.1:8787]
 
-Renders docs/demo.gif from the real output of the demo commands (see DEMO.md). The share step
+Renders docs/demo.gif from the real output of the demo commands. The share step
 is included only if a relay is reachable at --relay.
 """
 import os

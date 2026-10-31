@@ -62,7 +62,7 @@ MiniLM 50 ms · electra 63 ms · mobilebert 166 ms · mMiniLMv2 181 ms · albert
 |---|---|---|
 | Raw model | MiniLM alone on ai4privacy (F1 0.848) | this file |
 | Simulated hybrid | MiniLM + arbiter + Tier-1 offline on ai4privacy (0.834 / union 0.811 recall) | this file |
-| Before sending | Extension in Chrome: rules + MiniLM, writer-tied names/places only | not measured yet (ROADMAP §3) |
+| Before sending | Extension in Chrome: rules + MiniLM, writer-tied names/places only | not measured yet |
 | Share path | Share dialog: rules + contextual names, no MiniLM | CLI numbers in `RESULTS.md` are the closest |
 
 Reproduce with the scripts in `tools/sota/`.

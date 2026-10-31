@@ -39,7 +39,7 @@ declaration rather than inventing an upstream copyright statement.
 existing loader, not a Q4 conversion. Revision, weight hash and size are recorded
 in `models/MODEL_INFO.json`. `models/vocab.txt` was compared byte-for-byte with
 the same pinned revision and matches. `models/config.json` supplies model
-configuration; see `MODELS_SETUP.md` in the repository for integration details.
+configuration for the bundled runtime.
 
 This inventory is not a legal certification or an independent audit of the
 upstream model's training-data rights. Third-party trademarks remain with their

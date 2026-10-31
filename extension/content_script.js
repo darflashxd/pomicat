@@ -377,7 +377,7 @@
         return;
       }
       // Reading only one side means the site's layout changed: a share without your own messages
-      // also stops the inversion defence from knowing which amounts were yours (see ROADMAP P0.1)
+      // also stops the inversion defence from knowing which amounts were yours
       const users = turns.filter(t => t.role === "user").length;
       const answers = turns.filter(t => t.role === "assistant").length;
       if ((!users || !answers) && !window.confirm(`PomiCat found ${users} of your messages and ${answers} AI answers in this chat. ` +

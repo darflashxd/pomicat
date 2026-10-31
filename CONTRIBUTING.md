@@ -20,7 +20,7 @@ python tools/eval/chrome_ner.py
 python tools/build_extension.py
 ```
 
-Linux browser installation may require `python -m playwright install --with-deps chromium firefox`. See [TESTING.md](TESTING.md) for package testing, model diagnostics and test boundaries.
+Linux browser installation may require `python -m playwright install --with-deps chromium firefox`.
 
 Use fictional inputs and a local relay. Do not commit account data, credentials, share keys, browser profiles, or raw private transcripts. Report vulnerabilities using [SECURITY.md](SECURITY.md).
 

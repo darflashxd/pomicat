@@ -30,7 +30,7 @@ dist/
 build/
 
 # 3. Model Weights & Large Checkpoints (>100MB violates GitHub limits)
-# Model weights are not in git (see MODELS_SETUP.md)
+# Large model weights other than the bundled one are not in git
 *.onnx
 !extension/models/*.onnx
 *.safetensors
