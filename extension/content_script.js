@@ -323,16 +323,23 @@
       const label = pill.textContent;
       pill.textContent = "Preparing conversation…";
       let prepared;
-      try { prepared = await prepareConversation(); }
-      catch (error) {
+      try {
+        // The scan now waits for the page's last batch (about six seconds of quiet), so one pass
+        // finishes the conversation instead of stopping between batches. No confirm chain: it
+        // looked automatic and could be dismissed before the review ever opened.
+        prepared = await prepareConversation({
+          onProgress: (count) => { pill.textContent = `Reading… ${count} messages`; }
+        });
+      } catch (error) {
         if (error.name !== "AbortError") alert("Blackline: Could not prepare this conversation. Please try again.");
         return;
       } finally {
         delete pill.dataset.preparing;
         pill.textContent = label;
       }
-      const { turns, uncertain } = prepared;
-      if (uncertain && !window.confirm("Blackline could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
+      const { turns, uncertain, partial, read } = prepared;
+      if (partial && !window.confirm(`Blackline read ${read} messages and could not confirm it reached the end of this conversation. Review the collected messages anyway?`)) return;
+      else if (uncertain && !partial && !window.confirm("Blackline could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
       if (turns.length === 0) {
         alert("Blackline: No active conversation found in the current chat window.");
         return;
@@ -1202,11 +1209,26 @@
     return turns;
   }
 
-  async function prepareConversation() {
+  // One resumable scan per tab: the page can take tens of seconds to hydrate, so a second pass
+  // continues from the collected messages instead of starting over.
+  let scanState = null;
+
+  async function prepareConversation(options = {}) {
     const url = location.href;
     const root = getActiveConversationRoot();
+    const resuming = options.resume === true && scanState && scanState.url === url && scanState.root.isConnected;
+    if (!resuming) scanState = { url, root, messages: [], byKey: new Map() };
+    const session = scanState;
     const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-perf-reply-text], .ds-message";
     const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-'], [data-turn-key]";
+    // A long shared page paints its shell before the messages exist. Without this the click ends
+    // with "No active conversation found" even though the conversation arrives a moment later.
+    if (!root.querySelector(messageSelector)) {
+      const started = Date.now();
+      while (Date.now() - started < 4000 && !root.querySelector(messageSelector)) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
     // Start at a message, not the composer: the composer can have its own scroll area.
     let scroller = root.querySelector(messageSelector);
     while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
@@ -1219,7 +1241,7 @@
     let cancelled = false;
     cancel.addEventListener("click", () => { cancelled = true; });
     document.body.appendChild(cancel);
-    const deadline = Date.now() + 15000;
+    const deadline = Date.now() + (options.budgetMs || 45000);
     const check = () => { if (cancelled || location.href !== url || !root.isConnected) throw new DOMException("Preparation cancelled", "AbortError"); };
     // Quiet DOM is a bounded wait, not proof that the site's server history is complete.
     const wait = (minimum = 150, target = root, ready = () => true, action = null) => new Promise((resolve, reject) => {
@@ -1238,11 +1260,39 @@
       try { if (action) action(); }
       catch (error) { observer.disconnect(); clearInterval(timer); reject(error); }
     });
-    const messages = [];
+    const messages = session.messages;
+    const byKey = session.byKey;
+    const startCount = messages.length;
     let uncertain = false;
-    const same = (a, b) => a.key && b.key ? a.key === b.key : a.role === b.role && a.content === b.content;
+    // Turns are stored once per stable identity. Re-renders and virtualised scrolling produce the
+    // same message repeatedly; appending text snapshots made duplicates and gaps.
+    const bodyHash = (role, content) => {
+      const text = content.replace(/\s+/g, " ").trim();
+      let hash = 5381;
+      for (let i = 0; i < text.length; i++) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+      return `${role}:${text.length}:${hash}`;
+    };
+    // Cleaning a message clones its subtree. On a long answer that is the expensive part, and the
+    // same message is re-read on every scroll pass. Cache by a cheap signature instead.
+    const contentCache = new WeakMap();
+    const cachedContent = (node) => {
+      if (!node) return "";
+      const raw = node.textContent || "";
+      let hash = 5381;
+      for (let i = 0; i < raw.length; i++) hash = ((hash * 33) ^ raw.charCodeAt(i)) >>> 0;
+      // Collapsed/hidden children keep the same text but must be cleaned again after expanding.
+      const collapsed = node.querySelectorAll("[hidden], [aria-expanded='false'], [aria-busy='true']").length;
+      const signature = `${raw.length}:${hash}:${collapsed}`;
+      const hit = contentCache.get(node);
+      if (hit && hit.signature === signature) return hit.content;
+      const content = getCleanNodeContent(node);
+      contentCache.set(node, { signature, content });
+      return content;
+    };
     const collect = () => {
-      const snapshot = [];
+      let added = 0;
+      const fresh = [];
+      const occurrences = new Map();
       const nodes = [...root.querySelectorAll(messageSelector)].filter(node =>
         !isComposerOrSafeShareUI(node) && !node.parentElement?.closest(messageSelector));
       for (const node of nodes) {
@@ -1252,65 +1302,83 @@
         if (node.matches(".ds-message") && !deepseekAnswer && !node.querySelector(".ds-collapsible-text")) { uncertain = true; continue; }
         const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !deepseekAnswer ? "user" : "assistant");
         const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-turn-key") || unit.getAttribute("data-testid"));
-        const key = identity ? `${role}:${identity}` : null;
-        const content = getCleanNodeContent(claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node);
+        const source = claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node;
+        const content = cachedContent(source);
         if (!content) continue;
-        const previous = snapshot[snapshot.length - 1];
-        // Split assistant markdown blocks may belong to one message; never read their shared wrapper.
-        if (key && previous?.key === key && role === "assistant") previous.content += "\n\n" + content;
-        else snapshot.push({ key, role, content });
-      }
-      if (!snapshot.length) return;
-      if (!messages.length) { messages.push(...snapshot); return; }
-      // Forward scroll keeps an overlap. Match ordered sequences, never deduplicate by text globally.
-      let overlap = Math.min(messages.length, snapshot.length);
-      while (overlap && !messages.slice(-overlap).every((item, i) => same(item, snapshot[i]))) overlap--;
-      if (!overlap) {
-        const index = snapshot[0].key ? messages.findIndex(item => item.key === snapshot[0].key) : -1;
-        if (index >= 0 && snapshot.every((item, i) => messages[index + i] && same(messages[index + i], item))) {
-          snapshot.forEach((item, i) => { messages[index + i] = item; });
-          return;
+        const hash = bodyHash(role, content);
+        // Without an identity attribute, identical texts are still distinct messages. Counting
+        // occurrences keeps their keys stable across passes without merging them.
+        const seenCount = occurrences.get(hash) || 0;
+        occurrences.set(hash, seenCount + 1);
+        const key = identity ? `${role}:${identity}` : `${hash}#${seenCount}`;
+        const existing = byKey.get(key);
+        if (existing) {
+          // Split assistant markdown blocks share one turn key; concatenate them once.
+          if (role === "assistant" && content !== existing.content && !existing.content.includes(content)) {
+            existing.content += "\n\n" + content;
+          } else if (content.length > existing.content.length) {
+            existing.content = content; // a streamed answer grew between passes
+          }
+          continue;
         }
-        uncertain = true; // no reliable overlap: retain observations, disclose possible gaps/duplicates
-      } else {
-        if (snapshot.slice(0, overlap).some(item => !item.key)) uncertain = true;
-        snapshot.slice(0, overlap).forEach((item, i) => { messages[messages.length - overlap + i] = item; });
+        const item = { key, role, content };
+        byKey.set(key, item);
+        messages.push(item);
+        fresh.push(source);
+        added++;
       }
-      messages.push(...snapshot.slice(overlap));
+      return { added, fresh };
     };
     const expanded = new WeakSet();
-    const expand = async () => {
-      for (const button of root.querySelectorAll("button, [role='button']")) {
-        if (Date.now() >= deadline) { uncertain = true; return; }
-        if (expanded.has(button) || button.disabled || button.getAttribute("aria-expanded") === "true" || !isVisibleElement(button)) continue;
-        if (!button.closest(messageSelector)) continue;
-        if (!/^(show more|read more|expand)$/i.test((button.innerText || button.getAttribute("aria-label") || "").trim())) continue;
-        check(); expanded.add(button);
-        const message = button.closest(messageSelector);
-        const before = getCleanNodeContent(message);
-        await wait(150, message, () => {
-          const changed = getCleanNodeContent(message) !== before;
-          const pending = message.querySelector("[hidden], [aria-busy='true']");
-          // An attribute toggle alone is not evidence that delayed text arrived.
-          return changed && !pending;
-        }, () => button.click());
-        if (getCleanNodeContent(message) === before || message.querySelector("[hidden], [aria-busy='true']")) uncertain = true;
-        if (button.isConnected && button.getAttribute("aria-expanded") === "false") uncertain = true;
+    // Expanding is scoped to newly seen messages: scanning every control on every pass dominated
+    // the scan time on long answers.
+    const expand = async (scope = null) => {
+      const containers = scope || [root];
+      for (const container of containers) {
+        for (const button of container.querySelectorAll("button, [role='button']")) {
+          if (Date.now() >= deadline) { uncertain = true; return; }
+          if (expanded.has(button) || button.disabled || button.getAttribute("aria-expanded") === "true" || !isVisibleElement(button)) continue;
+          if (!button.closest(messageSelector)) continue;
+          if (!/^(show more|read more|expand)$/i.test((button.innerText || button.getAttribute("aria-label") || "").trim())) continue;
+          check(); expanded.add(button);
+          const message = button.closest(messageSelector);
+          const before = cachedContent(message);
+          await wait(120, message, () => {
+            // CSS line clamping keeps the full text in the DOM, so a successful "Show more" often
+            // changes only aria-expanded. Treat that as success instead of waiting the full 3s and
+            // then flagging the conversation as unverifiable.
+            const changed = cachedContent(message) !== before;
+            const opened = !button.isConnected || button.getAttribute("aria-expanded") === "true";
+            const pending = message.querySelector("[hidden], [aria-busy='true']");
+            // The attribute flip is the site's own statement that the content is now shown.
+            return (changed || opened) && !pending;
+          }, () => button.click());
+          if (message.querySelector("[hidden], [aria-busy='true']")) uncertain = true;
+          if (button.isConnected && button.getAttribute("aria-expanded") === "false") uncertain = true;
+        }
       }
     };
+    const streaming = () => Boolean(root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']"));
+    const atBottom = () => scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 20;
     try {
       check();
       if (scroller.scrollHeight <= scroller.clientHeight + 20) {
         await expand();
         check(); collect();
         const grew = scroller.scrollHeight > scroller.clientHeight + 20;
-        if (!grew) return {
-          turns: tidyTurns(messages.length ? messages : extractRawTurns()),
-          uncertain: uncertain || Date.now() >= deadline || Boolean(root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']"))
-        };
-        messages.length = 0; // expansion changed layout; recollect in top-to-bottom order
+        if (!grew) {
+          const turns = tidyTurns(messages.length ? messages : extractRawTurns());
+          return {
+            turns,
+            uncertain: uncertain || streaming(),
+            partial: false,
+            timedOut: false,
+            read: turns.length,
+            addedThisPass: messages.length - startCount
+          };
+        }
       }
-      // Scan from top down so insertion order follows the active conversation.
+      // Start from the top so the first pass sees the beginning of the conversation.
       let topSettled = 0;
       while (Date.now() < deadline && topSettled < 2) {
         check();
@@ -1318,24 +1386,68 @@
         scroller.scrollTop = 0;
         await wait();
         topSettled = scroller.scrollTop === 0 && scroller.scrollHeight === height ? topSettled + 1 : 0;
+        collect();
       }
-      let settled = 0;
+      // A share page appends a batch of turns roughly every 4 seconds (measured: 2.1s, 5.9s,
+      // 10.0s, 14.0s, 18.8s). Finishing after three quiet passes (~0.6s) stopped *between*
+      // batches and reported the gap as the end of the conversation, so wait out the cadence.
+      // Step by whole turns: one long answer can be ten screens tall, and its text is collected
+      // in a single pass, so pixel stepping burned a dozen passes inside it.
+      const scanStartedAt = Date.now();
+      const turnSelector = "[data-turn-key], [data-testid^='conversation-turn-']";
+      let lastNewAt = scanStartedAt;
+      let lastHeight = scroller.scrollHeight;
+      let grewDuringScan = false;
+      let reported = -1;
+      let timedOut = false;
+      const stepSize = () => {
+        const viewTop = scroller.getBoundingClientRect().top;
+        const turns = [...root.querySelectorAll(turnSelector)]
+          .filter((node) => !node.parentElement?.closest(turnSelector));
+        for (const turn of turns) {
+          const rect = turn.getBoundingClientRect();
+          if (rect.bottom <= viewTop + 20) continue;
+          return Math.max(
+            scroller.clientHeight * 0.6,
+            Math.min(rect.bottom - viewTop + 8, scroller.clientHeight * 10)
+          );
+        }
+        return scroller.clientHeight * 0.8;
+      };
       while (Date.now() < deadline) {
-        check(); await expand(); collect();
+        check();
+        const { added, fresh } = collect();
+        if (added > 0) lastNewAt = Date.now();
+        if (fresh.length) await expand(fresh);
+        const height = scroller.scrollHeight;
+        if (height > lastHeight + 1) grewDuringScan = true;
+        lastHeight = height;
+        // Six seconds covers the slowest measured gap between batches (4.8s). A page that never
+        // grew is a normal chat, which can settle much sooner.
+        const quietNeeded = grewDuringScan ? 6000 : 1800;
+        const settled = atBottom()
+          && Date.now() - lastNewAt >= quietNeeded
+          && Date.now() - scanStartedAt >= 3500;
+        if (settled) break;
+        if (options.onProgress && messages.length !== reported) {
+          reported = messages.length;
+          options.onProgress(reported);
+        }
         const before = scroller.scrollTop;
-        scroller.scrollTop += Math.max(1, scroller.clientHeight * 0.5);
+        scroller.scrollTop = Math.min(height, before + stepSize());
         await wait();
-        if (scroller.scrollTop === before) {
-          if (++settled >= 3) break;
-        } else settled = 0;
+        if (!atBottom() && scroller.scrollTop === before && Date.now() - lastNewAt >= 8000) {
+          // Neither moving nor finding new messages: the page is stuck, not merely slow.
+          uncertain = true;
+          break;
+        }
       }
-      check(); collect();
-      // DOM exhaustion is not proof that server-side history was fully loaded.
-      uncertain ||= settled < 3 || topSettled < 2 || scroller.scrollHeight > scroller.clientHeight + 20;
-      if (root.querySelector("[data-is-streaming='true'], [data-testid='stop-button'], [aria-busy='true']")) uncertain = true;
-      // ponytail: DOM scans cannot prove server history exhaustion; scrollable chats stay unverified.
+      if (Date.now() >= deadline) timedOut = true;
+      collect();
+      const complete = !timedOut && atBottom() && !streaming();
+      if (!complete) uncertain = true;
       const turns = messages.length ? tidyTurns(messages) : extractConversationTurns();
-      return { turns, uncertain };
+      return { turns, uncertain, partial: !complete, timedOut, read: turns.length, addedThisPass: messages.length - startCount };
     } finally {
       cancel.remove();
       if (location.href === url) scroller.scrollTop = initial;

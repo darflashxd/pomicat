@@ -45,9 +45,9 @@ try:
                 assert result.startswith("PASS:"), result
                 assert not errors, 'Unexpected page JavaScript error: ' + str(errors)
                 print(f"Round {round_number + 1}: {result}")
-            for fixture in ["submit_lifecycle.html", "extraction_integrity.html", "model_lifecycle.html", "maybe_review.html", "range_review.html", "hydration_sanitize.html"]:
+            for fixture in ["submit_lifecycle.html", "extraction_integrity.html", "model_lifecycle.html", "maybe_review.html", "range_review.html", "hydration_sanitize.html", "progressive_share.html"]:
                 page.goto(f"http://127.0.0.1:{server.server_port}/tests/fixtures/{fixture}")
-                page.wait_for_function("/^(PASS|FAIL):/.test(document.getElementById('result').textContent)", timeout=15000)
+                page.wait_for_function("/^(PASS|FAIL):/.test(document.getElementById('result').textContent)", timeout=30000)
                 result = page.locator("#result").inner_text()
                 assert result.startswith("PASS:"), result
                 assert not errors, 'Unexpected page JavaScript error: ' + str(errors)
