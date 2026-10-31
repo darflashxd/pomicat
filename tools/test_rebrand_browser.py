@@ -18,7 +18,7 @@ with sync_playwright() as p:
         page.route('https://audit.invalid/**', lambda route: route.fulfill(path=str(EXT / route.request.url.split('audit.invalid/')[1])))
         page.goto('https://audit.invalid/word/index.html')
         assert page.title() == 'PomiCat'
-        assert page.locator('header a').inner_text() == 'PomiCat'
+        assert page.locator('header a.brand').inner_text() == 'PomiCat'
         page.goto('https://audit.invalid/viewer/index.html')
         assert page.title() == 'PomiCat · Private conversation'
         assert page.locator('.brand-title').inner_text() == 'PomiCat'

@@ -164,9 +164,74 @@
   }
 
   function replaceInParagraph(paragraph, rules) {
-    const nodes = [...paragraph.getElementsByTagNameNS("*", "t")].filter(node => node.namespaceURI === W || node.namespaceURI === "http://schemas.openxmlformats.org/officeDocument/2006/math");
+    const MATH = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    const isMath = node => node.namespaceURI === MATH;
+    const isText = node => (node.namespaceURI === W || node.namespaceURI === MATH) && node.localName === "t";
+    // Word keeps a line break as <w:br/> inside the paragraph. Joining only <w:t> glued the last
+    // word of a line to the first word of the next one, so a selected value that ended a line
+    // failed the word-boundary check, stayed in the copy, and verifyDocx blocked the export.
+    const isBreak = node => node.namespaceURI === W && ["br", "cr", "tab", "ptab"].includes(node.localName);
+    const ordered = [];
+    const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_ELEMENT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (isText(node) || isBreak(node)) ordered.push(node);
+    }
+    if (!ordered.some(isText)) return 0;
+    let text = "";
+    const map = [];
+    let previousMath = false;
+    let afterBreak = true;
+    for (const node of ordered) {
+      if (isBreak(node)) {
+        text += "\n";
+        map.push(null);
+        previousMath = false;
+        afterBreak = true;
+        continue;
+      }
+      // Keep the math boundary marker, but only between pieces of text on the same line.
+      if (!afterBreak && (previousMath || isMath(node))) { text += "\u0000"; map.push(null); }
+      const value = node.textContent;
+      for (let i = 0; i < value.length; i++) {
+        text += value[i];
+        map.push({ node, offset: i });
+      }
+      previousMath = isMath(node);
+      afterBreak = false;
+    }
+    const spans = spansFor(text, rules);
+    if (!spans.length) return 0;
+    for (let s = spans.length - 1; s >= 0; s--) {
+      const { start, end, replacement } = spans[s];
+      const first = map[start], last = map[end - 1];
+      if (!first || !last) continue;
+      if (first.node === last.node) {
+        const value = first.node.textContent;
+        first.node.textContent = value.slice(0, first.offset) + replacement + value.slice(last.offset + 1);
+      } else {
+        first.node.textContent = first.node.textContent.slice(0, first.offset) + replacement;
+        const from = ordered.indexOf(first.node);
+        const to = ordered.indexOf(last.node);
+        for (let i = from + 1; i < to; i++) {
+          if (isText(ordered[i])) ordered[i].textContent = "";
+        }
+        last.node.textContent = last.node.textContent.slice(last.offset + 1);
+      }
+      for (const node of ordered) if (isText(node)) node.setAttribute("xml:space", "preserve");
+    }
+    return spans.length;
+  }
+
+  /**
+   * A selected phrase can itself be split by an explicit line break. The first pass treats the
+   * break as a boundary; this pass matches the same text with breaks removed and replaces across
+   * it. The break element stays in place, but the private characters on both sides are gone.
+   */
+  function replaceAcrossBreaks(paragraph, rules) {
+    const MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    const nodes = [...paragraph.getElementsByTagNameNS("*", "t")].filter(node => node.namespaceURI === W || node.namespaceURI === MATH_NS);
     if (!nodes.length) return 0;
-    const isMath = node => node.namespaceURI === "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    const isMath = node => node.namespaceURI === MATH_NS;
     let text = "";
     const map = [];
     nodes.forEach((node, index) => {
@@ -249,7 +314,10 @@
       }
     }
     let replaced = 0;
-    for (const paragraph of [...doc.getElementsByTagNameNS(W, "p")]) replaced += replaceInParagraph(paragraph, rules);
+    for (const paragraph of [...doc.getElementsByTagNameNS(W, "p")]) {
+      replaced += replaceInParagraph(paragraph, rules);
+      replaced += replaceAcrossBreaks(paragraph, rules);
+    }
     return { xml: new XMLSerializer().serializeToString(doc), replaced, removed };
   }
 
