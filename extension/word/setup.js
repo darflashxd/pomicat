@@ -45,7 +45,7 @@ async function runCapture(){
   try {
     const tabId=Number(query.get("tab"));
     const tab=await api.tabs.get(tabId);
-    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen Blackline from Word.");
+    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen PomiCat from Word.");
     const url=SafeShareWordSource.downloadUrl(tab.url);
     // Execute in isolated content-script world: session cookies stay with the browser.
     const result=await api.scripting.executeScript({target:{tabId},func:async (target,maxBytes)=>{

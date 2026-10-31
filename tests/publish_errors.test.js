@@ -8,7 +8,7 @@ let result = describePublishError(
   Object.assign(new Error(`Extension reload required to grant access to ${relay}.`), { code: 'RELOAD_REQUIRED' }),
   relay
 );
-assert.match(result.hint, /Reload the Blackline extension/);
+assert.match(result.hint, /Reload the PomiCat extension/);
 assert.match(result.hint, /blackline-relay/);
 
 result = describePublishError(new Error('Encrypted copy exceeds the relay limit (512 KB). Download the file instead.'), relay);

@@ -40,7 +40,7 @@ a live response. Keep a local relay fallback; do not rely on venue connectivity.
 
 ## 1. Show the sharing workflow (45 seconds)
 
-Open Blackline on a short English chat. Check both user and assistant turns were extracted.
+Open PomiCat on a short English chat. Check both user and assistant turns were extracted.
 Show automatic redactions, optional model suggestions, and a manual redaction of an unknown
 format. Explain: "The preview is what the recipient will receive. The model is English-focused;
 an empty scan is not proof of safety."
@@ -107,7 +107,7 @@ on a supported origin, decryption uses the extension viewer. The two trust paths
 ### What a search crawler sees (30 seconds)
 
 In 2025, shared ChatGPT conversations turned up in Google results: a ChatGPT share is a plain
-page. A Blackline link, for a chat or a Word document, keeps its key after the `#`, which
+page. A PomiCat link, for a chat or a Word document, keeps its key after the `#`, which
 browsers and crawlers never send to the server. Use a share **without** `--burn` (fetching the API reads the share once):
 
 ```bash

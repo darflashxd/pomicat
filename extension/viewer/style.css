@@ -92,6 +92,13 @@ body {
   height: 15px;
 }
 
+.brand-icon-wrapper img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
 .brand-title {
   font-size: 14px;
   font-weight: 600;

@@ -25,7 +25,7 @@
   // The local model tags field labels ("My NIK is …") and our own name as entities; the values
   // after them are the rules' job. Exact word, acronyms in capitals only ("Sim" or "Pin" can be a
   // name), so "Rina" or "NIK 3201…" still go through.
-  const LABEL_WORDS = /^(?:[Bb]lackline|[Ss]afe[Ss]hare(?:-AI)?|NIK|NPWP|KTP|KK|SIM|BPJS|NIP|NISN|NIB|SSN|NINO|IBAN|SWIFT|BIC|CVV|CVC|OTP|PIN|API|URL|IP|ID|[Ee]-?mail)$/;
+  const LABEL_WORDS = /^(?:[Pp]omi[Cc]at|[Bb]lackline|[Ss]afe[Ss]hare(?:-AI)?|NIK|NPWP|KTP|KK|SIM|BPJS|NIP|NISN|NIB|SSN|NINO|IBAN|SWIFT|BIC|CVV|CVC|OTP|PIN|API|URL|IP|ID|[Ee]-?mail)$/;
   const DAMPING_WORD =/\b(?:example|sample|dummy|placeholder|contoh)\b/i;
   // ponytail: hand-set cut-offs on uncalibrated model scores (chosen on RedacBench's personal texts,
   // tools/eval/RESULTS.md §9); calibrate on labelled data. A full-name shape lowers the bar.

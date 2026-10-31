@@ -17,7 +17,7 @@
     if (code === "RELOAD_REQUIRED" || /reload required|not granted|permission/i.test(message)) {
       return {
         message,
-        hint: `Reload the Blackline extension, approve access to ${relay}, then create the link again. The sanitized DOCX is unchanged.`
+        hint: `Reload the PomiCat extension, approve access to ${relay}, then create the link again. The sanitized DOCX is unchanged.`
       };
     }
     if (/too large|max 512|340000|340 KB|512 KB|exceeds the relay limit/i.test(message)) {

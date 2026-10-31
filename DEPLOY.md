@@ -1,10 +1,11 @@
-# Deploying the Blackline relay to Cloudflare
+# Deploying the PomiCat relay to Cloudflare
 
-Production Blackline config: `relay/wrangler.blackline.toml`. From `relay/`, use
-`npx wrangler@4 deploy --config wrangler.blackline.toml --name blackline-relay`.
+Production PomiCat config: `relay/wrangler.pomicat.toml`. From `relay/`, use
+`npx wrangler@4 deploy --config wrangler.pomicat.toml --name pomicat-relay`.
 It shares the existing D1 and rate-limit namespaces, runs the Worker before
 static assets for security headers, and adds no cleanup cron. `wrangler.toml`
-still targets the legacy SafeShare Worker: do not use it for a Blackline deploy.
+still targets the legacy SafeShare Worker and `wrangler.blackline.toml` the
+Blackline Worker: do not use them for a PomiCat deploy.
 
 Previously SafeShare. Existing Worker/D1 names, URLs and configuration keys below
 stay unchanged for compatibility. Rebranding the extension does not deploy this

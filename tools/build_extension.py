@@ -1,6 +1,6 @@
 """Usage: python tools/build_extension.py
 
-Builds dist/Blackline-<version>-chrome.zip and dist/Blackline-<version>-firefox.zip from
+Builds dist/PomiCat-<version>-chrome.zip and dist/PomiCat-<version>-firefox.zip from
 extension/. Chrome uses manifest.json (so "Load unpacked" on extension/ works directly);
 Firefox gets manifest.firefox.json as its manifest.json.
 Also writes dist/SHA256SUMS (zips + the share page files the relay serves), so people can check a
@@ -29,7 +29,7 @@ def files():
 version = json.load(open(os.path.join(EXT, "manifest.json"), encoding="utf-8"))["version"]
 os.makedirs(DIST, exist_ok=True)
 for target, manifest in MANIFESTS.items():
-    out = os.path.join(DIST, f"Blackline-{version}-{target}.zip")
+    out = os.path.join(DIST, f"PomiCat-{version}-{target}.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(os.path.join(ROOT, "LICENSE"), "LICENSE")
         z.write(os.path.join(EXT, manifest), "manifest.json")
@@ -53,7 +53,7 @@ def sha256(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-sums = [(sha256(os.path.join(DIST, f"Blackline-{version}-{t}.zip")), f"Blackline-{version}-{t}.zip") for t in MANIFESTS]
+sums = [(sha256(os.path.join(DIST, f"PomiCat-{version}-{t}.zip")), f"PomiCat-{version}-{t}.zip") for t in MANIFESTS]
 viewer = os.path.join(EXT, "viewer")
 for base, _, names in os.walk(viewer):
     for name in sorted(names):

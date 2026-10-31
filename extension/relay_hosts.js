@@ -17,10 +17,11 @@
   "use strict";
 
   const ORIGINS = [
+    "https://pomicat-relay.bleedguard.workers.dev",
     "https://safeshare-relay.bleedguard.workers.dev",
     "https://blackline-relay.bleedguard.workers.dev"
   ];
-  const DEFAULT_RELAY = "https://blackline-relay.bleedguard.workers.dev";
+  const DEFAULT_RELAY = "https://pomicat-relay.bleedguard.workers.dev";
   const LOCAL = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i;
 
   function originOf(value) {

@@ -130,18 +130,21 @@ class SafeShareModal {
 
     const backdrop = document.createElement("div");
     backdrop.id = "safeshare-modal-backdrop";
+    // The modal is injected into a site page, so the mark travels as a data URL. A chrome-extension
+    // URL would need web_accessible_resources and can still be blocked by the site's image CSP.
+    const brandMark = typeof POMICAT_MARK === "string" ? POMICAT_MARK : "";
     backdrop.innerHTML = `
       <div id="safeshare-modal-card" role="dialog" aria-modal="true" aria-labelledby="safeshare-modal-title">
         <div class="safeshare-header">
           <div class="safeshare-brand">
             <div class="safeshare-logo">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
+              ${brandMark
+                ? `<img src="${brandMark}" alt="">`
+                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`}
             </div>
             <div>
               <div class="safeshare-title" id="safeshare-modal-title">Share Privately</div>
-            <div class="safeshare-version-tag">Blackline · End-to-end encrypted</div>
+            <div class="safeshare-version-tag">PomiCat · End-to-end encrypted</div>
             </div>
           </div>
           <button class="safeshare-close-btn" id="safeshare-close-btn" aria-label="Close modal">
@@ -1826,7 +1829,7 @@ class SafeShareModal {
               throw new Error((response && response.error) || "Relay upload returned unsuccessful");
             }
           } catch (err) {
-            console.warn(`[Blackline] Upload attempt ${attempt + 1} via background worker failed:`, err);
+            console.warn(`[PomiCat] Upload attempt ${attempt + 1} via background worker failed:`, err);
             if (attempt < 2) {
               await new Promise(r => setTimeout(r, 200));
             }
@@ -1849,7 +1852,7 @@ class SafeShareModal {
               revokeToken = (await uploadRes.json()).revoke_token;
             }
           } catch (fetchErr) {
-            console.warn("[Blackline] Direct edge fetch fallback failed:", fetchErr);
+            console.warn("[PomiCat] Direct edge fetch fallback failed:", fetchErr);
           }
         }
 
@@ -1913,7 +1916,7 @@ class SafeShareModal {
         }
       } catch (err) {
         if (!stillOpen()) return;
-        console.error("[Blackline] Encryption error:", err);
+        console.error("[PomiCat] Encryption error:", err);
         btn.innerText = "Error Encrypting";
         btn.disabled = false;
       } finally {

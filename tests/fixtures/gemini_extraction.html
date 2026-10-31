@@ -1,0 +1,52 @@
+<!doctype html><meta charset="utf-8"><title>Gemini extraction</title>
+<pre id="result">Running</pre><iframe id="chat" src="fake_chat.html" style="width:100%;height:650px"></iframe>
+<script>
+document.getElementById('chat').onload = async () => {
+  const w = document.getElementById('chat').contentWindow, d = w.document;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const assert = (ok, message) => { if (!ok) throw Error(message); };
+  try {
+    for (let i = 0; i < 100 && !d.getElementById('safeshare-action-pill'); i++) await wait(20);
+    const thread = d.getElementById('thread');
+    // Mirrors gemini.google.com: custom elements, no message ids, and a screen-reader label that
+    // markdown conversion turns into "##### Anda berkata" unless the label is removed first.
+    thread.innerHTML =
+      '<user-query><div class="query-content"><div class="query-text gds-body-l">' +
+      '<h5 class="cdk-visually-hidden screen-reader-user-query-label">Anda berkata</h5>' +
+      '<p class="query-text-line">Ringkas anggaran untuk Maya Hartwell.</p></div></div></user-query>' +
+      '<model-response><div class="response-container"><message-content id="message-content-id-r_test1">' +
+      '<div class="markdown"><p>Tabungan 20% dari Rp 8.500.000 adalah Rp 1.700.000.</p></div>' +
+      '</message-content></div></model-response>' +
+      '<user-query><div class="query-content"><div class="query-text gds-body-l">' +
+      '<h5 class="cdk-visually-hidden screen-reader-user-query-label">Anda berkata</h5>' +
+      '<p class="query-text-line">Sama persis.</p></div></div></user-query>' +
+      '<model-response><div class="response-container"><message-content id="message-content-id-r_test2">' +
+      '<div class="markdown"><p>Jawaban yang sama.</p></div></message-content></div></model-response>' +
+      '<user-query><div class="query-content"><div class="query-text gds-body-l">' +
+      '<h5 class="cdk-visually-hidden screen-reader-user-query-label">Anda berkata</h5>' +
+      '<p class="query-text-line">Sama persis.</p></div></div></user-query>' +
+      '<model-response><div class="response-container"><message-content id="message-content-id-r_test3">' +
+      '<div class="markdown"><p>Jawaban yang sama.</p></div></message-content></div></model-response>';
+    w.confirm = () => true;
+    d.getElementById('safeshare-action-pill').click();
+    for (let i = 0; i < 200 && !d.getElementById('diff-box-orig'); i++) await wait(25);
+    const orig = d.getElementById('diff-box-orig');
+    assert(orig, 'modal unavailable');
+    const blocks = [...orig.querySelectorAll('.turn-block')];
+    assert(blocks.length === 6, `expected 6 turns, got ${blocks.length}`);
+    const text = orig.innerText;
+    assert(!/Anda berkata/.test(text), 'screen-reader label leaked');
+    assert(!text.includes('#####'), 'heading marker from the label leaked');
+    assert(text.includes('Ringkas anggaran untuk Maya Hartwell.'), 'user text missing');
+    assert(text.includes('Rp 1.700.000'), 'answer text missing');
+    // Identical Gemini prompts are distinct turns, not duplicates to merge.
+    assert((text.match(/Sama persis\./g) || []).length === 2, 'identical user turns merged');
+    assert((text.match(/Jawaban yang sama\./g) || []).length === 2, 'identical answers merged');
+    const roles = blocks.map((b) => (b.querySelector('.turn-header').textContent.includes('USER') ? 'user' : 'assistant'));
+    assert(roles.join(',') === 'user,assistant,user,assistant,user,assistant', 'role order wrong: ' + roles.join(','));
+    document.getElementById('result').textContent = 'PASS: Gemini custom elements, label stripped, identical turns kept, role order. No uploads.';
+  } catch (error) {
+    document.getElementById('result').textContent = 'FAIL: ' + error.message;
+  }
+};
+</script>

@@ -121,6 +121,13 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
   height: 16px;
 }
 
+.safeshare-logo img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
 .safeshare-title {
   font-size: 18px;
   font-weight: 600;

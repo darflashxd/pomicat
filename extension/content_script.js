@@ -22,7 +22,7 @@
   const mappingScope = encodeURIComponent(location.origin);
   const pendingMappingId = `draft-${draftId}`;
   const loadedVersion = runtimeApi && runtimeApi.runtime && runtimeApi.runtime.getManifest ? runtimeApi.runtime.getManifest().version : "dev";
-  console.log(`[Blackline] Extension content script active (v${loadedVersion}).`);
+  console.log(`[PomiCat] Extension content script active (v${loadedVersion}).`);
 
   // The chat id is the last path segment after the site's marker. ChatGPT (Oct 2026) can hand out
   // ids such as "local-chatgpt:<uuid>", so the whole segment is taken and decoded rather than
@@ -266,7 +266,7 @@
         count: syncRes.count + addedCount
       };
     } catch (err) {
-      console.warn("[Blackline] Gate 2 NER pass fallback:", err);
+      console.warn("[PomiCat] Gate 2 NER pass fallback:", err);
       return { ...syncRes, nerUnavailable: true };
     }
   }
@@ -277,11 +277,10 @@
     const pill = document.createElement("button");
     pill.id = "safeshare-action-pill";
     pill.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      </svg>
-      <span>Blackline</span>
+      <img src="${typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : ""}" alt="" height="24" style="display:block;width:auto;border-radius:6px">
     `;
+    pill.setAttribute("aria-label", "PomiCat: review and share this conversation");
+    pill.title = "PomiCat: review and share this conversation";
     pill.style.cssText = `
       position: fixed;
       bottom: 24px;
@@ -331,24 +330,24 @@
           onProgress: (count) => { pill.textContent = `Reading… ${count} messages`; }
         });
       } catch (error) {
-        if (error.name !== "AbortError") alert("Blackline: Could not prepare this conversation. Please try again.");
+        if (error.name !== "AbortError") alert("PomiCat: Could not prepare this conversation. Please try again.");
         return;
       } finally {
         delete pill.dataset.preparing;
         pill.textContent = label;
       }
       const { turns, uncertain, partial, read } = prepared;
-      if (partial && !window.confirm(`Blackline read ${read} messages and could not confirm it reached the end of this conversation. Review the collected messages anyway?`)) return;
-      else if (uncertain && !partial && !window.confirm("Blackline could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
+      if (partial && !window.confirm(`PomiCat read ${read} messages and could not confirm it reached the end of this conversation. Review the collected messages anyway?`)) return;
+      else if (uncertain && !partial && !window.confirm("PomiCat could not verify that the entire conversation was loaded. Review the collected messages anyway?")) return;
       if (turns.length === 0) {
-        alert("Blackline: No active conversation found in the current chat window.");
+        alert("PomiCat: No active conversation found in the current chat window.");
         return;
       }
       // Reading only one side means the site's layout changed: a share without your own messages
       // also stops the inversion defence from knowing which amounts were yours (see ROADMAP P0.1)
       const users = turns.filter(t => t.role === "user").length;
       const answers = turns.filter(t => t.role === "assistant").length;
-      if ((!users || !answers) && !window.confirm(`Blackline found ${users} of your messages and ${answers} AI answers in this chat. ` +
+      if ((!users || !answers) && !window.confirm(`PomiCat found ${users} of your messages and ${answers} AI answers in this chat. ` +
         "The site may have changed its layout, so the share could be incomplete and protection weaker. Open the share dialog anyway?")) return;
       const modal = new SafeShareModal();
       modal.open(turns);
@@ -483,7 +482,7 @@
       if (indicator) indicator.remove(); // Remove stale indicator
       indicator = document.createElement("div");
       indicator.id = "safeshare-shield-indicator";
-      indicator.title = "Blackline: what to protect before sending (click to change)";
+      indicator.title = "PomiCat: what to protect before sending (click to change)";
       indicator.addEventListener("click", (e) => {
         e.stopPropagation();
         if (extensionGone()) return; // "SafeShare was updated: refresh this tab"
@@ -505,8 +504,8 @@
     const topics = sensitiveTopics(getInputText(inputEl));
     const topicNote = topics.length ? ` · ⚠️ ${topics.join(", ")} sent as typed` : "";
     indicator.title = topics.length
-      ? `This message says something personal about your ${topics.join(" and ")}. Blackline doesn't replace it (the AI needs it to help); remove it if you'd rather not send it.`
-      : "Blackline: what to protect before sending (click to change)";
+      ? `This message says something personal about your ${topics.join(" and ")}. PomiCat doesn't replace it (the AI needs it to help); remove it if you'd rather not send it.`
+      : "PomiCat: what to protect before sending (click to change)";
 
     if (!isEnabled) {
       indicator.className = "shield-disabled";
@@ -693,7 +692,7 @@
       const holdOnError = (err) => {
         e.preventDefault();
         e.stopImmediatePropagation();
-        console.error("[Blackline] Protection failed; message held, not sent:", err);
+        console.error("[PomiCat] Protection failed; message held, not sent:", err);
         const indicator = document.getElementById("safeshare-shield-indicator");
         if (indicator) {
           indicator.textContent = "🛡️ Protection error: message NOT sent. Retry, or switch protection off ▾";
@@ -725,7 +724,7 @@
       if (rewritten && rewritten.isTransformed) {
         try { setInputText(inputEl, rewritten.sanitizedPrompt); }
         catch (err) { isRewriting = false; return holdOnError(err); }
-        console.log("[Blackline] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
+        console.log("[PomiCat] Protected before sending (Hybrid Gate 1+2):", rewritten.count, "item(s)");
       }
       if (rewritten && rewritten.nerUnavailable) {
         const indicator = document.getElementById("safeshare-shield-indicator");
@@ -810,7 +809,7 @@
         ? "not in this tab's map (sent from another tab, before a reload, or in another chat)"
         : !roots.length ? "no assistant message found by MESSAGE_SELECTOR on this site"
           : "only in your own message (shown as sent, by design) or outside the answer";
-      console.info(`[Blackline] ${m[0]} left as is: ${why}. Map size ${idMap.byPlaceholder.size}, answer roots ${roots.length}.`);
+      console.info(`[PomiCat] ${m[0]} left as is: ${why}. Map size ${idMap.byPlaceholder.size}, answer roots ${roots.length}.`);
     }
   }
 
@@ -1102,7 +1101,7 @@
           node.replaceWith(document.createTextNode("\n[Attachment omitted]\n"));
         }
       }
-      clone.querySelectorAll("[hidden], [aria-hidden='true'], [role='button']:not([data-expr]), button, script, style").forEach(n => n.remove());
+      clone.querySelectorAll("[hidden], [aria-hidden='true'], [role='button']:not([data-expr]), button, script, style, .screen-reader-user-query-label, .cdk-visually-hidden").forEach(n => n.remove());
       // Find all hydrated local compute spans in the clone
       clone.querySelectorAll(".ss-sent-note").forEach(n => n.remove()); // "🔒 2 values protected" is ours, not the chat
       const hydratedSpans = clone.querySelectorAll(".ss-local-compute, .ss-katex-hydrated, [data-expr]");
@@ -1219,7 +1218,7 @@
     const resuming = options.resume === true && scanState && scanState.url === url && scanState.root.isConnected;
     if (!resuming) scanState = { url, root, messages: [], byKey: new Map() };
     const session = scanState;
-    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-perf-reply-text], .ds-message";
+    const messageSelector = "[data-message-author-role], [data-user-message-bubble='true'], [data-markdown-text-style='assistant-message'], [data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-perf-reply-text], .ds-message, user-query, model-response";
     const idSelector = "[data-message-id], [data-chatgpt-search-unit-key], [data-chatgpt-selection-message-id], [data-testid^='conversation-turn-'], [data-turn-key]";
     // A long shared page paints its shell before the messages exist. Without this the click ends
     // with "No active conversation found" even though the conversation arrives a moment later.
@@ -1300,10 +1299,23 @@
         const deepseekAnswer = node.matches(".ds-message")
           ? node.querySelector(".ds-assistant-message-main-content") : null;
         if (node.matches(".ds-message") && !deepseekAnswer && !node.querySelector(".ds-collapsible-text")) { uncertain = true; continue; }
-        const role = node.getAttribute("data-message-author-role") || (node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user" : node.matches(".ds-message") && !deepseekAnswer ? "user" : "assistant");
+        const role = node.getAttribute("data-message-author-role")
+          || (node.matches("user-query") ? "user"
+            : node.matches("model-response") ? "assistant"
+            : node.matches("[data-user-message-bubble='true'], [data-testid='user-message']") ? "user"
+            : node.matches(".ds-message") && !deepseekAnswer ? "user"
+            : "assistant");
         const identity = unit && (unit.getAttribute("data-message-id") || unit.getAttribute("data-chatgpt-search-unit-key") || unit.getAttribute("data-chatgpt-selection-message-id") || unit.getAttribute("data-turn-key") || unit.getAttribute("data-testid"));
-        const source = claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node;
-        const content = cachedContent(source);
+        // Gemini uses custom elements with no message ids; read the text node, not the wrapper that
+        // also carries the screen-reader prefix ("Anda berkata" / "Gemini berkata").
+        const geminiSource = node.matches("user-query, model-response")
+          ? (node.matches("user-query")
+            ? node.querySelector(".query-text") || node
+            : node.querySelector("message-content") || node.querySelector(".markdown") || node)
+          : null;
+        let source = geminiSource || claudeAnswerBody(node) || deepseekAnswer || (node.matches(".ds-message") && node.querySelector(".ds-collapsible-text")) || node;
+        let content = cachedContent(source);
+        if (geminiSource) content = content.replace(/^\s*(?:#{1,6}\s*)?(?:Anda berkata|You said|Gemini berkata)\s*/i, "").trimStart();
         if (!content) continue;
         const hash = bodyHash(role, content);
         // Without an identity attribute, identical texts are still distinct messages. Counting
@@ -1394,7 +1406,7 @@
       // Step by whole turns: one long answer can be ten screens tall, and its text is collected
       // in a single pass, so pixel stepping burned a dozen passes inside it.
       const scanStartedAt = Date.now();
-      const turnSelector = "[data-turn-key], [data-testid^='conversation-turn-']";
+      const turnSelector = "[data-turn-key], [data-testid^='conversation-turn-'], user-query, model-response";
       let lastNewAt = scanStartedAt;
       let lastHeight = scroller.scrollHeight;
       let grewDuringScan = false;
@@ -1642,7 +1654,7 @@
       // shown on screen and shares can't be made: say so instead of failing quietly
       const indicator = document.getElementById("safeshare-shield-indicator");
       if (indicator) {
-        indicator.textContent = "⚠️ Blackline was updated: refresh this tab";
+        indicator.textContent = "⚠️ PomiCat was updated: refresh this tab";
         indicator.className = "shield-disabled";
         indicator.dataset.errorUntil = String(Number.MAX_SAFE_INTEGER);
       }
@@ -1684,11 +1696,11 @@
     if (key !== lastHealthKey && extApi && extApi.storage && extApi.storage.local) {
       lastHealthKey = key;
       Promise.resolve(extApi.storage.local.set({ [`safeshare_health_${location.hostname}`]: status })).catch(() => {});
-      if (!ok) console.warn("[Blackline] Site health check failed:", problems.join(", "));
+      if (!ok) console.warn("[PomiCat] Site health check failed:", problems.join(", "));
     }
     const indicator = document.getElementById("safeshare-shield-indicator");
     if (!ok && indicator) {
-      indicator.textContent = `⚠️ Blackline can't fully read this page (${problems.join(", ")}). The site may have changed; shares may be incomplete ▾`;
+      indicator.textContent = `⚠️ PomiCat can't fully read this page (${problems.join(", ")}). The site may have changed; shares may be incomplete ▾`;
       indicator.dataset.errorUntil = String(Date.now() + 11000);
     }
   }
@@ -1720,7 +1732,7 @@
       const inputEl = findPromptInputElement();
       if (inputEl) {
         setInputText(inputEl, promptText);
-        console.log("[Blackline] Injected continuation prompt directly into active session.");
+        console.log("[PomiCat] Injected continuation prompt directly into active session.");
       } else {
         // On a share page there is no chat box: open the chat site and paste it there
         const api = typeof browser !== "undefined" ? browser : (typeof chrome !== "undefined" ? chrome : null);
@@ -1742,7 +1754,7 @@
 
       const applyPrompt = (inputEl) => {
         setInputText(inputEl, pending.prompt);
-        console.log("[Blackline] Pasted continuation prompt into the new chat.");
+        console.log("[PomiCat] Pasted continuation prompt into the new chat.");
       };
 
       // Immediate check at t=0

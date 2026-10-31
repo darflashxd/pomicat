@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Blackline",
-  "version": "2.5.7",
-  "description": "Redacts sensitive data in AI chats and Word documents, then shares a sanitized copy as an encrypted link.",
+  "name": "PomiCat",
+  "version": "3.0.0",
+  "description": "Review and redact sensitive data in AI chats and Word documents, then share a sanitized copy as an encrypted link.",
   "permissions": [
     "storage",
     "clipboardWrite",
@@ -14,8 +14,10 @@
     "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://chat.deepseek.com/*",
+    "https://gemini.google.com/*",
     "https://safeshare-relay.bleedguard.workers.dev/*",
     "https://blackline-relay.bleedguard.workers.dev/*",
+    "https://pomicat-relay.bleedguard.workers.dev/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://*.sharepoint.com/*",
@@ -36,6 +38,7 @@
       "matches": [
         "https://safeshare-relay.bleedguard.workers.dev/*",
         "https://blackline-relay.bleedguard.workers.dev/*",
+        "https://pomicat-relay.bleedguard.workers.dev/*",
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
@@ -52,8 +55,10 @@
         "https://chat.openai.com/*",
         "https://claude.ai/*",
         "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*",
         "https://safeshare-relay.bleedguard.workers.dev/*",
         "https://blackline-relay.bleedguard.workers.dev/*",
+        "https://pomicat-relay.bleedguard.workers.dev/*",
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
@@ -75,6 +80,7 @@
         "engine/symbolic_rewriter.js",
         "engine/local_compute.js",
         "engine/settings.js",
+        "ui/brand-assets.js",
         "ui/modal.js",
         "content_script.js"
       ],
@@ -104,18 +110,20 @@
     }
   },
   "action": {
-    "default_title": "Blackline",
+    "default_title": "PomiCat",
     "default_icon": {
       "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://safeshare-relay.bleedguard.workers.dev https://blackline-relay.bleedguard.workers.dev http://localhost:* http://127.0.0.1:*; object-src 'none';"
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://pomicat-relay.bleedguard.workers.dev https://safeshare-relay.bleedguard.workers.dev https://blackline-relay.bleedguard.workers.dev http://localhost:* http://127.0.0.1:*; object-src 'none';"
   },
   "icons": {
     "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   }

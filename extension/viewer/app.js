@@ -32,10 +32,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lockMeta = document.querySelector("#crawler-lock-screen .lock-meta");
   if (lockMeta) {
     lockMeta.innerText = inExtension
-      ? "Opened inside the Blackline extension: decrypted by the extension's own copy of this page." +
+      ? "Opened inside the PomiCat extension: decrypted by the extension's own copy of this page." +
       (/^https:\/\/(?:safeshare|blackline)-relay\.bleedguard\.workers\.dev$/.test(window.SAFESHARE_RELAY_URL)
           ? "" : ` Chat loaded from ${window.SAFESHARE_RELAY_URL}, not the official relay.`)
-      : "Decrypted by this page, served by the relay. With the Blackline extension installed, links open inside the extension instead.";
+      : "Decrypted by this page, served by the relay. With the PomiCat extension installed, links open inside the extension instead.";
   }
   let shareId = params.get("id");
   if (!shareId) {
@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       lock.querySelector("h2").innerText = "⚠️ Session Revoked";
       lock.querySelector("p").innerText = "This conversation session has been permanently revoked and cleared from memory.";
     }
-    console.warn("[Blackline] Access denied: Session has been revoked.");
+    console.warn("[PomiCat] Access denied: Session has been revoked.");
     return;
   }
 
@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (memoryZeroizer) {
     memoryZeroizer.registerZeroizer(() => {
-      console.warn("[Blackline] Clearing application references and DOM content.");
+      console.warn("[PomiCat] Clearing application references and DOM content.");
       decryptedData = null;
       if (watermarkedTurns && Array.isArray(watermarkedTurns)) {
         watermarkedTurns.length = 0;
@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       decryptedData = await cryptoEngine.decrypt(ciphertext, hashKey);
     } catch (err) {
-      console.error("[Blackline Viewer] Standalone decryption error:", err);
+      console.error("[PomiCat Viewer] Standalone decryption error:", err);
       lockScreen.style.display = "block";
       if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired";
@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       decryptedData = await cryptoEngine.decrypt(ciphertext, hashKey);
       if (!decryptedData || decryptedData.shareId !== shareId) throw new Error('Share ID does not match encrypted payload');
     } catch (err) {
-      console.error("[Blackline Viewer] Relay decryption error:", err);
+      console.error("[PomiCat Viewer] Relay decryption error:", err);
       lockScreen.style.display = "block";
       if (err && (err.code === "EXPIRED" || (err.message && err.message.toLowerCase().includes("expired")))) {
         lockScreen.querySelector("h2").innerText = "⏱️ Link Expired or Revoked";
@@ -195,11 +195,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!valid) {
       lockScreen.style.display = "block";
       lockScreen.querySelector("h2").textContent = "Unsupported document link";
-      lockScreen.querySelector("p").textContent = "Ask the sender to create a new link with the current Blackline version.";
+      lockScreen.querySelector("p").textContent = "Ask the sender to create a new link with the current PomiCat version.";
       return;
     }
     lockScreen.style.display = "none";
-    document.title = "Blackline - Reviewed document";
+    document.title = "PomiCat - Reviewed document";
     const brand = document.querySelector(".brand-sub");
     if (brand) brand.textContent = "Private document";
     const section = document.createElement("section");
@@ -423,9 +423,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const summarize = summarizeChk ? summarizeChk.checked : true;
         const result = await extensionBridge.forwardToAIPlatform(platformName, turns, { summarize });
         if (result.success) {
-          alert(`[Blackline]\n✓ ${result.message}`);
+          alert(`[PomiCat]\n✓ ${result.message}`);
         } else {
-          alert(`[Blackline]\nContext forwarding is supported directly via the Blackline Browser Extension.`);
+          alert(`[PomiCat]\nContext forwarding is supported directly via the PomiCat Browser Extension.`);
         }
       }
     };

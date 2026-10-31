@@ -16,7 +16,7 @@ async function relayBaseUrl() {
     if (safeshare_relay) return String(safeshare_relay).replace(/\/$/, "");
   } catch (_) {}
   return (typeof BlacklineRelayHosts !== "undefined" && BlacklineRelayHosts.DEFAULT_RELAY) ||
-    "https://blackline-relay.bleedguard.workers.dev";
+    "https://pomicat-relay.bleedguard.workers.dev";
 }
 
 // MV3 service workers can be asleep on the first message; retry once before giving up.

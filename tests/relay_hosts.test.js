@@ -18,7 +18,8 @@ for (const file of ['extension/manifest.json', 'extension/manifest.firefox.json'
   );
 }
 
-assert.equal(hosts.DEFAULT_RELAY, 'https://blackline-relay.bleedguard.workers.dev');
+assert.equal(hosts.DEFAULT_RELAY, 'https://pomicat-relay.bleedguard.workers.dev');
+assert.ok(hosts.isRelayOrigin('https://pomicat-relay.bleedguard.workers.dev'));
 assert.ok(hosts.isRelayOrigin('https://safeshare-relay.bleedguard.workers.dev'));
 assert.ok(hosts.isRelayOrigin('https://blackline-relay.bleedguard.workers.dev'));
 assert.ok(hosts.isRelayOrigin('http://localhost:8787'));

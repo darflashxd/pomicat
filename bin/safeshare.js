@@ -2,10 +2,10 @@
 /**
  * SafeShare CLI and library.
  *
- *   safeshare redact [file] [options] [--json]
- *   safeshare invert [file] [--json]
- *   safeshare share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]
- *   safeshare proxy  [options] [--port 8788] [--upstream https://api.openai.com]
+ *   pomicat redact [file] [options] [--json]
+ *   pomicat invert [file] [--json]
+ *   pomicat share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]
+ *   pomicat proxy  [options] [--port 8788] [--upstream https://api.openai.com]
  *
  * options: --profile public|trusted, --numbers remove|range, --presidio <url>, --policy <file>
  *
@@ -341,10 +341,10 @@ function main(argv) {
   if (!["redact", "invert", "share"].includes(cmd)) {
     console.error(
       "Usage:\n" +
-      "  safeshare redact [file] [options] [--json]\n" +
-      "  safeshare invert [file] [--json]\n" +
-      "  safeshare share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]\n" +
-      "  safeshare proxy  [options] [--port 8788] [--upstream https://api.openai.com]\n" +
+      "  pomicat redact [file] [options] [--json]\n" +
+      "  pomicat invert [file] [--json]\n" +
+      "  pomicat share  [file] [options] [--relay http://127.0.0.1:8787] [--ttl 3600] [--burn]\n" +
+      "  pomicat proxy  [options] [--port 8788] [--upstream https://api.openai.com]\n" +
       "\n" +
       "Options:\n" +
       "  --profile public|trusted   who will read it (default public)\n" +

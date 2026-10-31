@@ -6,8 +6,8 @@
 
 class SafeShareCrypto {
   constructor(
-    relayBaseUrl = "https://safeshare-relay.bleedguard.workers.dev",
-    viewerBaseUrl = "https://safeshare-relay.bleedguard.workers.dev"
+    relayBaseUrl = "https://pomicat-relay.bleedguard.workers.dev",
+    viewerBaseUrl = "https://pomicat-relay.bleedguard.workers.dev"
   ) {
     this.relayBaseUrl = relayBaseUrl;
     this.viewerBaseUrl = viewerBaseUrl;

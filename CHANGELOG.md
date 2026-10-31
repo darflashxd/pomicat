@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0 - 2026-10-31
+
+- Rename the product to PomiCat. Extension identity, storage keys, encrypted link format, and the
+  older relay hosts are unchanged, so existing settings and links keep working.
+- Add Gemini support: `user-query` and `model-response` extraction, label stripping, and turn-based
+  scrolling.
+- Add the `pomicat-relay` Worker on the same D1 database. It shares the rate-limit namespaces and
+  adds no cleanup cron; `safeshare-relay` and `blackline-relay` stay deployed for existing links.
+- Read long share chats to the end: wait out the page's batch cadence, step by whole turns, and drop
+  the circular completion check. Measured on a 17-turn share: 22 -> 37 messages, 0 duplicates.
+- Cache model inference and halve the window overlap.
+- New icons, README banner, and refreshed screenshots.
+
 ## Unreleased — chat and Word detection consistency
 
 - Consolidate historical audit notes here; current operational instructions remain in DEPLOY.md

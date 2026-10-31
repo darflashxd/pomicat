@@ -18,7 +18,7 @@ All identities/credentials are fictional, emails use `.invalid`. No authentic si
 
 These fixtures are authored functional/demo tests, **not an independent detection benchmark**.
 They do not yet cover charts, comments, OLE, all date/locale formats or OCR accuracy. The manifest
-contains intended policy decisions, not model predictions. No SafeShare redaction engine result
+contains intended policy decisions, not model predictions. No PomiCat redaction engine result
 is implied by successfully generating the files.
 
 External English holdout candidates (not downloaded or incorporated):
@@ -27,12 +27,12 @@ External English holdout candidates (not downloaded or incorporated):
 - [Gretel financial synthetic PII](https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual),
   Apache-2.0; filter English and manually verify labels. Check training overlap before claiming holdout.
 - [WIPO structural DOCX samples](https://pct.wipo.int/DocConverter/pages/sampleFiles.xhtml): useful
-  for equations/tables; redistribution rights not established. Do not bundle as SafeShare fixtures.
+  for equations/tables; redistribution rights not established. Do not bundle as PomiCat fixtures.
 
 ## Live testing gate
 
 Open an authored sample in Word Online using an authorized test account. Confirm the final
-`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating Blackline launcher, the automatic
+`END_OF_DOCUMENT_*` sentinel is saved. Exercise the floating PomiCat launcher, the automatic
 first read, the two-pane review, apply, local-relay encrypted share and a recipient browser
 without the extension. Compare tables, equations and image placements; independently inspect all
 sanitized OOXML/media parts. A link is only a correct test if the recipient preview and the

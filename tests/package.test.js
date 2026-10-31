@@ -21,7 +21,7 @@ try {
   fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ name: "pkg-test", version: "1.0.0", private: true }));
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", path.join(tmp, tgz)], { cwd: tmp });
 
-  const installed = path.join(tmp, "node_modules", "safeshare-ai");
+  const installed = path.join(tmp, "node_modules", "pomicat");
   const cli = path.join(installed, "bin", "safeshare.js");
   const metadata = require(path.join(installed, 'package.json'));
   assert.equal(metadata.bin.blackline, metadata.bin.safeshare, 'both commands must use the same implementation');

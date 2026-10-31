@@ -1,9 +1,10 @@
 {
-  "name": "safeshare-ai",
-  "version": "2.5.7",
-  "description": "Blackline reviews and redacts AI chats and Word documents before encrypted sharing. Previously SafeShare.",
+  "name": "pomicat",
+  "version": "3.0.0",
+  "description": "PomiCat reviews and redacts AI chats and Word documents before encrypted sharing. Previously SafeShare and Blackline.",
   "main": "bin/safeshare.js",
   "bin": {
+    "pomicat": "bin/safeshare.js",
     "safeshare": "bin/safeshare.js",
     "blackline": "bin/safeshare.js"
   },
@@ -34,10 +35,10 @@
     "firefox-addon",
     "e2e-encryption"
   ],
-  "author": "SafeShare-AI contributors",
+  "author": "PomiCat contributors",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/darflashxd/safeshare.git"
+    "url": "https://github.com/darflashxd/pomicat.git"
   }
 }

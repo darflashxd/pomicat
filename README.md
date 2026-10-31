@@ -1,18 +1,23 @@
-# Blackline
+<img src="docs/brand/pomicat-banner.png" alt="PomiCat" width="100%">
 
-[![Tests](https://github.com/darflashxd/safeshare/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/darflashxd/safeshare/actions/workflows/test.yml)
+# PomiCat
+
+[![Tests](https://github.com/darflashxd/pomicat/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/darflashxd/pomicat/actions/workflows/test.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/darflashxd/safeshare?label=release)](https://github.com/darflashxd/safeshare/releases)
+[![Release](https://img.shields.io/github/v/release/darflashxd/pomicat?label=release)](https://github.com/darflashxd/pomicat/releases)
 
 ### Share the content. Not the secrets.
 
 A useful AI chat can also contain your salary, a client's name, or a password pasted by mistake.
 A Word document can carry the same details into someone else's hands.
 
-Blackline lets you review the copy, redact sensitive information, and share it through an encrypted
-link. It works with ChatGPT, Claude, DeepSeek, and supported Word Online documents.
+PomiCat lets you review the copy, redact sensitive information, and share it through an encrypted
+link. It works with ChatGPT, Claude, Gemini, DeepSeek, and supported Word Online documents.
 
-[Download extension](https://github.com/darflashxd/safeshare/releases) ·
+Previously SafeShare, then Blackline. The rename keeps the extension identity, saved settings,
+the encrypted link format, and the older relay hosts working.
+
+[Download extension](https://github.com/darflashxd/pomicat/releases) ·
 [Get started](#quick-start-share-privately) · [Screenshots](#screenshots) · [Demo walkthrough](DEMO.md)
 
 | AI conversations | Word documents |
@@ -20,9 +25,9 @@ link. It works with ChatGPT, Claude, DeepSeek, and supported Word Online documen
 | ![AI conversation review](docs/screenshots/01-review-overview.png) | ![Word agreement review](docs/screenshots/word-agreement-review.png) |
 | Check what the recipient will see. | Review employee details and settlement figures before sending the copy. |
 
-*Fictional examples, shown in separate product views. The chat capture is from SafeShare v2.4.0;
-the Word capture uses Blackline v2.5.7, with the account number redacted manually.
-[Chat capture details](#supported-chat-interfaces) · [Word capture details](#word-review-and-recipient-copy).*
+*Fictional examples, shown in separate product views. Captures use PomiCat v3.0.0 with fictional
+data and a local or hosted relay. [Chat capture details](#supported-chat-interfaces) ·
+[Word capture details](#word-review-and-recipient-copy).*
 
 Detection runs on your device. Sharing uploads an encrypted copy to a relay.
 
@@ -33,7 +38,7 @@ Detection runs on your device. Sharing uploads an encrypted copy to a relay.
 - **Check the copy side by side.** Inspect each highlight, restore a selection, or mark something
   the detectors missed. You make the final call on what stays visible.
 - **Look beyond the original value.** A percentage, subtotal, or annual figure can reveal a number
-  you already hid. Blackline checks supported arithmetic relationships as well as direct identifiers.
+  you already hid. PomiCat checks supported arithmetic relationships as well as direct identifiers.
 - **Send a copy, not the original.** Share a reviewed chat or sanitized DOCX through an encrypted
   link. Set an expiry or revoke future access. Chat links also offer burn-after-read.
 
@@ -53,7 +58,7 @@ Assistant: Saving 20% gives $1,000 a month.
 $1,000 / 0.20 = $5,000
 ```
 
-Blackline checks for numerical clues like these, so you can review the calculations as well as
+PomiCat checks for numerical clues like these, so you can review the calculations as well as
 the original amount. It covers specific arithmetic relationships, not every possible inference.
 [See the example](#hiding-the-original-value-is-not-enough) or [try it offline](#try-the-attack-offline).
 
@@ -62,11 +67,11 @@ the original amount. It covers specific arithmetic relationships, not every poss
 ### Chrome, Edge, and Brave
 
 ```bash
-git clone https://github.com/darflashxd/safeshare.git
-cd safeshare
+git clone https://github.com/darflashxd/pomicat.git
+cd pomicat
 ```
 
-1. Use the latest published Chrome ZIP from [Releases](https://github.com/darflashxd/safeshare/releases), or
+1. Use the latest published Chrome ZIP from [Releases](https://github.com/darflashxd/pomicat/releases), or
    clone the repository and use the `extension/` folder while developing. Extract the ZIP.
 2. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the
    extracted folder (or the repository's `extension/` folder).
@@ -77,13 +82,13 @@ The model, vocabulary, and ONNX WASM runtime are bundled in the repository. **Ru
 extension requires no Python, model download, or inference API key.** Creating and opening relay
 shares requires a reachable relay; local detection and model inference run on your device.
 
-Existing unpacked installations: run `git pull origin main`, reload Blackline in the extensions
+Existing unpacked installations: run `git pull origin main`, reload PomiCat in the extensions
 page, and refresh your chat tabs. Pulling source does not reload code already running in a tab.
 
 ### Create your first private share
 
-1. Open a short fictional conversation in ChatGPT, Claude or DeepSeek, then click **Blackline**.
-   For Word, open a saved fictional DOCX and click the floating **Blackline** button.
+1. Open a short fictional conversation in ChatGPT, Claude or DeepSeek, then click **PomiCat**.
+   For Word, open a saved fictional DOCX and click the floating **PomiCat** button.
 2. Check that the expected messages or document content were captured. Compare the original and
    protected previews, inspect suggestions, and manually select anything the detectors missed.
 3. For Word, choose **Create sanitized DOCX** and wait for verification. Review images manually.
@@ -98,22 +103,22 @@ found no reconstruction; it does not certify the copy as anonymous.
 
 ### Updating and name compatibility
 
-Previously SafeShare. The extension retains its identity and legacy settings so an update does not
-reset the installation. New links use `https://blackline-relay.bleedguard.workers.dev`; the old relay
-remains supported. The GitHub repository, npm package `safeshare-ai`, and `safeshare` command retain
-their names for compatibility; `blackline` is also available as a CLI alias. No account or relay
-migration is required merely to use the current name.
+Previously SafeShare, then Blackline. The extension retains its identity and legacy settings so an
+update does not reset the installation. New links use
+`https://pomicat-relay.bleedguard.workers.dev`; the older relay hosts remain supported so existing
+links keep opening. The npm package is `pomicat`, and the `pomicat`, `safeshare`, and `blackline`
+commands all point at the same CLI. No account or relay migration is required to use the new name.
 
 ### Firefox
 
-Use a Firefox package from [Releases](https://github.com/darflashxd/safeshare/releases) if one is
+Use a Firefox package from [Releases](https://github.com/darflashxd/pomicat/releases) if one is
 published, or build the packages locally with Python 3:
 
 ```bash
 python tools/build_extension.py
 ```
 
-Extract `dist/Blackline-<version>-firefox.zip` (older releases use `SafeShare-`). Open
+Extract `dist/PomiCat-<version>-firefox.zip` (older releases use `PomiCat-`). Open
 `about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**, and choose the extracted
 `manifest.json`. Temporary add-ons must be reloaded after a browser restart. The repository's
 `extension/manifest.json` is for Chromium, not Firefox.
@@ -149,12 +154,12 @@ while you type.** It changes what is submitted, not what the page could already 
 
 *The prompt was sent as `<S1>`. The note under the message keeps the mapping on this screen only,
 and the reply's formulas are computed locally against it. The chat site received `<S1>`, not
-`$4,800`. Captured from the v2.4.1 extension on Chrome 155, ChatGPT dark theme, with a local relay;
+`$4,800`. Captured from the v3.0.0 extension on Chrome 156, ChatGPT dark theme, with a local relay;
 the reply and its computed values are unedited.*
 
 ### Word Online integration
 
-Open a saved document and click the floating **Blackline** button. The extension reads a separate
+Open a saved document and click the floating **PomiCat** button. The extension reads a separate
 copy through your existing SharePoint session; it does not overwrite the original.
 
 Compare the two previews and click a highlight to redact or restore it. Select other text to add
@@ -185,16 +190,16 @@ be read, export and link creation stop; a preview-only check is not treated as s
 
 ## Screenshots
 
-Chat screenshots show historical SafeShare builds; the Word agreement screenshots show the
-installed Blackline extension. Captions distinguish live captures from local fixtures.
+Chat screenshots show historical PomiCat builds; the Word agreement screenshots show the
+installed PomiCat extension. Captions distinguish live captures from local fixtures.
 
 ### Word review and recipient copy
 
-![Separation agreement reviewed in Blackline](docs/screenshots/word-agreement-review.png)
+![Separation agreement reviewed in PomiCat](docs/screenshots/word-agreement-review.png)
 
 ![Settlement amounts before and after redaction](docs/screenshots/word-agreement-payments.png)
 
-*Captured through Word Online and the installed Blackline v2.5.7 extension, 31 October 2026.
+*Captured through Word Online and the installed PomiCat v3.0.0 extension, 31 October 2026.
 The fictional separation agreement includes employee details, a settlement table and payment
 instructions. Names were selected by the local model; the account number required manual
 redaction. Thirteen text replacements across three package parts passed selected-value verification;
@@ -219,7 +224,7 @@ The assistant still shows the numbers derived from the salary. Redacting `$4,800
 
 ![Monthly allocations remain after the salary is redacted](docs/screenshots/02-derived-amounts.png)
 
-*The salary is masked, but the monthly allocations are also recoverable values. Blackline reviews
+*The salary is masked, but the monthly allocations are also recoverable values. PomiCat reviews
 them together.*
 
 ![Annual total reveals the hidden salary](docs/screenshots/02b-annual-derived.png)
@@ -233,9 +238,8 @@ hidden salary. The three unmasked suggestions in these captures are date-like fa
 ![Recipient view of a shared conversation](docs/screenshots/04-recipient-view.png)
 
 *The recipient sees the reviewed conversation, not the owner's local restoration mapping. This
-capture uses the v2.4.1 relay-served viewer with the extension disabled, so no originals are
-available in the page. The conversation runs to its last line and the **Continue** bar stays
-visible.*
+capture opens inside the PomiCat extension's own viewer, so no originals are available in the page.
+The conversation runs to its last line and the **Continue** bar stays visible.*
 
 ### Where the key lives
 
@@ -243,8 +247,8 @@ visible.*
 
 *A share URL is `<relay>/v/<id>#<key>`. The part after `#` is the AES-256-GCM key, and the browser
 does not put it on the wire: the page's own request for the ciphertext is `/api/share/<id>`, with no
-fragment. The key is redacted in this capture; both URLs are the page's console output on v2.4.1
-against the local relay.*
+fragment. The key is redacted in this capture; both URLs are the page's console output against the
+local relay.*
 
 Browsers do not include the `#fragment` in HTTP requests. The relay also sends
 `X-Robots-Tag: noindex`. `tests/relay_lifecycle.test.js` uses a Googlebot user agent to check that
@@ -263,26 +267,29 @@ capture.*
 ### Supported chat interfaces
 
 <details>
-<summary>ChatGPT, Claude, and DeepSeek</summary>
+<summary>ChatGPT, Claude, Gemini, and DeepSeek</summary>
 
 **ChatGPT**
 
-![SafeShare on ChatGPT](docs/screenshots/platform-chatgpt.png)
+![PomiCat on ChatGPT](docs/screenshots/platform-chatgpt.png)
 
 **Claude**
 
-![SafeShare on Claude](docs/screenshots/platform-claude.png)
+![PomiCat on Claude](docs/screenshots/platform-claude.png)
+
+**Gemini**
+
+![PomiCat on Gemini](docs/screenshots/platform-gemini.png)
 
 **DeepSeek**
 
-![SafeShare on DeepSeek](docs/screenshots/platform-deepseek.png)
+![PomiCat on DeepSeek](docs/screenshots/platform-deepseek.png)
 
 </details>
 
-All captures use fictional conversations, Chrome 155, and a relay at
-`http://127.0.0.1:8787`. The review, derived-amount, revocation, and platform captures were taken
-with v2.4.0; the before-send and recipient-view captures were retaken with v2.4.1, and the
-fragment-boundary capture was taken with v2.4.1. No mock UI or screenshot slideshow is used.
+All captures use fictional conversations and relay data. Platform captures were taken in Chrome with
+the extension loaded; the review, derived-amount, revocation, recipient, and fragment captures use a
+local relay at `http://127.0.0.1:8787`. No mock UI or screenshot slideshow is used.
 
 ## Reproduce the attack
 
@@ -310,7 +317,7 @@ Most likely hidden value: $5,000 (agreed by 3 visible numbers)
     $12,000 / 12 / 20%
 ```
 
-Redact the original conversation with Blackline, then run the same attack:
+Redact the original conversation with PomiCat, then run the same attack:
 
 ```bash
 node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
@@ -401,12 +408,12 @@ revocation block later retrieval; they cannot recall copies already saved by a r
 **Can it miss information?** Yes. Detection is best-effort, the model is English-focused, and
 image text requires manual marking. Review the protected copy; an empty attack check is not a safety certificate.
 
-**Why are the repo and commands still called SafeShare?** Existing package names and aliases are
+**Why are the repo and commands still called PomiCat?** Existing package names and aliases are
 kept for compatibility. See [updating and name compatibility](#updating-and-name-compatibility).
 
 ## Status
 
-- **Source version:** `2.5.7`; published Chrome/Firefox packages are available under `v2.5.7`.
+- **Source version:** `3.0.0`; published Chrome/Firefox packages are available under `v3.0.0`.
   Changes under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) are newer than those ZIPs. Record
   the commit when testing source: matching version strings do not establish identical code.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek and Word Online with unpacked Chromium;
@@ -425,7 +432,7 @@ kept for compatibility. See [updating and name compatibility](#updating-and-name
 | Chat provider | Optional rewrite at submission | Typed text is visible to the page before submission; the provider retains anything already received. |
 | Changed chat-site layout | Extraction health checks and review UI | Missing turns or submit-hook changes still require real-site testing. |
 
-With Blackline installed on a supported relay origin, share links are routed to the extension's
+With PomiCat installed on a supported relay origin, share links are routed to the extension's
 own viewer. Without it, recipients use the hosted viewer and must trust its operator. CSP is
 defense in depth, not protection against a host that controls both the page and its headers.
 
@@ -440,7 +447,7 @@ defense in depth, not protection against a host that controls both the page and 
 - Restored amounts are ordinary page text and may be read by site scripts. Closed-shadow rendering
   for some other restored values is not a security boundary against a compromised browser or
   another privileged extension. Session mappings can disappear after browser/extension lifecycle
- changes; Blackline cannot reconstruct originals that were not sent to the AI.
+ changes; PomiCat cannot reconstruct originals that were not sent to the AI.
 - The optional sharer-originals feature stores a separate encrypted restoration copy on the
   creator's device; ordinary recipients do not receive that private mapping. See [the changelog](CHANGELOG.md).
 - Copy deterrence is not copy protection. Screenshots, photographs, or an authorized reader's own
@@ -455,7 +462,7 @@ share does not remove it from the original service or from copies already made.
 
 ### Results at a glance
 
-| Check | Baseline observation | Blackline observation | Source |
+| Check | Baseline observation | PomiCat observation | Source |
 |---|---|---|---|
 | Historical LLM salary attack: 3 models, 4 runs of 40 templated chats, EN + ID | Naive masking: 100% recovered. Presidio: 100% directly visible or recovered, depending on language. | 0 recoveries in 160 run cases, with repeated scenarios across models; not 160 independent conversations | [RESULTS_LLM.md](tools/attack_bench/RESULTS_LLM.md) |
 | Historical rule-based arithmetic attacker, 40 templated chats | Naive: 53% recovered. Presidio: 100% directly visible in the English run. | 0% recovered in this experiment | [attack bench](tools/attack_bench/RESULTS.md) |
@@ -472,8 +479,8 @@ Requires Node.js 18 or newer and Git. No account, API key, model download or rel
 These examples contain fictional data only.
 
 ```bash
-git clone https://github.com/darflashxd/safeshare.git
-cd safeshare
+git clone https://github.com/darflashxd/pomicat.git
+cd pomicat
 node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
 ```
 
@@ -523,8 +530,9 @@ node bin/safeshare.js redact examples/chat_original_en.txt --numbers range
 ```
 
 Input is plain text with `User:` / `Assistant:` lines, or a JSON array of `{role, content}`.
-`npm link` installs the `safeshare` command from your checkout. The library exports
-`redactTurns` and `invert` through `require("safeshare-ai")` after local installation.
+`npm link` installs the `pomicat` command from your checkout; `safeshare` and `blackline` remain
+aliases. The library exports `redactTurns` and `invert` through `require("pomicat")` after local
+installation.
 
 | Reader profile | Intended policy |
 |---|---|
@@ -632,7 +640,7 @@ or private transcripts. Repository issues are not a confidential reporting chann
 ## Troubleshooting
 
 **A share link opens a blank page.** The installed unpacked extension is older than the page.
-Reload it in `chrome://extensions`, approve `blackline-relay.bleedguard.workers.dev` if Chrome
+Reload it in `chrome://extensions`, approve `pomicat-relay.bleedguard.workers.dev` if Chrome
 asks, then reopen the link. Current builds fall back to the web viewer (`?web=1`) when the
 extension cannot take over, so a stale background worker no longer leaves a blank page.
 
@@ -640,7 +648,7 @@ extension cannot take over, so a stale background worker no longer leaves a blan
 
 | Message | What to do |
 |---|---|
-| Reload the Blackline extension… | Reload it in `chrome://extensions` and approve the relay host |
+| Reload the PomiCat extension… | Reload it in `chrome://extensions` and approve the relay host |
 | … too large … 512 KB … | Use Download DOCX; the encrypted link cap is 512 KB |
 | Too many uploads … | Wait about a minute |
 | Relay … could not be reached | Check the relay URL in the Word panel or retry |
@@ -650,7 +658,7 @@ a person, and burn-after-reading shares would be consumed. Clicking the button i
 
 ## License and attribution
 
-Blackline source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
+PomiCat source is licensed under [Apache-2.0](LICENSE). The bundled BERT-small PII model is
 published by [Gravitee](https://huggingface.co/gravitee-io/bert-small-pii-detection) under
 Apache-2.0 as declared upstream. Bundled runtimes and optional dependencies retain their own
 licenses; see [bundled attribution and license texts](extension/THIRD_PARTY_NOTICES.md).
