@@ -195,27 +195,31 @@ installed PomiCat extension. Captions distinguish live captures from local fixtu
 
 ### Word review and recipient copy
 
+![PomiCat launcher in Word Online](docs/screenshots/word-online-launcher.png)
+
+*The current build adds a PomiCat button to a document opened in Word Online. This capture uses a
+blank test document in the signed-in account; no document content leaves the page unless a link is
+created.*
+
 ![Separation agreement reviewed in PomiCat](docs/screenshots/word-agreement-review.png)
 
 ![Settlement amounts before and after redaction](docs/screenshots/word-agreement-payments.png)
 
-*Captured through Word Online and the installed PomiCat v3.0.0 extension, 31 October 2026.
-The fictional separation agreement includes employee details, a settlement table and payment
+*The fictional separation agreement includes employee details, a settlement table and payment
 instructions. Names were selected by the local model; the account number required manual
 redaction. Thirteen text replacements across three package parts passed selected-value verification;
 independent ZIP/XML inspection found none of the 12 checked private values. The supported attack
 check found no reconstruction. This is one reviewed example, not an automatic-detection score.
-The installed extension's exact source commit was not independently attested. Screenshots are
-workspace crops without account identity or link keys; no review UI was fabricated. Generate the
-source DOCX with `python tools/build_agreement_showcase.py <new-output.docx>`. The source document
-was uploaded to the signed-in Word account; no encrypted public share was created for this capture.*
+These two review captures date from the previous build; the review UI is unchanged in v3.0.0 apart
+from the product name. Screenshots are workspace crops without account identity or link keys; no
+review UI was fabricated. Generate the source DOCX with
+`python tools/build_agreement_showcase.py <new-output.docx>`.*
 
 ![Recipient document viewer with sanitized download](docs/screenshots/word-viewer-current.png)
 
-*The recipient viewer image above remains a separate local fixture captured 30 October 2026 from
-source based on `635766f`, Chromium 149. It is not a recipient link for the agreement shown here.
-Names were selected manually in that fixture; no tenant login or relay upload was involved.
-Reproduce it with `python tools/capture_word_screenshots.py`.*
+*Regenerated on 31 October 2026 from the current source with
+`python tools/capture_word_screenshots.py`. Names were selected manually in the local fixture; no
+tenant login or relay upload was involved.*
 
 ### Hiding the original value is not enough
 
