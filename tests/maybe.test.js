@@ -306,4 +306,20 @@ const Modal = require("../extension/ui/modal.js");
   const list = Maybe.scan([{ role: "user", content: "x Q7wE2rT9yU4iO1pA6sD3fG8h and token: Z9mL4pR8tN2kV7bQ5sX3dF6wJ1hC0aE" }]);
   assert(list[0].score >= list[1].score, "sorted by score");
 }
+// The writer's own city is hidden in every message, whatever the capitals; someone else's is only suggested
+{
+  const Maybe = require("../extension/engine/maybe.js");
+  const turns = [{ role: "user", content: "helo my name is pomicat! i live in bandung channn" },
+    { role: "assistant", content: "WELCOME!!! Pomicat is officially here in Bandung channn" }];
+  const at = (i, w) => turns[i].content.indexOf(w);
+  const spans = [{ turnIndex: 0, start: at(0, "bandung"), end: at(0, "bandung") + 7, label: "LOCATION", score: 0.7 },
+    { turnIndex: 1, start: at(1, "Bandung"), end: at(1, "Bandung") + 7, label: "LOCATION", score: 0.8 }];
+  const list = Maybe.scan(turns, spans);
+  assert(list.filter(c => /^bandung$/i.test(c.raw)).length === 2 && list.filter(c => /^bandung$/i.test(c.raw)).every(c => c.risky), "writer's city pre-ticked in both turns");
+  const shared = Maybe.apply(turns, list, new Map());
+  assert(!/bandung/i.test(shared.map(t => t.content).join(" ")), "no Bandung left in the share");
+  const other = [{ role: "user", content: "What is the weather like in Bandung today?" }];
+  const s = other[0].content.indexOf("Bandung");
+  assert(!Maybe.scan(other, [{ turnIndex: 0, start: s, end: s + 7, label: "LOCATION", score: 0.8 }])[0].risky, "a city the writer only asks about stays a suggestion");
+}
 console.log("maybe: context score checks passed");

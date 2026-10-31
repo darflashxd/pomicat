@@ -98,8 +98,15 @@
     return out;
   }
 
+  // "I live in Bandung", "my wife Rina": the writer's own place or person (pseudonymizer.js owns the
+  // patterns; looked up at scan time because the browser loads the two files in either order)
+  const personalBefore = () => (typeof ConsistentPseudonymizer !== "undefined" ? ConsistentPseudonymizer
+    : typeof require === "function" ? require("./pseudonymizer.js") : {}).PERSONAL_BEFORE || {};
+
   function scan(turns, modelSpans = []) {
     const candidates = new Map();
+    const personal = personalBefore();
+    const writerTied = new Set();
     // The text as typed (minus smuggling characters): the share keeps everything else unchanged
     const normalized = turns.map(({ role, content }) => ({ role, content: heuristics.stripSmuggled(content) }));
     const excludedByTurn = normalized.map(t => [...t.content.matchAll(placeholders)].map(m => [m.index, m.index + m[0].length]));
@@ -132,7 +139,10 @@
           (ID_LABELS.test(span.label) && (spanRaw.match(/\d/g) || []).length >= 9 && /^[\d\s().+-]+$/.test(spanRaw)) ||
           // a place with a house number: a street address, not a city
           (span.label === "LOCATION" && /\d/.test(spanRaw) && /\p{L}{3,}/u.test(spanRaw));
-        add(text.slice(span.start, span.end), span.start, confidentName, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score, span.label);
+        const kind = /^(?:PERSON|GIVEN_NAME|SURNAME)$/.test(span.label) ? "PERSON" : span.label === "LOCATION" ? "LOCATION" : "";
+        const tied = turn.role === "user" && kind && personal[kind]?.test(text.slice(Math.max(0, span.start - 60), span.start));
+        if (tied) writerTied.add(spanRaw.trim().toLowerCase());
+        add(text.slice(span.start, span.end), span.start, confidentName || tied, `Local model: ${span.label} (uncalibrated score ${span.score.toFixed(2)})`, "model", span.score, span.label);
       }
       // A credential assignment matters even for a low-entropy human password. '=' alone does not.
       const assignments = /(?<![\w.-])([\w.-]{0,96}(?:password|passwd|pwd|secret|token|api[_-]?key|credential)[\w.-]{0,32})["']?\s*(?:=|:|\bis\b)\s*(?:"([^"\r\n]{6,})"|'([^'\r\n]{6,})'|([^\s"'`,;<>]{6,}))/gi;
@@ -160,6 +170,13 @@
         candidates.set(a.raw, { raw: a.raw, risky: false, reason: "Possible amount the amount rules didn't catch; not verified", score: a.score, why: a.why });
       }
     });
+    // The writer's own place or person stays hidden everywhere, whatever the capitals ("bandung", "Bandung")
+    for (const c of candidates.values()) {
+      if (writerTied.has(c.raw.trim().toLowerCase())) {
+        c.risky = true;
+        if (!c.why.includes("tied to the writer")) c.why = [...c.why, "tied to the writer (\"I live in\", \"my name is\")"];
+      }
+    }
     // Highest score first, so the review list shows the likeliest misses at the top
     return [...candidates.values()].sort((a, b) => b.score - a.score).map((c, i) => {
       const occurrences = normalized.flatMap((t, turnIndex) => [...t.content.matchAll(literal(c.raw))]
