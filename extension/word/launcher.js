@@ -9,13 +9,22 @@
   host.id = "safeshare-word-launcher";
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
-  style.textContent = ':host{position:fixed;right:24px;bottom:24px;z-index:2147483646}button{display:flex;align-items:center;gap:8px;background:#20242a;color:#f0f2f5;border:1px solid #737d8a;border-radius:24px;padding:12px 18px;font:600 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 14px #0004;min-height:44px}button:focus-visible{outline:3px solid #dcebc1;outline-offset:3px}svg{width:18px;height:18px}';
+  style.textContent = ':host{position:fixed;right:24px;bottom:24px;z-index:2147483646}button{padding:0;border:0;background:transparent;cursor:pointer;line-height:0;border-radius:9999px;box-shadow:0 3px 14px #0004}button:focus-visible{outline:3px solid #dcebc1;outline-offset:3px}img{display:block;width:138px;height:38px;border-radius:9999px}';
+  const pillLogo = typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : "";
   const button = document.createElement("button");
-  button.type = "button"; button.textContent = "PomiCat";
+  button.type = "button";
+  if (pillLogo) {
+    button.innerHTML = `<img src="${pillLogo}" alt="">`;
+  } else {
+    button.textContent = "PomiCat";
+    button.setAttribute("style", 'display:flex;align-items:center;gap:8px;background:#20242a;color:#f0f2f5;border:1px solid #737d8a;border-radius:24px;padding:12px 18px;font:600 14px system-ui,sans-serif;min-height:44px');
+  }
   button.setAttribute("aria-label", "Open PomiCat Word review");
   button.title = "Review and redact a saved Word copy before sharing";
   const unavailable = () => {
+    button.innerHTML = "";
     button.textContent = "Refresh Word to reconnect";
+    button.setAttribute("style", 'display:flex;align-items:center;background:#20242a;color:#f0f2f5;border:1px solid #737d8a;border-radius:24px;padding:12px 18px;font:600 14px system-ui,sans-serif;min-height:44px');
     button.title = "Save your document, then refresh this Word tab to reconnect PomiCat.";
     button.setAttribute("aria-label", button.title);
     button.disabled = true;

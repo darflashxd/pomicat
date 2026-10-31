@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PomiCat",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Review and redact sensitive data in AI chats and Word documents, then share a sanitized copy as an encrypted link.",
   "permissions": [
     "storage",
@@ -93,6 +93,7 @@
         "https://word.cloud.microsoft/*"
       ],
       "js": [
+        "ui/brand-assets.js",
         "word/launcher.js"
       ],
       "run_at": "document_idle"

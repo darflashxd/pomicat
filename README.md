@@ -25,7 +25,7 @@ the encrypted link format, and the older relay hosts working.
 | ![AI conversation review](docs/screenshots/01-review-overview.png) | ![Word agreement review](docs/screenshots/word-agreement-review.png) |
 | Check what the recipient will see. | Review employee details and settlement figures before sending the copy. |
 
-*Fictional examples, shown in separate product views. Captures use PomiCat v3.0.0 with fictional
+*Fictional examples, shown in separate product views. Captures use PomiCat v3.0.1 with fictional
 data and a local or hosted relay. [Chat capture details](#supported-chat-interfaces) ·
 [Word capture details](#word-review-and-recipient-copy).*
 
@@ -154,7 +154,7 @@ while you type.** It changes what is submitted, not what the page could already 
 
 *The prompt was sent as `<S1>`. The note under the message keeps the mapping on this screen only,
 and the reply's formulas are computed locally against it. The chat site received `<S1>`, not
-`$4,800`. Captured from the v3.0.0 extension on Chrome 156, ChatGPT dark theme, with a local relay;
+`$4,800`. Captured from the v3.0.1 extension on Chrome 156, ChatGPT dark theme, with a local relay;
 the reply and its computed values are unedited.*
 
 ### Word Online integration
@@ -210,7 +210,7 @@ instructions. Names were selected by the local model; the account number require
 redaction. Thirteen text replacements across three package parts passed selected-value verification;
 independent ZIP/XML inspection found none of the 12 checked private values. The supported attack
 check found no reconstruction. This is one reviewed example, not an automatic-detection score.
-These two review captures date from the previous build; the review UI is unchanged in v3.0.0 apart
+These two review captures date from the previous build; the review UI is unchanged in the current build apart
 from the product name. Screenshots are workspace crops without account identity or link keys; no
 review UI was fabricated. Generate the source DOCX with
 `python tools/build_agreement_showcase.py <new-output.docx>`.*
@@ -417,7 +417,7 @@ kept for compatibility. See [updating and name compatibility](#updating-and-name
 
 ## Status
 
-- **Source version:** `3.0.0`; published Chrome/Firefox packages are available under `v3.0.0`.
+- **Source version:** `3.0.1`; published Chrome/Firefox packages are available under `v3.0.1`.
   Changes under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) are newer than those ZIPs. Record
   the commit when testing source: matching version strings do not establish identical code.
 - **Exercised interfaces:** ChatGPT, Claude, DeepSeek and Word Online with unpacked Chromium;

@@ -276,19 +276,46 @@
 
     const pill = document.createElement("button");
     pill.id = "safeshare-action-pill";
-    pill.innerHTML = `
-      <img src="${typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : ""}" alt="" height="24" style="display:block;width:auto;border-radius:6px">
-    `;
+    const logo = typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : "";
+    const logoHTML = logo
+      ? `<img src="${logo}" alt="" style="display:block;width:100%;height:100%;border-radius:9999px;object-fit:cover">`
+      : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>PomiCat</span>`;
+    pill.innerHTML = logoHTML;
     pill.setAttribute("aria-label", "PomiCat: review and share this conversation");
     pill.title = "PomiCat: review and share this conversation";
-    pill.style.cssText = `
+    const pillStyle = document.createElement("style");
+    pillStyle.textContent = `
+      #safeshare-action-pill.ss-busy {
+        width: auto !important; height: auto !important; min-height: 38px;
+        padding: 10px 16px !important; background: rgba(24, 24, 27, 0.92) !important;
+        color: #f4f4f5 !important; display: flex; align-items: center; justify-content: center;
+        font: 500 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.2; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+    `;
+    document.head?.appendChild(pillStyle);
+    pill.style.cssText = logo ? `
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      z-index: 99999;
+      width: 138px;
+      height: 38px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      border-radius: 9999px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+      line-height: 0;
+      overflow: hidden;
+    ` : `
       position: fixed;
       bottom: 24px;
       right: 28px;
       z-index: 99999;
       background: rgba(24, 24, 27, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
       color: #f4f4f5;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 9999px;
@@ -296,7 +323,7 @@
       font-size: 13px;
       font-weight: 500;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -306,20 +333,19 @@
 
     pill.addEventListener("mouseenter", () => {
       pill.style.transform = "translateY(-1px)";
-      pill.style.borderColor = "rgba(255, 255, 255, 0.22)";
-      pill.style.background = "#27272a";
+      pill.style.filter = "brightness(1.08)";
     });
     pill.addEventListener("mouseleave", () => {
       pill.style.transform = "translateY(0)";
-      pill.style.borderColor = "rgba(255, 255, 255, 0.12)";
-      pill.style.background = "rgba(24, 24, 27, 0.92)";
+      pill.style.filter = "brightness(1)";
     });
 
     pill.addEventListener("click", async () => {
       if (pill.dataset.preparing === "true") return;
       handleSessionRouteChange();
       pill.dataset.preparing = "true";
-      const label = pill.textContent;
+      const label = pill.innerHTML;
+      pill.classList.add("ss-busy");
       pill.textContent = "Preparing conversation…";
       let prepared;
       try {
@@ -334,7 +360,8 @@
         return;
       } finally {
         delete pill.dataset.preparing;
-        pill.textContent = label;
+        pill.classList.remove("ss-busy");
+        pill.innerHTML = label;
       }
       const { turns, uncertain, partial, read } = prepared;
       if (partial && !window.confirm(`PomiCat read ${read} messages and could not confirm it reached the end of this conversation. Review the collected messages anyway?`)) return;

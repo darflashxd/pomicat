@@ -1,6 +1,6 @@
 {
   "name": "pomicat",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "PomiCat reviews and redacts AI chats and Word documents before encrypted sharing. Previously SafeShare and Blackline.",
   "main": "bin/safeshare.js",
   "bin": {

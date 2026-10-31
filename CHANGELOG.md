@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1 - 2026-10-31
+
+- Rebuild the bottom-right button from the full PomiCat plate, so the wordmark is no longer cut.
+- Restore the button image after a scan; the text label used to wipe it, leaving an empty pill.
+- Give the Word Online launcher the same artwork as the button, loaded from the shared brand asset.
+
 ## 3.0.0 - 2026-10-31
 
 - Rename the product to PomiCat. Extension identity, storage keys, encrypted link format, and the
