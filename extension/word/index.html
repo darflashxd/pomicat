@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PomiCat — Word Online</title><link rel="stylesheet" href="word.css"><script src="../engine/contextual.js"></script></head>
-<body><header><a href="index.html">PomiCat</a><span>Word Online</span></header><main>
-<p class="eyebrow">INTEGRATION PREVIEW</p><h1>Private sharing.<br>From Word Online.</h1>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PomiCat for Word Online</title><link rel="stylesheet" href="word.css"><script src="../engine/contextual.js"></script></head>
+<body><header><a href="index.html" class="brand"><img src="../icons/icon48.png" alt="">PomiCat</a><nav class="top-links" aria-label="Help"><span>Word Online</span><a href="https://darflashxd.github.io/pomicat/" target="_blank" rel="noopener">Docs</a><a href="https://github.com/darflashxd/pomicat" target="_blank" rel="noopener">GitHub</a></nav></header><main>
+<p class="eyebrow">Word Online · Experimental integration</p><h1>Private sharing.<br>From Word Online.</h1>
 <p class="intro">Review a separate copy before sharing. Your original Word document stays unchanged.</p>
 <section id="capture-section" hidden><h2>Inspect the saved document</h2><p id="capture-intro">Read a local copy through your current SharePoint session. Save changes in Word first. DOCX up to 10 MiB.</p><button id="capture">Read saved copy</button><p id="capture-status" role="status" aria-live="polite"></p><details><summary>Prototype limits</summary><p>No document is uploaded to PomiCat unless you create a link. Preview shows text and table contents, not original layout. Images are reviewed separately; equations appear as text.</p></details></section>
 
@@ -84,7 +84,27 @@
 </section>
 </section>
 
-<aside><h2>Experimental integration</h2><p>Read the saved copy, review redactions, then share an encrypted link. Nothing is uploaded until you create a link.</p></aside>
-<details><summary>How private Word sharing will work</summary><ol><li>Connect Microsoft and capture the saved document.</li><li>Review redactions in a formatted preview.</li><li>Share an encrypted link to the reviewed copy.</li></ol><p>Recipients will read the copy, with optional DOCX export. Editing in Word will require a separate copy in their Microsoft account.</p></details>
+<div class="welcome">
+<h2>How it works</h2>
+<ol class="steps">
+<li><strong>Open the document</strong>Open a saved .docx in Word Online, then click the PomiCat button in the bottom-right corner.</li>
+<li><strong>Review a copy</strong>PomiCat reads the saved copy on your computer and highlights what looks private. Click any highlight to hide or restore it.</li>
+<li><strong>Share or download</strong>Create an encrypted link that can expire or be revoked, or download the cleaned DOCX.</li>
+</ol>
+<h2>What gets checked</h2>
+<ul class="features">
+<li><strong>Names and places</strong>Found by a small model that runs in your browser.</li>
+<li><strong>IDs and account numbers</strong>National IDs, bank accounts, cards, phone numbers and similar formats.</li>
+<li><strong>Amounts</strong>Salaries and payments, plus the figures that would let someone work them back out.</li>
+<li><strong>Tracked changes and comments</strong>Removed by default, so old wording does not travel with the copy.</li>
+<li><strong>Document details</strong>Author, company and other hidden properties are cleared unless you keep them.</li>
+<li><strong>Images</strong>Mark areas by hand. The pixels are replaced, not covered with a shape.</li>
+</ul>
+<div class="promise"><strong>Your original stays as it is.</strong>
+<ul><li>Nothing leaves your computer until you create a link.</li>
+<li>The key to open a link is the part after <code>#</code>, which browsers never send to a server.</li>
+<li>Detection can miss things. Read the preview before you share.</li></ul></div>
+</div>
+<details><summary>What the recipient gets</summary><p>Recipients read the cleaned copy in their browser and can download it as DOCX. To edit it in Word, they save their own copy to their Microsoft account.</p></details>
 <details><summary>Manage earlier chat and document links</summary><p>Revocation controls are saved on this device. Revoking blocks future retrieval; saved copies remain.</p><p id="status" class="subtitle" role="status"></p><div id="legacy"></div></details>
 </main><dialog id="image-dialog" class="image-dialog"><div class="dialog-head"><span id="dialog-title">Review image</span><button type="button" id="dialog-close">Close</button></div><canvas id="dialog-canvas"></canvas><p id="dialog-hint" class="help">Drag on the image to mark an area. Areas are burned into the pixels, not covered.</p><div class="row"><button type="button" id="dialog-whole">Redact whole image</button><button type="button" id="dialog-clear">Clear areas</button><button type="button" id="dialog-done">Done</button></div><p id="dialog-count" class="subtitle"></p></dialog><script src="source.js"></script><script src="../engine/crypto.js"></script><script src="../engine/heuristics.js"></script><script src="docx.js"></script><script src="../engine/pseudonymizer.js"></script><script src="../engine/policy.js"></script><script src="../engine/ner_client.js"></script><script src="policy.js"></script><script src="settings.js"></script><script src="textmap.js"></script><script src="../engine/maybe.js"></script><script src="detect.js"></script><script src="redact.js"></script><script src="setup.js"></script><script src="review.js"></script><script src="../relay_hosts.js"></script><script src="publish_errors.js"></script><script src="publish.js"></script></body></html>
