@@ -9,8 +9,8 @@
   host.id = "safeshare-word-launcher";
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
-  style.textContent = ':host{position:fixed;right:24px;bottom:24px;z-index:2147483646}button{padding:0;border:0;background:transparent;cursor:pointer;line-height:0;border-radius:9999px;box-shadow:0 3px 14px #0004}button:focus-visible{outline:3px solid #dcebc1;outline-offset:3px}img{display:block;width:138px;height:38px;border-radius:9999px}';
-  const pillLogo = typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : "";
+  style.textContent = ':host{position:fixed;right:24px;bottom:24px;z-index:2147483646}button{padding:0;border:0;background:transparent;cursor:pointer;line-height:0;border-radius:14px;box-shadow:0 3px 14px #0004}button:has(img){width:48px;height:48px;padding:6px;background:rgba(39,39,47,.88);border:1px solid rgba(255,255,255,.1)}button:focus-visible{outline:3px solid #c8b6ff;outline-offset:3px}img{display:block;width:100%;height:100%;object-fit:contain}';
+  const pillLogo = typeof POMICAT_MARK === "string" ? POMICAT_MARK : "";
   const button = document.createElement("button");
   button.type = "button";
   if (pillLogo) {

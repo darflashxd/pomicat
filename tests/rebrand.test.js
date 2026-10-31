@@ -29,7 +29,7 @@ for (const [path, hash] of Object.entries({
 }
 assert.equal(read('extension/engine/crypto.js').replace(/\r\n/g, '\n').replaceAll('blackline-relay.bleedguard.workers.dev', 'safeshare-relay.bleedguard.workers.dev'), read('extension/viewer/crypto.js').replace(/\r\n/g, '\n'), 'only encrypting client defaults change; crypto format stays identical');
 assert.match(read('extension/word/launcher.js'), /button.textContent = "PomiCat"/);
-assert.match(read('extension/content_script.js'), /POMICAT_PILL_LOGO/);
+assert.match(read('extension/content_script.js'), /POMICAT_MARK/);
 assert.match(read('extension/viewer/index.html'), /class="brand-title">PomiCat</);
 assert.match(read('extension/ui/modal.js'), /PomiCat · End-to-end encrypted/);
 assert.match(read('tools/build_extension.py'), /PomiCat-\{version\}/);

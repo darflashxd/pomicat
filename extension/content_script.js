@@ -276,9 +276,9 @@
 
     const pill = document.createElement("button");
     pill.id = "safeshare-action-pill";
-    const logo = typeof POMICAT_PILL_LOGO === "string" ? POMICAT_PILL_LOGO : "";
+    const logo = typeof POMICAT_MARK === "string" ? POMICAT_MARK : "";
     const logoHTML = logo
-      ? `<img src="${logo}" alt="" style="display:block;width:100%;height:100%;border-radius:9999px;object-fit:cover">`
+      ? `<img src="${logo}" alt="" style="display:block;width:100%;height:100%;object-fit:contain">`
       : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>PomiCat</span>`;
     pill.innerHTML = logoHTML;
     pill.setAttribute("aria-label", "PomiCat: review and share this conversation");
@@ -292,6 +292,10 @@
         font: 500 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         line-height: 1.2; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       }
+      html[data-ss-theme="light"] #safeshare-action-pill:not(.ss-busy) {
+        background: rgba(255, 255, 255, 0.92) !important; border-color: #d9cffb !important;
+        box-shadow: 0 4px 14px rgba(46, 35, 102, 0.16) !important;
+      }
     `;
     document.head?.appendChild(pillStyle);
     pill.style.cssText = logo ? `
@@ -299,12 +303,14 @@
       bottom: 24px;
       right: 28px;
       z-index: 99999;
-      width: 138px;
-      height: 38px;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      border-radius: 9999px;
+      width: 48px;
+      height: 48px;
+      padding: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(39, 39, 47, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 14px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
       cursor: pointer;
       transition: transform 0.15s ease, filter 0.15s ease;
