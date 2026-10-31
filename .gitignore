@@ -94,3 +94,6 @@ tools/sota/results_raw/
 training/model_output/mminilmv2-sota/tokenizer.json
 training/model_output/mminilmv2-smoke/
 
+
+# Docs site build output (GitHub Pages workflow)
+_site/

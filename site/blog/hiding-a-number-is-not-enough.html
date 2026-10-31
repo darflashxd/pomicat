@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hiding a number is not enough · PomiCat</title>
+<meta name="description" content="Redacting the salary in an AI chat still leaks the salary. What three LLMs recovered, and why a share link should never be readable by a crawler.">
+<link rel="icon" href="../assets/brand/pomicat-mark-512.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../"><img src="../assets/brand/pomicat-mark-512.png" alt="">PomiCat</a>
+  <nav aria-label="Site">
+    <a href="../#install">Install</a>
+    <a href="../#guide">Guide</a>
+    <a href="../#security">Security</a>
+    <a href="./" aria-current="page">Blog</a>
+    <a href="https://github.com/darflashxd/pomicat">GitHub</a>
+  </nav>
+</header>
+<article class="post">
+  <p class="post-meta"><time datetime="2026-10-31">31 October 2026</time> · <a href="./">Blog</a></p>
+  <h1>Hiding a number is not enough</h1>
+
+  <p>People ask AI assistants about money all the time. How much should I save? Can I afford this rent? The answer is useful, so they share it with a partner, a friend or a group chat. Most of them know to hide the salary first.</p>
+
+  <p>Here is what that usually looks like:</p>
+<pre><code>User: My salary is [REDACTED] a month. If I save 20%, how much is that?
+Assistant: Saving 20% means $1,000 per month, leaving $4,000 for expenses.
+           Over a year that adds up to $12,000.</code></pre>
+  <p>The salary is gone, but the reply still holds it. $1,000 divided by 20% is $5,000. So is $4,000 divided by 80%, and $12,000 divided by 12 and then by 20%. Three different lines all point at the same number.</p>
+
+  <h2>We measured it</h2>
+  <p>We wrote 40 fictional chats like this one, each with a salary and an answer that uses it. Then we redacted them three ways and asked LLMs to find the salary:</p>
+  <table>
+    <thead><tr><th>Redaction</th><th>Salary recovered</th></tr></thead>
+    <tbody>
+      <tr><td>Naive: hide only the salary</td><td>100%</td></tr>
+      <tr><td>Presidio, a widely used PII tool</td><td>100% (left visible, or recovered from the reply)</td></tr>
+      <tr><td>PomiCat: hide the salary and the figures derived from it</td><td>0 of 160</td></tr>
+    </tbody>
+  </table>
+  <p>We ran DeepSeek V4 Pro, Claude Sonnet 5.5 and Claude Haiku 5.5 in English, and Sonnet again on Indonesian chats in Rupiah. Every model found every salary after naive redaction. A single line such as "saving 25% gives $600" was enough. After PomiCat, every model answered that there was not enough information.</p>
+  <p>The chats are templated and fictional, so this shows the attack works, not how often it happens in real conversations. The <a href="https://github.com/darflashxd/pomicat/blob/main/tools/attack_bench/RESULTS_LLM.md">full results</a> list the limits.</p>
+
+  <h2>What PomiCat does about it</h2>
+  <p>When you hide an amount, PomiCat looks for the numbers around it that are ratios, monthly or yearly versions, projections, sums or differences of it, across every message. Those are hidden too. Before you share, it runs the same kind of attack on the copy and tells you if anything can still be worked back out.</p>
+  <p>It covers specific kinds of arithmetic, not every possible inference. Birth years from ages and dates from weekday clues ("the Tuesday after the 14th") are handled the same way.</p>
+
+  <h2>Then there is the link</h2>
+  <p>In 2025, shared ChatGPT conversations started turning up in Google results. A share page is just a web page, and anything a crawler can read, it can index.</p>
+  <p>A PomiCat link looks like <code>https://relay/v/&lt;id&gt;#&lt;key&gt;</code>. Browsers never send the part after <code>#</code> to the server, and neither do crawlers. The relay only ever stores ciphertext. Our test suite fetches chat and Word document links as Googlebot and checks that neither the page, the API nor the relay's storage contains the text or the key.</p>
+  <p>That does not make a link secret. Anyone holding the full link can open it until it expires or you revoke it. It means search engines get nothing readable from it.</p>
+
+  <h2>Try it</h2>
+<pre><code>git clone https://github.com/darflashxd/pomicat.git
+cd pomicat
+node bin/safeshare.js invert examples/chat_naive_redacted_en.txt</code></pre>
+  <p>No account, API key or model download needed. Then <a href="../#install">install the extension</a> and try it on a chat of your own, with fictional numbers first.</p>
+</article>
+<footer>PomiCat is open source under Apache-2.0. <a href="https://github.com/darflashxd/pomicat">GitHub</a> · <a href="./">Blog</a></footer>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PomiCat · Share the content, not the secrets</title>
+<meta name="description" content="PomiCat is a browser extension that reviews AI chats and Word documents, hides private details and the numbers that give them away, and shares an encrypted copy.">
+<link rel="icon" href="assets/brand/pomicat-mark-512.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./"><img src="assets/brand/pomicat-mark-512.png" alt="">PomiCat</a>
+  <nav aria-label="Site">
+    <a href="#install">Install</a>
+    <a href="#guide">Guide</a>
+    <a href="#security">Security</a>
+    <a href="blog/">Blog</a>
+    <a href="https://github.com/darflashxd/pomicat">GitHub</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <img class="banner" src="assets/brand/pomicat-banner.png" alt="PomiCat">
+  <h1>Share the content. Not the secrets.</h1>
+  <p>A browser extension that reviews an AI chat or a Word document before you share it, hides private details and the numbers that would give them away, and sends an encrypted copy.</p>
+  <div class="actions">
+    <a class="btn primary" href="https://github.com/darflashxd/pomicat/releases/latest">Download</a>
+    <a class="btn" href="#install">Read the guide</a>
+  </div>
+</section>
+
+<div class="pillars">
+  <div class="pillar"><strong>On your device</strong><span>Rules and a small model run in the browser. Nothing is sent anywhere while you review.</span></div>
+  <div class="pillar"><strong>Beyond the obvious</strong><span>Hides the salary and also the "20% is $1,000" line that would let someone work it out.</span></div>
+  <div class="pillar"><strong>Encrypted links</strong><span>The key lives after the <code>#</code>. The relay stores ciphertext, and search engines get nothing readable.</span></div>
+  <div class="pillar"><strong>Chats and documents</strong><span>ChatGPT, Claude, Gemini, DeepSeek and Word Online.</span></div>
+</div>
+
+<div class="layout">
+<nav class="toc" aria-label="On this page">
+  <p>On this page</p>
+  <a href="#install">Install</a>
+  <a href="#guide">Share a chat</a>
+  <a href="#word">Share a Word document</a>
+  <a href="#before-sending">Protect before sending</a>
+  <a href="#how">How it works</a>
+  <a href="#security">Security model</a>
+  <a href="#limits">Limits</a>
+  <a href="#results">Results</a>
+  <a href="#cli">CLI and proxy</a>
+  <a href="#relay">Run your own relay</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+  <a href="#faq">FAQ</a>
+</nav>
+
+<main class="doc">
+
+<h2 id="install">Install</h2>
+<h3>Chrome, Edge and Brave</h3>
+<ol>
+  <li>Download the Chrome ZIP from the <a href="https://github.com/darflashxd/pomicat/releases/latest">latest release</a> and extract it.</li>
+  <li>Open <code>chrome://extensions</code>, turn on <strong>Developer mode</strong> and choose <strong>Load unpacked</strong>.</li>
+  <li>Select the extracted folder, then refresh any chat or Word tabs that were already open.</li>
+</ol>
+<p>The model and its runtime are bundled. You do not need Python, a model download or an API key to use the extension.</p>
+<h3>Firefox</h3>
+<p>Download the Firefox ZIP from the release, open <code>about:debugging#/runtime/this-firefox</code>, choose <strong>Load Temporary Add-on</strong> and pick the <code>manifest.json</code> inside. Temporary add-ons are removed when Firefox restarts.</p>
+<h3>From source</h3>
+<pre><code>git clone https://github.com/darflashxd/pomicat.git
+cd pomicat
+python tools/build_extension.py   # writes Chrome and Firefox ZIPs to dist/</code></pre>
+
+<h2 id="guide">Share a chat</h2>
+<ol>
+  <li>Open a conversation on ChatGPT, Claude, Gemini or DeepSeek and click the PomiCat button in the bottom-right corner.</li>
+  <li>Check that every message was read. The original and the copy others will see sit side by side.</li>
+  <li>Click a highlight to hide or restore it, or select any text to hide it yourself. Some model suggestions start ticked when they look like a credential or a confident name, so check each one.</li>
+  <li>Pick who will read it and how amounts are handled, then <strong>Create Private Link</strong>. Choose an expiry, and burn after reading if you want a single view.</li>
+  <li>You can revoke the link later from the extension's toolbar page.</li>
+</ol>
+<figure>
+  <img src="assets/screenshots/01-review-overview.png" alt="The share dialog with the original chat and the redacted copy side by side" loading="lazy">
+  <figcaption>The share dialog. Fictional data.</figcaption>
+</figure>
+<div class="callout">Detection can miss things. Read the copy before you share it. An empty attack check means the supported checks found nothing, not that the copy is anonymous.</div>
+
+<h2 id="word">Share a Word document</h2>
+<ol>
+  <li>Open a saved <code>.docx</code> in Word Online and click the PomiCat button.</li>
+  <li>PomiCat reads a separate copy through your current SharePoint session. Your original is never changed.</li>
+  <li>Review the highlights. Tracked changes, comments and document properties are removed unless you keep them.</li>
+  <li>Images are reviewed by hand: drag over an area and the pixels are replaced, not covered.</li>
+  <li><strong>Create sanitized DOCX</strong>, then download it or create an encrypted link (24 hours, 3 days or 7 days, revocable).</li>
+</ol>
+<figure>
+  <img src="assets/screenshots/word-agreement-review.png" alt="A fictional separation agreement reviewed in PomiCat" loading="lazy">
+  <figcaption>A fictional separation agreement. Names were picked up by the local model; the account number was marked by hand.</figcaption>
+</figure>
+<p class="muted">Links are limited to 512 KiB of ciphertext, so documents with many images are better downloaded. Text inside images is not detected automatically.</p>
+
+<h2 id="before-sending">Protect before sending</h2>
+<p>The chip above the chat box is a separate, optional feature. It is off by default.</p>
+<table>
+  <thead><tr><th>Mode</th><th>What happens</th></tr></thead>
+  <tbody>
+    <tr><td>Off</td><td>Your prompt is sent as typed. Sharing still works.</td></tr>
+    <tr><td>Protect amounts only</td><td>Personal amounts are sent as <code>&lt;S1&gt;</code>, <code>&lt;S2&gt;</code>. Formulas in the reply are computed on your screen.</td></tr>
+    <tr><td>Protect IDs + amounts</td><td>IDs and credentials are replaced too, and your own names and places when the local model is ready.</td></tr>
+  </tbody>
+</table>
+<div class="callout">The chat site can still read what you type before you press send. This feature changes what is submitted, not what the page can see.</div>
+
+<h2 id="how">How it works</h2>
+<pre><code>Read the conversation or document
+  -> rules, context checks and a local model mark private details
+  -> arithmetic checks find numbers that reveal a hidden value
+  -> you review, hide or restore
+  -> AES-256-GCM encryption in your browser
+  -> ciphertext goes to the relay; the key stays after the #</code></pre>
+<p>The bundled model is <a href="https://huggingface.co/gravitee-io/bert-small-pii-detection">gravitee-io/bert-small-pii-detection</a> (INT8, English-focused, about 28.7 MB). Rules cover IDs, bank accounts, cards, phone numbers, credentials and Indonesian formats such as NIK and Rupiah amounts.</p>
+
+<h2 id="security">Security model</h2>
+<table>
+  <thead><tr><th>Who or what</th><th>What PomiCat does</th><th>What is still possible</th></tr></thead>
+  <tbody>
+    <tr><td>A reader working out a hidden amount</td><td>Hides supported numerical clues and runs the same attack before you share</td><td>Unsupported transformations and semantic clues</td></tr>
+    <tr><td>Someone holding the full link</td><td>Expiry, burn after reading, revocation</td><td>They can read it while it is open and keep a copy</td></tr>
+    <tr><td>The relay operator</td><td>Only ciphertext is stored; the extension opens links in its own viewer</td><td>IP addresses, timing and sizes are visible; the hosted fallback viewer must be trusted</td></tr>
+    <tr><td>Search engines and link previews</td><td>The key is never sent; responses say <code>noindex</code>; opening needs a click</td><td><code>noindex</code> is a request, not access control</td></tr>
+    <tr><td>The chat site</td><td>Optional rewrite before sending</td><td>It sees what you type and keeps what it already received</td></tr>
+  </tbody>
+</table>
+<p>Report vulnerabilities privately as described in <a href="https://github.com/darflashxd/pomicat/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+
+<h2 id="limits">Limits</h2>
+<ul>
+  <li>The model is English-focused. Other languages rely mostly on rules.</li>
+  <li>Text in images, attachments and every field of pasted logs are not covered.</li>
+  <li>Combinations of details (job, town, age) can still point to a person.</li>
+  <li>Screenshots and photos of a shared copy cannot be prevented.</li>
+  <li>If a real password was already sent to a service, change it. Redacting a later share does not remove it there.</li>
+</ul>
+
+<h2 id="results">Results</h2>
+<table>
+  <thead><tr><th>Check</th><th>Without PomiCat</th><th>With PomiCat</th></tr></thead>
+  <tbody>
+    <tr><td>An LLM recovers a hidden salary (3 models, 4 runs of 40 fictional chats, English and Indonesian)</td><td>100% from naive redaction and from Presidio</td><td>0 of 160</td></tr>
+    <tr><td>Rule-based arithmetic attacker, 40 chats</td><td>53% naive, 100% Presidio</td><td>0%</td></tr>
+    <tr><td>Birth date narrowed to 4 days or fewer from weekday clues</td><td>40 of 40</td><td>0 of 40</td></tr>
+    <tr><td>A crawler fetching a share link</td><td>A plain share page shows the full text</td><td>Ciphertext only, no key, <code>noindex</code></td></tr>
+  </tbody>
+</table>
+<p class="muted">All data is fictional and templated. Details and limits: <a href="https://github.com/darflashxd/pomicat/blob/main/tools/attack_bench/RESULTS_LLM.md">LLM attacker</a>, <a href="https://github.com/darflashxd/pomicat/blob/main/tools/attack_bench/RESULTS.md">arithmetic attacker</a>, <a href="https://github.com/darflashxd/pomicat/blob/main/tools/eval/RESULTS.md">evaluation report</a>.</p>
+
+<h2 id="cli">CLI and proxy</h2>
+<p>Node.js 18 or newer, no extra dependencies.</p>
+<pre><code>node bin/safeshare.js invert examples/chat_naive_redacted_en.txt     # recovers $5,000
+node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com</code></pre>
+<p>The proxy redacts supported text fields in OpenAI and Anthropic requests before forwarding them. It does not restore responses and does not cover images or files. The CLI uses the rules, not the browser model.</p>
+
+<h2 id="relay">Run your own relay</h2>
+<pre><code>python relay/server_local.py
+node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 3600 --relay http://127.0.0.1:8787</code></pre>
+<p>Cloudflare Worker and D1 setup is in <a href="https://github.com/darflashxd/pomicat/blob/main/DEPLOY.md">DEPLOY.md</a>.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<details><summary>A share link opens a blank page</summary><p>The installed extension is older than the page. Reload it in <code>chrome://extensions</code>, approve the relay host if Chrome asks, then open the link again.</p></details>
+<details><summary>Word says "Link was not created"</summary><p>The message under the button names the cause. For a file over 512 KB, use Download DOCX. For "too many uploads", wait about a minute.</p></details>
+<details><summary>"Open conversation" appears before the chat</summary><p>On purpose. Link scanners open links without a person, and a burn-after-reading link would be used up. Your click is the first read.</p></details>
+
+<h2 id="faq">FAQ</h2>
+<details><summary>Does the original change?</summary><p>No. PomiCat reviews a copy. The optional before-sending mode is the only feature that changes what you submit.</p></details>
+<details><summary>Does the recipient need the extension?</summary><p>No. Without it the hosted viewer decrypts the link, and its operator must be trusted. With it, the extension's own viewer is used.</p></details>
+<details><summary>Who can read a link?</summary><p>Anyone with the complete link, including the part after <code>#</code>. Expiry and revocation stop later access, not copies already saved.</p></details>
+<details><summary>Can it miss things?</summary><p>Yes. Always read the copy before sharing.</p></details>
+
+</main>
+</div>
+
+<footer>PomiCat is open source under Apache-2.0. Previously SafeShare and Blackline. <a href="https://github.com/darflashxd/pomicat">GitHub</a> · <a href="blog/">Blog</a></footer>
+</body>
+</html>
