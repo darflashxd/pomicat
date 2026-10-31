@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Extreme Stress-Testing Suite
+ * PomiCat: Comprehensive Extreme Stress-Testing Suite
  * 
  * Verifies all 16 Out-of-the-Box Adversarial Vectors:
  *   Vector 01: Algebraic Inversion Defense (33 juta rounded midpoint projection)

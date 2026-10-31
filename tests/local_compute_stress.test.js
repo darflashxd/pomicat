@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Extreme Stress Test for Local Compute & Symbolic <S1> Hydration
+ * PomiCat: Comprehensive Extreme Stress Test for Local Compute & Symbolic <S1> Hydration
  * Validates fixes for:
  *   1. Dimensional analysis (Percentages vs Currencies vs Durations vs Ratios)
  *   2. LaTeX percent signs (\%), nested fractions, and exponents (^(n))

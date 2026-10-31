@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Zero-Clipboard Continuation Bridge
+ * PomiCat: Zero-Clipboard Continuation Bridge
  * 
  * Securely forks sanitized conversation context into ChatGPT, Claude, or DeepSeek:
  *   1. Direct In-Memory Extension Messaging (0% Clipboard Footprint)

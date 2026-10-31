@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Deep adversarial vulnerabilities and international hardening suite
+ * PomiCat: Deep adversarial vulnerabilities and international hardening suite
  *
  * Verifies the 6 newly hardened international vectors & deep defense capabilities:
  *   1. VEC-DEEP-01: Unicode Homoglyph & Confusable Evasion (Cyrillic lookalikes & fullwidth NFKC normalization)

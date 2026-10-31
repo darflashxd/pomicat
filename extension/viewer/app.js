@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Shared conversation viewer
+ * PomiCat: Shared conversation viewer
  * 
  * Features:
  * 1. Mode 1: Self-Contained Zero-Server Hash Mode (#d=<ciphertext>&k=<key>&exp=<deadline>)
@@ -316,7 +316,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     forensicTagEl.innerText = `ID: ${watermarkMeta.sessionId}`;
   }
 
-  // 2. Populate Native High-Fidelity Enclave Messages Stream
+  // 2. Render the shared messages
   if (messagesContainer) {
     messagesContainer.innerHTML = "";
     watermarkedTurns.forEach((turn) => {

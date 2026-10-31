@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Multi-Turn Live Scenarios Verification
+ * PomiCat: Comprehensive Multi-Turn Live Scenarios Verification
  * Validates the exact 5 real-world production transcripts tested by users in ChatGPT & Claude:
  * 
  *  Scenario 1: DevSecOps Incident (Port 5432 preserved, credentials & keys masked)

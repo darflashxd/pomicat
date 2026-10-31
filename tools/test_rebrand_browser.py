@@ -17,10 +17,10 @@ with sync_playwright() as p:
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.route('https://audit.invalid/**', lambda route: route.fulfill(path=str(EXT / route.request.url.split('audit.invalid/')[1])))
         page.goto('https://audit.invalid/word/index.html')
-        assert page.title() == 'PomiCat — Word Online'
+        assert page.title() == 'PomiCat for Word Online'
         assert page.locator('header a').inner_text() == 'PomiCat'
         page.goto('https://audit.invalid/viewer/index.html')
-        assert page.title() == 'PomiCat — Private Conversation'
+        assert page.title() == 'PomiCat · Private conversation'
         assert page.locator('.brand-title').inner_text() == 'PomiCat'
         assert not errors, errors
         print(json.dumps({'browser': engine.name, 'wordBrand': True, 'viewerBrand': True, 'pageErrors': errors}))
@@ -46,7 +46,7 @@ with sync_playwright() as p:
             args=[f'--disable-extensions-except={EXT}', f'--load-extension={EXT}'])
         page = context.new_page()
         page.goto(f'chrome-extension://{extension_id}/word/index.html')
-        assert page.title() == 'PomiCat — Word Online'
+        assert page.title() == 'PomiCat for Word Online'
         after = page.evaluate('''async () => ({id:chrome.runtime.id,version:chrome.runtime.getManifest().version,
           name:chrome.runtime.getManifest().name,data:await chrome.storage.local.get(null)})''')
         assert before['id'] == after['id'] and before['data'] == after['data'], after

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Zero-Width Unicode HMAC Steganography Engine
+ * PomiCat: Zero-Width Unicode HMAC Steganography Engine
  * 
  * Embeds imperceptible cryptographic watermarks into text using zero-width characters:
  *   - \uFEFF : Magic Header/Footer Marker (Byte Order Mark)

@@ -1,4 +1,4 @@
-// node tests/attack_bench_llm.test.js — parser and scoring for the LLM attack bench.
+// node tests/attack_bench_llm.test.js: parser and scoring for the LLM attack bench.
 const assert = require("node:assert/strict");
 const { buildPrompt, parseLlmAnswer, withinTolerance } = require("../tools/attack_bench/llm.js");
 

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Pre-Inference & Prompt Interception Audit
+ * PomiCat: Comprehensive Pre-Inference & Prompt Interception Audit
  * Validates the Before-Sending Protection Layer ("Shield"):
  *   1. Shield Modes ("all", "amounts", "off")
  *   2. Simultaneous Hard Secret ([ID_1]) and Financial (<S1>) rewriting

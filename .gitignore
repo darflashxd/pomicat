@@ -1,5 +1,5 @@
 # ==============================================================================
-# SafeShare-AI — Production .gitignore
+# PomiCat: Production .gitignore
 # ==============================================================================
 
 # 1. AI tooling: knowledge graphs (graphify) and Claude / agent config (never commit)

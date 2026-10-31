@@ -1,4 +1,4 @@
-# English candidate comparison — development experiment
+# English candidate comparison: development experiment
 
 ## Current status after upgrade audit
 

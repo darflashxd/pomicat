@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Symbolic Transformation & LOCAL_COMPUTE Audit
+ * PomiCat: Comprehensive Symbolic Transformation & LOCAL_COMPUTE Audit
  * Validates the Next-Generation Hard Technical Moat:
  * 
  *  1. Invariant: secret ∉ outbound_prompt (Zero server-side leakage).

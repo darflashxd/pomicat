@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — SafeShare-PrivacyBench Out-of-Distribution (OOD) Human Benchmark
+ * PomiCat: SafeShare-PrivacyBench Out-of-Distribution (OOD) Human Benchmark
  * 
  * Evaluates real-world, human-written conversational prompts (typo-heavy, informal,
  * non-template) to compute formal cybersecurity metrics:

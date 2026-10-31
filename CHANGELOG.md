@@ -19,7 +19,7 @@
 - Cache model inference and halve the window overlap.
 - New icons, README banner, and refreshed screenshots.
 
-## Unreleased — chat and Word detection consistency
+## Unreleased: chat and Word detection consistency
 
 - Consolidate historical audit notes here; current operational instructions remain in DEPLOY.md
   and reproducible checks in TESTING.md. Clarify historical benchmark denominators and crawler limits.
@@ -189,7 +189,7 @@
 - ChatGPT hydration: `.DilResponseRoot` responses and `\text{S1}` / `\texttt{<S1>}` formula
   variants are accepted before the review opens.
 
-## Unreleased — experimental share review
+## Unreleased: experimental share review
 
 - Found on the live sites (18 Oct): clicking DeepSeek's send arrow sent messages **without
   protection** (it matched no send-button pattern); on Claude the re-send clicked the "+" menu and

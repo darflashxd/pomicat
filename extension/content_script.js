@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Content Script
+ * PomiCat: Content Script
  * Injects SafeShare action button into ChatGPT, Claude, and DeepSeek interfaces,
  * manages Pre-Inference Outbound Symbolic Transformation (<S1>),
  * and executes Local Compute Hydration in client RAM.
@@ -717,7 +717,7 @@
       const cancelPending = () => {
         isRewriting = false;
         const indicator = document.getElementById("safeshare-shield-indicator");
-        if (indicator) indicator.textContent = "Draft or chat changed — review and send again ▾";
+        if (indicator) indicator.textContent = "Draft or chat changed. Review and send again ▾";
       };
 
       // Fail closed: if protection itself breaks, hold the message instead of letting the site send

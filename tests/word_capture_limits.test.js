@@ -1,4 +1,4 @@
-// node tests/word_capture_limits.test.js — execute the actual injected fetch function.
+// node tests/word_capture_limits.test.js: execute the actual injected fetch function.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');

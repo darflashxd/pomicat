@@ -35,7 +35,7 @@ def main():
           for(const value of names)providedFindings.push({value,category:'PROFILE',source:'manual',
             ruleName:'Manual review',reason:'Fictional example',replacement:'[REDACTED_NAME]',preChecked:true});
           renderFindings(lastDoc);
-          document.getElementById('capture-status').textContent='Local fictional fixture — no Word login or upload';
+          document.getElementById('capture-status').textContent='Local fictional fixture: no Word login or upload';
           document.getElementById('review-summary').textContent='Names selected manually; model inference is not shown in this fixture.';
           document.getElementById('review-section').hidden=false;
           const rules=activeRules();

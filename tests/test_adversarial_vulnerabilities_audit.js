@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Advanced Adversarial Vulnerabilities & Evasion Stress Audit
+ * PomiCat: Advanced Adversarial Vulnerabilities & Evasion Stress Audit
  *
  * Verifies that all 10 newly uncovered adversarial evasion vectors and edge cases
  * are 100% neutralized without regressions or over-redaction:

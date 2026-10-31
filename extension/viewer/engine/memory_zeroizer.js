@@ -1,11 +1,11 @@
 /**
- * SafeShare-AI — Client-Side RAM Memory Zeroizer & Ephemeral Session Lifecycle
+ * PomiCat: Client-Side RAM Memory Zeroizer & Ephemeral Session Lifecycle
  * 
  * Cryptographic Hygiene & RAM Sanitization:
  *   1. Clears registered references and DOM content on closure (best effort, not RAM erasure).
  *   2. Automatically shreds the URI fragment (#key) from the address bar to prevent key leakage in browser history.
  *   3. Enforces ephemeral session revocation flags in local/session storage.
- *   4. Free from client-side DevTools / F12 gimmicks — enforces actual cryptographic boundaries.
+ *   4. Free from client-side DevTools / F12 gimmicks; enforces actual cryptographic boundaries.
  */
 
 (function (root, factory) {

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Post-decryption copy-protection checks
+ * PomiCat: Post-decryption copy-protection checks
  * 
  * Verifies the 7 Pillars of Post-Decryption Exfiltration Defense:
  *   Audit 1: Dynamic Glyph Scrambler & Honeypot Trap

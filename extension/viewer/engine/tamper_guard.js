@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Client-Side RAM Memory Zeroizer & Ephemeral Session Lifecycle
+ * PomiCat: Client-Side RAM Memory Zeroizer & Ephemeral Session Lifecycle
  * (Maintained for backward-compatibility with SafeShareTamperGuard references)
  */
 

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Multi-Domain Adversarial Test Suite
+ * PomiCat: Comprehensive Multi-Domain Adversarial Test Suite
  * Evaluates extensive English adversarial scenarios across:
  * 1. Cybersecurity, Cloud Credentials & DevOps (Anthropic, GCP, HuggingFace, NPM, WireGuard, Basic Auth)
  * 2. Daily Life, Mental Health, Oncology & HIPAA Disclosures

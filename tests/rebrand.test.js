@@ -1,4 +1,4 @@
-// node tests/rebrand.test.js — brand changes must not reset identity or change protocol.
+// node tests/rebrand.test.js: brand changes must not reset identity or change protocol.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { createHash } = require('node:crypto');

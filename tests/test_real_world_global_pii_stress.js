@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Real-World Global PII & Deep In-the-Wild Stress Test Suite
+ * PomiCat: Real-World Global PII & Deep In-the-Wild Stress Test Suite
  * 
  * Evaluates real-world messy, uncurated human conversational prompts
  * across 12 diverse PII categories beyond financial and standard cyber configs:

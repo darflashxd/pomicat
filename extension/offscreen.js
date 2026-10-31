@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Offscreen Document for Local ML Inference (Gate 2)
+ * PomiCat: Offscreen Document for Local ML Inference (Gate 2)
  *
  * Runs persistent local ONNX WASM runtime in Chrome Manifest V3 without service worker termination.
  * Security Invariant: connect-src 'self' (Enforced via CSP in offscreen.html).

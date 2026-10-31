@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Client-Side Local Compute Engine (Zero-Eval Shunting-Yard AST)
+ * PomiCat: Client-Side Local Compute Engine (Zero-Eval Shunting-Yard AST)
  * Evaluates symbolic mathematical expressions from LLM responses in local RAM
  * without ever executing eval() or new Function().
  * 

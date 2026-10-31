@@ -1,4 +1,4 @@
-// node tests/ner_client.test.js — local transport validation and explicit failure states.
+// node tests/ner_client.test.js: local transport validation and explicit failure states.
 const assert = require("node:assert/strict");
 const { analyze } = require("../extension/engine/ner_client.js");
 (async () => {

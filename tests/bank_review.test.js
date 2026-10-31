@@ -1,4 +1,4 @@
-// node tests/bank_review.test.js — stable hard-entity identities, no real banking data.
+// node tests/bank_review.test.js: stable hard-entity identities, no real banking data.
 const assert = require("node:assert/strict");
 Object.assign(global, {
   HeuristicsRedactor: require("../extension/engine/heuristics.js"),

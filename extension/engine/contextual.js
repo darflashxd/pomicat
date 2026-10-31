@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Tier 2: Contextual rules
+ * PomiCat: Tier 2: Contextual rules
  * Rule-based (regex) classifier that separates personal disclosures ("my salary",
  * "gaji saya") from public or statistical figures ("average salary", "rata-rata").
  * No ML model runs here. A DistilBERT token classifier was trained (see training/,

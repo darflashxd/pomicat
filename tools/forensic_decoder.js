@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SafeShare-AI — Standalone watermark decoder for leaked share text
+ * PomiCat: Standalone watermark decoder for leaked share text
  * 
  * Extracts and verifies imperceptible Zero-Width Unicode HMAC watermarks from leaked AI text.
  * Determines the exact recipient, session ID, and timestamp of the unauthorized leak.

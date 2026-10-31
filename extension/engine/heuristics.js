@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Tier 1: Deterministic Heuristic & High-Entropy Scanner
+ * PomiCat: Tier 1: Deterministic Heuristic & High-Entropy Scanner
  * Instantly identifies and redacts hard secrets, credentials, PII (KTP, CC, email, phone)
  * with zero perceptible latency (< 2ms).
  */

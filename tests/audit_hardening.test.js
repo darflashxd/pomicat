@@ -1,4 +1,4 @@
-// Run: node tests/audit_hardening.test.js — reproductions from the October audit.
+// Run: node tests/audit_hardening.test.js: reproductions from the October audit.
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { redactTurns } = require('../bin/safeshare');

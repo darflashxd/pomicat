@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Dynamic Glyph Scrambler & Anti-Scraping Enclave Engine
+ * PomiCat: glyph scrambler that makes copied viewer text harder to scrape
  * 
  * Neutralizes:
  *   1. Web Crawlers & Headless Puppeteer / Playwright Scraping

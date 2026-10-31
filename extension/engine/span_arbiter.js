@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Priority Span Arbiter
+ * PomiCat: Priority Span Arbiter
  *
  * Parallel Character-Offset Interval Arbiter for Non-Destructive Dual-Gate Defense.
  * Resolves Priority Spans:

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — WordPiece tokenizer for uncased BERT-family NER models (offscreen.js), matching the
+ * PomiCat: WordPiece tokenizer for uncased BERT-family NER models (offscreen.js), matching the
  * original Hugging Face BertTokenizer (uncased) the model was trained and benchmarked with:
  * drop control characters, split on whitespace, punctuation and CJK characters, lowercase,
  * strip accents ("José" -> "jose"), greedy longest-match WordPiece, words over 100 characters

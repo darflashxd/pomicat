@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SafeShare-AI — Local Serverless & Static Relay Daemon
+PomiCat: Local Serverless & Static Relay Daemon
 Provides:
 1. REST API: store and retrieve ciphertext (the key never reaches the server)
 2. Atomic Burn-After-Reading: Shreds payload immediately on single read

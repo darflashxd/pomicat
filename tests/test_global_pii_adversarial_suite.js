@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Worldwide PII and adversarial stress suite
+ * PomiCat: Worldwide PII and adversarial stress suite
  * 
  * Comprehensive Verification of 63 Attack Vectors & Global PII Standards:
  *   1. Payment Cards & CVV Immunity (10 Vectors: formatted, spaced, conversational, Amex 4-digit CID, echo sweeper)

@@ -1,4 +1,4 @@
-// node tests/range_review.test.js — user's IDR equation/table and toggle regressions.
+// node tests/range_review.test.js: user's IDR equation/table and toggle regressions.
 const assert = require("node:assert/strict");
 const H = require("../extension/engine/heuristics.js");
 const P = require("../extension/engine/pseudonymizer.js");

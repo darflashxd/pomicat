@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Shared policy helpers (used by the extension and the CLI)
+ * PomiCat: Shared policy helpers (used by the extension and the CLI)
  *  - invert(): the inversion attack. Finds a hidden value that several visible numbers agree on.
  *  - inferBirthYears(): the same idea for dates. A hidden birth date comes back from "I am 28"
  *    plus the current year, or "in 2020 at 22".

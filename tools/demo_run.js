@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Interactive End-to-End Demo Launcher
+ * PomiCat: Interactive End-to-End Demo Launcher
  * Runs the 3-Tier Redactor, encrypts a realistic sensitive AI session,
  * stores it into the Cloudflare Global Edge & Local Relay, and outputs the Zero-Knowledge links.
  */

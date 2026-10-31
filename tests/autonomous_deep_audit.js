@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Master Autonomous Deep Security & Enclave Audit
+ * PomiCat: Master Autonomous Deep Security & Enclave Audit
  * 
  * Executes an exhaustive, multi-vector autonomous audit:
  *   [Phase 1] 30 Adversarial Redaction & Contextual Integrity Vectors (33 Juta, Shell Prompts, Meds, etc.)

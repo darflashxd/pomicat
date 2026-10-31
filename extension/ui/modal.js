@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Modal Controller (Calm Security with User-Controlled Redaction)
+ * PomiCat: Modal Controller (Calm Security with User-Controlled Redaction)
  * Coordinates the 3-Tier Redaction Pipeline, Granular Customization Engine,
  * and end-to-end encrypted sharing flow.
  */
@@ -32,7 +32,7 @@ class SafeShareModal {
     this.publishing = false;
     this.hardEntities = new Map();
     this.modelReview = new Map();
-    this.modelState = "Not checked — credential rules only";
+    this.modelState = "Not checked: credential rules only";
     this.modelBusy = false;
     this.reviewGeneration = 0;
 
@@ -362,7 +362,7 @@ class SafeShareModal {
     this.previewLeaks = [];
     this.modelReview.clear();
     this.hardEntities.clear();
-    this.modelState = "Not checked — credential rules only";
+    this.modelState = "Not checked: credential rules only";
     this.pseudonymizer.reset();
   }
 
@@ -1610,7 +1610,7 @@ class SafeShareModal {
       }
       if (generation === this.reviewGeneration) {
         const changed = this.reviewBaseTurns.some(t => !this.modelReview.has(t.content));
-        this.modelState = changed ? "Review text changed — run the local model again for the current preview" : "✓ Local AI model checked";
+        this.modelState = changed ? "Review text changed. Run the local model again for the current preview" : "✓ Local AI model checked";
         if (button) button.textContent = "Click to re-scan";
       }
     } catch (_) {

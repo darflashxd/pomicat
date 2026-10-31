@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Universal Domain Invariance Adversarial Benchmark
+ * PomiCat: Universal Domain Invariance Adversarial Benchmark
  * Validates cross-domain invariance across 6 critical operational sectors:
  * 
  *  1. Retail Banking & Debit Cards (Wells Fargo - Fail-Closed Card, CVV, Expiry, Account, Toll-Free Hotline)

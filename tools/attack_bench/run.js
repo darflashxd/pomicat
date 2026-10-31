@@ -396,19 +396,19 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
           "",
           "| Redaction | Salary leaked to the LLM |",
           "|---|---|",
-          `| naive — hides only the stated salary | **${pct(naive.leaked, naive.n)}** |`,
-          ...(presLlm ? [`| Presidio — generic PII tool | **${pct(presLlm.leaked, presLlm.n)}** |`] : []),
-          `| SafeShare — hides the amounts too | **${pct(safe.leaked, safe.n)}** |`,
+          `| naive: hides only the stated salary | **${pct(naive.leaked, naive.n)}** |`,
+          ...(presLlm ? [`| Presidio: generic PII tool | **${pct(presLlm.leaked, presLlm.n)}** |`] : []),
+          `| SafeShare: hides the amounts too | **${pct(safe.leaked, safe.n)}** |`,
           "",
           "**What this means**",
           "",
            "- Entity-only masking can leave arithmetic clues. Recovery above is measured on this run's templated cases, not all conversations.",
-          ...(presLlm ? ["- **Presidio does not cover amounts.** A widely-used PII tool leaves the salary fully visible because its default recognizers target names, emails, phones and cards — not financial figures."] : []),
+          ...(presLlm ? ["- **Presidio does not cover amounts.** A widely-used PII tool leaves the salary fully visible because its default recognizers target names, emails, phones and cards; not financial figures."] : []),
           `- SafeShare: ${safe.recovered}/${safe.n} salaries recovered after masking; ${safe.exposed}/${safe.n} left directly visible.`,
           ""
         );
         const aNaive = arithRow("naive");
-        if (aNaive) readable.push(`For reference, a rule-based arithmetic attacker already recovers ${pct(aNaive.recovered, aNaive.n)} from naive redaction — the LLM is the stronger attacker.`, "");
+        if (aNaive) readable.push(`For reference, a rule-based arithmetic attacker already recovers ${pct(aNaive.recovered, aNaive.n)} from naive redaction; the LLM is the stronger attacker.`, "");
       }
     }
     const repro = USE_LLM_CLI
@@ -428,7 +428,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
       ] : []),
       ...(USE_LLM ? [`- Attacker model: \`${modelLabel}\` via the provider API.`] : []),
       ...(!pres ? ["- Presidio was skipped (`.venv-eval` absent)."] : []),
-      ...(aborted ? ["- **Status: BLOCKED — run incomplete; do not read as a clean result.**"] : []),
+      ...(aborted ? ["- **Status: BLOCKED: run incomplete; do not read as a clean result.**"] : []),
       ...(totalInvalid && !aborted ? [`- **Incomplete evidence:** ${totalInvalid} of ${totalLlm} LLM calls were invalid. Leakage percentages are observed lower bounds, not defense success rates.`] : []),
       "",
       "### Limits",

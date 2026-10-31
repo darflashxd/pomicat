@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Tier 3: Canonical Equivalence Class & Global Cross-Turn Sweeper
+ * PomiCat: Tier 3: Canonical Equivalence Class & Global Cross-Turn Sweeper
  * 
  * Neutralizes "Echo & Derivation Leakage":
  * When an AI assistant echoes user data, formats it with abbreviations (e.g. "Rp28,5 jt"),
@@ -9,7 +9,7 @@
  */
 
 /**
- * SafeShare-AI — Adversary-Oracle Reconstruction Solver
+ * PomiCat: Adversary-Oracle Reconstruction Solver
  * 
  * Replaces naive hardcoded blocklists with a dynamic mathematical solver.
  * Probes whether any visible numbers in LLM responses can invert/reconstruct

@@ -1,6 +1,6 @@
 # SafeShare roadmap
 
-## Current hardening status — 2026-10-29
+## Current hardening status, 2026-10-29
 
 The older checklists below are historical. Current work adds explicit percentage-relation checks,
 public-keyword bypass regressions, scoped draft storage, persistent local burn handling, Word
@@ -60,7 +60,7 @@ Done items are ticked in place; open items are what's next.
 
 ---
 
-## P0 — leaks and breakage (fix before any demo or release)
+## P0: leaks and breakage (fix before any demo or release)
 
 ### P0.1 User messages are dropped when a chat is read for sharing ✅
 `extension/content_script.js:702`: the input/UI filter `isPromptInputOrUIElement()` now also
@@ -148,7 +148,7 @@ branch `backup-local`). The manifest fix is re-applied (`12a9874`); still missin
 
 ---
 
-## P1 — claims and reliability don't match yet
+## P1: claims and reliability don't match yet
 
 - [x] **NER doesn't protect share links.** MiniLM runs only before sending; the share dialog
       uses rules + pseudonymizer (`modal.js:284-349`), so "I live in Bandung." stays in a share.
@@ -238,21 +238,21 @@ Cloudflare, an account thief, any self-hoster) can change it to send the key and
 | 1.1 | Host / Cloudflare / account thief | Modified share page steals key + chat | Only for people without the extension | In-extension decryption (done) |
 | 1.2 | Host | Logs IPs, times, sizes, share IDs, user agents, who opens which link | Yes | Document; self-hosting for those who care |
 | 1.3 | Host | Withholds or deletes shares, keeps a burn-after-read copy | Yes | Can't prevent; the copy stays encrypted |
-| 1.4 | Host | Alters a share | No (AES-GCM, ID bound inside) | — |
+| 1.4 | Host | Alters a share | No (AES-GCM, ID bound inside) | n/a |
 | 1.5 | A malicious relay passed around ("use my relay") | Reads every link made through it (via 1.1) | Yes | Relay setting warns on non-official relays; in-extension decryption |
-| 2.1 | Network eavesdropper (café Wi-Fi, ISP) | Reads traffic | No (HTTPS, ciphertext only) | — |
+| 2.1 | Network eavesdropper (café Wi-Fi, ISP) | Reads traffic | No (HTTPS, ciphertext only) | n/a |
 | 2.2 | HTTPS interception (company proxy, antivirus web shield, malware root cert) | Rewrites the share page | Only without the extension | In-extension decryption (done) |
 | 2.3 | Anyone on the network | Uses a local `http://` relay exposed beyond 127.0.0.1 | Only if exposed | Keep localhost-only default; warn in DEPLOY/README |
 | 2.4 | Look-alike relay domain | Fake share page | Yes | Official domain, store listing, in-extension decryption |
 | 3.1 | Anyone with the link (forwarded, history, sync, screenshots) | Reads the share | By design | Expiry, burn-after-read, revoke |
 | 3.2 | Link scanners (Safe Links, Defender, Teams/Slack previews) | Burn links before the recipient | No | "Click to open" (done) |
 | 3.3 | Recipient | Screenshot / copy / photo | Yes | Out of scope; anti-copy is deterrence only |
-| 3.4 | Scrapers | Guess share IDs | No (122-bit IDs + rate limits) | — |
+| 3.4 | Scrapers | Guess share IDs | No (122-bit IDs + rate limits) | n/a |
 | 3.5 | Reader doing arithmetic / inference | Recover hidden values from the shared chat | Blocked for amounts, birth years, dates (supported clues) | Combinations warn only; locations defence only (§2) |
 | 4.1 | Any `*.workers.dev` / `*.pages.dev` site | Fingerprint + Continue prompt-injection bait | No | P0.7 (done) |
 | 4.2 | Chat site's own scripts (analytics, session replay) | Read typed text and values restored on screen | Typed text and amounts: yes | Closed shadow DOM for IDs/names/places (done); limit stated |
 | 4.3 | Chat site's own scripts | Read the amounts vault in page `sessionStorage` | No | Moved to `storage.session` (done) |
-| 4.4 | A website | Imitates the extension's chip/buttons to mislead users | Possible, low impact | — |
+| 4.4 | A website | Imitates the extension's chip/buttons to mislead users | Possible, low impact | n/a |
 | 4.5 | Another extension with "read all sites" | Reads everything on the page | Yes | Out of scope; state it |
 | 4.6 | Any website | Detects the extension via `models/*` | No | P0.7 (done) |
 | 4.7 | Look-alike (homoglyph) characters | Bypass redaction in the share output | No | P0.2 (done) |
@@ -366,7 +366,7 @@ Answers so far (2026-10-16): **1 = from Hugging Face** (details still needed) ·
 messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiting answer** ·
 **5 = agreed**.
 
-1. **MiniLM provenance** — *answer: downloaded from Hugging Face.* Still needed:
+1. **MiniLM provenance**: *answer: downloaded from Hugging Face.* Still needed:
    - [ ] the exact model link (`huggingface.co/<owner>/<model>`) and the licence on its page
    - [ ] what it was trained on (its model card says), and whether that includes ai4privacy:
          if yes, our 0.848 on ai4privacy is measured on data like its training data, and the
@@ -374,7 +374,7 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
    - [ ] whether it was changed after download (vocabulary pruned to 19,730 tokens, 4-bit
          quantised): which script did it, so others can reproduce it
    - [ ] add all of this to `MODELS_SETUP.md` and credit the original authors
-2. **Why user messages are in the input-box filter** (`content_script.js:702`) — *answer: user
+2. **Why user messages are in the input-box filter** (`content_script.js:702`): *answer: user
    messages are supposed to be in shares.* Fixed in `f484f89` (sharing reads both roles; the
    on-screen number display still skips your own bubbles).
    The filter was meant to skip the chat input box and SafeShare's own buttons. It now also
@@ -383,7 +383,7 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
    - [x] Was skipping user bubbles on purpose (e.g. to stop the number display from rewriting
          your own messages, or to avoid reading the half-typed draft)? If so, we keep that
          purpose but apply it only where it's needed, not to sharing.
-3. **Model scores: probability vs raw score** — *answer: do the fix. Done.*
+3. **Model scores: probability vs raw score**: *answer: do the fix. Done.*
    The model outputs a raw score per word ("logit", any number, e.g. -3.2 or 7.5). The
    benchmark converts these to probabilities between 0 and 1 (softmax) before comparing with
    thresholds like `0.35`. The extension (`offscreen.js` → `span_arbiter.js`) compares the
@@ -403,13 +403,13 @@ messages belong in shares (fixed)** · **3 = do the fix (done)** · **4 = awaiti
    - [ ] Re-measure the arbiter rows in `RESULTS_SOTA.md` with these fixes.
    Fix either way: apply softmax in `offscreen.js`, check tokenizer output matches, and measure
    the extension's real path (P1).
-4. **Firefox** — *open.*
+4. **Firefox**: *open.*
    The model runs in an "offscreen document", a hidden page that only Chrome has. Firefox has
    no offscreen documents (`background.js:13-16` returns early), so on Firefox the model never
    runs and before-sending protection uses rules only, without any notice.
    - [ ] Intended: Firefox = rules only (then the UI should say so), or run the model in
          Firefox's background page (possible, needs testing)?
-5. **Git workflow** — *agreed:* no `reset --hard` over others' work; pull/rebase before push;
+5. **Git workflow**: *agreed:* no `reset --hard` over others' work; pull/rebase before push;
    `extension/manifest.json` is the Chrome manifest. The two commits on `backup-local`
    (password/OTP/on-screen values, and this roadmap's first version) get merged by hand into
    `main` as part of P0.6.

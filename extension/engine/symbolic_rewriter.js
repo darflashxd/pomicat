@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Outbound Prompt Symbolic Rewriter
+ * PomiCat: Outbound Prompt Symbolic Rewriter
  * Intercepts outbound user prompts, identifies personal sensitive values,
  * stores them into the local Symbolic Vault, and replaces them with algebraic
  * variables (<S1>, <S2>) plus a steering contract.

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Ephemeral Symbolic Secret Vault
+ * PomiCat: Ephemeral Symbolic Secret Vault
  * Securely holds mapping between symbolic variables (<S1>, <S2>) and their
  * actual secret parameters in local browser RAM / the extension's session storage.
  * 

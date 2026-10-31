@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Comprehensive Casual & Natural Language Stress Test
+ * PomiCat: Comprehensive Casual & Natural Language Stress Test
  * Validates that SafeShare redacts 100% of real-world informal, casual, slang,
  * and conversational chats in both Indonesian and English without requiring rigid formal grammar.
  */

@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Background Service Worker
+ * PomiCat: Background Service Worker
  * Handles network relay uploads securely from an isolated privileged context,
  * completely bypassing webpage CSP (Content Security Policy) and Mixed Content blocks.
  */

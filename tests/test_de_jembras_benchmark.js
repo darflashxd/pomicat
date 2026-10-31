@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Real-World De Jembras Benchmark Verification
+ * PomiCat: Real-World De Jembras Benchmark Verification
  * 
  * Verifies the 5 critical failure modes identified in the case study:
  *   1. Key-Value Form Delimiter Name Extraction (name : de jembras -> name : [User_A])

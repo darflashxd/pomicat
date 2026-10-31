@@ -16,7 +16,7 @@ at all. See "Four different numbers" below.
 | MiniLM Q4, shipped until `47ede77` (35 PII labels) | **0.808** | **0.848** | Above Presidio (0.79); weak on DATE/TIME (covered by the Tier-1 ID_DOB_BARE rule) |
 | MiniLM Q4 + Tier-0 arbiter (after the GIT_HASH-must-have-a-letter fix) | 0.797 | 0.834 | CARD 0 → 0.975, SSN → 0.806 |
 | MiniLM Q4 + Tier-0 arbiter (before that fix) | 0.759 | 0.816 | Thresholds + veto removed CARD/SSN (left to Tier-1) |
-| Tier-1 rules + MiniLM (union) | **0.811** | — | Combined recall, best of both per label |
+| Tier-1 rules + MiniLM (union) | **0.811** | n/a | Combined recall, best of both per label |
 | GLiNER-bi-small, zero-shot | 0.678 | 0.743 | No training; generic labels |
 | DeBERTa-xsmall, fine-tuned on synthetic data | 0.366 | 0.458 | Synthetic F1 0.783; didn't transfer |
 | mMiniLMv2, fine-tuned on synthetic data | 0.341 | 0.423 | Synthetic F1 0.744; didn't transfer |

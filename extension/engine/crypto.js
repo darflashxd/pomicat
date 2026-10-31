@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Client-side AES-256-GCM encryption (server never sees the key)
+ * PomiCat: Client-side AES-256-GCM encryption (server never sees the key)
  * Uses W3C Standard Web Crypto API (SubtleCrypto) for AES-256-GCM.
  * The encryption key lives ONLY in the URI fragment (#) and is NEVER transmitted over the wire.
  */

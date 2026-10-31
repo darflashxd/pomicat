@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Chat id from a conversation URL.
+ * PomiCat: Chat id from a conversation URL.
  *
  * One vault and one placeholder map are kept per chat. The id has to be exact: if two different
  * chats map to the same string, a value protected in one chat can be shown in another.

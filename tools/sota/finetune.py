@@ -7,7 +7,7 @@ Usage: python tools/sota/finetune.py --base <hf_id_or_local_dir> --out training/
 Labels: data/schema.json (11 BIO). Data: data/train|val|test.json + first
 --hardneg rows of data/cli_hardneg_eval.json (all O) mixed into train.
 Batch auto: 64+fp16 on CUDA, else 8+fp32. Saves best model + evaluation_metrics.json.
-Seed 1337. CPU-only torch will be SLOW — prefer CUDA wheel or cloud for Fase 3.
+Seed 1337. CPU-only torch will be SLOW; prefer CUDA wheel or cloud for Fase 3.
 """
 import argparse
 import json

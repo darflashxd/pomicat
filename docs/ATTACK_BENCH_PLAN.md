@@ -33,7 +33,7 @@ results: [`tools/attack_bench/RESULTS.md`](../tools/attack_bench/RESULTS.md).
 | 2.7 | One headline number for the README ("an LLM recovers X% of hidden salaries from naive redaction, Y% from Presidio, Z% after SafeShare") | 2.6 | `me` + `you` |
 
 **Progress 2026-10-24:** one model done via `--llm-cli` (no API key): DeepSeek V4 Pro
-(`9router/ds/deepseek-v4-pro`) across 40 English chats — naive 100% leaked, Presidio 100% left
+(`9router/ds/deepseek-v4-pro`) across 40 English chats: naive 100% leaked, Presidio 100% left
 visible, SafeShare 0% (`tools/attack_bench/RESULTS_LLM.md`). Presidio was run in a local
 `.venv-eval` (presidio-analyzer + en_core_web_lg). The API path (`--llm`) still needs a key.
 Remaining: 2.3 second/third model, 2.4 real replies, 2.5 wider cases, 2.6 full report.

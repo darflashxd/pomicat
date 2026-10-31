@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Global Financial Adversarial Test Suite
+ * PomiCat: Global Financial Adversarial Test Suite
  * Evaluates international financial PII, executive comp, global banking (SSN, IBAN, SWIFT, ABA),
  * corporate ledgers, GAAP accounting parentheses, multi-turn algebraic inversions, and
  * macroeconomic zero-false-positive controls.

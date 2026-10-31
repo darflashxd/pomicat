@@ -1,5 +1,5 @@
 /**
- * SafeShare-AI — Cloudflare Worker relay (D1 storage + static viewer)
+ * PomiCat: Cloudflare Worker relay (D1 storage + static viewer)
  * 
  * Features:
  * - Stores ciphertext in Cloudflare D1 (KV fallback); runs without the sender online.
