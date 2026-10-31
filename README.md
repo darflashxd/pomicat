@@ -1,4 +1,9 @@
-<img src="docs/brand/pomicat-banner.png" alt="PomiCat" width="100%">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/pomicat-logo-dark.png">
+    <img src="docs/brand/pomicat-logo-light.png" alt="PomiCat" width="460">
+  </picture>
+</p>
 
 # PomiCat
 
@@ -17,7 +22,7 @@ and sends an encrypted copy.
 
 [Quick start](#quick-start) · [Docs](https://darflashxd.github.io/pomicat/) ·
 [Blog](https://darflashxd.github.io/pomicat/blog/) · [Releases](https://github.com/darflashxd/pomicat/releases) ·
-[Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 | AI conversations | Word documents |
 |---|---|
@@ -161,25 +166,12 @@ The full [security model](https://darflashxd.github.io/pomicat/#security) lists 
 | Read | For |
 |---|---|
 | [Docs site](https://darflashxd.github.io/pomicat/) | Install, chat and Word guides, security model, troubleshooting, FAQ |
-| [DEMO.md](DEMO.md) | A five-minute walkthrough, including what a search crawler sees |
-| [TESTING.md](TESTING.md) | Test commands, browser fixtures and what they cover |
-| [MODELS_SETUP.md](MODELS_SETUP.md) | Model provenance, runtime and models that are not shipped |
-| [DEPLOY.md](DEPLOY.md) | Local and Cloudflare relay setup |
-| [CHANGELOG.md](CHANGELOG.md) | Every change and security fix |
-| [ROADMAP.md](ROADMAP.md) | Open work |
-
-```bash
-npm test                          # full offline suite
-python tools/build_extension.py   # Chrome and Firefox ZIPs + SHA256SUMS in dist/
-```
+| [DEPLOY.md](DEPLOY.md) | Running your own relay, locally or on Cloudflare |
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first.
-
-- Use fictional data in issues, tests and screenshots.
-- Never post full share links, revoke tokens, passwords or real transcripts.
-- Report security problems privately as described in [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately as described in
+[SECURITY.md](SECURITY.md).
 
 ## Responsible use
 
@@ -192,6 +184,3 @@ Apache-2.0, see [LICENSE](LICENSE). The bundled model is
 [gravitee-io/bert-small-pii-detection](https://huggingface.co/gravitee-io/bert-small-pii-detection)
 (Apache-2.0 as declared upstream). Bundled runtimes keep their own licenses; see
 [third-party notices](extension/THIRD_PARTY_NOTICES.md).
-
-Previously SafeShare, then Blackline. The rename keeps the extension identity, saved settings, the
-link format and the older relay hosts, so existing installs and links keep working.

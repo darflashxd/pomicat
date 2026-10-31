@@ -7,8 +7,8 @@ static assets for security headers, and adds no cleanup cron. `wrangler.toml`
 still targets the legacy SafeShare Worker and `wrangler.blackline.toml` the
 Blackline Worker: do not use them for a PomiCat deploy.
 
-Previously SafeShare. Existing Worker/D1 names, URLs and configuration keys below
-stay unchanged for compatibility. Rebranding the extension does not deploy this
+Some Worker/D1 names, URLs and configuration keys below still use the older `safeshare`
+names on purpose, for compatibility. Rebranding the extension does not deploy this
 Worker or move existing shares. Do not recreate the database for the rename.
 
 The relay is a Cloudflare Worker. It stores encrypted shares in a D1 database and serves the page

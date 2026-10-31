@@ -21,7 +21,10 @@
 </header>
 
 <section class="hero">
-  <img class="banner" src="assets/brand/pomicat-banner.png" alt="PomiCat">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/pomicat-logo-dark.png">
+    <img class="banner" src="assets/brand/pomicat-logo-light.png" alt="PomiCat">
+  </picture>
   <h1>Share the content. Not the secrets.</h1>
   <p>A browser extension that reviews an AI chat or a Word document before you share it, hides private details and the numbers that would give them away, and sends an encrypted copy.</p>
   <div class="actions">
@@ -95,7 +98,7 @@ python tools/build_extension.py   # writes Chrome and Firefox ZIPs to dist/</cod
 </ol>
 <figure>
   <img src="assets/screenshots/word-agreement-review.png" alt="A fictional separation agreement reviewed in PomiCat" loading="lazy">
-  <figcaption>A fictional separation agreement. Names were picked up by the local model; the account number was marked by hand.</figcaption>
+  <figcaption>A fictional separation agreement. The amounts and the account number were found automatically; the names were marked by hand because the local model does not run on this capture page.</figcaption>
 </figure>
 <p class="muted">Links are limited to 512 KiB of ciphertext, so documents with many images are better downloaded. Text inside images is not detected automatically.</p>
 
@@ -180,6 +183,6 @@ node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 3600 --re
 </main>
 </div>
 
-<footer>PomiCat is open source under Apache-2.0. Previously SafeShare and Blackline. <a href="https://github.com/darflashxd/pomicat">GitHub</a> · <a href="blog/">Blog</a></footer>
+<footer>PomiCat is open source under Apache-2.0. <a href="https://github.com/darflashxd/pomicat">GitHub</a> · <a href="blog/">Blog</a></footer>
 </body>
 </html>
