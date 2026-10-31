@@ -15,6 +15,18 @@ let id2label = null;
 let vocab = null;
 let loadingPromise = null;
 
+// Small bounded cache: reopening the same review or re-checking an unchanged message should not
+// run the model again. Keyed by exact text, so a different string never reuses a result.
+const INFERENCE_CACHE_LIMIT = 24;
+const inferenceCache = new Map();
+function rememberInference(text, spans) {
+  inferenceCache.delete(text);
+  inferenceCache.set(text, spans.map(span => ({ ...span })));
+  while (inferenceCache.size > INFERENCE_CACHE_LIMIT) {
+    inferenceCache.delete(inferenceCache.keys().next().value);
+  }
+}
+
 // Tokenizer: engine/wordpiece.js (loaded before this file by offscreen.html)
 const { encode } = typeof SafeShareWordPiece !== "undefined" ? SafeShareWordPiece : require("./engine/wordpiece.js");
 
@@ -163,8 +175,12 @@ async function runInference(text, review = false) {
     loadingPromise ||= loadModel().catch(err => { loadingPromise = null; throw err; });
     await loadingPromise;
   }
+  const cached = inferenceCache.get(text);
+  if (cached) return cached.map(span => ({ ...span }));
   const spans = [];
-  for (const enc of encode(text, vocab)) {
+  // 16-piece overlap instead of 32: still wide enough for names and addresses, but ~14% fewer
+  // windows on long messages. MergeSpans below rejoins a span that crosses a window boundary.
+  for (const enc of encode(text, vocab, { overlap: 16 })) {
     if (enc.inputIds.length <= 2) continue;
     const feeds = {
       input_ids: new ort.Tensor("int64", enc.inputIds, [1, enc.inputIds.length]),
@@ -184,6 +200,7 @@ async function runInference(text, review = false) {
   for (const s of merged) {
     s.text = text.slice(s.start, s.end);
   }
+  rememberInference(text, merged);
   return merged;
 }
 
