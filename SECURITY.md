@@ -1,11 +1,11 @@
 # Security policy
 
-Blackline (previously SafeShare) is not a guarantee of anonymity. Read the threat model and limitations in [README.md](README.md#security-model).
+PomiCat is not a guarantee of anonymity. Read the [security model](https://darflashxd.github.io/pomicat/#security) and the [limits](README.md#limits).
 
 ## Reporting vulnerabilities
 
 Use GitHub's **Security → Report a vulnerability** if private reporting is available:
-https://github.com/darflashxd/safeshare/security/advisories/new
+https://github.com/darflashxd/pomicat/security/advisories/new
 
 If private reporting is unavailable, open an issue asking maintainers to establish a private reporting channel. Do not include vulnerability details in that public issue.
 
