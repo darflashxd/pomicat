@@ -701,3 +701,14 @@ button { min-height: 40px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Continue bar: PomiCat indigo glass with its own light text, readable on light and dark pages */
+.continuation-bar { background: rgba(46, 35, 102, 0.94); border-color: rgba(200, 182, 255, 0.30); box-shadow: 0 14px 40px -6px rgba(46, 35, 102, 0.55), 0 0 0 1px rgba(123, 92, 255, 0.20); }
+.continuation-bar:hover { background: rgba(52, 40, 116, 0.97); border-color: rgba(200, 182, 255, 0.45); box-shadow: 0 18px 46px -6px rgba(46, 35, 102, 0.65), 0 0 0 1px rgba(123, 92, 255, 0.30); }
+.continuation-info, .continuation-toggle { color: #ddd3ff; }
+.continuation-toggle:hover { color: #ffffff; }
+.continuation-info svg { color: #c8b6ff; }
+.continuation-toggle input[type="checkbox"] { accent-color: #9d87f0; }
+.continuation-bar .btn-platform { background: rgba(255, 255, 255, 0.10); border-color: rgba(200, 182, 255, 0.35); color: #ffffff; }
+.continuation-bar .btn-platform:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(200, 182, 255, 0.60); }
+.continuation-bar .btn-platform svg { width: 15px; height: 15px; }
