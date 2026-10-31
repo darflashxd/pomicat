@@ -354,9 +354,17 @@
     }
   }
 
-  function removeEmptyBibliography(parts) {
+  // Custom XML is metadata Word does not display: SharePoint and OneDrive add content-type and
+  // library properties (owners, IDs) to almost every document. A cleaned copy drops all of it.
+  // Content bound to it is refused separately (dataBinding check in sanitizeDocx). Keeping
+  // metadata keeps the old strict rule: only an empty bibliography may stay, anything else stops.
+  function removeCustomXml(parts, removeMetadata) {
     const names = [...parts.keys()].filter(name => /^customXml\//i.test(name));
     if (!names.length) return;
+    if (removeMetadata) {
+      removePackageParts(parts, new Set(names));
+      return;
+    }
     const allowed = new Set();
     for (const name of names.filter(name => /^customXml\/item\d+\.xml$/.test(name))) {
       const xml = new DOMParser().parseFromString(decoder.decode(parts.get(name)), 'application/xml');
@@ -386,13 +394,13 @@
         allowed.add(rels);
       }
     }
-    if (names.some(name => !allowed.has(name))) throw new Error('Custom XML contains data or unsupported bindings. Export stopped; the original document is unchanged.');
+    if (names.some(name => !allowed.has(name))) throw new Error('Custom XML contains data or unsupported bindings. Untick "Keep document metadata" to remove it, or export stops; the original document is unchanged.');
     removePackageParts(parts, new Set(names));
   }
 
   async function sanitizeDocx(buffer, options = {}) {
     const parts = await unzip(buffer);
-    removeEmptyBibliography(parts);
+    removeCustomXml(parts, options.removeMetadata !== false);
     const unsupported = [...parts.keys()].find(name => /^word\/(?:embeddings|charts|activeX)\//i.test(name) || /^word\/.*(?:afchunk|vbaProject)/i.test(name)
       || /^word\/media\//i.test(name) && !/\.(?:png|jpe?g|gif|bmp)$/i.test(name));
     if (unsupported) throw new Error("Unsupported embedded content: " + unsupported + ". Export stopped.");

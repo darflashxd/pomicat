@@ -156,7 +156,8 @@ def main():
     assert len(cases['10mib-media']) > 10 * 1024 * 1024
     assert next(r for r in results if r['case'] == '10mib-media')['placedImages'] == 4
     assert next(r for r in results if r['case'] == 'oversized-inflation')['accepted'] is False
-    assert next(r for r in results if r['case'] == 'custom-xml')['accepted'] is False
+    custom_xml = next(r for r in results if r['case'] == 'custom-xml')
+    assert custom_xml['accepted'] is True and not custom_xml['independentLeftovers'], 'custom XML must be removed, not kept'
     assert next(r for r in results if r['case'] == 'embedded-object')['accepted'] is False
     for name in ['custom-properties', 'company-metadata']:
         result = next(r for r in results if r['case'] == name)
