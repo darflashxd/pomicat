@@ -228,8 +228,12 @@
       let out = syncRes.sanitizedPrompt;
       let addedCount = 0;
 
+      // The model sometimes tags part of a placeholder the rules already wrote ("[ADDRESS_5]");
+      // replacing that piece broke the label into "[PLACE_2]ADDRESS_5]"
+      const placeholders = [...out.matchAll(/\[[A-Z][A-Z0-9_]*\]|<S\d+>/g)].map((m) => [m.index, m.index + m[0].length]);
       const validNerSpans = nerSpans.filter((s) =>
-        ["PERSON", "LOCATION", "GIVEN_NAME", "SURNAME", "STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(s.label)
+        ["PERSON", "LOCATION", "GIVEN_NAME", "SURNAME", "STREET_NAME", "CITY", "STATE", "ZIP_CODE", "SECONDARY_ADDRESS", "BUILDING_NUMBER"].includes(s.label) &&
+        !placeholders.some(([a, b]) => s.start < b && s.end > a)
       );
 
       if (validNerSpans.length && spanArbiter) {
@@ -383,7 +387,13 @@
       if ((!users || !answers) && !window.confirm(`PomiCat found ${users} of your messages and ${answers} AI answers in this chat. ` +
         "The site may have changed its layout, so the share could be incomplete and protection weaker. Open the share dialog anyway?")) return;
       const modal = new SafeShareModal();
-      modal.open(turns);
+      // Values behind <S1>, <S2>… in this chat (before-sending protection): the review uses them to
+      // hide figures derived from them ("<S16> / 12 is about $7,083.33"). They stay on this device.
+      const vault = symbolicVault && symbolicVault.size() ? symbolicVault.getAll() : {};
+      const shown = new Set(turns.flatMap(t => String(t.content).match(/<S\d+>/g) || []));
+      const symbolValues = Object.entries(vault).filter(([k]) => shown.has(k))
+        .map(([, v]) => Number(v && v.numericValue)).filter(v => Number.isFinite(v) && v > 0);
+      modal.open(turns, { symbolValues });
     });
 
     document.body.appendChild(pill);

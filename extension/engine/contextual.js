@@ -137,7 +137,9 @@ class ContextualClassifier {
       turnText = turnText.slice(0, det.index) + part + turnText.slice(det.index + det.length);
     }
     const detected = [];
-    const sentences = turnText.split(/(?<=[.!?\n])\s+/);
+    // A line break ends a sentence unless the line clearly continues ("My salary is⏎$5,000"):
+    // otherwise "…by 2026⏎How do I protect my SSN" made the follower count look like the writer's money
+    const sentences = turnText.split(/(?<=[.!?])\s+|(?<![,:;=|]|\b(?:is|was|are|of|to|and|or|at|about|around|my|our|your|saya|adalah))[ \t]*\n(?![ \t]*\||[^\n]{1,50}:\s)\s*/i);
 
     for (const sent of sentences) {
       // A typo in the money word, or "my/I" plus an explicit currency, still makes it personal
