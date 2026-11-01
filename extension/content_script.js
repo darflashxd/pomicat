@@ -960,6 +960,7 @@
    * If shield is disabled, reverts any existing local compute spans back to original expressions.
    * Resolves KaTeX math annotations, tables, code, and text containers.
    */
+  let streamingRetryTimer = null;
   function runHydrationPass() {
     if (!localCompute || !symbolicVault || typeof document === "undefined" || !document.body) return;
     const isEnabled = isPreInferenceEnabled();
@@ -1026,6 +1027,9 @@
     // PASS 2: Hydrate leaf text blocks (ONLY ASSISTANT MESSAGES)
     // STRICT RULE: Never query user message bubbles, prompt inputs, or code blocks (<pre>)
     // to prevent Virtual DOM collisions and self-hydration loops.
+    // A one-paragraph answer is always the last block, so it waits for streaming to end. Retry
+    // until it does instead of relying on a DOM change afterwards ("0.30 * S1" stayed raw).
+    let deferredWhileStreaming = false;
     const leafNodes = document.querySelectorAll(
       "[data-markdown-text-style='assistant-message'] p, [data-markdown-text-style='assistant-message'] li, [data-markdown-text-style='assistant-message'] td, [data-markdown-text-style='assistant-message'] th, [data-markdown-text-style='assistant-message'] div.math, " +
       "[data-message-author-role='assistant'] p, [data-message-author-role='assistant'] li, [data-message-author-role='assistant'] td, [data-message-author-role='assistant'] th, [data-message-author-role='assistant'] div.markdown > div, [data-message-author-role='assistant'] .math-inline, [data-message-author-role='assistant'] .math-display, " +
@@ -1056,11 +1060,11 @@
         const table = node.closest("table");
         if (table) {
           const assistantContainer = table.closest("[data-message-author-role='assistant'], .font-claude-message, .font-claude-response, [data-perf-reply-text], [data-testid='assistant-message'] [data-cds='Prose'], div.ds-markdown, .chat-message-assistant");
-          if (assistantContainer && assistantContainer.lastElementChild === table) return;
+          if (assistantContainer && assistantContainer.lastElementChild === table) { deferredWhileStreaming = true; return; }
         }
         const block = node.closest("p, li, td, th") || node;
         const parentContainer = block.parentElement;
-        if (parentContainer && parentContainer.lastElementChild === block) return;
+        if (parentContainer && parentContainer.lastElementChild === block) { deferredWhileStreaming = true; return; }
       }
 
       // Check unbalanced parentheses (incomplete streaming expression)
@@ -1078,6 +1082,9 @@
         }
       }
     });
+    if (deferredWhileStreaming && !streamingRetryTimer) {
+      streamingRetryTimer = setTimeout(() => { streamingRetryTimer = null; runHydrationPass(); }, 1500);
+    }
   }
 
   /**
@@ -1120,7 +1127,8 @@
       }, 350);
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    // The stop button can turn back into the send button by attribute only, with no node added
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-testid", "aria-label", "data-is-streaming"] });
   }
 
   /**
