@@ -88,7 +88,7 @@ class HeuristicsRedactor {
       {
         // "My 2FA backup code is 8842-1197", "recovery code: 4F7K-9QX2" (card security codes: CVV rule)
         id: "BACKUP_CODE", name: "2FA backup / recovery code", category: "CREDENTIALS", valueGroup: 2,
-        regex: /\b((?:(?:2FA|MFA|two[- ]factor)[ \t]+)?(?:backup|recovery)[ \t]+codes?)((?:[ \t]+(?:is|are|was))?[ \t]*[:=]?[ \t]*)([A-Z0-9]{3,8}(?:-[A-Z0-9]{3,8}|[ ]\d{3,8}){0,3})(?![A-Z0-9-])/giu,
+        regex: /\b((?:(?:2FA|MFA|two[- ]factor)[ \t]+)?(?:backup|recovery)[ \t]+codes?)((?:[ \t]+(?:is|are|was))?[ \t]*[:=]?[ \t]*)([A-Z0-9]{3,8}(?:-[A-Z0-9]{3,8}|[ ]\d{3,8}){0,3}(?:[ \t]*(?:,|\band\b|\bor\b|&)[ \t]*(?=[A-Z-]*\d)[A-Z0-9]{3,8}(?:-[A-Z0-9]{3,8}){0,3}){0,9})(?![A-Z0-9-])/giu,
         validator: (raw) => /\d/.test(raw),
         replacement: "$1$2[REDACTED_OTP]"
       },

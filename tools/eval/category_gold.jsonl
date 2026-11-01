@@ -1,0 +1,67 @@
+{"id": "credential_1", "category": "CREDENTIAL", "source_text": "My password is Tr0ub4dor&3 for the staging box.", "privacy_mask": [{"value": "Tr0ub4dor&3", "label": "CREDENTIAL"}]}
+{"id": "credential_2", "category": "CREDENTIAL", "source_text": "psql postgresql://admin:S3cretPass@10.0.0.20:5432/app", "privacy_mask": [{"value": "S3cretPass", "label": "CREDENTIAL"}]}
+{"id": "credential_3", "category": "CREDENTIAL", "source_text": "DATABASE_URL=postgres://app:Kq8zr2Lw7@db.internal:5432/prod", "privacy_mask": [{"value": "Kq8zr2Lw7", "label": "CREDENTIAL"}]}
+{"id": "credential_4", "category": "CREDENTIAL", "source_text": "REDIS_URL=redis://:hunter2pw@cache.local:6379/0", "privacy_mask": [{"value": "hunter2pw", "label": "CREDENTIAL"}]}
+{"id": "credential_5", "category": "CREDENTIAL", "source_text": "export API_TOKEN=a7F3kQ9zX2mV8pL4", "privacy_mask": [{"value": "a7F3kQ9zX2mV8pL4", "label": "CREDENTIAL"}]}
+{"id": "credential_6", "category": "CREDENTIAL", "source_text": "curl -u deploy:Wint3rIsComing! https://ci.example.com/api", "privacy_mask": [{"value": "Wint3rIsComing!", "label": "CREDENTIAL"}]}
+{"id": "credential_7", "category": "CREDENTIAL", "source_text": "mysql -u root -pRootPass2026 shop", "privacy_mask": [{"value": "RootPass2026", "label": "CREDENTIAL"}]}
+{"id": "credential_8", "category": "CREDENTIAL", "source_text": "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "privacy_mask": [{"value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "label": "CREDENTIAL"}]}
+{"id": "credential_9", "category": "CREDENTIAL", "source_text": "Authorization: Basic YWRtaW46c3VwZXJzZWNyZXQ=", "privacy_mask": [{"value": "YWRtaW46c3VwZXJzZWNyZXQ=", "label": "CREDENTIAL"}]}
+{"id": "credential_10", "category": "CREDENTIAL", "source_text": "kata sandi wifi saya Bandung2026!", "privacy_mask": [{"value": "Bandung2026!", "label": "CREDENTIAL"}]}
+{"id": "credential_11", "category": "CREDENTIAL", "source_text": "My backup codes are 4829-1734 and 9917-2203.", "privacy_mask": [{"value": "4829-1734", "label": "CREDENTIAL"}, {"value": "9917-2203", "label": "CREDENTIAL"}]}
+{"id": "credential_12", "category": "CREDENTIAL", "source_text": "The OTP is 482913, don't share it.", "privacy_mask": [{"value": "482913", "label": "CREDENTIAL"}]}
+{"id": "gov_id_1", "category": "GOV_ID", "source_text": "NIK saya 3201012304950001.", "privacy_mask": [{"value": "3201012304950001", "label": "GOV_ID"}]}
+{"id": "gov_id_2", "category": "GOV_ID", "source_text": "My SSN is 512-48-3907.", "privacy_mask": [{"value": "512-48-3907", "label": "GOV_ID"}]}
+{"id": "gov_id_3", "category": "GOV_ID", "source_text": "My Dutch BSN is 111222333", "privacy_mask": [{"value": "111222333", "label": "GOV_ID"}]}
+{"id": "gov_id_4", "category": "GOV_ID", "source_text": "My passport number is X12345678.", "privacy_mask": [{"value": "X12345678", "label": "GOV_ID"}]}
+{"id": "gov_id_5", "category": "GOV_ID", "source_text": "NPWP saya 09.254.294.3-407.000", "privacy_mask": [{"value": "09.254.294.3-407.000", "label": "GOV_ID"}]}
+{"id": "gov_id_6", "category": "GOV_ID", "source_text": "My Aadhaar is 2345 6789 0123.", "privacy_mask": [{"value": "2345 6789 0123", "label": "GOV_ID"}]}
+{"id": "gov_id_7", "category": "GOV_ID", "source_text": "My National Insurance number is AB 12 34 56 C.", "privacy_mask": [{"value": "AB 12 34 56 C", "label": "GOV_ID"}]}
+{"id": "gov_id_8", "category": "GOV_ID", "source_text": "My driver's license number is D1234567.", "privacy_mask": [{"value": "D1234567", "label": "GOV_ID"}]}
+{"id": "gov_id_9", "category": "GOV_ID", "source_text": "My Brazilian CPF is 123.456.789-09", "privacy_mask": [{"value": "123.456.789-09", "label": "GOV_ID"}]}
+{"id": "bank_card_1", "category": "BANK_CARD", "source_text": "My card is 4111 1111 1111 1111.", "privacy_mask": [{"value": "4111 1111 1111 1111", "label": "BANK_CARD"}]}
+{"id": "bank_card_2", "category": "BANK_CARD", "source_text": "The CVV is 123 on the back.", "privacy_mask": [{"value": "123", "label": "BANK_CARD"}]}
+{"id": "bank_card_3", "category": "BANK_CARD", "source_text": "My IBAN is DE89370400440532013000.", "privacy_mask": [{"value": "DE89370400440532013000", "label": "BANK_CARD"}]}
+{"id": "bank_card_4", "category": "BANK_CARD", "source_text": "Transfer to my BCA account number 0123456789.", "privacy_mask": [{"value": "0123456789", "label": "BANK_CARD"}]}
+{"id": "bank_card_5", "category": "BANK_CARD", "source_text": "Sort code 12-34-56, account 12345678.", "privacy_mask": [{"value": "12-34-56", "label": "BANK_CARD"}, {"value": "12345678", "label": "BANK_CARD"}]}
+{"id": "bank_card_6", "category": "BANK_CARD", "source_text": "The remaining funds go to my bank account DEMO-ACCT-8392.", "privacy_mask": [{"value": "DEMO-ACCT-8392", "label": "BANK_CARD"}]}
+{"id": "contact_1", "category": "CONTACT", "source_text": "Email me at rina.kusuma@example.com.", "privacy_mask": [{"value": "rina.kusuma@example.com", "label": "CONTACT"}]}
+{"id": "contact_2", "category": "CONTACT", "source_text": "My phone is +62 812 3456 7890.", "privacy_mask": [{"value": "+62 812 3456 7890", "label": "CONTACT"}]}
+{"id": "contact_3", "category": "CONTACT", "source_text": "Call me on (415) 555-0134 after six.", "privacy_mask": [{"value": "(415) 555-0134", "label": "CONTACT"}]}
+{"id": "contact_4", "category": "CONTACT", "source_text": "my email is maya.pratama@example.com", "privacy_mask": [{"value": "maya.pratama@example.com", "label": "CONTACT"}]}
+{"id": "contact_5", "category": "CONTACT", "source_text": "WhatsApp saya 0812-3456-7890", "privacy_mask": [{"value": "0812-3456-7890", "label": "CONTACT"}]}
+{"id": "personal_money_1", "category": "PERSONAL_MONEY", "source_text": "My salary is $5,000 a month.", "privacy_mask": [{"value": "$5,000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_2", "category": "PERSONAL_MONEY", "source_text": "I get paid $42 an hour, about 30 hours a week.", "privacy_mask": [{"value": "$42", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_3", "category": "PERSONAL_MONEY", "source_text": "Please review my loan. The approved loan is Rp480,000,000.", "privacy_mask": [{"value": "Rp480,000,000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_4", "category": "PERSONAL_MONEY", "source_text": "My outstanding debt with another lender is Rp95,000,000.", "privacy_mask": [{"value": "Rp95,000,000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_5", "category": "PERSONAL_MONEY", "source_text": "Gaji saya Rp 12.500.000 per bulan.", "privacy_mask": [{"value": "Rp 12.500.000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_6", "category": "PERSONAL_MONEY", "source_text": "My rent is $1,200 and I want to save more.", "privacy_mask": [{"value": "$1,200", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_7", "category": "PERSONAL_MONEY", "source_text": "I have $14,000 in savings and $3,000 in debt.", "privacy_mask": [{"value": "$14,000", "label": "PERSONAL_MONEY"}, {"value": "$3,000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_8", "category": "PERSONAL_MONEY", "source_text": "I earn ₹1,20,000 a month.", "privacy_mask": [{"value": "₹1,20,000", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_9", "category": "PERSONAL_MONEY", "source_text": "My salary is fifteen thousand dollars a month.", "privacy_mask": [{"value": "fifteen thousand dollars", "label": "PERSONAL_MONEY"}]}
+{"id": "personal_money_10", "category": "PERSONAL_MONEY", "source_text": "My mortgage payment is $2,150 a month until 2040.", "privacy_mask": [{"value": "$2,150", "label": "PERSONAL_MONEY"}]}
+{"id": "address_1", "category": "ADDRESS", "source_text": "I live at 742 Evergreen Terrace, Springfield.", "privacy_mask": [{"value": "742 Evergreen Terrace", "label": "ADDRESS"}]}
+{"id": "address_2", "category": "ADDRESS", "source_text": "Please ship it to 221B Baker Street, London.", "privacy_mask": [{"value": "221B Baker Street", "label": "ADDRESS"}]}
+{"id": "address_3", "category": "ADDRESS", "source_text": "Alamat saya Jl. Merdeka No. 12, Bandung.", "privacy_mask": [{"value": "Jl. Merdeka No. 12", "label": "ADDRESS"}]}
+{"id": "address_4", "category": "ADDRESS", "source_text": "I'm at 1600 Amphitheatre Parkway, Mountain View.", "privacy_mask": [{"value": "1600 Amphitheatre Parkway", "label": "ADDRESS"}]}
+{"id": "age_dob_1", "category": "AGE_DOB", "source_text": "I was born on 14 March 1998.", "privacy_mask": [{"value": "14 March 1998", "label": "AGE_DOB"}]}
+{"id": "age_dob_2", "category": "AGE_DOB", "source_text": "I'm 28 years old and want to learn piano.", "privacy_mask": [{"value": "28", "label": "AGE_DOB"}]}
+{"id": "age_dob_3", "category": "AGE_DOB", "source_text": "My son is aged 7.", "privacy_mask": [{"value": "7", "label": "AGE_DOB"}]}
+{"id": "name_1", "category": "NAME", "source_text": "My name is Maya Pratama.", "privacy_mask": [{"value": "Maya Pratama", "label": "NAME"}]}
+{"id": "name_2", "category": "NAME", "source_text": "Hi, I'm Jane Doe from the finance team.", "privacy_mask": [{"value": "Jane Doe", "label": "NAME"}]}
+{"id": "name_3", "category": "NAME", "source_text": "Nama saya Rina Kusuma.", "privacy_mask": [{"value": "Rina Kusuma", "label": "NAME"}]}
+{"id": "safe_1", "category": "SAFE", "source_text": "The average barista earns $15 an hour.", "privacy_mask": []}
+{"id": "safe_2", "category": "SAFE", "source_text": "I paid $42 for dinner.", "privacy_mask": []}
+{"id": "safe_3", "category": "SAFE", "source_text": "What is the weather like in Bandung today?", "privacy_mask": []}
+{"id": "safe_4", "category": "SAFE", "source_text": "Port 5432 is the Postgres default.", "privacy_mask": []}
+{"id": "safe_5", "category": "SAFE", "source_text": "Apple's revenue was $383 billion in 2023.", "privacy_mask": []}
+{"id": "safe_6", "category": "SAFE", "source_text": "Use version 3.0.2 of the library.", "privacy_mask": []}
+{"id": "safe_7", "category": "SAFE", "source_text": "HTTP 503 means service unavailable.", "privacy_mask": []}
+{"id": "safe_8", "category": "SAFE", "source_text": "Run npm install, then npm test.", "privacy_mask": []}
+{"id": "safe_9", "category": "SAFE", "source_text": "The meeting is at 10:30 on Monday.", "privacy_mask": []}
+{"id": "safe_10", "category": "SAFE", "source_text": "A 30% tip on a $50 bill is $15.", "privacy_mask": []}
+{"id": "safe_11", "category": "SAFE", "source_text": "Python 3.12 added better error messages.", "privacy_mask": []}
+{"id": "safe_12", "category": "SAFE", "source_text": "The Eiffel Tower is 330 metres tall.", "privacy_mask": []}
+{"id": "safe_13", "category": "SAFE", "source_text": "Set the timeout to 5000 ms.", "privacy_mask": []}
+{"id": "safe_14", "category": "SAFE", "source_text": "Indonesia has about 280 million people.", "privacy_mask": []}
+{"id": "safe_15", "category": "SAFE", "source_text": "Banks often charge an administration fee of 1% on a typical loan.", "privacy_mask": []}
