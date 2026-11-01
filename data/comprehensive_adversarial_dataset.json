@@ -19,8 +19,8 @@
       "category": "CYBER_CREDENTIALS",
       "title": "Google Cloud Platform (GCP) API Key",
       "input": "Google Maps Javascript API initialization failed. Key used: AIzaSyD9xK8LmNoPqRsTuVwXyZ1234567890AbC on domain app.corp.internal.",
-      "expected_redactions": ["AIzaSyD9xK8LmNoPqRsTuVwXyZ1234567890AbC"],
-      "expected_preservations": ["Google Maps Javascript API", "app.corp.internal"],
+      "expected_redactions": ["AIzaSyD9xK8LmNoPqRsTuVwXyZ1234567890AbC", "app.corp.internal"],
+      "expected_preservations": ["Google Maps Javascript API"],
       "category_tag": "CREDENTIALS"
     },
     {
@@ -46,8 +46,8 @@
       "category": "CYBER_CREDENTIALS",
       "title": "GitLab Personal Access Token",
       "input": "Migrating repository to internal self-hosted GitLab server with token glpat-1234567890abcdefghij from gitlab.corp.internal.",
-      "expected_redactions": ["glpat-1234567890abcdefghij"],
-      "expected_preservations": ["GitLab server", "gitlab.corp.internal"],
+      "expected_redactions": ["glpat-1234567890abcdefghij", "gitlab.corp.internal"],
+      "expected_preservations": ["GitLab server"],
       "category_tag": "CREDENTIALS"
     },
     {

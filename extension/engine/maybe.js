@@ -127,6 +127,8 @@
         if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end <= span.start || span.end > text.length ||
           !Number.isFinite(span.score) || span.score < 0.15 || span.score > 1) continue;
         const spanText = text.slice(span.start, span.end).trim();
+        // A name, ID or secret never runs across a line break ("1.⏎⏎00111111" in a binary answer)
+        if (/\n/.test(spanText)) continue;
         // Field labels, and our own symbols the AI repeats bare ("0.25 * S1", "NIK_1"): the model
         // tagged S1 as a ZIP code on DeepSeek
         if (!/[\p{L}\p{N}]/u.test(spanText) || LABEL_WORDS.test(spanText) || /^(?:password|passwd|pwd|secret|token|credential)s?$/i.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;

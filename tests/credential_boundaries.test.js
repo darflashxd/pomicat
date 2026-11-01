@@ -199,3 +199,25 @@ console.log('credential boundaries: prose after password:, symbol passwords, bac
   for (const leak of ['7,083.33', '5,312.50']) assert(!anonymizedTurns[0].content.includes(leak), `${leak} left: ${anonymizedTurns[0].content}`);
 }
 console.log('credential boundaries: national IDs, addresses, line sentences, symbol-derived figures passed');
+
+// Network: technical "X address" is not a street, IPv6 whole, internal hosts, Telegram tokens
+{
+  const s = text => scanner.scan(text).sanitizedText;
+  assert.equal(s("What's the broadcast address of 203.0.113.0/26?"), "What's the broadcast address of 203.0.113.0/26?");
+  assert.equal(s('My IPv6 address is 2001:db8:85a3::8a2e:370:7334, why?'), 'My IPv6 address is [REDACTED_IPV6], why?');
+  assert.equal(s("My laptop's MAC address is 00:1A:2B:3C:4D:5E"), "My laptop's MAC address is [REDACTED_MAC_ADDRESS]");
+  assert.equal(s('Telegram bot token 123456789:AAH-abcdefghijklmnopqrstuvwxyz012345678'), 'Telegram bot token [REDACTED_TELEGRAM_TOKEN]');
+  assert.equal(s('db-prod-01.corp.internal is unreachable from jenkins.corp.local'), '[REDACTED_HOST] is unreachable from [REDACTED_HOST]');
+  assert.equal(s('Our wiki is https://wiki.acmecorp.internal/pages/prod-runbook, please summarize it'), 'Our wiki is [REDACTED_INTERNAL_URL], please summarize it');
+  assert.equal(s('My home address is 12 High Street, Leeds'), 'My home address is [REDACTED_ADDRESS]');
+}
+// Model spans across a line break are not suggestions; ages hidden next to [DOB_n]
+{
+  const Maybe = require('../extension/engine/maybe.js');
+  const text = 'all host bits are set to 1.\n\n00111111 in binary = 63.';
+  assert.deepEqual(Maybe.scan([{ role: 'assistant', content: text }], [{ turnIndex: 0, start: text.indexOf('1.'), end: text.indexOf('00111111') + 8, label: 'PASSWORD', score: 0.8 }]), []);
+  const P = require('../extension/engine/pseudonymizer.js');
+  const out = new P().anonymizeConversation([{ role: 'user', content: "I'm 28 years old, born in [DOB_4]" }, { role: 'assistant', content: 'You are 28 years old.' }], [], [], {}).anonymizedTurns;
+  assert(out.every(t => !/\b28\b/.test(t.content)), out.map(t => t.content).join(' | '));
+}
+console.log('credential boundaries: network, internal hosts, Telegram, multi-line model spans, ages passed');

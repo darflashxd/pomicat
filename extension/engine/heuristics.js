@@ -734,8 +734,13 @@ class HeuristicsRedactor {
         name: "International Physical Street Address",
         category: "PROFILE",
         regex: /(?:<address>([^<]+)<\/address>|["']?(?:street_address|physical_address|billing_address|shipping_address|address)["']?[ \t]*[:=][ \t]*["']?([^"'\r\n]{10,120})["']?|\b((?:(?:(?:(?:my|our|home|residential|shipping|mailing|street|billing|physical|company|business|office)[ \t]+)?address(?:[ \t]+of[ \t]+[A-Za-z0-9._ \t-]+)?[ \t]*(?:is|was|[:=\-])?[ \t]*(?:to[ \t]+my[ \t]+residential[ \t]+address[ \t]*:[ \t]*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent|dispatched)[ \t]+(?:(?:it|this|them|that|(?:the|my)[ \t]+\p{L}+)[ \t]+)?to[ \t]+)|(?:(?:[A-Za-z\p{L}]+(?:[ \t]+[A-Za-z\p{L}]+)?)[ \t]+)?(?:live[s]?|living|stay[s]?|staying|reside[s]?|residing)[ \t]+(?:at|in)[ \t]+|(?:(?:office|store|headquarters|facility|branch)[ \t]+is[ \t]+at[ \t]+))))[ \t]*((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk|Box|PSC)\.?[ \t]+[0-9A-Za-z#]+,?[ \t]*(?:[0-9]{1,5}[ \t]+)?|[0-9]{1,6}[A-Za-z]?[ \t]+)[A-Za-z0-9\p{L} \t.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill|Square|Sq|Close|Cl|katu|tie|strasse|str|gatan|vej|weg|allee|calle|rue|via|avda|piazza|utca|u\.)\b(?:[A-Za-z0-9\p{L} \t.,\/-]*?(?:Singapore[ \t]+\d{6}|[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?[ \t]*\d[A-Z]{2}|\b\d{3}-\d{4}\b|\b(?:NSW|VIC|QLD|TAS|ACT)[ \t]+\d{4}\b|\b\d{5,6}\b(?:[ \t]+\p{L}[\p{L}-]+)?))?(?:(?:,[ \t]*(?!(?:please|thanks?|thank|help|now|today|tomorrow|tonight|and|but|so|then|ok|okay|pls|yes|no|indonesia|singapore|malaysia|japan|germany|france|india|australia|canada|netherlands|england|spain|italy|china|korea|united\s+(?:kingdom|states)|uk|usa|us)\b)\p{L}[\p{L}-]+(?:[ \t]+(?!(?:please|thanks?|thank|help|now|today|tomorrow|tonight|and|but|so|then|ok|okay|pls|yes|no|indonesia|singapore|malaysia|japan|germany|france|india|australia|canada|netherlands|england|spain|italy|china|korea|united\s+(?:kingdom|states)|uk|usa|us)\b)\p{L}[\p{L}-]+)?){1,2}(?:[ \t]+(?:NSW|VIC|QLD|TAS|ACT|[A-Z]{2})[ \t]+\d{4,5})?(?=[ \t]*(?:[.;!?()]|\r?\n|$)))?|(?:(?![.!?][ \t]|\b(?:and|but|that|which|who|whose|has|have|had|is|are|was|were|with|because|so|or|then|than)\b)[A-Za-z\p{L} .-]){1,40}?[ \t]+\d+[a-zA-Z]?(?:[A-Za-z0-9\p{L} \t.,\/-]*?\b(?:Apt|Apartment|Suite|Unit|Box|PSC)\.?[ \t]+[0-9A-Za-z#]+)?(?:[A-Za-z0-9\p{L} \t.,\/-]*?(?:Singapore[ \t]+\d{6}|[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?[ \t]*\d[A-Z]{2}|\b\d{3}-\d{4}\b|\b(?:NSW|VIC|QLD|TAS|ACT)[ \t]+\d{4}\b|\b\d{5,6}\b(?:[ \t]+\p{L}[\p{L}-]+)?))?(?:(?:,[ \t]*(?!(?:please|thanks?|thank|help|now|today|tomorrow|tonight|and|but|so|then|ok|okay|pls|yes|no|indonesia|singapore|malaysia|japan|germany|france|india|australia|canada|netherlands|england|spain|italy|china|korea|united\s+(?:kingdom|states)|uk|usa|us)\b)\p{L}[\p{L}-]+(?:[ \t]+(?!(?:please|thanks?|thank|help|now|today|tomorrow|tonight|and|but|so|then|ok|okay|pls|yes|no|indonesia|singapore|malaysia|japan|germany|france|india|australia|canada|netherlands|england|spain|italy|china|korea|united\s+(?:kingdom|states)|uk|usa|us)\b)\p{L}[\p{L}-]+)?){1,2}(?:[ \t]+(?:NSW|VIC|QLD|TAS|ACT|[A-Z]{2})[ \t]+\d{4,5})?(?=[ \t]*(?:[.;!?()]|\r?\n|$)))?|\d{1,4}(?:-\d{1,4}){1,3}[ \t]+[\p{L} ,.-]{2,60}?\b\d{3}-\d{4}\b|(?:PSC[ \t]+\d+,[ \t]*Box[ \t]+\d+|PO[ \t]+Box[ \t]+\d+)[A-Za-z0-9 \t.,\/-]+))/giu,
-        validator: (raw) => {
+        validator: (raw, index, text) => {
           if (/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/.test(raw)) return false;
+          if (text && Number.isInteger(index)) {
+            const lead = text.slice(Math.max(0, index - 40), index) + raw.slice(0, Math.max(0, raw.search(/address/i)));
+            if (/\b(?:ip|ipv[46]|mac|e-?mail|broadcast|network|subnet|gateway|bitcoin|btc|eth(?:ereum)?|wallet|crypto|web|server|host|wi-?fi|memory|return|base|loopback|multicast|hardware|ip\s*v[46])\s*$/i.test(lead)) return false;
+            if (/^[.:][0-9a-f]/i.test(text.slice(index + raw.length, index + raw.length + 2))) return false;
+          }
           const computingExclusions = /\b(?:memori|memory|fungsi|function|pointer|register|symbol|instruksi|instruction|hex|libc|gdb|binary|assembly|setcontext|ip|mac|url|socket)\b|&[a-zA-Z_]|0x[0-9a-fA-F]+/i;
           return !computingExclusions.test(raw);
         },
@@ -1056,12 +1061,30 @@ class HeuristicsRedactor {
         id: "NETWORK_IPV6",
         name: "IPv6 Network Address",
         category: "SYSTEM",
-        regex: /\b(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})\b/gi,
+        regex: /\b(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,})(?![0-9a-fA-F:])/gi,
         validator: (raw) => {
           // Exclude simple CSS or code structures
           return raw.includes(":") && raw.length >= 7;
         },
         replacement: "[REDACTED_IPV6]"
+      },
+      {
+        // Telegram bot token: "123456789:AAH-…" (bot id, colon, 30+ character secret)
+        id: "TELEGRAM_BOT_TOKEN", name: "Telegram bot token", category: "CREDENTIALS",
+        regex: /\b\d{8,10}:[A-Za-z0-9_-]{30,50}(?![A-Za-z0-9_-])/g,
+        replacement: "[REDACTED_TELEGRAM_TOKEN]"
+      },
+      {
+        // Internal URLs and hostnames reveal a company's network: wiki.acmecorp.internal/…,
+        // db-prod-01.corp.internal, jenkins.corp.local. System details: "Keep debug details" keeps them.
+        id: "INTERNAL_URL", name: "Internal URL", category: "SYSTEM",
+        regex: /\bhttps?:\/\/[A-Za-z0-9.-]+\.(?:internal|local|corp|lan|intranet|home\.arpa)(?::\d+)?(?:\/[^\s"'<>)]*[^\s"'<>),.;:!?])?/gi,
+        replacement: "[REDACTED_INTERNAL_URL]"
+      },
+      {
+        id: "INTERNAL_HOSTNAME", name: "Internal hostname", category: "SYSTEM",
+        regex: /(?<![@\w.-])(?:[A-Za-z0-9-]+\.)+(?:internal|local|corp|lan|intranet|home\.arpa)\b(?![.-]\w)/gi,
+        replacement: "[REDACTED_HOST]"
       },
       // 16x. Hardware MAC Address (Standard Colon, Dash, or Dot formats)
       {
