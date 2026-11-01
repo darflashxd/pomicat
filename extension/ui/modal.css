@@ -105,6 +105,14 @@ html[data-ss-theme="light"] #safeshare-modal-card .btn-maybe-bulk:hover { color:
 html[data-ss-theme="light"] #safeshare-modal-card .maybe-badge.badge-suggest { color: #4b32c4; background: #f3f0ff; }
 html[data-ss-theme="light"] #safeshare-modal-card .maybe-item-text { color: #3a424b; }
 html[data-ss-theme="light"] #safeshare-modal-card .maybe-badge.badge-risky { color: #a3123a; background: #fff1f2; }
+/* Customize drawer (detected items list) */
+html[data-ss-theme="light"] #safeshare-modal-card .safeshare-inspector-drawer { background: #f6f7f9; }
+html[data-ss-theme="light"] #safeshare-modal-card :is(.inspector-drawer-header, .inspector-group-header) { border-bottom-color: #dfe3e8; }
+html[data-ss-theme="light"] #safeshare-modal-card :is(.group-header-badge, .item-turn-tag) { background: #e9edf1; color: #4a535d; }
+html[data-ss-theme="light"] #safeshare-modal-card .inspector-item-card { background: #ffffff; }
+html[data-ss-theme="light"] #safeshare-modal-card .btn-drawer-action:hover { background: rgba(91, 63, 214, 0.08); }
+html[data-ss-theme="light"] #safeshare-modal-card .val-raw { color: #b42318; }
+html[data-ss-theme="light"] #safeshare-modal-card .ss-slider { background-color: #c3c9d1; }
 html[data-ss-theme="light"] #safeshare-attack-check { border-color: #d0d7df; background: #fafbfc; }
 html[data-ss-theme="light"] #safeshare-attack-check .attack-check-title { color: #20252b; }
 html[data-ss-theme="light"] #safeshare-attack-check .attack-ok { color: #046c4e; }
