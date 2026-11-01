@@ -5,15 +5,18 @@
   </picture>
 </p>
 
-# PomiCat
+<p align="center">
+  <a href="https://github.com/darflashxd/pomicat/actions/workflows/test.yml"><img src="https://github.com/darflashxd/pomicat/actions/workflows/test.yml/badge.svg?branch=main" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/darflashxd/pomicat/releases"><img src="https://img.shields.io/github/v/release/darflashxd/pomicat?label=release" alt="Release"></a>
+</p>
 
-[![Tests](https://github.com/darflashxd/pomicat/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/darflashxd/pomicat/actions/workflows/test.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/darflashxd/pomicat?label=release)](https://github.com/darflashxd/pomicat/releases)
+<h3 align="center">Share the content. Not the secrets.</h3>
 
-**Share the content. Not the secrets.** A browser extension that reviews an AI chat or a Word
-document before you share it, hides private details and the numbers that would give them away,
-and sends an encrypted copy.
+<p align="center">
+  A browser extension that reviews an AI chat or a document before you share it, hides private
+  details and the numbers that would give them away, and sends an encrypted copy.
+</p>
 
 - **On your device:** rules and a small model run in the browser. Nothing leaves while you review.
 - **Beyond the obvious:** hides the salary, and also the "saving 20% is $1,000" line that reveals it.
