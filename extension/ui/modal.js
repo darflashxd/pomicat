@@ -1880,6 +1880,8 @@ class SafeShareModal {
         document.getElementById("safeshare-inspector-drawer").style.display = "none";
         document.getElementById("safeshare-modal-footer").style.display = "none";
         document.getElementById("safeshare-result-view").style.display = "block";
+        // The link is made: the settings no longer change anything, so they go
+        document.querySelector("#safeshare-modal-card .ss-protection-settings")?.remove();
 
         const urlDisplay = document.getElementById("result-url-display");
         urlDisplay.innerText = finalShareUrl;

@@ -715,8 +715,9 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 }
 
 .turn-header {
-  font-weight: 600;
-  color: var(--ss-text-secondary);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--ss-text-primary);
   margin-bottom: 3px;
   font-size: 11.5px;
 }
