@@ -14,13 +14,18 @@
 <h3 align="center">Share the content. Not the secrets.</h3>
 
 <p align="center">
+  <b>Shared AI chats ended up in Google in 2025. PomiCat links can't be read by crawlers,<br>
+  and the copy inside is properly redacted.</b>
+</p>
+
+<p align="center">
   A browser extension that reviews an AI chat or a document before you share it, hides private
   details and the numbers that would give them away, and sends an encrypted copy.
 </p>
 
-- **On your device:** rules and a small model run in the browser. Nothing leaves while you review.
+- **Crawler-proof links:** the key lives after the `#`, which browsers and crawlers never send. The relay stores ciphertext; a crawler gets an empty `noindex` page.
 - **Beyond the obvious:** hides the salary, and also the "saving 20% is $1,000" line that reveals it.
-- **Encrypted links:** the key lives after the `#`. The relay stores ciphertext; crawlers get nothing readable.
+- **On your device:** rules and a small model run in the browser. Nothing leaves while you review.
 - **Chats and documents:** ChatGPT, Claude, Gemini, DeepSeek, Word Online and Google Docs.
 
 [Quick start](#quick-start) · [Docs](https://darflashxd.github.io/pomicat/) ·
@@ -53,7 +58,16 @@
 </tr>
 </table>
 
-## Why hiding the number is not enough
+## The problem
+
+In 2025, shared ChatGPT conversations turned up in Google: a share link is an ordinary web page,
+so anything on it can be crawled and indexed. PomiCat links carry their key after the `#`, which
+never reaches a server. A crawler, or anyone without the full link, gets an empty page and
+ciphertext, and the page only opens on a real click. [`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js)
+checks this on every run by fetching chat and document links as Googlebot.
+
+And hiding the secret is only half the job. If the assistant replied "saving 20% is $1,000", the
+hidden salary is one division away:
 
 ```text
 User:      My salary is [REDACTED] a month. If I save 20%, how much is that?
