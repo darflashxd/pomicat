@@ -58,4 +58,8 @@ assert.equal(solver.solveAndRedact("2,100,000", [3000000], ["Rp 2.100.000"]), "2
 assert(T.normalize(String.raw`\[ 30\% \times Rp\,3.000.000 \]`).includes("30% × Rp 3.000.000"));
 assert.equal(T.normalize('`\\times`'), '`\\times`', "code is not math");
 assert(!T.renderEscaped(m.escapeHtml('<img src=x onerror=alert(1)>')).includes("<img"));
+// Preview gaps: blank-line runs collapse to one break, edges trimmed, code blocks untouched
+assert.equal(T.renderEscaped("\n\nquote\n\n\n\n \n\nExplain\n\n"), "quote<br><br>Explain<br>");
+assert.equal(T.renderEscaped("one\ntwo"), "one<br>two<br>");
+assert.equal(T.renderEscaped("```\na\n\n\nb\n```"), "<pre><code>a\n\n\nb\n</code></pre>");
 console.log("range review: IDR toggles, stable badges, range badge, safe headings/tables/math passed");

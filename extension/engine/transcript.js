@@ -42,8 +42,14 @@
     const lines = html.split("\n");
     const output = [];
     let code = false;
+    // Preview only: like the shared viewer, a run of blank lines is one paragraph break and
+    // blank lines at the start or end of a message are dropped. Code blocks keep every line.
+    let started = false, gap = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (!code && /^[\s ​-‍⁠﻿]*$/.test(line)) { gap = started; continue; }
+      if (gap) { output.push("<br>"); gap = false; }
+      started = true;
       if (/^\s*```/.test(line)) { output.push(code ? "</code></pre>" : "<pre><code>"); code = !code; continue; }
       if (code) { output.push(line + "\n"); continue; }
       if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|\-]+\|\s*$/.test(lines[i + 1] || "")) {
