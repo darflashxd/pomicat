@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const Scanner = require('../extension/engine/heuristics.js');
 const scanner = new Scanner();
-const { redactTurns } = require('../bin/safeshare.js');
+const { redactTurns } = require('../bin/pomicat.js');
 const cases = [
   ['Password for my online banking is ', 'Tr0ub4dor&3'],
   ['Kode OTP BCA: ', '739204'],

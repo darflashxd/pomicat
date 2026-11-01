@@ -47,7 +47,7 @@ const detect = require('../extension/word/detect.js');
   const assignedDoc = {blocks: [{text: 'client_secret: OddSecret42'}], supplementary: []};
   const rulesOnly = await detect.detect({doc: assignedDoc, map: T.flatten(assignedDoc), heuristics: new H(), TextMap: T});
   assert.ok(rulesOnly.some(item => item.value === 'OddSecret42' && item.category === 'CREDENTIALS' && item.preChecked), 'assignment protection must survive model failure');
-  const {redactTurns} = require('../bin/safeshare');
+  const {redactTurns} = require('../bin/pomicat');
   for (const text of ['Home address | Jl. Cempaka Putih Tengah No. 42, Jakarta Pusat', 'BCA 527188901234']) {
     const document = {blocks: [{text}], supplementary: []};
     const findings = await detect.detect({doc: document, map: T.flatten(document), heuristics: new H(), TextMap: T});

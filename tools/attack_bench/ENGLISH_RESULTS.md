@@ -12,8 +12,8 @@ of real-world incident prevalence. Model NER is not used in this CLI benchmark.
 - 20 out-of-scope cases: annual salary encoded in base64. These test a known limit, not supported
   numerical transformation coverage.
 - Baselines: none; **oracle entity-only masking** of the stated salary (not a third-party product);
-  production synchronous SafeShare CLI, public/remove defaults.
-- Attackers: SafeShare `invert`; a separate parser for explicit EN monthly-savings/annual/remainder
+  production synchronous PomiCat CLI, public/remove defaults.
+- Attackers: PomiCat `invert`; a separate parser for explicit EN monthly-savings/annual/remainder
   relations (does not import the solver); and a separate base64 annual decoder.
 - Correct recovery: within 1% of source salary. Top-5 means first five candidates. Directly visible
   salaries are counted separately, not counted twice as recovered.
@@ -24,7 +24,7 @@ of real-world incident prevalence. Model NER is not used in this CLI benchmark.
 |---|---:|---:|---:|
 | None | 100 | 0 / 0 (direct exposure counted above) | 0 / 0 (direct exposure counted above) |
 | Oracle entity-only | 0 | 8 / 15 | 82 / 82 |
-| SafeShare | 0 | 0 / 0 | 0 / 0 |
+| PomiCat | 0 | 0 / 0 | 0 / 0 |
 
 Rounded cases may not permit recovery within 1%; not recovering the original is not proof the
 remaining estimate or interval is harmless. Both tools share the general numeric-attack domain;
@@ -33,10 +33,10 @@ the separate parser is a different implementation, not an independent external s
 ## Negative controls and out-of-scope results
 
 - Both arithmetic attackers emit at least one hypothesis on **20/40** controls, before and after
-  SafeShare. This measures unsupported attribution to a user's salary, not an arithmetic error.
+  PomiCat. This measures unsupported attribution to a user's salary, not an arithmetic error.
   `invert` output must be interpreted as ranked candidates, not confirmed secrets.
 - Base64 annual decoder recovers **20/20** out-of-scope salaries after both entity-only masking
-  and SafeShare. The numeric attackers report none. The limitation is deliberately reported rather
+  and PomiCat. The numeric attackers report none. The limitation is deliberately reported rather
   than removed from the denominator or patched only to improve this score.
 - All explicit safe-note sentinels survive for every redactor (160/160). Technical port `5432`
   survives in all applicable conversations (140/140). These two narrow retention measures are

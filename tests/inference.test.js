@@ -1,7 +1,7 @@
 // Run: node tests/inference.test.js
 // Attacks (invert / inferDates) against a naive redaction, and SafeShare's redaction against them.
 const assert = require("assert");
-const { redact } = require("../bin/safeshare.js");
+const { redact } = require("../bin/pomicat.js");
 const { invert, inferDates } = require("../extension/engine/policy.js");
 
 const joined = (turns) => turns.map((t) => t.content).join("\n");

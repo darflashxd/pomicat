@@ -43,7 +43,7 @@ def main():
             def make_share(burn, mismatch=False):
                 script = """
                 const Crypto=require('./extension/engine/crypto');
-                const {redactTurns}=require('./bin/safeshare');
+                const {redactTurns}=require('./bin/pomicat');
                 (async()=>{const c=new Crypto(process.argv[1],process.argv[1]);
                 const turns=redactTurns([{role:'user',content:'My email password is QuasarSecret782.'},
                 {role:'assistant',content:'Store credentials in a password manager.'}]);

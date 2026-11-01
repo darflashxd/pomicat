@@ -2,7 +2,7 @@
 // Profiles (public / trusted), range generalization, and the Presidio pre-pass (fake analyzer).
 const assert = require("assert");
 const http = require("http");
-const { redact, redactTurns, invert, bucket, formatRange } = require("../bin/safeshare.js");
+const { redact, redactTurns, invert, bucket, formatRange } = require("../bin/pomicat.js");
 
 const chat = [
   { role: "user", content: "Gaji saya Rp 3.000.000 per bulan. Kalau saya nabung 30%, berapa per bulan dan setahun?" },

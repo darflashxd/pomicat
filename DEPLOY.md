@@ -3,13 +3,12 @@
 Production PomiCat config: `relay/wrangler.pomicat.toml`. From `relay/`, use
 `npx wrangler@4 deploy --config wrangler.pomicat.toml --name pomicat-relay`.
 It shares the existing D1 and rate-limit namespaces, runs the Worker before
-static assets for security headers, and adds no cleanup cron. `wrangler.toml`
-still targets the legacy SafeShare Worker and `wrangler.blackline.toml` the
-Blackline Worker: do not use them for a PomiCat deploy.
+static assets for security headers, and adds no cleanup cron. `wrangler.toml` and
+`wrangler.blackline.toml` deploy the two older relay Workers, which keep earlier links
+opening: do not use them for a PomiCat deploy.
 
-Some Worker/D1 names, URLs and configuration keys below still use the older `safeshare`
-names on purpose, for compatibility. Rebranding the extension does not deploy this
-Worker or move existing shares. Do not recreate the database for the rename.
+Some Worker/D1 names, URLs and configuration keys below use older names on purpose, so existing
+links and data keep working. Do not recreate the database.
 
 The relay is a Cloudflare Worker. It stores encrypted shares in a D1 database and serves the page
 that opens share links. Its API receives ciphertext: the decryption key is in the link's `#`
@@ -18,9 +17,10 @@ served code; a modified hosted viewer could read that fragment and plaintext.
 
 ## Existing relay compatibility and rollback
 
-The Blackline and legacy SafeShare Workers share the existing D1 database and rate-limiter
-namespaces. No data copy is needed. Limits are approximate per-location counters, not global quotas.
-Keep cleanup cron on the legacy Worker; the Blackline config deliberately adds no duplicate cron.
+The PomiCat Worker and the two older relay Workers share one D1 database and rate-limiter
+namespace. No data copy is needed. Limits are approximate per-location counters, not global quotas.
+Keep the cleanup cron on the oldest Worker (`wrangler.toml`); the other configs deliberately add no
+duplicate cron.
 
 Keep both hosts permitted while older links circulate. A rollback changes client defaults or
 deploys reviewed code; do not restore an old database snapshot, which could resurrect burned or
@@ -33,9 +33,9 @@ Everything below fits in Cloudflare's free plan. It takes about 15 minutes the f
 
 - A Cloudflare account (free)
 - Node.js 18 or newer (`node --version`)
-- This repository: `git clone https://github.com/darflashxd/safeshare && cd safeshare/relay`
+- This repository: `git clone https://github.com/darflashxd/pomicat && cd pomicat/relay`
 
-All commands below run inside the `relay/` folder. They target the Blackline config explicitly;
+All commands below run inside the `relay/` folder. They target the PomiCat config explicitly;
 use the legacy config only when deliberately updating the legacy Worker.
 
 ## 1. Log in
@@ -55,7 +55,7 @@ Skip this step if `safeshare-db` already exists in your account (it's listed by
 npx wrangler@4 d1 create safeshare-db
 ```
 
-It prints a `database_id`. Open `wrangler.blackline.toml` and replace the existing `database_id` under
+It prints a `database_id`. Open `wrangler.pomicat.toml` and replace the existing `database_id` under
 `[[d1_databases]]` with yours. Then create the table:
 
 ```bash
@@ -76,7 +76,7 @@ If it says the column already exists, that's fine.
 ## 3. Deploy
 
 ```bash
-npx wrangler@4 deploy --config wrangler.blackline.toml
+npx wrangler@4 deploy --config wrangler.pomicat.toml --name pomicat-relay
 ```
 
 The output ends with your URL, for example `https://safeshare-relay.<your-subdomain>.workers.dev`,
@@ -97,7 +97,7 @@ Shares are limited to 512 KiB ciphertext. Larger DOCX copies must be downloaded 
 From the repository root:
 
 ```bash
-node bin/safeshare.js share examples/chat_original.txt --burn --relay https://safeshare-relay.<your-subdomain>.workers.dev
+node bin/pomicat.js share examples/chat_original.txt --burn --relay https://safeshare-relay.<your-subdomain>.workers.dev
 ```
 
 - Open the printed link: you should see the redacted chat.
@@ -128,12 +128,12 @@ Then rebuild the extension zips with `python tools/build_extension.py`.
 
 For a quick test without rebuilding (upload only; the Continue button on the share page needs the
 changes above), override it in the extension: on `chrome://extensions`, click
-**service worker** under SafeShare and run
+**service worker** under PomiCat and run
 `chrome.storage.local.set({ safeshare_relay: "https://safeshare-relay.<your-subdomain>.workers.dev" })`.
 
 ## Updating later
 
-`git pull`, then `npx wrangler@4 deploy --config wrangler.blackline.toml` from `relay/`. Check the changelog for any database
+`git pull`, then `npx wrangler@4 deploy --config wrangler.pomicat.toml --name pomicat-relay` from `relay/`. Check the changelog for any database
 step (like the `ALTER TABLE` above) before deploying.
 
 If a release adds a relay host to `extension/manifest.json`, also reload the unpacked extension

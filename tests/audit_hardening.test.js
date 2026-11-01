@@ -1,16 +1,16 @@
 // Run: node tests/audit_hardening.test.js: reproductions from the October audit.
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { redactTurns } = require('../bin/safeshare');
+const { redactTurns } = require('../bin/pomicat');
 const policy = require('../extension/engine/policy');
 const { AdversaryOracleSolver } = require('../extension/engine/pseudonymizer');
 
 const leaked = 'User: My salary is [REDACTED_FINANCIAL_1].\nAssistant: Saving 20% means $1,000 per month, leaving $4,000. Over a year that adds up to $12,000.';
 for (const json of [false, true]) {
-  const run = spawnSync(process.execPath, ['bin/safeshare.js', 'invert', ...(json ? ['--json'] : [])], { input: leaked, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['bin/pomicat.js', 'invert', ...(json ? ['--json'] : [])], { input: leaked, encoding: 'utf8' });
   assert.equal(run.status, 2, 'output format must not change leak exit status');
   if (json) assert.equal(JSON.parse(run.stdout).amounts[0].value, 5000);
-  const clean = spawnSync(process.execPath, ['bin/safeshare.js', 'invert', ...(json ? ['--json'] : [])], { input: 'No private numbers.', encoding: 'utf8' });
+  const clean = spawnSync(process.execPath, ['bin/pomicat.js', 'invert', ...(json ? ['--json'] : [])], { input: 'No private numbers.', encoding: 'utf8' });
   assert.equal(clean.status, 0);
 }
 for (const prefix of ['Benchmark output', 'Median benchmark', 'Standar', 'Survei']) {

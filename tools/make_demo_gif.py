@@ -64,13 +64,13 @@ def main():
 
     scenes = [
         ("# A chat where only the salary was redacted:", "cat examples/chat_naive_redacted_en.txt"),
-        ("# The inversion attack recovers it from the assistant's numbers:", "node bin/safeshare.js invert examples/chat_naive_redacted_en.txt"),
-        ("# Same chat, redacted by SafeShare (derived numbers removed too):", "node bin/safeshare.js redact examples/chat_original_en.txt"),
-        (None, "node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert"),
+        ("# The inversion attack recovers it from the assistant's numbers:", "node bin/pomicat.js invert examples/chat_naive_redacted_en.txt"),
+        ("# Same chat, redacted by SafeShare (derived numbers removed too):", "node bin/pomicat.js redact examples/chat_original_en.txt"),
+        (None, "node bin/pomicat.js redact examples/chat_original_en.txt | node bin/pomicat.js invert"),
     ]
     if has_relay:
         scenes.append(("# Share it: encrypted locally, key stays in the #fragment, burns after one read:",
-                       f"node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 600 --relay {relay}"))
+                       f"node bin/pomicat.js share examples/chat_original_en.txt --burn --ttl 600 --relay {relay}"))
 
     frames, durations, screen = [], [], []
 

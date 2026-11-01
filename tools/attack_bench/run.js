@@ -6,7 +6,7 @@
 // hides; each attacker then tries to recover the salary. Recovered = within 1% of the truth.
 //
 // Redactors: none · naive (hides only the stated salary) · Presidio (default recognizers, needs
-//            .venv-eval with presidio + en_core_web_lg) · SafeShare (bin/safeshare.js redact)
+//            .venv-eval with presidio + en_core_web_lg) · SafeShare (bin/pomicat.js redact)
 // Attackers: arithmetic (policy.invert, no key needed) · LLM API (--llm; one of:
 //            OPENAI_API_KEY + LLM_MODEL, ANTHROPIC_API_KEY + LLM_MODEL) · LLM through the local
 //            OpenCode CLI (--llm-cli; default model opencode/deepseek-v4.1-flash-free, no API key) ·
@@ -19,7 +19,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { createHash } = require("crypto");
-const { redact } = require("../../bin/safeshare.js");
+const { redact } = require("../../bin/pomicat.js");
 const { invert } = require("../../extension/engine/policy.js");
 const { chatText, buildPrompt, parseLlmAnswer, withinTolerance } = require("./llm.js");
 
@@ -398,7 +398,7 @@ function makeCliAttacker({ invoke, model, retries, log, delay, cache, cacheFile 
           "|---|---|",
           `| naive: hides only the stated salary | **${pct(naive.leaked, naive.n)}** |`,
           ...(presLlm ? [`| Presidio: generic PII tool | **${pct(presLlm.leaked, presLlm.n)}** |`] : []),
-          `| SafeShare: hides the amounts too | **${pct(safe.leaked, safe.n)}** |`,
+          `| PomiCat: hides the amounts too | **${pct(safe.leaked, safe.n)}** |`,
           "",
           "**What this means**",
           "",

@@ -16,8 +16,7 @@ for (const path of ['extension/manifest.json', 'extension/manifest.firefox.json'
   if (path.includes('firefox')) assert.equal(manifest.browser_specific_settings.gecko.id, 'safeshare@research.local');
 }
 assert.equal(pkg.name, 'pomicat');
-assert.equal(pkg.bin.blackline, pkg.bin.safeshare);
-assert.equal(pkg.bin.safeshare, pkg.bin.pomicat);
+assert.deepEqual(pkg.bin, { pomicat: 'bin/pomicat.js' }, 'one CLI command, named pomicat');
 // Normalized hashes; viewer_redirect.js changed in 2.5.6 for the web-viewer fallback.
 for (const [path, hash] of Object.entries({
   'extension/engine/settings.js': '57f3173e764083949621f8c1eff915c5c2d4ed6b9861b0907da8ae5a59cd8511',

@@ -159,14 +159,14 @@ python tools/build_extension.py   # writes Chrome and Firefox ZIPs to dist/</cod
 
 <h2 id="cli">CLI and proxy</h2>
 <p>Node.js 18 or newer, no extra dependencies.</p>
-<pre><code>node bin/safeshare.js invert examples/chat_naive_redacted_en.txt     # recovers $5,000
-node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
-node bin/safeshare.js proxy --port 8788 --upstream https://api.openai.com</code></pre>
+<pre><code>node bin/pomicat.js invert examples/chat_naive_redacted_en.txt     # recovers $5,000
+node bin/pomicat.js redact examples/chat_original_en.txt | node bin/pomicat.js invert
+node bin/pomicat.js proxy --port 8788 --upstream https://api.openai.com</code></pre>
 <p>The proxy redacts supported text fields in OpenAI and Anthropic requests before forwarding them. It does not restore responses and does not cover images or files. The CLI uses the rules, not the browser model.</p>
 
 <h2 id="relay">Run your own relay</h2>
 <pre><code>python relay/server_local.py
-node bin/safeshare.js share examples/chat_original_en.txt --burn --ttl 3600 --relay http://127.0.0.1:8787</code></pre>
+node bin/pomicat.js share examples/chat_original_en.txt --burn --ttl 3600 --relay http://127.0.0.1:8787</code></pre>
 <p>Cloudflare Worker and D1 setup is in <a href="https://github.com/darflashxd/pomicat/blob/main/DEPLOY.md">DEPLOY.md</a>.</p>
 
 <h2 id="troubleshooting">Troubleshooting</h2>

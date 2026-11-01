@@ -88,10 +88,10 @@ Use an isolated Python environment with the package versions above; scripts also
 Playwright and installed Chromium/Firefox browsers. Install no dependencies into production.
 
 ```powershell
-python tools/eval/download_candidates.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison"
-python tools/eval/model_comparison.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison\report.json"
-python tools/eval/candidate_wasm.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison\wasm.json"
-python tools/eval/candidate_wasm.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison" --browser firefox --output "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison\wasm-firefox.json"
+python tools/eval/download_candidates.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison"
+python tools/eval/model_comparison.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison\report.json"
+python tools/eval/candidate_wasm.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison\wasm.json"
+python tools/eval/candidate_wasm.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison" --browser firefox --output "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison\wasm-firefox.json"
 python tools/eval/test_model_comparison.py
 ```
 
@@ -147,9 +147,9 @@ cost or a release memory budget.
 Reproduce additional checks:
 
 ```powershell
-python tools/eval/external_candidate_eval.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison\external.json"
-python tools/eval/test_candidate_tokenizer.py "$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison" --external-count 500
-$env:SAFESHARE_CANDIDATE_DIR="$env:LOCALAPPDATA\Temp\opencode\safeshare-model-comparison"
+python tools/eval/external_candidate_eval.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison" --output "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison\external.json"
+python tools/eval/test_candidate_tokenizer.py "$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison" --external-count 500
+$env:SAFESHARE_CANDIDATE_DIR="$env:LOCALAPPDATA\Temp\opencode\pomicat-model-comparison"
 python tools/eval/chrome_ner.py
 python tools/eval/firefox_ner.py
 Remove-Item Env:SAFESHARE_CANDIDATE_DIR

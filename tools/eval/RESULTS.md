@@ -1,4 +1,4 @@
-# Evaluation results (2026-10-10 and 2026-10-11, SafeShare 2.2.0 and 2.3.0)
+# Evaluation results (2026-10-10 and 2026-10-11, PomiCat 2.2.0 and 2.3.0)
 
 All runs are reproducible with the commands in [README.md](README.md). Raw data and outputs
 stay in `tools/eval/data/` (gitignored).
@@ -10,21 +10,21 @@ stay in `tools/eval/data/` (gitignored).
 
 | tool | value recall | token precision | token recall | token F1 |
 |---|---|---|---|---|
-| SafeShare 2.2.0 | 0.094 | 0.970 | 0.118 | **0.211** |
+| PomiCat 2.2.0 | 0.094 | 0.970 | 0.118 | **0.211** |
 | Presidio (default recognizers, `en_core_web_lg`) | 0.684 | 0.926 | 0.691 | **0.792** |
 | gitleaks 8.30.1 | 0.000 | – | 0.000 | 0.000 |
 
-Per label, SafeShare is close to Presidio only on emails (0.99 vs 1.00), SSNs (0.86 vs 1.00) and
+Per label, PomiCat is close to Presidio only on emails (0.99 vs 1.00), SSNs (0.86 vs 1.00) and
 card numbers (0.70 vs 0.85). It finds almost no names, cities, streets or dates (≤ 0.04), because
 it has no general named-entity recognition: it only catches names a user introduces
 ("my name is …", "nama saya …"). gitleaks only looks for secrets, and this dataset has none.
 
-**Takeaway:** SafeShare is not a general PII detector. For names and addresses, Presidio is far better.
+**Takeaway:** PomiCat is not a general PII detector. For names and addresses, Presidio is far better.
 
 ## 2. Indonesian entities: IndoNLU NERGrit (validation)
 
-209 sentences, 662 PERSON / PLACE / ORGANISATION spans. SafeShare value recall **0.003**.
-NERGrit is encyclopedic text about public people and places, which SafeShare deliberately
+209 sentences, 662 PERSON / PLACE / ORGANISATION spans. PomiCat value recall **0.003**.
+NERGrit is encyclopedic text about public people and places, which PomiCat deliberately
 leaves alone, so this mostly confirms the missing-NER gap above for Indonesian too.
 
 ## 3. False positives on real chats: WildChat-1M
@@ -58,33 +58,33 @@ On `examples/chat_original_en.txt`, Presidio leaves the salary (`$5,000`) and ev
 figure in place; it only masks "a year" as a date. Masking the salary alone is not enough:
 
 ```
-$ sed 's/\$5,000/<REDACTED>/' presidio_output.txt | safeshare invert
+$ sed 's/\$5,000/<REDACTED>/' presidio_output.txt | pomicat invert
 Most likely hidden value: $5,000 (agreed by 3 visible numbers)
 ```
 
-After SafeShare redaction, `invert` recovers nothing on the same chats (Indonesian and English).
+After PomiCat redaction, `invert` recovers nothing on the same chats (Indonesian and English).
 
-## 5. SafeShare + Presidio (2.3.0)
+## 5. PomiCat + Presidio (2.3.0)
 
 `--presidio` adds Presidio's recognizers (names, places, phones, IDs). Same 2,000 ai4privacy rows
 and 500 WildChat conversations:
 
 | setting | ai4privacy token F1 | token P | WildChat conversations touched |
 |---|---|---|---|
-| SafeShare alone | 0.213 | 0.969 | 7.8% |
+| PomiCat alone | 0.213 | 0.969 | 7.8% |
 | + Presidio, `names: personal` (default) | 0.310 | 0.980 | 8.8% |
 | + Presidio, `names: all` | 0.667 | 0.957 | 71% |
 | + Presidio, `names: all`, dates on | 0.780 | 0.926 | – |
 | Presidio alone | 0.792 | 0.926 | – |
 
-With every name and date on, SafeShare + Presidio matches Presidio on the benchmark (per label:
+With every name and date on, PomiCat + Presidio matches Presidio on the benchmark (per label:
 passports 1.00, SSNs 1.00, tax numbers 0.98, phones 0.70, streets 0.75) and adds the inversion
 defense. But on real chats that setting rewrites 71% of conversations, mostly celebrity names,
 story characters, authors in citations and places in essays.
 
 `names: personal` only accepts a name or place that directly follows words tying it to the user
 ("my wife", "my name is", "I'm", "teman saya", "I live in", "tinggal di"). Hand check of the 6
-conversations it adds over SafeShare alone: a self-introduction, a business location, a passport
+conversations it adds over PomiCat alone: a self-introduction, a business location, a passport
 number, two users' LAN IP addresses (reasonable) and a DOI read as a phone number (since fixed).
 
 Presidio exposed four engine bugs, fixed with tests: short entities replaced inside words
@@ -98,7 +98,7 @@ about the user?". That is what a trained contextual model should learn, measured
 ## 6. Does the inversion attack happen in real chats? (2026-10-11)
 
 `tools/eval/inversion_wild.js` on 20,000 English WildChat-1M conversations (one parquet shard,
-`tools/eval/wildchat_to_cache.py`). For each chat where SafeShare's rules find an amount the user
+`tools/eval/wildchat_to_cache.py`). For each chat where PomiCat's rules find an amount the user
 stated: mask exactly those amounts everywhere (what an entity-by-entity redactor does), then
 attack. "Recovered" = a top-3 `invert` guess within 1.5% of a masked amount; a decoy value
 (amount × 1.37) measures chance hits.
@@ -109,7 +109,7 @@ attack. "Recovered" = a top-3 `invert` guess within 1.5% of a masked amount; a d
 | masked amount still visible in another format | 37 (15.7%) | 0 |
 | recovered by `invert` (top 3) | 3 (1.3%), all coincidences on reading | 0 |
 | chance hits on the decoy | 0 | 0 |
-| after SafeShare: visible / recovered | 30 (12.8%) / 0 | 0 / 0 |
+| after PomiCat: visible / recovered | 30 (12.8%) / 0 | 0 / 0 |
 
 \* the amount is in a sentence like "my salary / our rent / I pay / gaji saya …", under 100 million.
 
@@ -119,7 +119,7 @@ attack. "Recovered" = a top-3 `invert` guess within 1.5% of a masked amount; a d
   for the inversion attack from this data.** The attack is demonstrated on controlled examples
   (`examples/`), not yet observed in the wild.
 - The "all chats" column is noisy: most detected "amounts" are company figures, data tables, IDs
-  and years, where a 1.5% match happens by chance. The 12.8% left visible after SafeShare are of
+  and years, where a 1.5% match happens by chance. The 12.8% left visible after PomiCat are of
   that kind; none are personal money.
 - Running this found and fixed a bug: `invert` counted a number repeated three times as three
   pieces of evidence. Support now counts distinct values.
@@ -133,14 +133,14 @@ the next experiment.
 
 A redacted birth date is undone by "I am 28" (plus the current year) or "I graduated in 2020 at
 22". `invert` now reports this when a text hides a birth date (`examples/chat_birthdate_naive.txt`
-→ 1998 or 1997), and SafeShare hides stated ages whenever it hides a birth date
+→ 1998 or 1997), and PomiCat hides stated ages whenever it hides a birth date
 (`tests/birthyear.test.js`). Ages alone are left as they are.
 
 ## 8. A third inference: a hidden date from weekday and day clues (2026-10-24)
 
 "My birthday is [REDACTED_DATE]. It was a Tuesday, the day after my sister's on the 14th" leaves
 few dates: `inferDates` (in `invert`) lists every day within a year either side that fits the
-weekday, the offset and the visible day number. SafeShare hides those clues whenever it hides a
+weekday, the offset and the visible day number. PomiCat hides those clues whenever it hides a
 date (`[REDACTED_WEEKDAY]`, `[REDACTED_OFFSET]`, `[REDACTED_DAY]`).
 
 40 fictional birth dates (half English, half Indonesian), each with a weekday and a "day after the
@@ -149,7 +149,7 @@ Nth" clue, measured through the extension's share dialog:
 | Redaction | Hidden date narrowed to ≤ 4 days |
 |---|---|
 | Naive (only the date replaced) | 40 / 40 (2 to 4 candidates, always including the true date) |
-| SafeShare share dialog | 0 / 40 |
+| PomiCat share dialog | 0 / 40 |
 
 Reproduced by `npm test` (`tests/maybe.test.js`, "dates benchmark"). Only birth dates count as
 personal: an appointment date is not hidden, so its clues are left as they are. The attack finds the
@@ -157,6 +157,6 @@ day and month within a two-year window; the year has to come from elsewhere (see
 
 ## What this means for the project
 
-SafeShare's value is the inversion defense, not entity detection. The natural setup is to run a
-strong entity detector (Presidio, or a trained model) for names and addresses, and SafeShare's
+PomiCat's value is the inversion defense, not entity detection. The natural setup is to run a
+strong entity detector (Presidio, or a trained model) for names and addresses, and PomiCat's
 inversion layer on top for numbers that can be derived from redacted ones.

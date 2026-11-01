@@ -13,7 +13,7 @@
 //   4. control: score the same guesses against a decoy (amount x 1.37) to measure chance hits.
 const fs = require("fs");
 const path = require("path");
-const { redactTurns, invert } = require("../../bin/safeshare.js");
+const { redactTurns, invert } = require("../../bin/pomicat.js");
 const ContextualClassifier = require("../../extension/engine/contextual.js");
 const ConsistentPseudonymizer = require("../../extension/engine/pseudonymizer.js");
 

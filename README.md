@@ -133,8 +133,8 @@ Node.js 18 or newer. No account, key, model or relay.
 ```bash
 git clone https://github.com/darflashxd/pomicat.git
 cd pomicat
-node bin/safeshare.js invert examples/chat_naive_redacted_en.txt
-node bin/safeshare.js redact examples/chat_original_en.txt | node bin/safeshare.js invert
+node bin/pomicat.js invert examples/chat_naive_redacted_en.txt
+node bin/pomicat.js redact examples/chat_original_en.txt | node bin/pomicat.js invert
 ```
 
 The first command recovers `$5,000`. The second prints `No hidden values recovered.`

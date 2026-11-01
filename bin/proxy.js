@@ -198,7 +198,7 @@ const ADAPTERS = [
 /** Redacts all slots together, so placeholders stay consistent across the conversation. */
 async function redactSlots(slots, policy) {
   if (!slots.length) return;
-  const { redact } = require("./safeshare.js");
+  const { redact } = require("./pomicat.js");
   const redacted = await redact(slots.map((s) => ({ role: s.role, content: s.get() })), policy);
   slots.forEach((s, k) => s.set(redacted[k].content));
 }

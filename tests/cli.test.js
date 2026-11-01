@@ -2,7 +2,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { redactTurns, invert } = require("../bin/safeshare.js");
+const { redactTurns, invert } = require("../bin/pomicat.js");
 
 const ex = (f) => fs.readFileSync(path.join(__dirname, "..", "examples", f), "utf8");
 

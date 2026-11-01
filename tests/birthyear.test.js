@@ -1,6 +1,6 @@
 // Run: node tests/birthyear.test.js
 const assert = require("assert");
-const { redactTurns, invert } = require("../bin/safeshare.js");
+const { redactTurns, invert } = require("../bin/pomicat.js");
 const { inferBirthYears } = require("../extension/engine/policy.js");
 
 // Attack: a hidden birth date comes back from stated ages

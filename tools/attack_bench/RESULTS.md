@@ -9,7 +9,7 @@
 | none | arithmetic | 100% | 0% | **100%** |
 | naive | arithmetic | 0% | 53% | **53%** |
 | presidio | arithmetic | 100% | 0% | **100%** |
-| safeshare | arithmetic | 0% | 0% | **0%** |
+| pomicat | arithmetic | 0% | 0% | **0%** |
 
 ## LLM attacker (DeepSeek V4 Pro via OpenCode CLI)
 
@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | naive | llm:9router/ds/deepseek-v4-pro | 0% | 100% | **100%** |
 | presidio | llm:9router/ds/deepseek-v4-pro | 100% | 0% | **100%** |
-| safeshare | llm:9router/ds/deepseek-v4-pro | 0% | 0% | **0%** |
+| pomicat | llm:9router/ds/deepseek-v4-pro | 0% | 0% | **0%** |
 
 Recovered = the attacker's answer is within 1% of the true salary. "Visible" = the redactor didn't hide the salary at all.
 

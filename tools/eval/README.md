@@ -1,6 +1,6 @@
 # Evaluation harness
 
-Compares SafeShare, Presidio and gitleaks on the same labelled data. Every tool writes
+Compares PomiCat, Presidio and gitleaks on the same labelled data. Every tool writes
 `{"id", "output"}` lines, and `score.py` scores only the redacted text, so any other tool
 can be added the same way.
 
@@ -27,8 +27,8 @@ safe-chat holdouts. No model, credential verification requests or new dependenci
 ## Quick check (synthetic, offline)
 
 ```bash
-node tools/eval/run_safeshare.js tools/eval/sample_gold.jsonl > out_safeshare.jsonl
-python tools/eval/score.py tools/eval/sample_gold.jsonl out_safeshare.jsonl
+node tools/eval/run_pomicat.js tools/eval/sample_gold.jsonl > out_pomicat.jsonl
+python tools/eval/score.py tools/eval/sample_gold.jsonl out_pomicat.jsonl
 ```
 
 ## Real held-out data
@@ -46,11 +46,11 @@ Gold format is the ai4privacy one: `source_text` plus `privacy_mask: [{value, la
    For gitleaks, install v8+ from its GitHub releases page.
 3. Run and score:
    ```bash
-   node tools/eval/run_safeshare.js gold.jsonl > out_safeshare.jsonl
-   node tools/eval/run_safeshare.js gold.jsonl --presidio http://127.0.0.1:5002 > out_safeshare_presidio.jsonl
+   node tools/eval/run_pomicat.js gold.jsonl > out_pomicat.jsonl
+   node tools/eval/run_pomicat.js gold.jsonl --presidio http://127.0.0.1:5002 > out_pomicat_presidio.jsonl
    python tools/eval/run_presidio.py gold.jsonl > out_presidio.jsonl
    python tools/eval/run_gitleaks.py gold.jsonl > out_gitleaks.jsonl
-   python tools/eval/score.py gold.jsonl out_safeshare.jsonl out_presidio.jsonl out_gitleaks.jsonl
+   python tools/eval/score.py gold.jsonl out_pomicat.jsonl out_presidio.jsonl out_gitleaks.jsonl
    ```
 
 gitleaks only looks for secrets, so compare it on the credential labels only.
@@ -66,4 +66,4 @@ gitleaks only looks for secrets, so compare it on the credential labels only.
   ~230 MB, kept local) then `node tools/eval/inversion_wild.js 20000`. Writes
   `data/inversion_wild_report.json`; see RESULTS.md section 6.
 
-Report every number, including the categories where SafeShare loses.
+Report every number, including the categories where PomiCat loses.

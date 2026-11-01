@@ -4,7 +4,7 @@
 // context so they can be hand-labelled as true or false positives.
 // The data stays local (tools/eval/data is gitignored); it can contain real personal data.
 const fs = require("fs");
-const { redact } = require("../../bin/safeshare.js");
+const { redact } = require("../../bin/pomicat.js");
 
 const [n = "500", outPath = "tools/eval/data/wildchat_redactions.jsonl", ...rest] = process.argv.slice(2);
 const arg = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);

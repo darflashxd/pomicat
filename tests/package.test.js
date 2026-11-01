@@ -22,9 +22,9 @@ try {
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", path.join(tmp, tgz)], { cwd: tmp });
 
   const installed = path.join(tmp, "node_modules", "pomicat");
-  const cli = path.join(installed, "bin", "safeshare.js");
+  const cli = path.join(installed, "bin", "pomicat.js");
   const metadata = require(path.join(installed, 'package.json'));
-  assert.equal(metadata.bin.blackline, metadata.bin.safeshare, 'both commands must use the same implementation');
+  assert.deepEqual(metadata.bin, { pomicat: 'bin/pomicat.js' }, 'installed package exposes the pomicat command');
   const chat = path.join(tmp, "chat.txt");
   fs.writeFileSync(chat, "User: My salary is $5,000 a month and my NIK is 3201012304950001.\nAssistant: Saving 20% is $1,000 a month, $12,000 a year.\n");
 

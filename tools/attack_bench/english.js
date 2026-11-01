@@ -1,7 +1,7 @@
 // Independent EN challenge bench. No LLM/API calls; fictional, fixed-seed development data.
 // node tools/attack_bench/english.js [--out report.json]
 const fs = require('node:fs');
-const { redactTurns, invert } = require('../../bin/safeshare.js');
+const { redactTurns, invert } = require('../../bin/pomicat.js');
 
 const money = n => '$' + n.toLocaleString('en-US', {maximumFractionDigits: 2});
 function buildCases() {

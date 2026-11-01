@@ -1,13 +1,13 @@
 # Can an LLM recover a hidden salary from a redacted chat?
 
 **Three LLM attackers from two vendors, in English and Indonesian: naive redaction leaked 100% every
-time, Presidio 100%, and SafeShare 0%.**
+time, Presidio 100%, and PomiCat 0%.**
 
 40 fictional chats per run: each states a monthly salary, and the assistant replies with 1–3
 figures derived from it ("save 20% → $1,000 a month"). Each redactor hides what it hides; the LLM
 attacker then reads the redacted chat and tries to recover the salary.
 
-| Salary leaked to the LLM | Naive (hides only the salary) | Presidio (generic PII tool) | SafeShare |
+| Salary leaked to the LLM | Naive (hides only the salary) | Presidio (generic PII tool) | PomiCat |
 |---|---|---|---|
 | DeepSeek V4 Pro · English | **100%** | **100%** (left visible) | **0%** |
 | Claude Sonnet 5.5 · English | **100%** | **100%** (left visible) | **0%** |
@@ -22,8 +22,8 @@ attacker then reads the redacted chat and tries to recover the salary.
 - **A generic PII tool doesn't help.** Presidio's default recognizers leave English amounts as they
   are. On Rupiah it did hide 87% of the stated salaries, but the LLM recovered 88% of those from the
   savings figures Presidio left in the reply: still 100% leaked.
-- **SafeShare held.** It hides the derived amounts too, so the attacker sees one percentage and
-  placeholders. Every model answered "not enough information" (0 recovered out of 160 SafeShare chats).
+- **PomiCat held.** It hides the derived amounts too, so the attacker sees one percentage and
+  placeholders. Every model answered "not enough information" (0 recovered out of 160 PomiCat chats).
 
 ### How it was measured
 - 40 fictional chats per run, fixed seed (`tools/attack_bench/run.js`), templated replies.
@@ -39,7 +39,7 @@ attacker then reads the redacted chat and tries to recover the salary.
 ### Limits
 - Templated replies, not real model output; only salaries and simple arithmetic.
 - Three models, two vendors; no OpenAI or Google model yet.
-- Shows that the attack works and that SafeShare's defence holds on these cases, not how often real
+- Shows that the attack works and that PomiCat's defence holds on these cases, not how often real
   chats leak. Not a proof of safety in general.
 
 ### Reproduce
@@ -57,13 +57,13 @@ Add `--out <file>` to keep each run's report. Raw transcripts stay local (`--llm
 | English | naive | Claude Sonnet 5.5 | 0% | 100% | **100%** |
 | English | naive | Claude Haiku 5.5 | 0% | 100% | **100%** |
 | English | presidio | any | 100% | 0% | **100%** |
-| English | safeshare | arithmetic | 0% | 0% | **0%** |
-| English | safeshare | DeepSeek V4 Pro | 0% | 0% | **0%** |
-| English | safeshare | Claude Sonnet 5.5 | 0% | 0% | **0%** |
-| English | safeshare | Claude Haiku 5.5 | 0% | 0% | **0%** |
+| English | pomicat | arithmetic | 0% | 0% | **0%** |
+| English | pomicat | DeepSeek V4 Pro | 0% | 0% | **0%** |
+| English | pomicat | Claude Sonnet 5.5 | 0% | 0% | **0%** |
+| English | pomicat | Claude Haiku 5.5 | 0% | 0% | **0%** |
 | Indonesian | naive | arithmetic | 0% | 53% | **53%** |
 | Indonesian | naive | Claude Sonnet 5.5 | 0% | 100% | **100%** |
 | Indonesian | presidio | arithmetic | 13% | 8% | **20%** |
 | Indonesian | presidio | Claude Sonnet 5.5 | 13% | 88% | **100%** |
-| Indonesian | safeshare | arithmetic | 0% | 0% | **0%** |
-| Indonesian | safeshare | Claude Sonnet 5.5 | 0% | 0% | **0%** |
+| Indonesian | pomicat | arithmetic | 0% | 0% | **0%** |
+| Indonesian | pomicat | Claude Sonnet 5.5 | 0% | 0% | **0%** |

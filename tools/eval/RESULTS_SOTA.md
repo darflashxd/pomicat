@@ -20,7 +20,7 @@ at all. See "Four different numbers" below.
 | GLiNER-bi-small, zero-shot | 0.678 | 0.743 | No training; generic labels |
 | DeBERTa-xsmall, fine-tuned on synthetic data | 0.366 | 0.458 | Synthetic F1 0.783; didn't transfer |
 | mMiniLMv2, fine-tuned on synthetic data | 0.341 | 0.423 | Synthetic F1 0.744; didn't transfer |
-| SafeShare rules only | 0.167 | 0.339 | EMAIL / SSN / CARD only |
+| PomiCat rules only | 0.167 | 0.339 | EMAIL / SSN / CARD only |
 | Electra, fine-tuned on synthetic data | 0.115 | 0.169 | Synthetic F1 0.627; didn't transfer at all |
 
 The arbiter rows were measured with raw-logit scores. `extension/offscreen.js` now passes softmax
@@ -36,8 +36,8 @@ false-positive rate on real chats; for that see the WildChat numbers in `RESULTS
 |---|---|
 | Electra / mMiniLM / DeBERTa fine-tuned (+ hard negatives) | **0.00%** |
 | MiniLM + arbiter (final) | **0.00%** (13.08% → 1.10% → 0.00% with Tier-0 BARE_PORT / SQL / PRIVATE_IP) |
-| SafeShare rules (final) | **0.00%** (7.58% → 0.00% by excluding private IPs) |
-| SafeShare rules (before) | 7.58% (left: private IPs 10.x / 192.168.x) |
+| PomiCat rules (final) | **0.00%** (7.58% → 0.00% by excluding private IPs) |
+| PomiCat rules (before) | 7.58% (left: private IPs 10.x / 192.168.x) |
 | MiniLM + arbiter (before) | 13.08% (left: bare ports, SQL ids, private IPs) |
 | MiniLM raw | 38.34% |
 

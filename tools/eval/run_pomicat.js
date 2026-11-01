@@ -1,10 +1,10 @@
-// Usage: node tools/eval/run_safeshare.js gold.jsonl [--presidio URL] [--profile public|trusted] [--heuristics-trace] > out.jsonl
+// Usage: node tools/eval/run_pomicat.js gold.jsonl [--presidio URL] [--profile public|trusted] [--heuristics-trace] > out.jsonl
 // --heuristics-trace evaluates ONLY the production deterministic scanner, not the full CLI.
 // Gold rows follow the ai4privacy format: { id?, source_text, privacy_mask: [{ value, label }] }.
 // Each row is redacted on its own (no cross-row state).
 const fs = require("fs");
 const readline = require("readline");
-const { redact } = require("../../bin/safeshare.js");
+const { redact } = require("../../bin/pomicat.js");
 const Heuristics = require('../../extension/engine/heuristics.js');
 
 const args = process.argv.slice(3);

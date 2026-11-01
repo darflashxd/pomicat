@@ -34,7 +34,7 @@ assert score(gold, wrapped)['positional']['full_span_recall'] == 0
 print("PASS: missing/duplicate IDs, reconstruction, exact coverage, partial masks, unchanged edits")
 root = Path(__file__).resolve().parents[2]
 corpus = root / 'tests/fixtures/english_credentials.jsonl'
-completed = subprocess.run(['node', str(root / 'tools/eval/run_safeshare.js'), str(corpus), '--heuristics-trace'],
+completed = subprocess.run(['node', str(root / 'tools/eval/run_pomicat.js'), str(corpus), '--heuristics-trace'],
                            capture_output=True, text=True, encoding='utf-8', check=True, timeout=30)
 rows = [json.loads(line) for line in corpus.read_text(encoding='utf-8').splitlines()]
 outputs = [json.loads(line) for line in completed.stdout.splitlines()]

@@ -10,7 +10,7 @@
 // Output: tools/eval/data/label_sheet.csv (gitignored: real people's text, keep it private).
 const fs = require("fs");
 const path = require("path");
-const { presidioHits } = require("../../bin/safeshare.js");
+const { presidioHits } = require("../../bin/pomicat.js");
 const ContextualClassifier = require("../../extension/engine/contextual.js");
 
 const args = process.argv.slice(2);
