@@ -55,8 +55,8 @@
       "category": "DIRECT_GOV_BANKING",
       "title": "German IBAN and SWIFT/BIC Code Wire",
       "input": "Settlement amount €85,000 to beneficiary IBAN: DE89370400440532013000 at SWIFT/BIC: DEUTDEDDFXX.",
-      "expected_redactions": ["DE89370400440532013000", "DEUTDEDDFXX", "€85,000"],
-      "expected_preservations": ["Settlement amount"],
+      "expected_redactions": ["DE89370400440532013000", "€85,000"],
+      "expected_preservations": ["Settlement amount", "DEUTDEDDFXX"],
       "category_tag": "FINANCIAL"
     },
     {

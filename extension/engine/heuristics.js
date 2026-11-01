@@ -72,6 +72,20 @@ class HeuristicsRedactor {
         replacement: "$1[REDACTED_OTP]"
       },
       {
+        // Labelled national IDs, kept whole: "Aadhaar number is 1234 5678 9012", "German tax ID is
+        // 12 345 678 901", "National Insurance number is QQ 12 34 56 C", "BSN is 111222333",
+        // "My Number card ID is 9876 5432 1098", "VAT number is DE123456789". Not "my number is 0812…".
+        id: "LABELLED_NATIONAL_ID", name: "National ID (labelled)", category: "GOV_ID", valueGroup: 3,
+        regex: /\b((?:aadhaa?r|(?:japanese\s+)?my\s+number\s+card|individual\s+number|(?:german\s+|personal\s+)?tax\s+(?:id|identification)|steuer-?id|BSN|burgerservicenummer|citizen\s+service\s+number|national\s+insurance|NI\s+number|NINO|VAT)(?:\s+(?:number|no\.?|card|ID))*)((?:\s+(?:is|was))?\s*[:=#]?\s*)((?:[A-Z]{1,3}[ -]?)?\d[\d -]{4,20}\d(?:[ -]?[A-Z](?![A-Za-z]))?)(?![\w-])/gi,
+        validator: (raw) => (raw.match(/\d/g) || []).length >= 6,
+        replacement: "$1$2[REDACTED_ID]"
+      },
+      {
+        id: "UK_SORT_CODE", name: "UK sort code", category: "FINANCIAL", valueGroup: 2,
+        regex: /\b(sort[ \t]+code(?:[ \t]+(?:is|was))?[ \t]*[:=]?[ \t]*)(\d{2}[- ]\d{2}[- ]\d{2})(?![\d-])/gi,
+        replacement: "$1[REDACTED_SORT_CODE]"
+      },
+      {
         // "My 2FA backup code is 8842-1197", "recovery code: 4F7K-9QX2" (card security codes: CVV rule)
         id: "BACKUP_CODE", name: "2FA backup / recovery code", category: "CREDENTIALS", valueGroup: 2,
         regex: /\b((?:(?:2FA|MFA|two[- ]factor)[ \t]+)?(?:backup|recovery)[ \t]+codes?)((?:[ \t]+(?:is|are|was))?[ \t]*[:=]?[ \t]*)([A-Z0-9]{3,8}(?:-[A-Z0-9]{3,8}|[ ]\d{3,8}){0,3})(?![A-Z0-9-])/giu,
@@ -196,14 +210,6 @@ class HeuristicsRedactor {
         replacement: "$1[REDACTED_IBAN]"
       },
       // 1f. SWIFT / BIC Code
-      {
-        id: "SWIFT_BIC",
-        name: "SWIFT / BIC Banking Code",
-        category: "CREDENTIALS",
-        // Code must be uppercase and separated from the keyword ("swift movement", "bicarbonate" are not codes)
-        regex: /\b((?:(?:[Ss][Ww][Ii][Ff][Tt](?:\s+[Cc][Oo][Dd][Ee]|\s+[Bb][Ii][Cc])?|[Bb][Ii][Cc])(?:\s*[:=\-]\s*|\s+)))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g,
-        replacement: "$1[REDACTED_SWIFT_BIC]"
-      },
       // 2. Credit Card Numbers (12-19 digits with Luhn verification & Fail-Closed Context Fallback)
       {
         id: "CREDIT_CARD",
@@ -544,7 +550,7 @@ class HeuristicsRedactor {
         id: "BIP39_SEED_PHRASE",
         name: "BIP-39 Mnemonic Recovery Seed Phrase",
         category: "CREDENTIALS",
-        regex: /(\b(?:seed|mnemonic|recovery(?:\s+phrase)?|bip-?39)[^:\n\r]*[:=\-]?\s*)([a-z]{3,12}(?:[ \t]+[a-z]{3,12}){11,23})\b/gi,
+        regex: /(\b(?:seed|mnemonic|recovery(?:\s+phrase)?|bip-?39)[^:\n\r]*?[:=\-]?\s*)\b(?!(?:phrase|words?|are|was|were|is)\b)([a-z]{3,12}(?:[ \t]+[a-z]{3,12}){11,23})\b/gi,
         replacement: "$1[REDACTED_MNEMONIC_SEED_PHRASE]"
       },
       // 5f. Linux /etc/shadow Password Hashes
@@ -826,6 +832,7 @@ class HeuristicsRedactor {
         regex: /\b((?:(?:sin|social\s+insurance(?:\s+number)?)\s*[:=\-~]?\s*|(?<=\b)))(\d{3}[-\s]\d{3}[-\s]\d{3})\b/gi,
         validator: (raw, index, text) => {
           if (!text) return true;
+          if (/\d[\s-]?$/.test(text.slice(Math.max(0, index - 2), index))) return false;
           const window = text.substring(Math.max(0, index - 60), Math.min(text.length, index + raw.length + 60)).toLowerCase();
           return /\b(?:sin|social\s+insurance|cra|canada|canadian|tax|resident)\b/.test(window);
         },

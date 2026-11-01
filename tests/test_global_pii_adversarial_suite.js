@@ -330,9 +330,11 @@ async function runGlobalPIISuite() {
 
   // VEC-BANK-05: SWIFT / BIC Banking Code
   const rBank05 = processDialogue("Routing via SWIFT code: DEUTDEDDFXX.", "Bank SWIFT DEUTDEDDFXX confirmed.");
-  recordCheck("VEC-BANK-05", "SWIFT/BIC code (DEUTDEDDFXX) redacted",
-    !rBank05.anonymizedTurns[0].content.includes("DEUTDEDDFXX") &&
-    !rBank05.anonymizedTurns[1].content.includes("DEUTDEDDFXX")
+  // A SWIFT/BIC code identifies the bank, not the person: kept by default, offered as a suggestion
+  const swiftSuggested = require("../extension/engine/maybe.js").scan([{ role: "user", content: "Routing via SWIFT code: DEUTDEDDFXX." }])
+    .some(c => c.raw === "DEUTDEDDFXX" && !c.risky);
+  recordCheck("VEC-BANK-05", "SWIFT/BIC code (DEUTDEDDFXX) offered as an unticked suggestion, not auto-redacted",
+    rBank05.anonymizedTurns[0].content.includes("DEUTDEDDFXX") && swiftSuggested
   );
 
   // VEC-BANK-06: US ABA Bank Routing Transit Number

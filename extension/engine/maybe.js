@@ -176,6 +176,10 @@
         const near = /\b(?:pass(?:word|wd|phrase|code)?|pwd|kata\s+sandi|sandi)\b/i.test(text.slice(Math.max(0, m.index - 160), m.index));
         add(raw, m.index, near, near ? "Password-shaped value after the word \"password\"" : "Password-shaped value; not verified", "random", undefined, undefined, true);
       }
+      // SWIFT/BIC identifies the bank, not the person: offered, never pre-ticked
+      for (const m of text.matchAll(/\b(?:SWIFT|BIC)(?:\s+(?:code|BIC))?\s*[:=-]?\s*([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g)) {
+        add(m[1], m.index + m[0].lastIndexOf(m[1]), false, "Bank SWIFT/BIC code (identifies the bank, not you)", "random");
+      }
       // Plain numbers skip add() (it drops unticked digit strings); these are asked about, unticked
       for (const a of possibleAmounts(text)) {
         if (excluded.some(([s, e]) => a.start < e && a.start + a.raw.length > s) || candidates.has(a.raw)) continue;
