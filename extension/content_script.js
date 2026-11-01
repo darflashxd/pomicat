@@ -963,29 +963,13 @@
   let streamingRetryTimer = null;
   function runHydrationPass() {
     if (!localCompute || !symbolicVault || typeof document === "undefined" || !document.body) return;
-    const isEnabled = isPreInferenceEnabled();
-
     // Values that were replaced before sending stay readable on your screen even after protection
     // is switched off (the map only holds what was actually replaced)
     restoreIdsOnScreen();
     try { addSentNotes(); } catch (_) {} // a display extra: never let it stop the pass
 
-    // If shield is disabled: un-hydrate all local compute spans so user sees raw symbols
-    if (!isEnabled) {
-      const hydratedSpans = document.querySelectorAll(".ss-local-compute:not(.ss-id-restored), [data-expr]:not(.ss-id-restored)");
-      hydratedSpans.forEach(span => {
-        const origExpr = span.getAttribute("data-expr");
-        if (origExpr) {
-          const txtNode = document.createTextNode(decodeURIComponent(origExpr));
-          span.replaceWith(txtNode);
-        }
-      });
-      document.querySelectorAll("[data-safeshare-hydrated]").forEach(el => {
-        delete el.dataset.safeshareHydrated;
-      });
-      return;
-    }
-
+    // Sums use values that were already sent as symbols, so they stay on screen when protection is
+    // switched off afterwards, like restored IDs ("off" only means the next message goes as typed)
     if (symbolicVault.size() === 0) return;
     const vaultData = symbolicVault.getAll();
     if (!vaultData || Object.keys(vaultData).length === 0) return;
