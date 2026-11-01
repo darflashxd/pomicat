@@ -186,12 +186,15 @@ class SafeShareSymbolicRewriter {
   buildSteeringInstruction(symbols, language = "en") {
     if (!symbols || symbols.length === 0) return "";
     const symList = symbols.join(", ");
+    // Chat sites render "<S1>" in an answer as an unknown HTML tag and drop it ("**0.30 * <S1>**"
+    // showed as "**0.30 *"), so the answer must use the bare name, which is computed on screen too
+    const bare = symbols.map(s => s.replace(/[<>]/g, "")).join(", ");
 
     if (language === "id") {
-      return `\n\n[PROTOKOL PRIVASI: Perlakukan variabel ${symList} sebagai parameter angka tetap. Keluarkan rincian anggaran, alokasi biaya, dan formula matematika terhadap ${symList} secara langsung menggunakan ekspresi aljabar standar (contoh: 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Jangan gunakan tag escape atau persamaan berantai.]`;
+      return `\n\n[PROTOKOL PRIVASI: Perlakukan variabel ${symList} sebagai parameter angka tetap. Keluarkan rincian anggaran, alokasi biaya, dan formula matematika terhadap ${symList} secara langsung menggunakan ekspresi aljabar standar (contoh: 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Dalam jawaban, tulis ${bare} tanpa kurung sudut. Jangan gunakan tag escape atau persamaan berantai.]`;
     }
 
-    return `\n\n[PRIVACY PROTOCOL: Treat ${symList} as an exact fixed parameter. Provide budget allocations, spending, and formulas in standard algebraic terms (e.g. 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). Do not use escape tags or chained equations.]`;
+    return `\n\n[PRIVACY PROTOCOL: Treat ${symList} as an exact fixed parameter. Provide budget allocations, spending, and formulas in standard algebraic terms (e.g. 0.20 * VAL_A, (1.20 * VAL_A) - (VAL_B + VAL_C)). In your answer write ${bare} without angle brackets. Do not use escape tags or chained equations.]`;
   }
 
   /**
