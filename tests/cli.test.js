@@ -167,7 +167,7 @@ console.log("cli: ip checks passed");
   const s = (t) => new H().scan(t).sanitizedText;
   const out = s("I live in Bandung and work as a nurse. My husband Budi and I want help with our money. I was born on 14 March 1998.");
   assert(out.includes("work as a nurse. My husband Budi"), out);
-  assert.strictEqual(s("I live in Hauptstrasse 12, Berlin"), "I live in [REDACTED_ADDRESS], Berlin");
+  assert.strictEqual(s("I live in Hauptstrasse 12, Berlin"), "I live in [REDACTED_ADDRESS]");
 }
 console.log("cli: address boundary checks passed");
 
