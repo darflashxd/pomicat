@@ -47,7 +47,7 @@
     let started = false, gap = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!code && /^[\s ​-‍⁠﻿]*$/.test(line)) { gap = started; continue; }
+      if (!code && /^[\s\u00a0\u200b-\u200d\u2060\ufeff]*$/.test(line)) { gap = started; continue; }
       if (gap) { output.push("<br>"); gap = false; }
       started = true;
       if (/^\s*```/.test(line)) { output.push(code ? "</code></pre>" : "<pre><code>"); code = !code; continue; }

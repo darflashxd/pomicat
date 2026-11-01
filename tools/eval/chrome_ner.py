@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix="safeshare-chrome-", dir=base) as tmp:
     scripts = ["engine/heuristics.js", "engine/contextual.js", "engine/pseudonymizer.js", "engine/policy.js", "engine/crypto.js",
                "engine/maybe.js", "engine/transcript.js", "engine/span_arbiter.js", "engine/ner_client.js", "ui/modal.js", "browser_review.js"]
     shutil.copyfile(ROOT / "tools/eval/browser_review.js", ext / "browser_review.js")
-    (ext / "smoke.html").write_text('<!doctype html><body>' + ''.join(f'<script src="{s}"></script>' for s in scripts), encoding="utf-8")
+    (ext / "smoke.html").write_text('<!doctype html><meta charset="utf-8"><body>' + ''.join(f'<script src="{s}"></script>' for s in scripts), encoding="utf-8")
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(str(Path(tmp) / "profile"), channel="chromium", headless=True,
             args=[f"--disable-extensions-except={ext}", f"--load-extension={ext}"])
