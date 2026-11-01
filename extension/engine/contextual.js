@@ -141,10 +141,15 @@ class ContextualClassifier {
     // otherwise "…by 2026⏎How do I protect my SSN" made the follower count look like the writer's money
     const sentences = turnText.split(/(?<=[.!?])\s+|(?<![,:;=|]|\b(?:is|was|are|of|to|and|or|at|about|around|my|our|your|saya|adalah))[ \t]*\n(?![ \t]*\||[^\n]{1,50}:\s)\s*/i);
 
+    // The writer's own loan or mortgage ("my loan disbursement"): its amount, fees and premiums in
+    // this turn are theirs too, even in a sentence without "my" ("The approved loan is Rp480,000,000")
+    const ownDeal = /\b(?:my|our|saya|aku|kami)\s+(?:[\w-]+\s+){0,2}(?:loan|mortgage|debt|credit|financing|kpr|pinjaman|cicilan|hutang|utang)\b/i.test(turnText);
+    const dealWord = /\b(?:loan|lender|fees?|premiums?|deduct\w*|disburse\w*|installments?|interest|principal|down\s+payment|tenor|pinjaman|cicilan|bunga|potongan|angsuran)\b/i;
     for (const sent of sentences) {
       // A typo in the money word, or "my/I" plus an explicit currency, still makes it personal
       const rentTotal = /\btotal move-in cost\b/i.test(sent) && /\bdeposit of \d+(?:\.\d+)?x rent\b/i.test(turnText);
       let isPersonal = correction || rentTotal || this.personalAnchors.some(rx => rx.test(sent)) ||
+        (ownDeal && dealWord.test(sent) && EXPLICIT_CURRENCY.test(sent)) ||
         (/\b(?:my|our|saya|aku|gue|gw|kami)\b/i.test(sent) && EXPLICIT_CURRENCY.test(sent));
       if (!isPersonal && /\d/.test(sent)) {
         const fixed = ContextualClassifier.fixMoneyTypos(sent);

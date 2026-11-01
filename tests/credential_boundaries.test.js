@@ -221,3 +221,16 @@ console.log('credential boundaries: national IDs, addresses, line sentences, sym
   assert(out.every(t => !/\b28\b/.test(t.content)), out.map(t => t.content).join(' | '));
 }
 console.log('credential boundaries: network, internal hosts, Telegram, multi-line model spans, ages passed');
+
+{
+  // The writer's own loan: the approved amount, fees and premium all become symbols, and
+  // "loan is Rp480,000,000" is an amount, not a record ID cut at the first comma
+  const Rewriter = require("../extension/engine/symbolic_rewriter.js");
+  const Vault = require("../extension/engine/symbolic_vault.js");
+  const loan = "Please review my loan disbursement. The approved loan is Rp480,000,000. The lender will deduct an administration fee of Rp4,800,000 and an insurance premium of Rp7,200,000. My outstanding debt with another lender is Rp95,000,000.";
+  const out = new Rewriter(new Vault()).rewrite(loan).sanitizedPrompt;
+  assert(!/480|4,800|7,200|95,000|RECORD_ID/.test(out), out);
+  // Without the writer's own loan, a fee sentence stays as written
+  const pub = new Rewriter(new Vault()).rewrite("Banks usually charge an administration fee of Rp4,800,000 on a typical loan.");
+  assert(!pub.sanitizedPrompt || pub.sanitizedPrompt.includes("Rp4,800,000"), pub.sanitizedPrompt);
+}

@@ -270,6 +270,10 @@ class HeuristicsRedactor {
         validator: (raw, index, text) => {
           const clean = raw.trim();
           if (/^(?:active|pending|closed|open|true|false|none|null|undefined|ready)$/i.test(clean)) return false;
+          // An amount, not an ID: "loan is Rp480,000,000", "loan of USD5000"
+          const value = clean.replace(/^.*?[#:=\s]#?(?=[^\s#:=]*$)/, "");
+          if (/^(?:rp|idr|rs|inr|usd|sgd|eur|gbp|aud|cad|myr|php|thb|jpy|cny|hkd|chf)\.?\d/i.test(value)) return false;
+          if (/^\d+$/.test(value) && text && Number.isInteger(index) && /^[.,]\d{3}/.test(text.slice(index + raw.length))) return false;
           return true;
         },
         replacement: "$1[REDACTED_RECORD_ID]"
