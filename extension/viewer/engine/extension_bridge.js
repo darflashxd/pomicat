@@ -36,7 +36,7 @@
         if (!event.data || typeof event.data !== "object") return;
         if (event.data.source === "SAFESHARE_EXTENSION_PONG") {
           this.extensionDetected = true;
-          console.log("[Blackline Bridge] Blackline browser extension detected on client machine.");
+          console.log("[PomiCat Bridge] PomiCat browser extension detected on client machine.");
         }
       });
 
@@ -104,7 +104,7 @@
           success: true,
           mode: "extension_bridge",
           continuationPrompt: continuationPrompt,
-          message: `Injected context directly into ${platform} via Blackline Extension! (0% Clipboard Footprint)`
+          message: `Injected context directly into ${platform} via the PomiCat extension! (0% Clipboard Footprint)`
         };
       }
 
@@ -200,7 +200,7 @@
         this.autoPurgeTimer = setTimeout(async () => {
           try {
             await navigator.clipboard.writeText("");
-            console.log("[Blackline Bridge] Ephemeral clipboard auto-purged after timeout.");
+            console.log("[PomiCat Bridge] Ephemeral clipboard auto-purged after timeout.");
           } catch (_) {}
         }, seconds * 1000);
       }

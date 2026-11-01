@@ -103,7 +103,7 @@
         try {
           zeroizer();
         } catch (err) {
-          console.error("[Blackline] Cleanup callback error:", err);
+          console.error("[PomiCat] Cleanup callback error:", err);
         }
       }
     }
@@ -120,7 +120,7 @@
       this.isTriggered = true;
       this.terminationReason = reason;
 
-      console.warn(`[Blackline Cleanup] Session terminated: ${reason}. Clearing registered references.`);
+      console.warn(`[PomiCat Cleanup] Session terminated: ${reason}. Clearing registered references.`);
 
       // 1. Instant URL Hash Shredding (Remove #key immediately from browser address bar)
       try {

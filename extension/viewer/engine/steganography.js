@@ -256,7 +256,7 @@
         return {
           detected: false,
           watermarkCount: 0,
-          error: "No Blackline forensic watermark found in text"
+          error: "No PomiCat watermark found in text"
         };
       }
 

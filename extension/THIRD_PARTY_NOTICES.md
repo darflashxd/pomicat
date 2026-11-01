@@ -1,6 +1,6 @@
 # Bundled components
 
-Blackline (formerly SafeShare) project code is licensed under Apache-2.0; see the repository's root
+PomiCat project code is licensed under Apache-2.0; see the repository's root
 `LICENSE` (also included as `LICENSE` in the extension ZIP). Copyright ownership
 and third-party licenses are not changed by bundling.
 

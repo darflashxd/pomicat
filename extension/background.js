@@ -4,7 +4,7 @@
  * completely bypassing webpage CSP (Content Security Policy) and Mixed Content blocks.
  */
 
-console.log("[Blackline] Background script initialized.");
+console.log("[PomiCat] Background script initialized.");
 
 const webExtApi = typeof browser !== "undefined" ? browser : chrome;
 
@@ -192,7 +192,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (!ok) throw relayError("RELAY_NOT_ALLOWED", "Relay not allowed: " + relayUrl);
       if (!(await relayHostGranted(origin))) {
         throw relayError("RELOAD_REQUIRED",
-          `Extension reload required to grant access to ${origin}. Reload Blackline in chrome://extensions and approve the relay host.`);
+          `Extension reload required to grant access to ${origin}. Reload PomiCat in chrome://extensions and approve the relay host.`);
       }
       return fetch(`${origin}/api/share`, {
         method: "POST",
@@ -212,11 +212,12 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return response.json();
       })
       .then((data) => {
-        console.log("[Blackline Background] Upload success");
+        console.log("[PomiCat Background] Upload success");
         if (typeof sendResponse === "function") sendResponse({ success: true, data });
       })
       .catch((err) => {
-        console.error("[Blackline Background] Upload failed:", err);
+        // A timeout or "Failed to fetch" means the relay could not be reached from this network
+        console.error(`[PomiCat Background] Upload failed: ${err?.name || "Error"}: ${err?.message || err}`);
         if (typeof sendResponse === "function") sendResponse({ success: false, error: err.message, code: err.code || null });
       });
 
@@ -285,7 +286,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (!ok) throw relayError("RELAY_NOT_ALLOWED", "Relay not allowed: " + relayUrl);
       if (!(await relayHostGranted(origin))) {
         throw relayError("RELOAD_REQUIRED",
-          `Extension reload required to grant access to ${origin}. Reload Blackline in chrome://extensions and approve the relay host.`);
+          `Extension reload required to grant access to ${origin}. Reload PomiCat in chrome://extensions and approve the relay host.`);
       }
       return fetch(`${origin}/api/revoke/${encodeURIComponent(shareId)}`, {
         method: "POST",
