@@ -13,7 +13,7 @@ const limit = 10 * 1024 * 1024;
       const context = {
         URL, Uint8Array, AbortSignal, location: { origin: 'https://word.invalid' },
         btoa: value => Buffer.from(value, 'binary').toString('base64'),
-        fetch: async () => ({ ok: true, headers: { get: key => key === 'content-length' ? header : 'application/octet-stream' }, body: {
+        fetch: async () => ({ ok: true, url: 'https://word.invalid/file', headers: { get: key => key === 'content-length' ? header : 'application/octet-stream' }, body: {
           cancel: async () => { cancelled = true; },
           getReader: () => ({ read: async () => {
             if (delivered) return { done: true };
@@ -30,6 +30,14 @@ const limit = 10 * 1024 * 1024;
       else assert.equal(Buffer.from(result.data, 'base64').length, length);
       assert.ok(cancelled, 'response body must be cancelled after success or rejection');
     }
+  }
+  // A redirect that ends on another site is refused (Google Docs follows same-origin redirects only)
+  {
+    const context = { URL, Uint8Array, AbortSignal, location: { origin: 'https://docs.google.com', hostname: 'docs.google.com' }, btoa: v => v,
+      fetch: async () => ({ ok: true, url: 'https://elsewhere.invalid/file', headers: { get: () => 'application/octet-stream' }, body: { cancel: async () => {} } }) };
+    vm.createContext(context);
+    const capture = vm.runInContext(`(${source.slice(begin, end)})`, context);
+    assert.equal((await capture('https://docs.google.com/document/d/x/export?format=docx', limit)).error, 'access');
   }
   console.log('10 MiB capture boundaries: absent, misleading and oversize Content-Length; streams cancelled.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

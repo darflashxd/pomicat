@@ -18,7 +18,7 @@ and sends an encrypted copy.
 - **On your device:** rules and a small model run in the browser. Nothing leaves while you review.
 - **Beyond the obvious:** hides the salary, and also the "saving 20% is $1,000" line that reveals it.
 - **Encrypted links:** the key lives after the `#`. The relay stores ciphertext; crawlers get nothing readable.
-- **Chats and documents:** ChatGPT, Claude, Gemini, DeepSeek and Word Online.
+- **Chats and documents:** ChatGPT, Claude, Gemini, DeepSeek, Word Online and Google Docs.
 
 [Quick start](#quick-start) · [Docs](https://darflashxd.github.io/pomicat/) ·
 [Blog](https://darflashxd.github.io/pomicat/blog/) · [Releases](https://github.com/darflashxd/pomicat/releases) ·
@@ -44,7 +44,7 @@ and sends an encrypted copy.
 <td width="33%" valign="top"><b>Encrypted sharing</b><br>AES-256-GCM in the browser. Links expire, can burn after one read, and can be revoked. Opening needs a click, so link scanners do not use them up.</td>
 </tr>
 <tr>
-<td valign="top"><b>Word Online</b><br>Reviews a separate copy of a saved DOCX. Removes tracked changes, comments and document properties, and replaces image pixels you mark.</td>
+<td valign="top"><b>Word Online and Google Docs</b><br>Reviews a separate DOCX copy of the document. Removes tracked changes, comments and document properties, and replaces image pixels you mark.</td>
 <td valign="top"><b>Protect before sending</b><br>Optional. Sends amounts as <code>&lt;S1&gt;</code> and IDs as placeholders, then computes the reply's formulas on your screen.</td>
 <td valign="top"><b>CLI and proxy</b><br>Redact transcripts, run the attack offline, or put a redacting proxy in front of OpenAI and Anthropic APIs.</td>
 </tr>
@@ -120,8 +120,8 @@ The model and runtime are bundled: no Python, model download or API key needed.
 4. Open the link in a private window and check what the recipient sees.
 5. Revoke it from the extension's toolbar page and confirm it no longer opens.
 
-For Word, open a saved `.docx` in Word Online and click the PomiCat button. See the
-[Word guide](https://darflashxd.github.io/pomicat/#word).
+For documents, open a saved `.docx` in Word Online or a Google Doc and click the PomiCat button.
+See the [document guide](https://darflashxd.github.io/pomicat/#word).
 
 ### Try the attack offline
 
@@ -141,7 +141,7 @@ The first command recovers `$5,000`. The second prints `No hidden values recover
 | Need | Details |
 |---|---|
 | Browser | Chrome, Edge or Brave (Manifest V3), or Firefox 109+ |
-| Sites | ChatGPT, Claude, Gemini, DeepSeek, Word Online (SharePoint, depends on the tenant) |
+| Sites | ChatGPT, Claude, Gemini, DeepSeek, Word Online (SharePoint, depends on the tenant), Google Docs |
 | CLI | Node.js 18+, no dependencies |
 | Building packages | Python 3 (`python tools/build_extension.py`) |
 | Your own relay | Python 3 for the local relay, or Cloudflare Workers + D1 ([DEPLOY.md](DEPLOY.md)) |

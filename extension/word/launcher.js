@@ -4,7 +4,7 @@
     previous.dispatchEvent(new Event("safeshare-word-dispose"));
     previous.remove();
   }
-  const isWord = () => /\/doc2?\.aspx$/i.test(location.pathname) && /\.docx$/i.test(new URLSearchParams(location.search).get("file") || "") || /\/word(?:\/|$)|wordeditor/i.test(location.pathname);
+  const isWord = () => location.hostname === "docs.google.com" && /^\/document\/(?:u\/\d+\/)?d\//.test(location.pathname) || /\/doc2?\.aspx$/i.test(location.pathname) && /\.docx$/i.test(new URLSearchParams(location.search).get("file") || "") || /\/word(?:\/|$)|wordeditor/i.test(location.pathname);
   const host = document.createElement("div");
   host.id = "safeshare-word-launcher";
   const shadow = host.attachShadow({ mode: "closed" });
@@ -19,8 +19,8 @@
     button.textContent = "PomiCat";
     button.setAttribute("style", 'display:flex;align-items:center;gap:8px;background:#20242a;color:#f0f2f5;border:1px solid #737d8a;border-radius:24px;padding:12px 18px;font:600 14px system-ui,sans-serif;min-height:44px');
   }
-  button.setAttribute("aria-label", "Open PomiCat Word review");
-  button.title = "Review and redact a saved Word copy before sharing";
+  button.setAttribute("aria-label", "Open PomiCat document review");
+  button.title = "Review and redact a copy of this document before sharing";
   const unavailable = () => {
     button.innerHTML = "";
     button.textContent = "Refresh Word to reconnect";

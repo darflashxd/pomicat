@@ -10,6 +10,11 @@ assert.equal(download.pathname,"/personal/test/_layouts/15/download.aspx");
 assert.deepEqual([...download.searchParams.keys()],["UniqueId"]);
 assert.throws(()=>downloadUrl(sample.replace("fictional.sharepoint.com","sharepoint.com.attacker.invalid")),/Unsupported/);
 assert.throws(()=>downloadUrl(sample.replace("Example.docx","Example.xlsx")),/Unsupported/);
+// Google Docs: the DOCX export of the open document, through the same account (/u/N kept)
+const gdoc="https://docs.google.com/document/u/1/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit?tab=t.0";
+assert.equal(downloadUrl(gdoc),"https://docs.google.com/document/u/1/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/export?format=docx");
+assert.throws(()=>downloadUrl(gdoc.replace("/document/","/spreadsheets/")),/Unsupported/);
+assert.throws(()=>downloadUrl(gdoc.replace("docs.google.com","docs.google.com.attacker.invalid")),/Unsupported/);
 for (const name of ["manifest.json", "manifest.firefox.json"]) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, name)));
   assert.ok(manifest.host_permissions.includes("https://*.sharepoint.com/*"), "Word hosts must be static");
@@ -18,6 +23,8 @@ for (const name of ["manifest.json", "manifest.firefox.json"]) {
   const launcher = manifest.content_scripts.find(s => (s.js || []).includes("word/launcher.js"));
   assert.ok(launcher, "launcher must be a static content script");
   assert.ok(launcher.matches.includes("https://*.sharepoint.com/*"));
+  assert.ok(launcher.matches.includes("https://docs.google.com/document/*"), "launcher on Google Docs only, not Sheets or Slides");
+  assert.ok(manifest.host_permissions.includes("https://docs.google.com/*"), "Google Docs export needs static host access");
 }
 const html = fs.readFileSync(path.join(root, "word/index.html"), "utf8");
 assert.ok(!/type=["']file/.test(html));

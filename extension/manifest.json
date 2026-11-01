@@ -23,7 +23,8 @@
     "http://127.0.0.1/*",
     "https://*.sharepoint.com/*",
     "https://*.officeapps.live.com/*",
-    "https://word.cloud.microsoft/*"
+    "https://word.cloud.microsoft/*",
+    "https://docs.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -85,7 +86,8 @@
       "matches": [
         "https://*.sharepoint.com/*",
         "https://*.officeapps.live.com/*",
-        "https://word.cloud.microsoft/*"
+        "https://word.cloud.microsoft/*",
+        "https://docs.google.com/document/*"
       ],
       "js": [
         "ui/brand-assets.js",

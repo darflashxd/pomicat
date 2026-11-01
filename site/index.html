@@ -37,7 +37,7 @@
   <div class="pillar"><strong>On your device</strong><span>Rules and a small model run in the browser. Nothing is sent anywhere while you review.</span></div>
   <div class="pillar"><strong>Beyond the obvious</strong><span>Hides the salary and also the "20% is $1,000" line that would let someone work it out.</span></div>
   <div class="pillar"><strong>Encrypted links</strong><span>The key lives after the <code>#</code>. The relay stores ciphertext, and search engines get nothing readable.</span></div>
-  <div class="pillar"><strong>Chats and documents</strong><span>ChatGPT, Claude, Gemini, DeepSeek and Word Online.</span></div>
+  <div class="pillar"><strong>Chats and documents</strong><span>ChatGPT, Claude, Gemini, DeepSeek, Word Online and Google Docs.</span></div>
 </div>
 
 <div class="layout">
@@ -45,7 +45,7 @@
   <p>On this page</p>
   <a href="#install">Install</a>
   <a href="#guide">Share a chat</a>
-  <a href="#word">Share a Word document</a>
+  <a href="#word">Share a document</a>
   <a href="#before-sending">Protect before sending</a>
   <a href="#how">How it works</a>
   <a href="#security">Security model</a>
@@ -88,10 +88,10 @@ python tools/build_extension.py   # writes Chrome and Firefox ZIPs to dist/</cod
 </figure>
 <div class="callout">Detection can miss things. Read the copy before you share it. An empty attack check means the supported checks found nothing, not that the copy is anonymous.</div>
 
-<h2 id="word">Share a Word document</h2>
+<h2 id="word">Share a Word document or Google Doc</h2>
 <ol>
-  <li>Open a saved <code>.docx</code> in Word Online and click the PomiCat button.</li>
-  <li>PomiCat reads a separate copy through your current SharePoint session. Your original is never changed.</li>
+  <li>Open a saved <code>.docx</code> in Word Online, or a Google Doc, and click the PomiCat button.</li>
+  <li>PomiCat reads a separate copy through your current SharePoint or Google session (Google Docs are exported as DOCX). Your original is never changed.</li>
   <li>Review the highlights. Tracked changes, comments and document properties are removed unless you keep them.</li>
   <li>Images are reviewed by hand: drag over an area and the pixels are replaced, not covered.</li>
   <li><strong>Create sanitized DOCX</strong>, then download it or create an encrypted link (24 hours, 3 days or 7 days, revocable).</li>

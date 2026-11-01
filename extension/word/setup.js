@@ -11,19 +11,21 @@ let appliedSnapshot = null;
 const scanner = new HeuristicsRedactor();
 try {
   const parsed = new URL(query.get("origin"));
-  if (parsed.protocol === "https:" && /(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(parsed.hostname)) origin = parsed.origin;
+  if (parsed.protocol === "https:" && (/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(parsed.hostname) || parsed.hostname === "docs.google.com")) origin = parsed.origin;
 } catch (_) {}
 // The launcher is declared statically, so this page only needs to know which
 // Word tab to read. No permission request happens here.
 const sharepointOrigin = (() => {
   try {
     const parsed = new URL(origin);
-    return /(^|\.)sharepoint\.com$/.test(parsed.hostname) ? parsed.origin : null;
+    return /(^|\.)sharepoint\.com$/.test(parsed.hostname) || parsed.hostname === "docs.google.com" ? parsed.origin : null;
   } catch (_) { return null; }
 })();
 if (sharepointOrigin) {
   $("capture-section").hidden = false;
-  $("capture-intro").textContent = `Connected to ${new URL(sharepointOrigin).hostname}. Reads the saved copy only; the original document is not changed.`;
+  $("capture-intro").textContent = new URL(sharepointOrigin).hostname === "docs.google.com"
+    ? "Connected to Google Docs. Exports a DOCX copy through your Google session; the original document is not changed. DOCX up to 10 MiB."
+    : `Connected to ${new URL(sharepointOrigin).hostname}. Reads the saved copy only; the original document is not changed.`;
 }
 
 async function runCapture(){
@@ -45,14 +47,14 @@ async function runCapture(){
   try {
     const tabId=Number(query.get("tab"));
     const tab=await api.tabs.get(tabId);
-    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen PomiCat from Word.");
+    if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen PomiCat from the document.");
     const url=SafeShareWordSource.downloadUrl(tab.url);
     // Execute in isolated content-script world: session cookies stay with the browser.
     const result=await api.scripting.executeScript({target:{tabId},func:async (target,maxBytes)=>{
       if(new URL(target).origin!==location.origin)return {error:true};
       try{
-        const response=await fetch(target,{credentials:"same-origin",redirect:"error",signal:AbortSignal.timeout(20000)});
-        if(!response.ok || /text\/html/i.test(response.headers.get("content-type")||""))return {error:"access"};
+        const response=await fetch(target,{credentials:"same-origin",redirect:location.hostname==="docs.google.com"?"follow":"error",signal:AbortSignal.timeout(20000)});
+        if(!response.ok || new URL(response.url).origin!==location.origin || /text\/html/i.test(response.headers.get("content-type")||""))return {error:"access"};
         if(Number(response.headers.get("content-length")||0)>maxBytes){await response.body?.cancel();return {error:"size"};}
         const reader=response.body.getReader(),chunks=[];let size=0;
         try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>maxBytes)return {error:"size"};chunks.push(part.value);}}finally{await reader.cancel();}
@@ -63,8 +65,8 @@ async function runCapture(){
       }catch(_){return {error:true};}
     },args:[url,10*1024*1024]});
     const data=result[0]?.result;
-    if(data?.error==="size")throw new Error("The saved DOCX is larger than 10 MiB. Download it from Word and use a smaller copy.");
-    if(!data?.data||data.error)throw new Error("Could not read the saved DOCX. Check Word access and download permissions, then retry.");
+    if(data?.error==="size")throw new Error("The DOCX copy is larger than 10 MiB. Use a smaller document.");
+    if(!data?.data||data.error)throw new Error("Could not read a DOCX copy. Check that you can open and download this document, then retry.");
     const bytes=Uint8Array.from(atob(data.data),c=>c.charCodeAt(0));
     sourceBytes=bytes;
     sanitizedBytes=null;

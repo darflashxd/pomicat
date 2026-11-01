@@ -19,7 +19,7 @@ const RelayHosts = (typeof globalThis !== "undefined" && globalThis.BlacklineRel
 // The Word launcher is declared statically in the manifest, so no runtime
 // permission request or dynamic registration is needed. Keep a single guarded
 // injection for tabs that loaded before the extension was reloaded.
-const WORD_ORIGIN = /^https:\/\/(?:[a-z0-9-]+\.)*(?:sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/i;
+const WORD_ORIGIN = /^https:\/\/(?:(?:[a-z0-9-]+\.)*(?:sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)|docs\.google\.com)$/i;
 async function injectWordLauncher(tabId, url) {
   try {
     if (!url || !WORD_ORIGIN.test(new URL(url).origin)) return;
@@ -36,7 +36,7 @@ webExtApi.action.onClicked.addListener((tab) => {
   if (tab?.id && tab?.url) {
     try {
       const url = new URL(tab.url);
-      if (url.protocol === "https:" && /(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) {
+      if (url.protocol === "https:" && (/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname) || url.hostname === "docs.google.com")) {
         query.set("tab", String(tab.id));
         query.set("origin", url.origin);
       }
@@ -141,7 +141,7 @@ webExtApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (!fromOwnContentScript(sender) || !sender.tab || !sender.url) return false;
     try {
       const url = new URL(sender.url);
-      if (url.protocol !== "https:" || !/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname)) return false;
+      if (url.protocol !== "https:" || !(/(^|\.)(sharepoint\.com|officeapps\.live\.com|word\.cloud\.microsoft)$/.test(url.hostname) || url.hostname === "docs.google.com")) return false;
       const params = new URLSearchParams({tab:String(sender.tab.id),origin:url.origin});
       webExtApi.tabs.create({url:webExtApi.runtime.getURL("word/index.html")+"?"+params});
     } catch (_) {}
