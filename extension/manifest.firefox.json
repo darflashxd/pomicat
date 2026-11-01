@@ -23,7 +23,8 @@
     "https://*.sharepoint.com/*",
     "https://*.officeapps.live.com/*",
     "https://word.cloud.microsoft/*",
-    "https://docs.google.com/*"
+    "https://docs.google.com/*",
+    "https://*.googleusercontent.com/*"
   ],
   "background": {
     "scripts": [
@@ -122,7 +123,7 @@
     }
   },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://pomicat-relay.bleedguard.workers.dev https://safeshare-relay.bleedguard.workers.dev https://blackline-relay.bleedguard.workers.dev http://localhost:* http://127.0.0.1:*; object-src 'none';"
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://pomicat-relay.bleedguard.workers.dev https://safeshare-relay.bleedguard.workers.dev https://blackline-relay.bleedguard.workers.dev http://localhost:* http://127.0.0.1:* https://docs.google.com https://*.googleusercontent.com; object-src 'none';"
   },
   "icons": {
     "16": "icons/icon16.png",

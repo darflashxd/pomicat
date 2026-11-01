@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('extension/word/setup.js', 'utf8');
-const begin = source.indexOf('func:async ') + 5;
-const end = source.indexOf('},args:', begin) + 1;
+const begin = source.indexOf('const captureDocx=') + 'const captureDocx='.length;
+const end = source.indexOf(';// end captureDocx', begin);
 const limit = 10 * 1024 * 1024;
 (async () => {
   for (const header of [null, '1', String(limit + 1)]) {
@@ -25,7 +25,7 @@ const limit = 10 * 1024 * 1024;
       };
       vm.createContext(context);
       const capture = vm.runInContext(`(${source.slice(begin, end)})`, context);
-      const result = await capture('https://word.invalid/file', limit);
+      const result = await capture('https://word.invalid/file', limit, { credentials: 'same-origin', redirect: 'error', origins: ['https://word.invalid'] });
       if (length > limit || Number(header) > limit) assert.equal(result.error, 'size');
       else assert.equal(Buffer.from(result.data, 'base64').length, length);
       assert.ok(cancelled, 'response body must be cancelled after success or rejection');
@@ -37,7 +37,13 @@ const limit = 10 * 1024 * 1024;
       fetch: async () => ({ ok: true, url: 'https://elsewhere.invalid/file', headers: { get: () => 'application/octet-stream' }, body: { cancel: async () => {} } }) };
     vm.createContext(context);
     const capture = vm.runInContext(`(${source.slice(begin, end)})`, context);
-    assert.equal((await capture('https://docs.google.com/document/d/x/export?format=docx', limit)).error, 'access');
+    const opts = { credentials: 'include', redirect: 'follow', origins: ['https://docs.google.com', '.googleusercontent.com'] };
+    assert.equal((await capture('https://docs.google.com/document/d/x/export?format=docx', limit, opts)).error, 'access');
+    // ...while Google's own download host is accepted
+    context.fetch = async () => ({ ok: true, url: 'https://doc-0s-docs.googleusercontent.com/export/x', headers: { get: () => null },
+      body: { cancel: async () => {}, getReader: () => { let sent = false; return { read: async () => sent ? { done: true } : (sent = true, { done: false, value: Uint8Array.from([80, 75, 3, 4]) }), cancel: async () => {} }; } } });
+    context.btoa = v => Buffer.from(v, 'binary').toString('base64');
+    assert.ok((await capture('https://docs.google.com/document/d/x/export?format=docx', limit, opts)).data, 'googleusercontent download accepted');
   }
   console.log('10 MiB capture boundaries: absent, misleading and oversize Content-Length; streams cancelled.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -23,10 +23,34 @@ const sharepointOrigin = (() => {
 })();
 if (sharepointOrigin) {
   $("capture-section").hidden = false;
+  if (new URL(sharepointOrigin).hostname === "docs.google.com") {
+    document.querySelector(".word-hero .eyebrow").textContent = "Google Docs · Experimental integration";
+    document.querySelector(".word-hero h1").innerHTML = "Private sharing.<br>From Google Docs.";
+    document.querySelector(".word-hero .intro").textContent = "Review a separate copy before sharing. Your original Google Doc stays unchanged.";
+    $("capture-section").querySelector("h2").textContent = "Inspect the document";
+  }
   $("capture-intro").textContent = new URL(sharepointOrigin).hostname === "docs.google.com"
     ? "Connected to Google Docs. Exports a DOCX copy through your Google session; the original document is not changed. DOCX up to 10 MiB."
     : `Connected to ${new URL(sharepointOrigin).hostname}. Reads the saved copy only; the original document is not changed.`;
 }
+
+// Fetches a DOCX with a size cap. Self-contained: it is also injected into the Word tab.
+// origins: exact origins, or ".suffix" for any https host under that domain.
+const captureDocx=async (target,maxBytes,opts)=>{
+  const allowed=href=>{const u=new URL(href);return opts.origins.some(o=>o.startsWith(".")?u.protocol==="https:"&&u.hostname.endsWith(o):u.origin===o);};
+  if(!allowed(target))return {error:true};
+  try{
+    const response=await fetch(target,{credentials:opts.credentials,redirect:opts.redirect,signal:AbortSignal.timeout(20000)});
+    if(!response.ok || !allowed(response.url) || /text\/html/i.test(response.headers.get("content-type")||"")){await response.body?.cancel();return {error:"access"};}
+    if(Number(response.headers.get("content-length")||0)>maxBytes){await response.body?.cancel();return {error:"size"};}
+    const reader=response.body.getReader(),chunks=[];let size=0;
+    try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>maxBytes)return {error:"size"};chunks.push(part.value);}}finally{await reader.cancel();}
+    const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}
+    if(bytes[0]!==80||bytes[1]!==75)return {error:true};
+    let binary="";for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+    return {data:btoa(binary)};
+  }catch(_){return {error:true};}
+};// end captureDocx
 
 async function runCapture(){
   if ($("capture").disabled) return;
@@ -49,22 +73,14 @@ async function runCapture(){
     const tab=await api.tabs.get(tabId);
     if(new URL(tab.url).origin!==origin)throw new Error("The source tab changed. Reopen PomiCat from the document.");
     const url=SafeShareWordSource.downloadUrl(tab.url);
-    // Execute in isolated content-script world: session cookies stay with the browser.
-    const result=await api.scripting.executeScript({target:{tabId},func:async (target,maxBytes)=>{
-      if(new URL(target).origin!==location.origin)return {error:true};
-      try{
-        const response=await fetch(target,{credentials:"same-origin",redirect:location.hostname==="docs.google.com"?"follow":"error",signal:AbortSignal.timeout(20000)});
-        if(!response.ok || new URL(response.url).origin!==location.origin || /text\/html/i.test(response.headers.get("content-type")||""))return {error:"access"};
-        if(Number(response.headers.get("content-length")||0)>maxBytes){await response.body?.cancel();return {error:"size"};}
-        const reader=response.body.getReader(),chunks=[];let size=0;
-        try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>maxBytes)return {error:"size"};chunks.push(part.value);}}finally{await reader.cancel();}
-        const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}
-        if(bytes[0]!==80||bytes[1]!==75)return {error:true};
-        let binary="";for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-        return {data:btoa(binary)};
-      }catch(_){return {error:true};}
-    },args:[url,10*1024*1024]});
-    const data=result[0]?.result;
+    // SharePoint: fetch inside the Word tab (isolated world), so its session cookies stay there.
+    // Google Docs: the export redirects to *.googleusercontent.com, which a page on
+    // docs.google.com may not read; this extension page (host access) follows it with the
+    // browser's Google session instead.
+    const google=new URL(tab.url).hostname==="docs.google.com";
+    const data=google
+      ? await captureDocx(url,10*1024*1024,{credentials:"include",redirect:"follow",origins:["https://docs.google.com",".googleusercontent.com"]})
+      : (await api.scripting.executeScript({target:{tabId},func:captureDocx,args:[url,10*1024*1024,{credentials:"same-origin",redirect:"error",origins:[origin]}]}))[0]?.result;
     if(data?.error==="size")throw new Error("The DOCX copy is larger than 10 MiB. Use a smaller document.");
     if(!data?.data||data.error)throw new Error("Could not read a DOCX copy. Check that you can open and download this document, then retry.");
     const bytes=Uint8Array.from(atob(data.data),c=>c.charCodeAt(0));
