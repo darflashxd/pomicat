@@ -14,8 +14,8 @@
 <h3 align="center">Share the content. Not the secrets.</h3>
 
 <p align="center">
-  <b>Shared AI chats ended up in Google in 2025. PomiCat links can't be read by crawlers,<br>
-  and the copy inside is properly redacted.</b>
+  <i>Shared AI chats ended up in Google in 2025. PomiCat links can't be read by crawlers,<br>
+  and the copy inside is properly redacted.</i>
 </p>
 
 <p align="center">
