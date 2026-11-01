@@ -53,7 +53,7 @@ with sync_playwright() as p:
           name:chrome.runtime.getManifest().name,data:await chrome.storage.local.get(null)})''')
         assert before['id'] == after['id'] and before['data'] == after['data'], after
         assert after['name'] == 'PomiCat'
-        page.locator('#legacy button').filter(has_text='Revoke synthetic_chat').wait_for(state='attached')
+        page.locator('#legacy .legacy-row[data-share-id="synthetic_chat"] button', has_text='Revoke').wait_for(state='attached')
         print(json.dumps({'browser':'chromium-extension','name':after['name'],'version':after['version'],
             'sameId':True,'legacyStorageSurvivesRestart':True}))
         context.close()

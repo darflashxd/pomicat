@@ -135,7 +135,7 @@ async function legacyLinks() {
     for (const share of shares) {
       // Title and dates make links tell-apart; links saved before this have only their id
       const day = (ms) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-      const row = document.createElement("div");row.className = "legacy-row";
+      const row = document.createElement("div");row.className = "legacy-row";row.dataset.shareId = share.shareId;
       const label = document.createElement("span");
       label.textContent = [share.title || (share.kind === "document" ? "Document link" : "Chat link"),
         share.createdAt ? `created ${day(share.createdAt)}` : `id ${String(share.shareId).slice(0, 8)}`,
