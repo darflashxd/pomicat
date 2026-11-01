@@ -130,3 +130,33 @@ for (const prefix of ['password is ', 'My email password is ', 'PWD=']) {
   assert(!result.sanitizedText.includes('Password42'), 'legacy conversational cap left a tail');
   assert(result.detections.some(d=>d.valueStart===prefix.length && d.valueEnd===prefix.length+secret.length));
 }
+
+// Prose after "password:", passwords with @ and $, backup codes, card codes, addresses vs clauses
+{
+  const s = text => scanner.scan(text).sanitizedText;
+  assert(s('A strong randomly generated password:\n\nSuggested Wi-Fi password').includes('Suggested Wi-Fi password'), 'next line of prose is not a password');
+  assert(!s('password:\n\nhunter2!x9').includes('hunter2!x9'), 'a secret-looking value on the next line is still a password');
+  assert(s('Strong\n\nV9#qL2!mR8@xT5$wK4pZ').includes('mR8@xT5'), 'user@host rule must not split a password');
+  assert(s('ssh deploy@web-01').includes('[user]@[host]'), 'standalone user@host still hidden');
+  for (const text of ['My 2FA backup code is 8842-1197 and the CVV on the back is 123.', 'recovery codes: 4F7K-9QX2'])
+    for (const v of ['8842-1197', '123', '4F7K-9QX2']) if (text.includes(v)) assert(!s(text).includes(v), `${v} left in ${s(text)}`);
+  assert.equal(s('my backup code is ready'), 'my backup code is ready');
+  assert(s('my name is pomicat i live in bandung and that video has 482913 views').includes('482913'), 'a clause is not a street address');
+  assert(!s('I live at 221B Baker Street, London NW1 6XE').includes('Baker Street'), 'letter house numbers are addresses');
+  const Maybe = require('../extension/engine/maybe.js');
+  const turns = [{ role: 'assistant', content: 'Suggested Wi-Fi password\n\nStrong\n\nV9#qL2!mR8@xT5$wK4pZ\n\nUse $HOME and https://Example.com/A1?b=2X' }];
+  const found = Maybe.scan(turns);
+  assert(found.some(c => c.raw === 'V9#qL2!mR8@xT5$wK4pZ' && c.risky), 'symbol password found whole and pre-ticked');
+  assert(!found.some(c => /\$HOME|https:/.test(c.raw)), 'shell variables and URLs are not passwords');
+}
+// Amounts in English words
+{
+  const out = redactTurns([
+    { role: 'user', content: 'I earn fifteen thousand dollars a month. I save 20%.' },
+    { role: 'assistant', content: 'Saving 20% of fifteen thousand dollars is $3,000 a month.' },
+    { role: 'user', content: 'The book costs ten dollars and one of my friends said hi.' }
+  ]).map(t => t.content).join('\n');
+  for (const leak of ['fifteen thousand', '3,000']) assert(!out.includes(leak), `${leak} left in: ${out}`);
+  assert(out.includes('ten dollars') && out.includes('one of my friends'), 'impersonal amounts and ordinary words stay');
+}
+console.log('credential boundaries: prose after password:, symbol passwords, backup/CVV codes, clause addresses, word amounts passed');

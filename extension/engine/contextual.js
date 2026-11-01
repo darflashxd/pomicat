@@ -168,6 +168,10 @@ class ContextualClassifier {
         if (/\b(?:gaji|penghasilan|upah|pendapatan|bonus|tabungan)\b/i.test(sent)) {
           for (const m of spokenAmounts) detected.push({turnIndex, raw:m[0], category:"SENSITIVE_FINANCIAL", sentence:sent, confidence:0.95});
         }
+        // English amounts in words with a currency word: "fifteen thousand dollars", "a hundred bucks"
+        const EN = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety";
+        const wordAmounts = new RegExp(`\\b(?:(?:${EN})|a(?=\\s+(?:hundred|thousand|million|billion)))(?:[\\s-]+(?:and[\\s-]+)?(?:${EN}|hundred|thousand|million|billion))*\\s+(?:dollars?|bucks|euros?|pounds?|rupees?|rupiah|ringgit|yen)\\b`, "gi");
+        for (const m of sent.matchAll(wordAmounts)) detected.push({turnIndex, raw:m[0], category:"SENSITIVE_FINANCIAL", sentence:sent, confidence:0.95});
         // Pre-compute phone number spans to prevent telephone numbers (e.g. 1-800-869-3557, 0812-3456-7890) from being parsed as financial amounts
         const phoneSpans = [];
         const phoneRx = /(?:\+62|62|0)[\s.-]?8[1-9](?:[\s.-]?[0-9]){7,10}\b|(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;

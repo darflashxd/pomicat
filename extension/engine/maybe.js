@@ -114,13 +114,14 @@
     normalized.forEach((turn, turnIndex) => {
       const text = turn.content;
       const excluded = excludedByTurn[turnIndex];
-      const add = (raw, start, risky, reason, source, modelScore, modelLabel) => {
-        if (excluded.some(([s, e]) => start < e && start + raw.length > s)) return;
+      // shellVars: a password-shaped token may contain "$wK4pZ", which is not a shell variable there
+      const add = (raw, start, risky, reason, source, modelScore, modelLabel, shellVars = false) => {
+        if (excluded.some(([s, e]) => start < e && start + raw.length > s && !(shellVars && text[s] === "$"))) return;
         if (/^(?:true|false|null|undefined|none)$/i.test(raw) || (!risky && /^\d+$/.test(raw))) return;
         const { score, why } = contextScore(raw, text, start, source, modelScore);
         const old = candidates.get(raw);
         if (old && old.score >= score && (old.risky || !risky)) return;
-        candidates.set(raw, { raw, risky: risky || score >= 0.75 || Boolean(old && old.risky), reason, score, why, source, modelScore, modelLabel });
+        candidates.set(raw, { raw, risky: risky || score >= 0.75 || Boolean(old && old.risky), reason, score, why, source, modelScore, modelLabel, shellVars });
       };
       for (const span of modelSpans.filter(s => s.turnIndex === turnIndex)) {
         if (!Number.isInteger(span.start) || !Number.isInteger(span.end) || span.start < 0 || span.end <= span.start || span.end > text.length ||
@@ -150,6 +151,8 @@
         if (/(?:public|example|sample)[_.-]?(?:key|token)|(?:name|path|file|length|size|endpoint|url|uri|budget|expiry|expires|expiration|algorithm|policy|type|rotation|enabled|count|limit)$/i.test(m[1])) continue;
         const raw = m[2] || m[3] || m[4].replace(/\.+$/, "");
         if (raw.length < 6) continue;
+        // Value on a later line than "password:": only when it looks like a secret, not prose
+        if (/\n/.test(m[0]) && /^[\p{L}-]+$/u.test(raw)) continue;
         if (m[0].match(/\bis\s+/i) && /^(?:returned|required|generated|optional|missing|invalid|expired|provided|needed)$/i.test(raw)) continue;
         const start = m.index + m[0].lastIndexOf(raw);
         add(raw, start, true, `Value assigned to ${m[1]}`, "assignment");
@@ -163,6 +166,15 @@
         const isUuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(raw);
         if ((isHex || isUuid) && /\b(?:git|commit|sha\d*|checksum|digest|uuid|request[_-]?id|trace[_-]?id|public[_-]?key)\b[^\n]*$/i.test(before)) continue;
         if (heuristics.shannonEntropy(raw) >= (isHex ? 3 : 4)) add(raw, m.index, false, "Random-looking value; not verified as a secret", "random");
+      }
+      // Password-shaped: upper, lower, digit and a symbol, no spaces ("V9#qL2!mR8@xT5$wK4pZ"). The
+      // random-string scan above skips symbols. Pre-ticked when "password" appears shortly before,
+      // even a few lines up ("Suggested Wi-Fi password / Strong / V9#…"). URLs and emails excluded.
+      for (const m of text.matchAll(/(?<![^\s"'`(])(?=\S*[A-Z])(?=\S*[a-z])(?=\S*\d)(?=\S*[!#$%^&*?~@])[^\s"'`<>()[\]]{10,64}/g)) {
+        const raw = m[0].replace(/[.,;:!?]+$/, "");
+        if (raw.length < 10 || /:\/\/|^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(raw)) continue;
+        const near = /\b(?:pass(?:word|wd|phrase|code)?|pwd|kata\s+sandi|sandi)\b/i.test(text.slice(Math.max(0, m.index - 160), m.index));
+        add(raw, m.index, near, near ? "Password-shaped value after the word \"password\"" : "Password-shaped value; not verified", "random", undefined, undefined, true);
       }
       // Plain numbers skip add() (it drops unticked digit strings); these are asked about, unticked
       for (const a of possibleAmounts(text)) {
@@ -180,9 +192,9 @@
     // Highest score first, so the review list shows the likeliest misses at the top
     return [...candidates.values()].sort((a, b) => b.score - a.score).map((c, i) => {
       const occurrences = normalized.flatMap((t, turnIndex) => [...t.content.matchAll(literal(c.raw))]
-        .filter(m => !occurrencesByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
+        .filter(m => c.shellVars || !occurrencesByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
         // Never inside our own placeholders: hiding "S1" in "<S1>" would break it
-        .filter(m => !excludedByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s))
+        .filter(m => !excludedByTurn[turnIndex].some(([s, e]) => m.index < e && m.index + c.raw.length > s && !(c.shellVars && t.content[s] === "$")))
         .map((m) => ({ turnIndex, start: m.index, end: m.index + c.raw.length })));
       return { ...c, id: `maybe_${i + 1}`, replacement: `[REDACTED_POSSIBLE_SECRET_${i + 1}]`, occurrences };
     }).filter(c => c.occurrences.length);

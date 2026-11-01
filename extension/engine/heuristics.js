@@ -72,6 +72,13 @@ class HeuristicsRedactor {
         replacement: "$1[REDACTED_OTP]"
       },
       {
+        // "My 2FA backup code is 8842-1197", "recovery code: 4F7K-9QX2" (card security codes: CVV rule)
+        id: "BACKUP_CODE", name: "2FA backup / recovery code", category: "CREDENTIALS", valueGroup: 2,
+        regex: /\b((?:(?:2FA|MFA|two[- ]factor)[ \t]+)?(?:backup|recovery)[ \t]+codes?)((?:[ \t]+(?:is|are|was))?[ \t]*[:=]?[ \t]*)([A-Z0-9]{3,8}(?:-[A-Z0-9]{3,8}|[ ]\d{3,8}){0,3})(?![A-Z0-9-])/giu,
+        validator: (raw) => /\d/.test(raw),
+        replacement: "$1$2[REDACTED_OTP]"
+      },
+      {
         id: "LOGIN_CODE", name: "Login code", category: "CREDENTIALS", valueGroup: 2,
         regex: /\b(Use\s+)(\d{4,8})(\s+as\s+your\s+(?:login|verification|security)\s+code)\b/gi,
         replacement: "$1[REDACTED_OTP]$3"
@@ -223,7 +230,7 @@ class HeuristicsRedactor {
         id: "CARD_SECURITY_CODE",
         name: "Card Security Code (CVV/CVC)",
         category: "FINANCIAL",
-        regex: /\b((?:(?:(?:card\s+)?(?:security|verification)\s+(?:code|number|value)|cvv2?|cvc2?|cid|csc|cvn2?|c\s*v\s*v|c\s*v\s*c)(?:\s*\/\s*(?:cvv2?|cvc2?|cid|csc|cvn2?))?)\s*(?:[:=\-~]|is|was|of|equals)?\s*[\[\("']?)([0-9]{3,4}|[0-9]\s+[0-9]\s+[0-9](?:\s+[0-9])?)([\]\)"']?)/gi,
+        regex: /\b((?:(?:(?:card\s+)?(?:security|verification)\s+(?:code|number|value)|cvv2?|cvc2?|cid|csc|cvn2?|c\s*v\s*v|c\s*v\s*c)(?:\s*\/\s*(?:cvv2?|cvc2?|cid|csc|cvn2?))?(?:\s+(?:on\s+the\s+back(?:\s+of\s+(?:the|my)\s+card)?|code|number))?)\s*(?:[:=\-~]|is|was|of|equals)?\s*[\[\("']?)([0-9]{3,4}|[0-9]\s+[0-9]\s+[0-9](?:\s+[0-9])?)([\]\)"']?)/gi,
         replacement: (raw) => {
           const m = raw.match(/^([\s\S]*?[\[\("']?)([0-9\s]{3,7})([\]\)"']?)$/);
           if (m) {
@@ -662,6 +669,9 @@ class HeuristicsRedactor {
           const valueMatch = /^(?:[\s\S]*?(?:[:=]|\bdiset\s+ke\b|\bdiset\s+menjadi\b|\bdiatur\s+ke\b|\bset\s+to\b|\bis\b|\badalah\b)\s*["']?)([^"'\r\n]+?)(?:["']|[.,;!?]?\s*$)/i.exec(raw);
           const candidateValue = valueMatch ? valueMatch[1].trim() : raw.trim();
           if (/^(?:required|unchanged|confidential|valid|invalid|correct|incorrect|hidden|redacted|missing|secret|protected|secure|insecure|plaintext|temporary|optional|needed|set|reset)$/i.test(candidateValue)) return false;
+          // "password:" with the value on a later line: only a secret-looking value (a digit or a
+          // symbol), not the next line of prose ("…generated password:\n\nSuggested Wi-Fi password")
+          if (/[:=][ \t]*\r?\n/.test(raw) && /^[\p{L}\s-]+$/u.test(candidateValue)) return false;
           return true;
         },
         extractToken: (match, raw) => {
@@ -710,7 +720,7 @@ class HeuristicsRedactor {
         // "I live in Bandung and work as a nurse. … born on 14" is not an address.
         name: "International Physical Street Address",
         category: "PROFILE",
-        regex: /(?:<address>([^<]+)<\/address>|["']?(?:street_address|physical_address|billing_address|shipping_address|address)["']?\s*[:=]\s*["']?([^"'\r\n]{10,120})["']?|\b((?:(?:(?:(?:my|our|home|residential|shipping|mailing|street|billing|physical|company|business|office)\s+)?address(?:\s+of\s+[A-Za-z0-9._\s-]+)?\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent|dispatched)\s+to\s+)|(?:(?:[A-Za-z\p{L}]+(?:\s+[A-Za-z\p{L}]+)?)\s+)?(?:live[s]?|living|stay[s]?|staying|reside[s]?|residing)\s+(?:at|in)\s+|(?:(?:office|store|headquarters|facility|branch)\s+is\s+at\s+))))\s*((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk|Box|PSC)\.?\s+[0-9A-Za-z#]+,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,6}\s+)[A-Za-z0-9\p{L}\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill|Square|Sq|Close|Cl|katu|tie|strasse|str|gatan|vej|weg|allee|calle|rue|via|avda|piazza|utca|u\.)\b(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|(?:(?![.!?]\s)[A-Za-z\p{L} .-]){1,40}?\s+\d+[a-zA-Z]?(?:[A-Za-z0-9\p{L}\s.,\/-]*?\b(?:Apt|Apartment|Suite|Unit|Box|PSC)\.?\s+[0-9A-Za-z#]+)?(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|(?:PSC\s+\d+,\s*Box\s+\d+|PO\s+Box\s+\d+)[A-Za-z0-9\s.,\/-]+))/giu,
+        regex: /(?:<address>([^<]+)<\/address>|["']?(?:street_address|physical_address|billing_address|shipping_address|address)["']?\s*[:=]\s*["']?([^"'\r\n]{10,120})["']?|\b((?:(?:(?:(?:my|our|home|residential|shipping|mailing|street|billing|physical|company|business|office)\s+)?address(?:\s+of\s+[A-Za-z0-9._\s-]+)?\s*(?:is|was|[:=\-])?\s*(?:to\s+my\s+residential\s+address\s*:\s*)?|(?:(?:shipping|deliver(?:y|ing)?|ship|send|sent|dispatched)\s+to\s+)|(?:(?:[A-Za-z\p{L}]+(?:\s+[A-Za-z\p{L}]+)?)\s+)?(?:live[s]?|living|stay[s]?|staying|reside[s]?|residing)\s+(?:at|in)\s+|(?:(?:office|store|headquarters|facility|branch)\s+is\s+at\s+))))\s*((?:(?:Flat|Unit|Apt|Apartment|Suite|Block|Blk|Box|PSC)\.?\s+[0-9A-Za-z#]+,?\s*(?:[0-9]{1,5}\s+)?|[0-9]{1,6}[A-Za-z]?\s+)[A-Za-z0-9\p{L}\s.,\/-]+?\b(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Way|Court|Ct|Terrace|Ter|Place|Pl|Circle|Cir|Parkway|Pkwy|Crescent|Cres|Grove|Walk|Hill|Square|Sq|Close|Cl|katu|tie|strasse|str|gatan|vej|weg|allee|calle|rue|via|avda|piazza|utca|u\.)\b(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|(?:(?![.!?]\s|\b(?:and|but|that|which|who|whose|has|have|had|is|are|was|were|with|because|so|or|then|than)\b)[A-Za-z\p{L} .-]){1,40}?\s+\d+[a-zA-Z]?(?:[A-Za-z0-9\p{L}\s.,\/-]*?\b(?:Apt|Apartment|Suite|Unit|Box|PSC)\.?\s+[0-9A-Za-z#]+)?(?:[A-Za-z0-9\p{L}\s.,\/-]*?(?:Singapore\s+\d{6}|[A-Z]{2}\s+\d{5}(?:-\d{4})?|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\b\d{5}\b))?|(?:PSC\s+\d+,\s*Box\s+\d+|PO\s+Box\s+\d+)[A-Za-z0-9\s.,\/-]+))/giu,
         validator: (raw) => {
           if (/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b/.test(raw)) return false;
           const computingExclusions = /\b(?:memori|memory|fungsi|function|pointer|register|symbol|instruksi|instruction|hex|libc|gdb|binary|assembly|setcontext|ip|mac|url|socket)\b|&[a-zA-Z_]|0x[0-9a-fA-F]+/i;
@@ -1202,6 +1212,8 @@ class HeuristicsRedactor {
         // (localhost, web-01, db01).
         validator: (raw, index, text) => {
           if (!text) return true;
+          const prev = text[index - 1], next = text[index + raw.length];
+          if ((prev && !/[\s"'`(\[<,;=:]/.test(prev)) || (next && /[!#$%^&*+=~]/.test(next))) return false;
           const host = raw.slice(raw.indexOf("@") + 1);
           const lineStart = text.lastIndexOf("\n", index) + 1;
           const before = text.slice(lineStart, index);

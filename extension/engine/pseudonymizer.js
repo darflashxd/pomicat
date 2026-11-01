@@ -141,6 +141,22 @@ function parseFinancialAmount(raw) {
     return (total + current) * ({ribu:1e3,juta:1e6,miliar:1e9}[spoken[2]]);
   }
   if (clean.includes("half a mil") && !/\d/.test(clean)) return 500000;
+  // English number words before a currency word: "fifteen thousand dollars" = 15000
+  const english = /^((?:[a-z]+[\s-]+)+?)(?:dollars?|bucks|euros?|pounds?|rupees?|rupiah|ringgit|yen)$/.exec(clean);
+  if (english && !/\d/.test(clean)) {
+    const units = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,
+      fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+    let total = 0, current = 0, seen = false;
+    for (const w of english[1].trim().split(/[\s-]+/)) {
+      if (w === "and") continue;
+      if (w === "a") { current += 1; continue; }
+      if (Object.hasOwn(units, w)) { current += units[w]; seen = true; }
+      else if (w === "hundred") { current = (current || 1) * 100; seen = true; }
+      else if (w === "thousand" || w === "million" || w === "billion") { total += (current || 1) * {thousand:1e3,million:1e6,billion:1e9}[w]; current = 0; seen = true; }
+      else return 0;
+    }
+    return seen ? total + current : 0;
+  }
   const match = /\d(?:[\d.,'’ \u00a0\u202f]*\d)?/.exec(clean);
   if (!match) return 0;
   const before = clean.slice(0, match.index);
