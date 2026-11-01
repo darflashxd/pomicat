@@ -1230,7 +1230,8 @@ class SafeShareModal {
         ? `Possible ${(candidate.modelLabel || "personal information").toLowerCase().replace(/_/g, " ")}`
         : /^Possible amount/i.test(candidate.reason || "") ? "Possible amount" : "Possibly sensitive value";
       reason.textContent += candidate.source === "model" && Number.isFinite(candidate.modelScore)
-        ? ` · Model score ${Math.round(candidate.modelScore * 100)}%` : " · Rule-based";
+        // The score says how sure the model is of the kind (a place), not that it is about the writer
+        ? ` · ${Math.round(candidate.modelScore * 100)}% sure it is a ${(candidate.modelLabel || "name").toLowerCase().replace(/_/g, " ").replace(/^location$/, "place")}${isRedacted ? "" : ", not linked to you"}` : " · Rule-based";
       const state = document.createElement("span");
       state.className = "maybe-description";
       state.textContent = `Found ${candidate.occurrences.length === 1 ? "once" : `${candidate.occurrences.length} times`} · ${isRedacted ? "Hidden" : "Visible"} in shared copy`;
