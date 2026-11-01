@@ -160,3 +160,42 @@ for (const prefix of ['password is ', 'My email password is ', 'PWD=']) {
   assert(out.includes('ten dollars') && out.includes('one of my friends'), 'impersonal amounts and ordinary words stay');
 }
 console.log('credential boundaries: prose after password:, symbol passwords, backup/CVV codes, clause addresses, word amounts passed');
+
+// IDs kept whole, sort codes, seed phrase, SWIFT optional, Bitcoin "is" not an address
+{
+  const s = text => scanner.scan(text).sanitizedText;
+  for (const [text, value] of [['My Aadhaar number is 1234 5678 9012', '5678'], ['My German tax ID is 12 345 678 901', '12 345'],
+    ['My National Insurance number is QQ 12 34 56 C', '34 56'], ['My Japanese My Number card ID is 9876 5432 1098', '5432'],
+    ['My Dutch BSN is 111222333', '111222333'], ['My UK sort code is 12-34-56', '12-34-56']]) assert(!s(text).includes(value), `${value} left in ${s(text)}`);
+  assert.equal(s('My number is 0812-3456-7890'), 'My number is [REDACTED_PHONE]');
+  assert(s('Wire it to SWIFT DEUTDEFF').includes('DEUTDEFF'), 'SWIFT/BIC is optional');
+  assert.equal(s('My seed phrase is abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'), 'My seed phrase is [REDACTED_MNEMONIC_SEED_PHRASE]');
+  assert.equal(scanner.scan('My Bitcoin address is 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa').detections.length, 1, 'only the wallet, no address');
+}
+// Addresses: one per line, city included, countries and ordinary words kept
+{
+  const s = text => scanner.scan(text).sanitizedText;
+  const block = 'I live at 10 Merdeka Street, Jakarta. Please make the fastest route\nI live at 221B Baker Street, London NW1 6XE. Please plan my commute\nMy friend lives at 42 Wallaby Way, Sydney NSW 2000\nShip it to 350 Fifth Avenue, Apt 4B, New York, NY 10118 (leave at the door)\nI\'m at 1600 Pennsylvania Avenue NW';
+  const out = s(block);
+  assert.equal(out.split('\n').length, 5, 'one address per line');
+  for (const leak of ['Merdeka', 'Jakarta', 'Baker', 'Wallaby', 'Sydney', 'Fifth', 'Pennsylvania']) assert(!out.includes(leak), `${leak} left in ${out}`);
+  assert(out.includes('Ship it to') && out.includes('(leave at the door)') && out.includes('Please plan my commute'));
+  assert(s('Shipping address: Flat 12, Baker Street, London NW1 6XE, United Kingdom.').includes('United Kingdom'), 'country stays');
+  for (const keep of ['I am at work 9 hours a day', "I'm at level 5", 'I live in Bandung and work as a nurse']) assert.equal(s(keep), keep);
+}
+// A line break ends a sentence, so another line's "my" does not make a follower count money
+{
+  const R = require('../extension/engine/symbolic_rewriter.js');
+  const r = new (R.SymbolicRewriter || R)();
+  const block = 'I have 500 followers and a target of 10,000 by 2026\nApple reported revenue of $383 billion last year\nHow do I protect my SSN online?';
+  assert.deepEqual(r.analyze(block).detectedItems.map(d => d.raw), []);
+  assert.deepEqual(r.analyze('My salary is\n$5,000 a month').detectedItems.map(d => d.raw), ['$5,000'], 'a wrapped sentence still counts');
+}
+// Figures derived from a before-sending symbol are hidden when its value is known
+{
+  const P = require('../extension/engine/pseudonymizer.js');
+  const turns = [{ role: 'user', content: 'User: I earn <S16> a year.\nAssistant: <S16> / 12 is about $7,083.33 per month. You keep $5,312.50 after 25% tax.' }];
+  const { anonymizedTurns } = new P().anonymizeConversation(turns, [], [], { extraSecrets: [85000] });
+  for (const leak of ['7,083.33', '5,312.50']) assert(!anonymizedTurns[0].content.includes(leak), `${leak} left: ${anonymizedTurns[0].content}`);
+}
+console.log('credential boundaries: national IDs, addresses, line sentences, symbol-derived figures passed');

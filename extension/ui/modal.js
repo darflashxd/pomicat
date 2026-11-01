@@ -122,8 +122,9 @@ class SafeShareModal {
     return this.hardEntities.get(key);
   }
 
-  open(turns) {
+  open(turns, { symbolValues = [] } = {}) {
     this.removeExisting();
+    this.symbolValues = symbolValues.filter(v => Number.isFinite(v) && v > 0);
     this.customSelections.clear();
     this.customCounter = 0;
     this.currentTurns = turns.map(({ role, content }) => ({ role, content: this.transcript.normalize(content) }));
@@ -830,6 +831,7 @@ class SafeShareModal {
         masterEntityMap: this.masterEntityMap,
         disabledLeaks,
         disabledFinancialVals,
+        extraSecrets: this.symbolValues || [],
         keepNames: trusted,
         labelLeak: raw => this.financialLeakLabel(raw)
       }

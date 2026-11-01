@@ -1383,14 +1383,15 @@ class ConsistentPseudonymizer {
     // Phase 3: Adversary-Oracle Reconstruction Solver
     // Evaluates all visible numbers against known secret values and suppresses derived leaks
     const disabledFinancialVals = (options.disabledFinancialVals || []);
-    const financialSecrets = financialNums
-      .map(f => f.val)
+    // extraSecrets: values behind before-sending symbols (<S1>) that appear in the chat
+    const financialSecrets = [...financialNums.map(f => f.val), ...(options.extraSecrets || [])]
       .filter(v => !disabledFinancialVals.some(dv => Math.abs(v - dv) / v <= 0.01));
     const allSolverLeaks = [];
     if (financialSecrets.length > 0) {
       const solver = new AdversaryOracleSolver();
       for (let turn of updatedTurns) {
-        if (turn.content && turn.role === "assistant") {
+        // A user message that pastes a conversation ("Assistant: …") carries derived figures too
+        if (turn.content && (turn.role === "assistant" || /^\s*assistant\s*:/im.test(turn.content))) {
           turn.content = solver.solveAndRedact(turn.content, financialSecrets, options.disabledLeaks || [], options.labelLeak);
           if (solver.lastLeaks && solver.lastLeaks.length > 0) {
             turn.solverLeaks = [...solver.lastLeaks].sort((a, b) => (a.start || 0) - (b.start || 0));
