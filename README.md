@@ -14,8 +14,8 @@
 <h3 align="center">Share the content. Not the secrets.</h3>
 
 <p align="center">
-  <i>Shared AI chats ended up in Google in 2025. PomiCat links can't be read by crawlers,<br>
-  and the copy inside is properly redacted.</i>
+  <i>Shared ChatGPT and Claude chats keep ending up in Google, most recently in July 2026.<br>
+  PomiCat links can't be read by crawlers, and the copy inside is properly redacted.</i>
 </p>
 
 <p align="center">
@@ -60,9 +60,10 @@
 
 ## The problem
 
-In 2025, shared ChatGPT conversations turned up in Google: a share link is an ordinary web page,
-so anything on it can be crawled and indexed. PomiCat links carry their key after the `#`, which
-never reaches a server. A crawler, or anyone without the full link, gets an empty page and
+Shared ChatGPT chats turned up in Google in 2025, and shared Claude chats in 2025 and again in
+July 2026. A share link is an ordinary web page, and the fixes were "please don't index" signals:
+the readable chat stays on the server for any crawler, archive or person who finds the link.
+PomiCat links carry their key after the `#`, which never reaches a server. A crawler, or anyone without the full link, gets an empty page and
 ciphertext, and the page only opens on a real click. [`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js)
 checks this on every run by fetching chat and document links as Googlebot.
 
