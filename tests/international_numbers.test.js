@@ -57,4 +57,15 @@ assert(!solver.solveAndRedact("USD 5,000.50", [5000.5]).includes("5,000.50"), "d
 const patterns = p.buildEquivalenceVariants("USD 5,000.50", "SENSITIVE_FINANCIAL").map(s => new RegExp(s, "i"));
 assert(patterns.some(re => re.test("5.000,5")), "cross-locale variant");
 assert(!patterns.some(re => re.test("5,000X5") || re.test("5000X5")), "decimal dots never regex wildcards");
+// Indian grouping and dollar prefixes: "I earn ₹18,00,000 per annum", "S$7,500 monthly"
+for (const [raw, value] of [["₹18,00,000", 1800000], ["Rs 1,50,000", 150000], ["₹1,50,00,000", 15000000], ["INR 18,00,000", 1800000], ["S$7,500", 7500]]) near(parse(raw), value, raw);
+{
+  const { redactTurns } = require("../bin/pomicat.js");
+  const out = redactTurns([
+    { role: "user", content: "I earn ₹18,00,000 per annum. How much is that per month?" },
+    { role: "assistant", content: "That is ₹1,50,000 a month." },
+    { role: "user", content: "I also earn S$7,500 monthly from a side job." }
+  ]).map(t => t.content).join("\n");
+  for (const leak of ["18,00,000", "1,50,000", "7,500", "₹["]) assert(!out.includes(leak), `${leak} left in: ${out}`);
+}
 console.log("international numbers: parsing, units, ambiguity, solver spans and ranges passed");

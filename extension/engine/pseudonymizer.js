@@ -149,15 +149,18 @@ function parseFinancialAmount(raw) {
   const number = match[0].replace(/[\u00a0\u202f]/g, " ").replace(/’/g, "'");
   let integer = number;
   let fraction = "";
+  // Indian grouping (lakh/crore): ₹18,00,000, Rs 1,50,00,000. Only after an Indian currency
+  // marker; a bare 1,23,456 stays ambiguous.
+  const lakh = /^\d{1,2}(?:,\d{2})+,\d{3}$/.test(number) && /(?:₹|\binr|\brs\.?)\s*$/.test(before);
   // ponytail: locale-free 1,234 / 1.234 mean thousands (also with units); 0.123 is
   // fractional. Add an explicit locale option if three-decimal amounts need disambiguation.
-  if (/[.,]/.test(number) && !/^[1-9]\d{0,2}([.,])\d{3}(?:\1\d{3})*$/.test(number)) {
+  if (/[.,]/.test(number) && !lakh && !/^[1-9]\d{0,2}([.,])\d{3}(?:\1\d{3})*$/.test(number)) {
     const i = Math.max(number.lastIndexOf("."), number.lastIndexOf(","));
     integer = number.slice(0, i);
     fraction = number.slice(i + 1);
     if (integer.includes(number[i]) || !/^\d+$/.test(fraction)) return 0;
   }
-  if (!/^\d+$/.test(integer) && !/^[1-9]\d{0,2}([.,' ])\d{3}(?:\1\d{3})*$/.test(integer)) return 0;
+  if (!lakh && !/^\d+$/.test(integer) && !/^[1-9]\d{0,2}([.,' ])\d{3}(?:\1\d{3})*$/.test(integer)) return 0;
   const unit = /^\s*(miliar|milyar|billions?|ember|crores?|juta|jt|jeti|jetong|millions?|lakhs?|lpa|rb|ribu|thousands?|grand|racks|bands|[bmk])(?![a-z])/i.exec(after);
   const u = unit ? unit[1] : "";
   const scale = /^(?:miliar|milyar|billion|ember|b$)/.test(u) ? 1e9 :
@@ -221,7 +224,7 @@ class AdversaryOracleSolver {
     }
 
     // Regex matching whole numerical tokens with currency, units, decimals, and %
-    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|[mb])(?!\w))?\s*\))|(?:(?:Rp\.?|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
+    const rx = /(?:(?:\(\s*(?:(?:Rp\.?|IDR|(?:S|A|C|NZ|HK|US)?\$|USD|€|EUR|£|GBP|CHF|SGD|₹|INR|Rs\.?)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|[mb])(?!\w))?\s*\))|(?:(?:Rp\.?|IDR|(?:S|A|C|NZ|HK|US)?\$|USD|€|EUR|£|GBP|CHF|SGD|₹|INR|Rs\.?)\s*)?\d+(?:[.,]\d+|[ '\u00a0\u202f’]\d{3}(?!\d))*(?:\s*(?:juta|jt|jeti|jetong|miliar|milyar|millions?|billions?|crores?|lakhs?|lpa|k|rb|ribu|thousands?|racks|bands|ember|%(?!\w)|[mb](?!\w)|\s+[mb]\b))?|half\s+a\s+mil\b)/gi;
     const nonFinUnits = /^\s*(?:(?:additional|more|extra|fewer|less)\s+)?(?:months?|years?|days?|hours?|weeks?|quarters?|percentage\s+points?|basis\s+points?|bps|points?|pts?|shares?|tokens?|users?|employees?|engineers?|customers?|plates?|guests?|items?|copies|cells|copies\s*\/\s*m[lL]|cells\s*\/\s*u[lL]|gwei|wei|eth|btc|sol|mmol\s*\/\s*l|mg\s*\/\s*dl|u\s*\/\s*l|gas|saham|lembar)\b/i;
     const tokens = [];
     let m;
@@ -265,7 +268,7 @@ class AdversaryOracleSolver {
       // Skip calendar years (1950-2040) unless explicitly preceded by currency symbols
       if (/^\d{4}$/.test(raw)) {
         const yNum = parseInt(raw, 10);
-        if (yNum >= 1950 && yNum <= 2040 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(raw)) {
+        if (yNum >= 1950 && yNum <= 2040 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD|₹|INR|Rs\.?)/i.test(raw)) {
           const beforeSnippet = text.substring(Math.max(0, m.index - 40), m.index).toLowerCase();
           const afterSnippet = text.substring(m.index + m[0].length, Math.min(text.length, m.index + m[0].length + 20)).toLowerCase();
           const isExplicitFinancial = /(?:rent|salary|gaji|income|pay|bonus|debt|owe|making|earning|take-home|spending|spent|balance|cost|fee|bill|charge|saving|tabungan)\s+(?:is\s+|of\s+)?$/i.test(beforeSnippet) || /^\s*(?:\/month|\/mo|\/year|\/bulan|per\s+month|per\s+year)/i.test(afterSnippet);
@@ -288,7 +291,7 @@ class AdversaryOracleSolver {
           end: m.index + m[0].length,
           val: val,
           isRatio: isRatio,
-          isSmallInt: !isRatio && val <= 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(raw)
+          isSmallInt: !isRatio && val <= 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD|₹|INR|Rs\.?)/i.test(raw)
         });
       }
     }
@@ -352,7 +355,7 @@ class AdversaryOracleSolver {
       if (secret < 100) continue;
 
       for (const token of tokens) {
-        if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD)/i.test(token.raw))) continue;
+        if (token.isRatio || token.isSmallInt || (token.val < 100 && !/(?:Rp|IDR|\$|USD|€|EUR|£|GBP|CHF|SGD|₹|INR|Rs\.?)/i.test(token.raw))) continue;
         if (codeBlocks.some(([s, e]) => token.start >= s && token.start < e)) continue;
         // A public-looking label cannot override a direct relation to a known secret.
         const directRelation = secretValues.some(value => Math.abs(token.val - value) / value <= this.tolerance ||
