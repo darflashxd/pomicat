@@ -602,8 +602,11 @@ class HeuristicsRedactor {
         id: "DATABASE_URI",
         name: "Database Credentials URI",
         category: "CREDENTIALS",
-        regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)(?::\/\/|%3A%2F%2F)[^:\s'"]*:[^@\s'"]+@[^\s/:'"]+(?::\d+)?(?:\/[^\s'"]*)?/gi,
-        replacement: "postgresql://postgres:placeholder_password@localhost:5432/sandbox_db"
+        // Only the password is secret. Scheme, user, host, port and database stay so the AI can still
+        // help with the command, including the host: it is what connection questions are about.
+        valueGroup: 2,
+        regex: /(\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|mssql|sqlserver|clickhouse|cockroachdb)(?::\/\/|%3A%2F%2F)[^:@\s'"\/]*:)([^@\s'"]+)(@[^\s\/:'"]+(?::\d+)?(?:\/[^\s'"]*)?)/gi,
+        replacement: "$1[REDACTED_PASSWORD]$3"
       },
       // 10b. CLI Curl / Basic Auth Credentials (-u user:password)
       {
@@ -627,6 +630,8 @@ class HeuristicsRedactor {
         name: "Environment Variable Secret",
         category: "CREDENTIALS",
         regex: /\b((?:[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_KEY)|DATABASE_URL|DB_URL|AWS_SECRET_ACCESS_KEY|SECRET_ACCESS_KEY|API_SECRET|DB_PASS(?:WORD)?|PASSWORD|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|APP_SECRET|CLIENT_SECRET)\s*=\s*)(?!\$\{[^}\n]+\}|\$[A-Za-z_]\w*)([^\s\r\n'"]{8,})/gi,
+        // DATABASE_URL=postgres://user:pass@host/db: the connection-string rule hides only the password
+        validator: (raw) => !/^[^=]*=\s*[a-z][a-z0-9+]*:\/\/[^:@\s\/]*:[^@\s]+@/i.test(raw),
         replacement: "$1[REDACTED_SECRET]"
       },
       // 10d-2. Passwords on the command line: mysql -pSECRET / --password=SECRET, sshpass -p SECRET

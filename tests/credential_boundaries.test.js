@@ -251,3 +251,20 @@ console.log('credential boundaries: network, internal hosts, Telegram, multi-lin
   const s = line.indexOf("number is");
   assert(!Maybe.scan([{ role: "user", content: line }], [{ turnIndex: 0, start: s, end: s + 9, label: "PASSPORT", score: 0.9 }]).length, "model ID span without digits");
 }
+
+{
+  // Connection strings: only the password goes, so the AI still sees scheme, user, host, port, db
+  const { redactTurns } = require("../bin/pomicat.js");
+  for (const [input, want] of [
+    ["psql postgresql://admin:S3cretPass@10.0.0.20:5432/app", "psql postgresql://admin:[REDACTED_PASSWORD]@10.0.0.20:5432/app"],
+    ["redis://:hunter2pw@cache.corp.internal:6379/0", "redis://:[REDACTED_PASSWORD]@cache.corp.internal:6379/0"],
+    ["mongodb+srv://app:p%40ss@cluster0.mongodb.net/prod", "mongodb+srv://app:[REDACTED_PASSWORD]@cluster0.mongodb.net/prod"]
+  ]) assert.equal(redactTurns([{ role: "user", content: input }])[0].content, want);
+}
+
+{
+  // Compose env: DATABASE_URL= keeps its URL, only the password goes
+  const { redactTurns } = require("../bin/pomicat.js");
+  const out = redactTurns([{ role: "user", content: "environment:\n  - DATABASE_URL=postgres://admin:S3cretPass@10.0.0.20:5432/app\n  - REDIS_URL=redis://:S3cretPass@10.0.0.30:637\n  - API_TOKEN=abcdEFGH12345678" }])[0].content;
+  assert(!out.includes("S3cretPass") && out.includes("DATABASE_URL=postgres://admin:[REDACTED_PASSWORD]@") && out.includes("API_TOKEN=[REDACTED_SECRET]"), out);
+}

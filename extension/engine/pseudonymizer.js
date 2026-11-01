@@ -1095,6 +1095,11 @@ class ConsistentPseudonymizer {
             try { values.push(decodeURIComponent(uri[1])); } catch (_) {}
           }
           if (hd.type === "CLI_BASIC_AUTH") values.push(token.slice(token.indexOf(":") + 1));
+          // A connection string's token is already just its password ("p%40ss" may be echoed decoded)
+          if (hd.type === "DATABASE_URI" && !uri) {
+            values.push(token);
+            try { values.push(decodeURIComponent(token)); } catch (_) {}
+          }
           if (/PASSWORD|SECRET|CREDENTIAL/.test(hd.type) && token.length >= 8) values.push(token.replace(/[.,;]+$/, ""));
           for (const value of new Set(values.filter(v => v.length >= 8))) {
             heuristicRules.push({regexStr: `(?<![\\p{L}\\p{N}_])${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}_])`, replacement: "[REDACTED_SECRET]", length: value.length, isDerived: false});
