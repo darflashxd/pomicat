@@ -1414,10 +1414,9 @@ class ConsistentPseudonymizer {
       }
     }
 
-    // A hidden birth date is undone by "I am 28" + the current year, or "in 2020 at 22":
-    // once a birth date is redacted anywhere, hide stated ages everywhere too.
-    // Also the before-sending placeholders ([DOB_1]): a stated age with a hidden birth date gives the year
-    if (updatedTurns.some(t => /\[(?:REDACTED_)?DOB(?:_\d+)?\]/.test(t.content))) {
+    // A stated age is personal on its own ("I'm 28 years old"), and with a birth date it gives the
+    // year ("I am 28" + the current year, "in 2020 at 22"), so it is always hidden
+    {
       for (const t of updatedTurns) {
         t.content = t.content
           .replace(new RegExp(AGE_PATTERNS.age.source, "gi"), (m, n) => m.replace(n, "[REDACTED_AGE]"))

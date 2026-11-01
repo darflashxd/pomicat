@@ -20,8 +20,8 @@ assert(!/\b28\b|\bat 22\b/.test(out), out);
 assert(out.includes("[REDACTED_DOB]") && out.includes("[REDACTED_AGE]"), out);
 assert.deepStrictEqual(inferBirthYears(out, { now: 2026 }), [], "nothing left to infer: " + out);
 
-// No birth date redacted: ages stay (they're harmless alone)
-const kept = redactTurns([{ role: "user", content: "I am 28 years old and want to learn piano." }])[0].content;
-assert(kept.includes("28"), kept);
+// No birth date: a stated age is still hidden, other small numbers stay
+const alone = redactTurns([{ role: "user", content: "I am 28 years old and want to learn piano. I'm 5 minutes away." }])[0].content;
+assert(!/28/.test(alone) && alone.includes("[REDACTED_AGE]") && alone.includes("5 minutes"), alone);
 
 console.log("birth year: all checks passed");

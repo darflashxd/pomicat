@@ -717,7 +717,7 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 .turn-header {
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: var(--ss-text-primary);
+  color: var(--ss-accent-emerald); /* PomiCat lavender on dark sites, violet on light ones */
   margin-bottom: 3px;
   font-size: 11.5px;
 }
