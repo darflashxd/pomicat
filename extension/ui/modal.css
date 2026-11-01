@@ -382,9 +382,9 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 }
 
 .btn-toggle-inspector.active {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #60a5fa;
+  background: rgba(185, 166, 255, 0.15);
+  border-color: rgba(185, 166, 255, 0.4);
+  color: #b9a6ff;
 }
 
 .inspector-gear-icon {
@@ -448,7 +448,7 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 }
 
 .btn-drawer-action:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(139, 109, 255, 0.1);
   text-decoration: underline;
 }
 
@@ -1150,9 +1150,9 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 
 /* Identifiers shown again on your screen only (the AI received a placeholder) */
 .ss-local-compute.ss-id-restored {
-  background: rgba(59, 130, 246, 0.16);
-  color: #93c5fd;
-  border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
+  background: rgba(185, 166, 255, 0.16);
+  color: #c4b5fd;
+  border-bottom: 1px dashed rgba(196, 181, 253, 0.6);
   cursor: help;
 }
 #safeshare-maybe-review {
@@ -1381,7 +1381,7 @@ html[data-ss-theme="light"] .ss-katex-hydrated {
   border-color: rgba(5, 150, 105, 0.35);
 }
 html[data-ss-theme="light"] .ss-local-compute.ss-id-restored {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border-bottom-color: rgba(29, 78, 216, 0.5);
+  background: rgba(139, 109, 255, 0.1);
+  color: #4b32c4;
+  border-bottom-color: rgba(75, 50, 196, 0.5);
 }
