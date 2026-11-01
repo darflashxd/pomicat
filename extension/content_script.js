@@ -1335,6 +1335,7 @@
       let added = 0;
       const fresh = [];
       const occurrences = new Map();
+      const order = []; // this pass's messages in page order
       const nodes = [...root.querySelectorAll(messageSelector)].filter(node =>
         !isComposerOrSafeShareUI(node) && !node.parentElement?.closest(messageSelector));
       for (const node of nodes) {
@@ -1374,14 +1375,25 @@
           } else if (content.length > existing.content.length) {
             existing.content = content; // a streamed answer grew between passes
           }
+          order.push(existing);
           continue;
         }
         const item = { key, role, content };
         byKey.set(key, item);
-        messages.push(item);
+        order.push(item);
         fresh.push(source);
         added++;
       }
+      // Place new messages by page position, not discovery time: an answer whose text renders
+      // only once scrolled into view would otherwise land after every later question.
+      const known = new Set(messages);
+      order.forEach((item, i) => {
+        if (known.has(item)) return;
+        const prev = order.slice(0, i).reverse().find(x => known.has(x));
+        const next = prev ? null : order.slice(i + 1).find(x => known.has(x));
+        messages.splice(prev ? messages.indexOf(prev) + 1 : next ? messages.indexOf(next) : messages.length, 0, item);
+        known.add(item);
+      });
       return { added, fresh };
     };
     const expanded = new WeakSet();

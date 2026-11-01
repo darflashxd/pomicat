@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><title>Turn order regression</title>
+<pre id="result">Running</pre><iframe id="chat" src="fake_chat.html" style="width:100%;height:650px"></iframe>
+<script>
+// Answers whose text renders only after being scrolled into view must keep their place:
+// user, assistant, user, assistant (not user, user, user, assistant, assistant, assistant).
+document.getElementById('chat').onload=async()=>{
+ const w=document.getElementById('chat').contentWindow,d=w.document;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ try{
+  for(let i=0;i<100&&!d.getElementById('safeshare-action-pill');i++)await wait(20);
+  const t=d.getElementById('thread');
+  let html='';for(let i=1;i<=3;i++)html+=`<div data-testid="conversation-turn-u${i}"><div data-message-author-role="user" style="height:900px">Question ${i}</div></div><div data-testid="conversation-turn-a${i}"><div data-message-author-role="assistant" data-fill="Answer ${i}" style="height:900px"></div></div>`;
+  t.innerHTML=html;
+  d.scrollingElement.scrollTop=d.scrollingElement.scrollHeight;
+  t.querySelectorAll('[data-fill]')[2].textContent='Answer 3';
+  w.setInterval(()=>t.querySelectorAll('[data-fill]').forEach(n=>{const r=n.getBoundingClientRect();if(r.top<w.innerHeight&&r.bottom>0&&!n.textContent&&!n.dataset.t){n.dataset.t=1;w.setTimeout(()=>n.textContent=n.dataset.fill,700);}}),30);
+  w.confirm=()=>true;
+  d.getElementById('safeshare-action-pill').click();
+  for(let i=0;i<1200&&!d.getElementById('diff-box-orig');i++)await wait(50);
+  const got=[...d.getElementById('diff-box-orig').querySelectorAll('.turn-block')].map(b=>b.innerText.replace(/\s+/g,' ').trim()).join(' | ');
+  const want='[USER]: Question 1 | [ASSISTANT]: Answer 1 | [USER]: Question 2 | [ASSISTANT]: Answer 2 | [USER]: Question 3 | [ASSISTANT]: Answer 3';
+  if(got!==want)throw Error(got);
+  document.getElementById('result').textContent='PASS: late-rendered answers stay in page order. No uploads.';
+ }catch(e){document.getElementById('result').textContent='FAIL: '+e.message;}
+};
+</script>
