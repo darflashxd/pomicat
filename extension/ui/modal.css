@@ -120,7 +120,9 @@ html[data-ss-theme="light"] #safeshare-attack-check .attack-fail { color: #a61b1
 html[data-ss-theme="light"] #safeshare-attack-check .attack-note { color: #4a535d; }
 html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { background: rgba(123, 92, 255, 0.12); color: #3b2a8f; border-color: rgba(123, 92, 255, 0.45); }
 #safeshare-modal-card :is(button, select, summary):focus-visible { outline: 2px solid #b9a6ff; outline-offset: 3px; }
-#safeshare-modal-card input[type="checkbox"] { accent-color: #7b5cff; }
+/* Chat sites reset checkbox styles (ChatGPT hides them with appearance: none); draw ours explicitly */
+#safeshare-modal-card input[type="checkbox"] { accent-color: #7b5cff; appearance: auto !important; -webkit-appearance: checkbox !important; width: 15px !important; height: 15px !important; opacity: 1 !important; position: static !important; margin: 0 !important; flex-shrink: 0; cursor: pointer; }
+#safeshare-modal-card .ss-compare-control, #safeshare-modal-card label:has(> input[type="checkbox"]) { cursor: pointer; }
 #safeshare-modal-card .ss-protection-settings summary::marker { color: #9d87f0; }
 #safeshare-modal-card .safeshare-summary-card { background: transparent; border-radius: 0; box-shadow: none; }
 #safeshare-modal-card .summary-icon-wrap { background: transparent; }
@@ -734,9 +736,10 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 
 /* Interactive Badges in Sanitized Box */
 .ss-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  /* Inline, not flex: a badge around multi-line text must wrap like text, not lay lines out as columns */
+  display: inline;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 11.5px;
@@ -771,6 +774,7 @@ html[data-ss-theme="light"] #safeshare-modal-card .ss-badge-redacted { backgroun
 }
 
 .ss-badge-icon {
+  margin-left: 4px;
   font-size: 9px;
   opacity: 0.8;
   user-select: none;
