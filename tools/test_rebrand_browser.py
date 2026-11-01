@@ -33,6 +33,8 @@ with sync_playwright() as p:
             args=[f'--disable-extensions-except={EXT}', f'--load-extension={EXT}'])
         worker = context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
         before = worker.evaluate('''async () => {
+          // A just-started worker can run before chrome.storage is attached (flaky on CI)
+          for (let i = 0; i < 100 && !globalThis.chrome?.storage?.local; i++) await new Promise(r => setTimeout(r, 50));
           const data={safeshare_settings:{profile:'trusted'},safeshare_relay:'http://127.0.0.1:8788',
             safeshare_own_synthetic:{ct:'synthetic-ciphertext',expMs:4102444800000},
             document_share_revoke_synthetic:{shareId:'synthetic',token:'fictional-token'},
