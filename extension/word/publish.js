@@ -108,7 +108,7 @@ async function publishSanitized() {
       uploadError.code = (result && result.code) || "UPLOAD_FAILED";
       throw uploadError;
     }
-    PublishState.last = { relayUrl: cryptoEngine.relayBaseUrl, shareId: encrypted.shareId, token: result.data.revoke_token };
+    PublishState.last = { relayUrl: cryptoEngine.relayBaseUrl, shareId: encrypted.shareId, token: result.data.revoke_token, kind: "document", createdAt: Date.now() };
     await api.storage.local.set({ ["document_share_revoke_" + encrypted.shareId]: PublishState.last });
     document.getElementById("share-link").value = encrypted.fullShareUrl;
     document.getElementById("link-result").hidden = false;

@@ -128,11 +128,20 @@ async function legacyLinks() {
     const stored = await api.storage.local.get(null);
     const expired = Object.entries(stored).filter(([k,v]) => k.startsWith("chat_share_revoke_") && v?.expiresAt <= Date.now()).map(([k]) => k);
     if (expired.length) await api.storage.local.remove(expired);
-    const shares = [...Object.entries(stored).filter(([k])=>(k.startsWith("document_share_revoke_") || k.startsWith("chat_share_revoke_")) && !expired.includes(k)).map(([,v])=>v),...(stored.document_share_revocations || [])];
+    const shares = [...Object.entries(stored).filter(([k])=>(k.startsWith("document_share_revoke_") || k.startsWith("chat_share_revoke_")) && !expired.includes(k)).map(([k,v])=>({kind:k.startsWith("chat_")?"chat":"document",...v})),...(stored.document_share_revocations || [])]
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     $("legacy").replaceChildren();
     if (!shares.length) { $("legacy").textContent = "No earlier chat or document links stored on this device."; return; }
     for (const share of shares) {
-      const button = document.createElement("button");button.textContent = `Revoke ${share.shareId}`;
+      // Title and dates make links tell-apart; links saved before this have only their id
+      const day = (ms) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+      const row = document.createElement("div");row.className = "legacy-row";
+      const label = document.createElement("span");
+      label.textContent = [share.title || (share.kind === "document" ? "Document link" : "Chat link"),
+        share.createdAt ? `created ${day(share.createdAt)}` : `id ${String(share.shareId).slice(0, 8)}`,
+        share.expiresAt ? `expires ${day(share.expiresAt)}` : ""].filter(Boolean).join(" · ");
+      const button = document.createElement("button");button.textContent = "Revoke";
+      button.setAttribute("aria-label", `Revoke ${label.textContent}`);
       button.addEventListener("click",async()=>{
         button.disabled = true;
         try {
@@ -145,7 +154,7 @@ async function legacyLinks() {
           if(current.document_share_revocations)await api.storage.local.set({document_share_revocations:current.document_share_revocations.filter(s=>s.shareId!==share.shareId)});
           await legacyLinks();$("status").textContent = "Earlier link revoked. Saved copies cannot be recalled.";
         } catch (_) { button.disabled=false;$("error").textContent="Revocation failed. Retry; the link may still exist until expiry.";$("error").hidden=false; }
-      });$("legacy").append(button);
+      });row.append(label, button);$("legacy").append(row);
     }
   } catch (_) { $("legacy").textContent="Saved revocation controls could not be loaded. Retry after reloading the extension."; }
 }

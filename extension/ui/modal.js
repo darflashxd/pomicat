@@ -1867,7 +1867,9 @@ class SafeShareModal {
           try {
             const api = typeof browser !== "undefined" ? browser : chrome;
             await api.storage.local.set({ [`chat_share_revoke_${encResult.shareId}`]: {
-              relayUrl, shareId: encResult.shareId, token: revokeToken, expiresAt: encResult.expMs
+              relayUrl, shareId: encResult.shareId, token: revokeToken, expiresAt: encResult.expMs,
+              // Shown in the toolbar page's list of earlier links; kept on this device only
+              title: String(document.title || "").replace(/\s+/g, " ").trim().slice(0, 80), createdAt: Date.now()
             } });
           } catch (_) {
             if (stillOpen()) window.alert("Link created, but revocation could not be saved. Keep this dialog open to revoke it.");
