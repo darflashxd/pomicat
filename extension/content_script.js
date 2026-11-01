@@ -1742,7 +1742,8 @@
     const problems = [];
     if (!findPromptInputElement()) problems.push("chat box not found");
     if (!users) problems.push("your messages not found");
-    if (!answers) problems.push("AI answers not found");
+    // A new chat waiting on its first reply (a long "Thinking…") has no answer yet; that is normal
+    if (!answers && users > 1) problems.push("AI answers not found");
     if (answers && !document.querySelectorAll(MESSAGE_SELECTOR).length) problems.push("answers not found for on-screen values");
     healthFailures = problems.length ? healthFailures + 1 : 0;
     const ok = healthFailures < 2;
