@@ -90,6 +90,21 @@ The chats are templated and fictional. Details and limits: [LLM attacker](tools/
 [arithmetic attacker](tools/attack_bench/RESULTS.md), [evaluation report](tools/eval/RESULTS.md),
 crawler check in [`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js).
 
+### What it catches
+
+| Set | Result |
+|---|---|
+| 52 fictional chat lines with a value the writer ties to themselves: credentials, IDs, cards, contacts, own money, addresses, ages, names | 55 of 55 values hidden |
+| 15 fictional lines that must stay as written ("the average barista earns $15 an hour", "port 5432") | 15 of 15 unchanged |
+| ai4privacy held-out English, 2,000 rows, rules only | 16% of values (Presidio: 68%). Emails 99%, SSNs 86%, cards 70% |
+
+The first two rows are a development set built from cases found while testing
+([`category_gold.jsonl`](tools/eval/category_gold.jsonl), checked on every test run), not an
+independent benchmark. The third shows the limit: PomiCat's rules look for what you say about
+yourself, not every name, city or date. In the browser, a local model suggests those in the review,
+and `--presidio` adds Presidio's detectors to the command line. Details in the
+[evaluation report](tools/eval/RESULTS.md).
+
 ## How it works
 
 ```text

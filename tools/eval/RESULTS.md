@@ -155,6 +155,20 @@ Reproduced by `npm test` (`tests/maybe.test.js`, "dates benchmark"). Only birth 
 personal: an appointment date is not hidden, so its clues are left as they are. The attack finds the
 day and month within a two-year window; the year has to come from elsewhere (see §7).
 
+## 9. Re-run and a per-category check (2026-11-01, PomiCat 3.0.2 + fixes)
+
+**ai4privacy, same 2,000 held-out rows, rules only (CLI):** value recall 0.163 (was 0.094 in 2.2.0),
+token precision 0.958, token F1 0.337. Presidio unchanged at 0.684 / 0.926 / 0.792. Per label:
+emails 0.99, SSNs 0.86, cards 0.70, phones 0.55, tax numbers 0.38; names, cities, streets, dates
+and passport numbers stay at or below 0.12. The in-browser model is not part of this run.
+
+**Per-category development set** ([`category_gold.jsonl`](category_gold.jsonl), built by
+`build_category_gold.py`): 52 fictional lines with a value the writer ties to themselves and 15
+lines that must stay as written. All 55 values hidden, all 15 safe lines unchanged, token
+precision 0.947 (the misses are nearby words such as "CVV is" hidden with the value). Rules were
+tuned on cases like these, so it is a regression check, not a held-out score.
+`tests/category_gold.test.js` runs it on every `npm test`.
+
 ## What this means for the project
 
 PomiCat's value is the inversion defense, not entity detection. The natural setup is to run a
