@@ -131,7 +131,7 @@
         if (/\n/.test(spanText)) continue;
         // Field labels, and our own symbols the AI repeats bare ("0.25 * S1", "NIK_1"): the model
         // tagged S1 as a ZIP code on DeepSeek
-        if (!/[\p{L}\p{N}]/u.test(spanText) || LABEL_WORDS.test(spanText) || /^(?:password|passwd|pwd|secret|token|credential)s?$/i.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
+        if (!/[\p{L}\p{N}]/u.test(spanText) || LABEL_WORDS.test(spanText) || (ID_LABELS.test(span.label) && /^[a-z\s'-]+$/.test(spanText)) || /^(?:password|passwd|pwd|secret|token|credential)s?$/i.test(spanText) || /^<?S\d+>?$|^[A-Z]+_\d+$|^VAL_[A-Z]$/.test(spanText)) continue;
         // A person's name the model is confident about is pre-ticked (hidden unless you untick it):
         // left unticked, RedacBench's personal texts kept most names (see tools/eval/RESULTS.md §9)
         const spanRaw = text.slice(span.start, span.end);

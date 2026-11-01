@@ -112,7 +112,8 @@ class SafeShareSymbolicRewriter {
     for (const det of cDetections) {
       if (det.category === "SENSITIVE_FINANCIAL") {
         const val = this.pseudonymizer.parseFinancialValue(det.raw);
-        if (Number.isFinite(val) && Math.abs(val) >= 100) {
+        // Small amounts are usually prices, but an hourly or daily wage ("$42 an hour") is income
+        if (Number.isFinite(val) && (Math.abs(val) >= 100 || /\b(?:an|per|a)\s*(?:hour|hr|day|shift)\b/i.test(det.sentence || ""))) {
           if (this.isWithinDependencyDistance(text, det.raw, 12)) {
             detectedItems.push({
               raw: det.raw,

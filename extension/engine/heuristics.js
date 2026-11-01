@@ -804,6 +804,8 @@ class HeuristicsRedactor {
         name: "Driver License",
         category: "GOV_ID",
         regex: /(?:<driver_license>([^<]+)<\/driver_license>|["']?(?:driver_license|drivers_license|driver_licence|driving_licence|dl)["']?\s*[:=]\s*["']?([A-Z0-9.-]{6,25})["']?|\b((?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*)([A-Z0-9]{1,6}[- .]?[A-Z0-9]{3,10}(?:[- .][A-Z0-9]{1,8})*|[0-9]{6,18})\b)/gi,
+        // A license number has digits: "driver's license number is [DRIVER_LICENSE_1]" matched "number is"
+        validator: (raw) => /\d/.test(raw),
         replacement: (raw) => {
           const m = /^([^A-Z0-9<"']*(?:<driver_license>|["']?(?:driver_license|drivers_license|driver_licence|driving_licence|dl)["']?\s*[:=]\s*["']?|(?:(?:driver'?s?\s*(?:license|licence)|driving\s*licence|dl)\s*(?:#|id|number|no\.?)?)\s*(?:is|was|[:=\-~])*\s*))/i.exec(raw);
           const prefix = m ? m[1] : "";

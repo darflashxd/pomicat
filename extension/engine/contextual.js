@@ -21,6 +21,8 @@ class ContextualClassifier {
   constructor() {
     // Contextual trigger patterns (1st & 2nd person, Casual, Advice, & Elliptical)
     this.personalAnchors = [
+      // An hourly or daily wage: "I get paid $42 an hour", "I charge $80 per hour"
+      /\b(?:i|we)\s+(?:get|got|am|are|was|were)\s+paid\b|\b(?:i'm|we're)\s+paid\b|\b(?:i|we)\s+(?:make|earn|charge|bill)\b[^.!?\n]{0,30}\b(?:an|per|a|\/)\s*(?:hour|hr|day|shift|week)\b/i,
       // The writer's own condition ("I'm pregnant", "saya sedang hamil", "I have diabetes")
       /\b(?:i\s*['’]?m|i\s+am|i\s+have|i\s+was|saya|aku)\s+(?:\w+\s+){0,2}(?:pregnant|hamil|diabetic|diabetes|bipolar|schizophreni[ac]|skizofrenia|depresi|hiv(?:[- ]positive)?)\b/i,
       /\b(?:gaji|penghasilan|upah|bonus|take home pay|thp|kompensasi|uang saku|pendapatan|tunjangan|remunerasi)(?:\s+\w+)?\s*(?:saya|ku|kami|Anda|kamu|mu|gw|gue|aku)?\b/i,

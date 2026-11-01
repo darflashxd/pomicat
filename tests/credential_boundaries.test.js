@@ -234,3 +234,20 @@ console.log('credential boundaries: network, internal hosts, Telegram, multi-lin
   const pub = new Rewriter(new Vault()).rewrite("Banks usually charge an administration fee of Rp4,800,000 on a typical loan.");
   assert(!pub.sanitizedPrompt || pub.sanitizedPrompt.includes("Rp4,800,000"), pub.sanitizedPrompt);
 }
+
+{
+  // Hourly wage and ID lines that already carry before-sending placeholders
+  const { redactTurns } = require("../bin/pomicat.js");
+  const Rewriter = require("../extension/engine/symbolic_rewriter.js");
+  const Vault = require("../extension/engine/symbolic_vault.js");
+  const wage = redactTurns([{ role: "user", content: "I get paid $42 an hour, about 30 hours a week" }])[0].content;
+  assert(!wage.includes("$42"), wage);
+  assert(redactTurns([{ role: "user", content: "I paid $42 for dinner" }])[0].content.includes("$42"));
+  assert(!/\$42/.test(new Rewriter(new Vault()).rewrite("I get paid $42 an hour").sanitizedPrompt || ""));
+  const ids = redactTurns([{ role: "user", content: "My Dutch BSN is 111222333\nMy driver's license number is [DRIVER_LICENSE_1]" }])[0].content;
+  assert(!ids.includes("111222333") && ids.includes("license number is [DRIVER_LICENSE_1]"), ids);
+  const Maybe = require("../extension/engine/maybe.js");
+  const line = "My passport number is [PASSPORT_1]";
+  const s = line.indexOf("number is");
+  assert(!Maybe.scan([{ role: "user", content: line }], [{ turnIndex: 0, start: s, end: s + 9, label: "PASSPORT", score: 0.9 }]).length, "model ID span without digits");
+}
