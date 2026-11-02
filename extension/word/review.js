@@ -151,10 +151,30 @@ function renderPreview(doc) {
     if (block.rows) {
       for (const [label, target] of [["source", source], ["sanitized", sanitized]]) {
         const table = document.createElement("table");
+        if (block.layout) {
+          const {widths, borders} = block.layout;
+          const total = widths.reduce((a, b) => a + b, 0);
+          if (total) {
+            const group = document.createElement('colgroup');
+            for (const width of widths) {
+              const col = document.createElement('col');
+              col.style.width = `${width / total * 100}%`;
+              group.append(col);
+            }
+            table.append(group);
+          }
+          for (const edge of ['top','bottom','left','right']) table.style.setProperty(`border-${edge}`, borders[edge] || 'none');
+        }
         for (const row of block.rows) {
           const tr = document.createElement("tr");
           for (const cell of row) {
             const td = document.createElement("td");
+            if (block.layout) {
+              const borders = block.layout.borders;
+              td.style.border = 'none';
+              if (tr.children.length) td.style.borderLeft = borders.insideV || 'none';
+              if (row !== block.rows[0]) td.style.borderTop = borders.insideH || 'none';
+            }
             td.innerHTML = renderTextHtml(String(cell ?? ""), findings, label === "sanitized");
             tr.append(td);
           }

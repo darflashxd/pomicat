@@ -172,6 +172,27 @@ body {
   padding: 32px 20px 120px 20px;
 }
 
+/* Document workspace; chat layout remains unchanged. */
+body.document-mode { height: 100dvh; overflow: hidden; }
+.document-mode .viewer-layout { height: 100dvh; min-height: 0; }
+.document-mode .top-nav { flex-shrink: 0; }
+.document-mode .main-container { max-width: none; min-height: 0; padding: 16px 24px; display: flex; }
+.document-mode footer { display: none; }
+.document-view { display: flex; flex-direction: column; gap: 10px; width: 100%; min-height: 0; background: var(--bg-canvas); }
+.document-view:fullscreen { padding: 16px 24px; }
+.document-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.document-toolbar h2 { font-size: 16px; font-weight: 600; }
+.document-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.document-actions button { font: inherit; font-size: 14px; min-height: 44px; padding: 8px 16px; border: 1px solid var(--border-active); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; }
+.document-actions .document-download { background: var(--accent-emerald); color: var(--text-inverse); }
+.document-actions button:focus-visible { outline: 2px solid var(--accent-emerald); outline-offset: 3px; }
+.document-note, .document-status { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.document-status:empty { display: none; }
+.document-frame { display: block; flex: 1; min-height: 0; width: 100%; border: 1px solid var(--border-active); border-radius: var(--radius-sm); background: #fff; }
+@media (max-width: 640px) {
+  .document-mode .main-container, .document-view:fullscreen { padding: 12px; }
+}
+
 /* Lock Screen State */
 .lock-card {
   background: var(--bg-surface);

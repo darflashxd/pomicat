@@ -34,6 +34,8 @@ jobs:
       - run: python tools/eval/relay_browser.py --browser firefox
       - run: python tools/test_hr_toggle_browser.py
       - run: python tools/test_rebrand_browser.py
+      - run: python tools/test_document_viewer.py
+      - run: python tools/test_word_table_preview.py
       - run: python tools/test_mapping_browser.py
       - run: python tools/test_word_review_browser.py
       - run: python tools/test_docx_privacy_browser.py

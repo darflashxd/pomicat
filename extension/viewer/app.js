@@ -204,26 +204,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (brand) brand.textContent = "Private document";
     const section = document.createElement("section");
     section.className = "document-view";
+    document.body.classList.add("document-mode");
+    const toolbar = document.createElement("div");
+    toolbar.className = "document-toolbar";
+    const heading = document.createElement("h2");
+    heading.textContent = "Document preview";
     const note = document.createElement("p");
     note.className = "document-note";
-    note.textContent = "Sanitized copy reviewed by the sender. Text preview is shown; download keeps tables, styles and images.";
+    note.textContent = "Simplified preview. Download the DOCX for document formatting and images. Reviewed by the sender; detection can miss sensitive content.";
     const frame = document.createElement("iframe");
     frame.title = "Reviewed document";
     frame.setAttribute("sandbox", "");
     frame.srcdoc = doc.preview;
-    frame.style.cssText = "width:100%;height:60vh;border:1px solid #444;background:#fff;border-radius:6px";
+    frame.className = "document-frame";
     const download = document.createElement("button");
     download.type = "button";
-    download.className = "btn-primary";
-    download.textContent = "Download sanitized DOCX";
+    download.className = "document-download";
+    download.textContent = "Download DOCX";
+    const actions = document.createElement("div");
+    actions.className = "document-actions";
+    const status = document.createElement("p");
+    status.className = "document-status";
+    status.setAttribute("role", "status");
+    if (document.fullscreenEnabled && section.requestFullscreen) {
+      const fullscreen = document.createElement("button");
+      fullscreen.type = "button";
+      fullscreen.textContent = "Full screen";
+      fullscreen.addEventListener("click", async () => {
+        try {
+          if (document.fullscreenElement === section) await document.exitFullscreen();
+          else await section.requestFullscreen();
+          status.textContent = "";
+        } catch (_) { status.textContent = "Full screen is unavailable. You can still read and download the document."; }
+      });
+      document.addEventListener("fullscreenchange", () => {
+        fullscreen.textContent = document.fullscreenElement === section ? "Exit full screen" : "Full screen";
+      });
+      actions.append(fullscreen);
+    }
     download.addEventListener("click", () => {
+      try {
       const bytes = Uint8Array.from(atob(doc.docx), c => c.charCodeAt(0));
       const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
       const a = document.createElement("a");
       a.href = url; a.download = "reviewed-document.docx"; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
+      status.textContent = "Download requested. Saved copies remain available after link expiry or revocation.";
+      } catch (_) { status.textContent = "Download could not be started. Try again in this browser."; }
     });
-    section.append(note, frame, download);
+    actions.append(download);
+    toolbar.append(heading, actions);
+    section.append(toolbar, note, status, frame);
     lockScreen.parentElement.append(section);
     return;
   }

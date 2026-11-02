@@ -45,16 +45,20 @@ function sanitizedPreviewHtml() {
     if (node.tagName === "P") {
       parts.push(`<p>${escapePreview(node.textContent)}</p>`);
     } else if (node.tagName === "TABLE") {
+      const borderStyle = element => ['border-top','border-bottom','border-left','border-right'].map(prop => `${prop}:${element.style.getPropertyValue(prop) || 'none'}`).join(';');
+      const cols = [...node.querySelectorAll('col')].map(col => `<col style="width:${/^\d+(?:\.\d+)?%$/.test(col.style.width) ? col.style.width : 'auto'}">`).join('');
       const rows = [...node.rows].map(row =>
-        `<tr>${[...row.cells].map(cell => `<td>${escapePreview(cell.textContent)}</td>`).join("")}</tr>`);
-      parts.push(`<table>${rows.join("")}</table>`);
+        `<tr>${[...row.cells].map(cell => `<td style="${escapePreview(borderStyle(cell))}">${escapePreview(cell.textContent)}</td>`).join("")}</tr>`);
+      parts.push(`<table style="${escapePreview(borderStyle(node))}"><colgroup>${cols}</colgroup>${rows.join("")}</table>`);
     } else if (node.tagName === "DETAILS") {
       const summary = node.querySelector("summary");
       const body = node.querySelector("p");
       parts.push(`<h4>${escapePreview(summary ? summary.textContent : "")}</h4><p>${escapePreview(body ? body.textContent : "")}</p>`);
     }
   }
-  const body = parts.join("") || "<p>This document contains no text blocks to preview.</p>";
+  // ponytail: flowing HTML preview, not Word pagination; use a local DOCX renderer if fidelity is required.
+  const previewStyle = "<style>*{box-sizing:border-box}html{background:#e7e9ec}body{width:100%;max-width:960px;min-height:100vh;margin:0 auto;padding:40px 48px;overflow-wrap:anywhere}table{table-layout:auto}td{overflow-wrap:anywhere}@media(max-width:640px){body{padding:24px 18px}td{padding:6px}}</style>";
+  const body = previewStyle + (parts.join("") || "<p>This document contains no text blocks to preview.</p>");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Reviewed document</title><style>body{font:16px/1.6 Georgia,serif;color:#1a1a1a;background:#fff;margin:0;padding:32px;max-width:820px}p{white-space:pre-wrap;margin:0 0 14px}h4{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#555;margin:18px 0 6px}table{border-collapse:collapse;width:100%;margin:0 0 16px;font-size:14px}td{border:1px solid #b9bec6;padding:8px;vertical-align:top}</style></head><body>${body}</body></html>`;
 }
 
