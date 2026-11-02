@@ -59,7 +59,7 @@ https://github.com/user-attachments/assets/71cf2b24-782b-467b-8b13-36c2831ee7e5
 Review a separate document copy, redact an image region, create an encrypted link,
 and inspect the exported DOCX. The original document is not edited.
 
-https://github.com/user-attachments/assets/48c5559d-535e-44ff-8795-40f677017d08
+https://github.com/user-attachments/assets/c437f5a6-7def-46bd-bdec-40c8d8c6a70d
 
 *Both demonstrations use fictional content. Detection can miss sensitive information;
 review the copy before sharing.*
