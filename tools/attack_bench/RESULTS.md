@@ -21,4 +21,9 @@
 
 Recovered = the attacker's answer is within 1% of the true salary. "Visible" = the redactor didn't hide the salary at all.
 
+Presidio's tested default recognizers do not target salary amounts. Total leakage includes values
+left visible, not only successful reconstruction. This comparison tests salary-related arithmetic
+coverage, not general PII detection quality. These recorded results are not rerun for every release;
+this report does not identify an exact evaluated source commit.
+
 Readable report, method and per-case transcript: `tools/attack_bench/RESULTS_LLM.md`. One attacker model only; Presidio's default recognizers don't cover financial amounts, so it leaves salaries visible.

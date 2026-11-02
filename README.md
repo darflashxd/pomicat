@@ -11,22 +11,22 @@
   <a href="https://github.com/darflashxd/pomicat/releases"><img src="https://img.shields.io/github/v/release/darflashxd/pomicat?label=release" alt="Release"></a>
 </p>
 
-<h3 align="center">Share the content. Not the secrets.</h3>
+<h3 align="center">Hide the secret. Check the clues. Encrypt the copy.</h3>
 
 <p align="center">
-  <i>Shared ChatGPT and Claude chats keep ending up in Google, most recently in July 2026.<br>
-  PomiCat links can't be read by crawlers, and the copy inside is properly redacted.</i>
+  <i>A redacted salary can still be revealed by the savings calculation below it.</i>
 </p>
 
 <p align="center">
-  A browser extension that reviews an AI chat or a document before you share it, hides private
-  details and the numbers that would give them away, and sends an encrypted copy.
+  PomiCat reviews AI chats and documents for private details and supported arithmetic clues,
+  lets you inspect the copy, then encrypts it before sharing.
 </p>
 
-- **Crawler-proof links:** the key lives after the `#`, which browsers and crawlers never send. The relay stores ciphertext; a crawler gets an empty `noindex` page.
-- **Beyond the obvious:** hides the salary, and also the "saving 20% is $1,000" line that reveals it.
-- **On your device:** rules and a small model run in the browser. Nothing leaves while you review.
-- **Chats and documents:** ChatGPT, Claude, Gemini, DeepSeek, Word Online and Google Docs.
+- **Beyond individual values:** checks supported arithmetic clues, including the "saving 20% is $1,000" line that reveals a hidden salary.
+- **Review before sharing:** compare the original and redacted copy, hide or restore findings, and manually redact missed text.
+- **Client-side encryption:** the relay stores ciphertext. The key stays after the `#` and is not included in HTTP requests to the relay.
+- **Local detection:** rules and a small model process captured chat text in the browser, without an external detection API.
+- **Chats and documents:** ChatGPT, Claude, Gemini, DeepSeek, Word Online and an experimental Google Docs integration.
 
 [Quick start](#quick-start) · [Docs](https://darflashxd.github.io/pomicat/) ·
 [Blog](https://darflashxd.github.io/pomicat/blog/) · [Releases](https://github.com/darflashxd/pomicat/releases) ·
@@ -42,6 +42,8 @@
 > Detection can miss things. Read the copy before you share it. An empty attack check means the
 > supported checks found nothing, not that the copy is anonymous. Anyone holding the complete link
 > can read the copy and save it; expiry and revocation cannot recall saved copies.
+> Recipients using the hosted viewer must trust its operator: the viewer's JavaScript can access
+> the fragment key and decrypted content. Extension recipients use a bundled viewer.
 
 ## Highlights
 
@@ -49,7 +51,7 @@
 <tr>
 <td width="33%" valign="top"><b>Side-by-side review</b><br>The original and what others will see, next to each other. Click a highlight to hide or restore it, or select any text to hide it yourself.</td>
 <td width="33%" valign="top"><b>Arithmetic checks</b><br>Finds ratios, monthly and yearly versions, projections, sums and differences of a hidden amount across the whole chat, and runs the attack before you share.</td>
-<td width="33%" valign="top"><b>Encrypted sharing</b><br>AES-256-GCM in the browser. Links expire, can burn after one read, and can be revoked. Opening needs a click, so link scanners do not use them up.</td>
+<td width="33%" valign="top"><b>Encrypted sharing</b><br>AES-256-GCM in the browser. Chat links support expiry, burn-after-reading and revocation. Explicit opening reduces accidental consumption by ordinary link previews.</td>
 </tr>
 <tr>
 <td valign="top"><b>Word Online and Google Docs</b><br>Reviews a separate DOCX copy of the document. Removes tracked changes, comments and document properties, and replaces image pixels you mark.</td>
@@ -60,12 +62,12 @@
 
 ## The problem
 
-Shared ChatGPT chats turned up in Google in 2025, and shared Claude chats in 2025 and again in
-July 2026. A share link is an ordinary web page, and the fixes were "please don't index" signals:
-the readable chat stays on the server for any crawler, archive or person who finds the link.
-PomiCat links carry their key after the `#`, which never reaches a server. A crawler, or anyone without the full link, gets an empty page and
-ciphertext, and the page only opens on a real click. [`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js)
-checks this on every run by fetching chat and document links as Googlebot.
+A readable share link can expose a conversation to anyone who obtains it. A `noindex` signal
+asks search engines not to index the page; it does not control access to its contents.
+PomiCat encrypts the reviewed copy before upload. The key travels after the `#`, outside HTTP
+requests to the relay. Fetching the URL without the key does not reveal the encrypted content.
+[`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js) checks chat and document links
+using requests with a Googlebot User-Agent. This tests HTTP responses, not every crawler's behavior.
 
 And hiding the secret is only half the job. If the assistant replied "saving 20% is $1,000", the
 hidden salary is one division away:
@@ -77,16 +79,19 @@ Assistant: Saving 20% means $1,000 per month, leaving $4,000 for expenses.
 $1,000 / 0.20 = $5,000
 ```
 
-PomiCat hides the derived figures too, then checks the copy with the same attack.
+PomiCat checks supported derived figures too, then runs an arithmetic attack check on the draft.
 
 | Check | Without PomiCat | With PomiCat |
 |---|---|---|
-| An LLM recovers a hidden salary (3 models, 4 runs of 40 fictional chats, EN + ID) | 100% after naive redaction and after Presidio | 0 of 160 |
-| Rule-based arithmetic attacker, 40 chats | 53% naive, 100% Presidio | 0% |
+| Salary visible or recoverable in LLM evaluation (3 models, 4 runs of 40 fictional chats, EN + ID) | 100% after salary-only redaction and the tested Presidio configuration | 0 of 160 |
+| Salary visible or recoverable with the rule-based arithmetic attacker, 40 English chats | 53% salary-only redaction, 100% Presidio | 0% |
 | Birth date narrowed to 4 days or fewer from weekday clues | 40 of 40 | 0 of 40 |
-| A crawler fetching a share link (chat or document) | A plain share page shows the full text | Ciphertext only, no key, `noindex` |
+| HTTP fetch without the fragment key (chat or document) | A readable share page exposes its content | Ciphertext cannot be decrypted without the key; responses use `noindex` |
 
-The chats are templated and fictional. Details and limits: [LLM attacker](tools/attack_bench/RESULTS_LLM.md),
+The chats are templated and fictional: four runs of 40 cases, not 160 independently collected
+conversations. Presidio's tested default recognizers do not target salary amounts, so these results
+show an arithmetic-leakage coverage gap, not a general ranking of PII detectors. These are published
+evaluation results, not a fresh evaluation of every release. Details and limits: [LLM attacker](tools/attack_bench/RESULTS_LLM.md),
 [arithmetic attacker](tools/attack_bench/RESULTS.md), [evaluation report](tools/eval/RESULTS.md),
 crawler check in [`tests/relay_lifecycle.test.js`](tests/relay_lifecycle.test.js).
 
@@ -156,6 +161,9 @@ The model and runtime are bundled: no Python, model download or API key needed.
 For documents, open a saved `.docx` in Word Online or a Google Doc and click the PomiCat button.
 See the [document guide](https://darflashxd.github.io/pomicat/#word).
 
+Document links support expiry and revocation, not the chat workflow's burn-after-reading option.
+The relay limits ciphertext to 512 KiB; download image-heavy documents that exceed the limit.
+
 ### Try the attack offline
 
 Node.js 18 or newer. No account, key, model or relay.
@@ -167,14 +175,16 @@ node bin/pomicat.js invert examples/chat_naive_redacted_en.txt
 node bin/pomicat.js redact examples/chat_original_en.txt | node bin/pomicat.js invert
 ```
 
-The first command recovers `$5,000`. The second prints `No hidden values recovered.`
+The first command ranks `$5,000` highest and exits with code 1 to report a recoverable value.
+The second prints `No hidden values recovered.` This applies to the supported checks on this fixture,
+not to anonymity in general. The CLI uses rules and context checks, not the browser model.
 
 ## Requirements
 
 | Need | Details |
 |---|---|
 | Browser | Chrome, Edge or Brave (Manifest V3), or Firefox 109+ |
-| Sites | ChatGPT, Claude, Gemini, DeepSeek, Word Online (SharePoint, depends on the tenant), Google Docs |
+| Sites | ChatGPT, Claude, Gemini, DeepSeek, Word Online (SharePoint, depends on the tenant), Google Docs (experimental) |
 | CLI | Node.js 18+, no dependencies |
 | Building packages | Python 3 (`python tools/build_extension.py`) |
 | Your own relay | Python 3 for the local relay, or Cloudflare Workers + D1 ([DEPLOY.md](DEPLOY.md)) |
