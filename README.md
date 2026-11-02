@@ -45,6 +45,25 @@
 > Recipients using the hosted viewer must trust its operator: the viewer's JavaScript can access
 > the fragment key and decrypted content. Extension recipients use a bundled viewer.
 
+## See PomiCat in action
+
+### AI chats: review and encrypted sharing
+
+Compare the original chat with the redacted copy, create and open an encrypted link,
+then see the optional before-sending protection on a new prompt.
+
+https://github.com/user-attachments/assets/9d2ced08-a9b6-4d8c-abde-46f44b876ac8
+
+### Word documents: review, redact and export
+
+Review a separate document copy, redact an image region, create an encrypted link,
+and inspect the exported DOCX. The original document is not edited.
+
+https://github.com/user-attachments/assets/71144fd4-7c4b-49e0-9367-d7042a2e6f5c
+
+*Both demonstrations use fictional content. Detection can miss sensitive information;
+review the copy before sharing.*
+
 ## Highlights
 
 <table>
