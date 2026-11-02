@@ -52,7 +52,7 @@
 Compare the original chat with the redacted copy, create and open an encrypted link,
 then see the optional before-sending protection on a new prompt.
 
-https://github.com/user-attachments/assets/9d2ced08-a9b6-4d8c-abde-46f44b876ac8
+https://github.com/user-attachments/assets/71cf2b24-782b-467b-8b13-36c2831ee7e5
 
 ### Word documents: review, redact and export
 
