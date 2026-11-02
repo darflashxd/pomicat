@@ -11,7 +11,7 @@
   <a href="https://github.com/darflashxd/pomicat/releases"><img src="https://img.shields.io/github/v/release/darflashxd/pomicat?label=release" alt="Release"></a>
 </p>
 
-<h3 align="center">Hide the secret. Check the clues. Encrypt the copy.</h3>
+<h3 align="center">Share the content. Not the secrets.</h3>
 
 <p align="center">
   <i>A redacted salary can still be revealed by the savings calculation below it.</i>
