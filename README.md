@@ -52,14 +52,14 @@
 Compare the original chat with the redacted copy, create and open an encrypted link,
 then see the optional before-sending protection on a new prompt.
 
-https://github.com/user-attachments/assets/71cf2b24-782b-467b-8b13-36c2831ee7e5
+https://github.com/user-attachments/assets/8038591e-b661-4704-93ee-6775d82f054b
 
 ### Word documents: review, redact and export
 
 Review a separate document copy, redact an image region, create an encrypted link,
 and inspect the exported DOCX. The original document is not edited.
 
-https://github.com/user-attachments/assets/c437f5a6-7def-46bd-bdec-40c8d8c6a70d
+https://github.com/user-attachments/assets/8d1a73ba-ec2c-45e1-8c31-e272916623b0
 
 *Both demonstrations use fictional content. Detection can miss sensitive information;
 review the copy before sharing.*
